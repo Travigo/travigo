@@ -55,6 +55,7 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 				if err = d.DecodeElement(&stopPoint, &ty); err != nil {
 					log.Fatalf("Error decoding item: %s", err)
 				} else if matchesFilter(&stopPoint) {
+					stopPoint.Location.ConvertOSGridRef()
 					naptan.StopPoints = append(naptan.StopPoints, stopPoint)
 				}
 			} else if ty.Name.Local == "StopArea" {

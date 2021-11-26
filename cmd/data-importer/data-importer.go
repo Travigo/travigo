@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/britbus/data-importer/pkg/naptan"
-	"github.com/kr/pretty"
 	"github.com/urfave/cli/v2"
 )
 
@@ -37,9 +36,9 @@ func main() {
 								return err
 							}
 
-							pretty.Println(naptanDoc.StopPoints[0])
-							// log.Println(len(naptanDoc.StopPoints))
-							// log.Println(len(naptanDoc.StopAreas))
+							// pretty.Println(naptanDoc)
+							log.Println(len(naptanDoc.StopPoints))
+							log.Println(len(naptanDoc.StopAreas))
 
 							return nil
 						},
