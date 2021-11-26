@@ -36,9 +36,11 @@ func main() {
 								return err
 							}
 
-							// pretty.Println(naptanDoc)
-							log.Println(len(naptanDoc.StopPoints))
-							log.Println(len(naptanDoc.StopAreas))
+							// pretty.Println(naptanDoc.StopPoints)
+							// log.Println(len(naptanDoc.StopPoints))
+							// log.Println(len(naptanDoc.StopAreas))
+
+							naptan.ImportNaPTANIntoMongo(naptanDoc)
 
 							return nil
 						},
