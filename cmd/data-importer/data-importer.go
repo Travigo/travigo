@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/urfave/cli/v2"
 )
@@ -26,6 +27,10 @@ func main() {
 								return errors.New("file path must be provided")
 							}
 
+							if err := database.Connect(); err != nil {
+								log.Fatal(err)
+							}
+
 							filePath := c.Args().Get(0)
 							naptanDoc, err := naptan.ParseXMLFile(filePath, naptan.BusFilter)
 
@@ -33,7 +38,7 @@ func main() {
 								return err
 							}
 
-							naptan.ImportNaPTANIntoMongo(naptanDoc)
+							naptanDoc.ImportIntoMongo()
 
 							return nil
 						},
