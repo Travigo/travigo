@@ -35,6 +35,7 @@ func getStopArea(c *fiber.Ctx) error {
 			"error": "Could not find Stop Areea matching StopAreaCode",
 		})
 	} else {
+		stopArea.GetStops()
 		return c.JSON(stopArea)
 	}
 }
