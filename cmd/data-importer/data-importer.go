@@ -5,14 +5,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/britbus/data-importer/pkg/naptan"
+	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/urfave/cli/v2"
 )
 
 func main() {
-	// log.Println("sup")
-	// naptan.ParseXMLFile("test/naptan-short-example.xml")
-
 	app := &cli.App{
 		Name: "data-importer",
 		Commands: []*cli.Command{
@@ -35,10 +32,6 @@ func main() {
 							if err != nil {
 								return err
 							}
-
-							// pretty.Println(naptanDoc.StopPoints)
-							// log.Println(len(naptanDoc.StopPoints))
-							// log.Println(len(naptanDoc.StopAreas))
 
 							naptan.ImportNaPTANIntoMongo(naptanDoc)
 

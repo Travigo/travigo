@@ -10,9 +10,9 @@ type Location struct {
 	GridType  string
 	Easting   string
 	Northing  string
-	Position  *GeoJson
-	Longitude float64 `xml:"Translation>Longitude"`
-	Latitude  float64 `xml:"Translation>Latitude"`
+	Position  *GeoJson `json:"-"`
+	Longitude float64  `xml:"Translation>Longitude"`
+	Latitude  float64  `xml:"Translation>Latitude"`
 }
 
 func (l *Location) UpdateCoordinates() {
