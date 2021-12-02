@@ -7,6 +7,8 @@ import (
 
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
+	"github.com/britbus/britbus/pkg/transxchange"
+	"github.com/kr/pretty"
 	"github.com/urfave/cli/v2"
 )
 
@@ -38,7 +40,40 @@ func main() {
 								return err
 							}
 
-							naptanDoc.ImportIntoMongo()
+							naptanDoc.ImportIntoMongoAsCTDF()
+
+							return nil
+						},
+					},
+				},
+			},
+			{
+				Name:  "transxchange",
+				Usage: "TransXChange bus route data",
+				Subcommands: []*cli.Command{
+					{
+						Name:      "import-file",
+						Usage:     "import an XML file",
+						ArgsUsage: "<file path>",
+						Action: func(c *cli.Context) error {
+							if c.Args().Len() == 0 {
+								return errors.New("file path must be provided")
+							}
+
+							// if err := database.Connect(); err != nil {
+							// 	log.Fatal(err)
+							// }
+
+							filePath := c.Args().Get(0)
+							tranxXChangeDoc, err := transxchange.ParseXMLFile(filePath)
+
+							if err != nil {
+								return err
+							}
+
+							pretty.Println(tranxXChangeDoc)
+
+							// naptanDoc.ImportIntoMongo()
 
 							return nil
 						},

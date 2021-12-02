@@ -41,6 +41,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 	stopsCollection := database.GetCollection("stops")
 	stopAreasCollection := database.GetCollection("stop_groups")
 
+	// TODO: Doesnt really make sense for the NaPTAN package to be managing CTDF tables and indexes
 	stopsIndex := []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
@@ -56,14 +57,14 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 		panic(err)
 	}
 
-	stopAreaIndex := []mongo.IndexModel{
+	stopGroupsIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "stopareacode", Value: bsonx.Int32(1)}},
+			Keys: bsonx.Doc{{Key: "identifier", Value: bsonx.Int32(1)}},
 		},
 	}
 
 	opts = options.CreateIndexes()
-	_, err = stopAreasCollection.Indexes().CreateMany(context.Background(), stopAreaIndex, opts)
+	_, err = stopAreasCollection.Indexes().CreateMany(context.Background(), stopGroupsIndex, opts)
 	if err != nil {
 		panic(err)
 	}

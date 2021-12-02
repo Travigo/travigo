@@ -52,7 +52,12 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			"NaptanCode": orig.NaptanCode,
 		},
 		PrimaryName: orig.Descriptor.CommonName,
-		OtherNames:  []string{orig.Descriptor.ShortCommonName, orig.Descriptor.Landmark, orig.Descriptor.Street},
+		OtherNames: map[string]string{
+			"ShortCommonName": orig.Descriptor.ShortCommonName,
+			"Street":          orig.Descriptor.Street,
+			"Indicator":       orig.Descriptor.Indicator,
+			"Landmark":        orig.Descriptor.Landmark,
+		},
 
 		CreationDateTime:     orig.CreationDateTime,
 		ModificationDateTime: orig.ModificationDateTime,

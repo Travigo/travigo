@@ -8,7 +8,7 @@ type Stop struct {
 	ModificationDateTime string
 
 	PrimaryName string
-	OtherNames  []string
+	OtherNames  map[string]string
 	Type        string // or an enum
 	Status      string
 	DataSource  *DataSource
