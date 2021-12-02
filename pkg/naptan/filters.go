@@ -13,7 +13,7 @@ func BusFilter(object interface{}) bool {
 		// GCLS - Clustered on-street Bus / Coach / Tram stops
 		// GBCS - Bus/Coach Station
 		// GMLT - Multimode Interchange
-		return stopAreaType == "GPBS" || stopAreaType == "GCLS" || stopAreaType == "GBCS"
+		return stopAreaType == "GPBS" || stopAreaType == "GCLS" || stopAreaType == "GBCS" || stopAreaType == "GMLT"
 	default:
 		return false
 	}

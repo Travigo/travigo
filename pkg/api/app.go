@@ -13,8 +13,8 @@ func SetupServer(listen string) {
 	stopsGroup := webApp.Group("/stops")
 	routes.StopsRouter(stopsGroup)
 
-	stopAreaGroup := webApp.Group("/stopareas")
-	routes.StopAreasRouter(stopAreaGroup)
+	stopGroupsGroup := webApp.Group("/stopgroups")
+	routes.StopGroupsRouter(stopGroupsGroup)
 
 	webApp.Listen(listen)
 }

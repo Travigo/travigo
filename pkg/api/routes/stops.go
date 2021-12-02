@@ -2,17 +2,16 @@ package routes
 
 import (
 	"context"
-	"regexp"
 
+	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func StopsRouter(router fiber.Router) {
 	router.Get("/", listStops)
-	router.Get("/:stopID", getStop)
+	router.Get("/:identifier", getStop)
 }
 
 func listStops(c *fiber.Ctx) error {
@@ -21,33 +20,18 @@ func listStops(c *fiber.Ctx) error {
 }
 
 func getStop(c *fiber.Ctx) error {
-	stopID := c.Params("stopID")
-	atcoCodeRegex := regexp.MustCompile(`^[0-9]{3}[0-1][A-Za-z0-9]{1,8}$`)
-	naptanCodeRegex := regexp.MustCompile(`^[0-9a-zA-Z]{5,9}$`)
-
-	var searchField string
-
-	if atcoCodeRegex.Match([]byte(stopID)) {
-		searchField = "atcocode"
-	} else if naptanCodeRegex.Match([]byte(stopID)) {
-		searchField = "naptancode"
-	} else {
-		c.SendStatus(400)
-		return c.JSON(fiber.Map{
-			"error": "Invalid stopID Format. Must be a Atco or NaPTAN code",
-		})
-	}
+	identifier := c.Params("identifier")
 
 	stopsCollection := database.GetCollection("stops")
-	var stopPoint *naptan.StopPoint
-	stopsCollection.FindOne(context.Background(), bson.M{searchField: stopID}).Decode(&stopPoint)
+	var stop *ctdf.Stop
+	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&stop)
 
-	if stopPoint == nil {
+	if stop == nil {
 		c.SendStatus(404)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Stop matching stopID",
+			"error": "Could not find Stop matching Stop Identifier",
 		})
 	} else {
-		return c.JSON(stopPoint)
+		return c.JSON(stop)
 	}
 }

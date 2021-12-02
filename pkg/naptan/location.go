@@ -10,9 +10,8 @@ type Location struct {
 	GridType  string
 	Easting   string
 	Northing  string
-	Position  *GeoJson `json:"-"`
-	Longitude float64  `xml:"Translation>Longitude"`
-	Latitude  float64  `xml:"Translation>Latitude"`
+	Longitude float64 `xml:"Translation>Longitude"`
+	Latitude  float64 `xml:"Translation>Latitude"`
 }
 
 func (l *Location) UpdateCoordinates() {
@@ -28,14 +27,4 @@ func (l *Location) UpdateCoordinates() {
 		l.Latitude = lat
 		l.Longitude = lon
 	}
-
-	l.Position = &GeoJson{
-		Type:        "Point",
-		Coordinates: []float64{l.Longitude, l.Latitude},
-	}
-}
-
-type GeoJson struct {
-	Type        string    `json:"-"`
-	Coordinates []float64 `json:"coordinates"`
 }

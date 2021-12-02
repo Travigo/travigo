@@ -1,11 +1,9 @@
 package naptan
 
 import (
-	"context"
-	"log"
+	"fmt"
 
-	"github.com/britbus/britbus/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/britbus/britbus/pkg/ctdf"
 )
 
 type StopArea struct {
@@ -23,18 +21,27 @@ type StopArea struct {
 	Stops []StopPoint
 }
 
-func (stopArea *StopArea) GetStops() {
-	stopsCollection := database.GetCollection("stops")
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"stopareas.stopareacode": stopArea.StopAreaCode})
-
-	for cursor.Next(context.TODO()) {
-		//Create a value into which the single document can be decoded
-		var stopPoint *StopPoint
-		err := cursor.Decode(&stopPoint)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		stopArea.Stops = append(stopArea.Stops, *stopPoint)
+func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
+	ctdfStopGroup := ctdf.StopGroup{
+		Identifier:           fmt.Sprintf("UK%s", orig.StopAreaCode),
+		Name:                 orig.Name,
+		Status:               orig.Status,
+		CreationDateTime:     orig.CreationDateTime,
+		ModificationDateTime: orig.ModificationDateTime,
 	}
+
+	switch orig.StopAreaType {
+	case "GPBS":
+		ctdfStopGroup.Type = "pair"
+	case "GCLS":
+		ctdfStopGroup.Type = "cluster"
+	case "GBCS":
+		ctdfStopGroup.Type = "bus_station"
+	case "GMLT":
+		ctdfStopGroup.Type = "multimode_interchange"
+	default:
+		ctdfStopGroup.Type = "unknown"
+	}
+
+	return &ctdfStopGroup
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/kr/pretty"
 	"go.mongodb.org/mongo-driver/bson"
@@ -36,24 +37,21 @@ func (n *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) ImportIntoMongo() {
+func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 	stopsCollection := database.GetCollection("stops")
-	stopAreasCollection := database.GetCollection("stopareas")
+	stopAreasCollection := database.GetCollection("stop_groups")
 
-	stopPointIndex := []mongo.IndexModel{
+	stopsIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "naptancode", Value: bsonx.Int32(1)}},
+			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "atcocode", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "location.position", Value: bsonx.String("2dsphere")}},
+			Keys: bsonx.Doc{{Key: "location", Value: bsonx.String("2dsphere")}},
 		},
 	}
 
 	opts := options.CreateIndexes()
-	_, err := stopsCollection.Indexes().CreateMany(context.Background(), stopPointIndex, opts)
+	_, err := stopsCollection.Indexes().CreateMany(context.Background(), stopsIndex, opts)
 	if err != nil {
 		panic(err)
 	}
@@ -72,13 +70,14 @@ func (naptanDoc *NaPTAN) ImportIntoMongo() {
 
 	// Not the most optimised code created but it works
 	for i := 0; i < len(naptanDoc.StopPoints); i++ {
-		stopPoint := naptanDoc.StopPoints[i]
+		naptanStopPoint := naptanDoc.StopPoints[i]
+		ctdfStop := naptanStopPoint.ToCTDF()
 
-		var existingStopPoint *StopPoint
-		stopsCollection.FindOne(context.Background(), bson.M{"naptancode": stopPoint.NaptanCode}).Decode(&existingStopPoint)
+		var existingCtdfStop *ctdf.Stop
+		stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier}).Decode(&existingCtdfStop)
 
-		if existingStopPoint == nil {
-			bsonRep, _ := bson.Marshal(stopPoint)
+		if existingCtdfStop == nil {
+			bsonRep, _ := bson.Marshal(ctdfStop)
 			_, err := stopsCollection.InsertOne(context.Background(), bsonRep)
 
 			if err != nil {
@@ -88,9 +87,9 @@ func (naptanDoc *NaPTAN) ImportIntoMongo() {
 			continue
 		}
 
-		if existingStopPoint.ModificationDateTime != stopPoint.ModificationDateTime {
-			bsonRep, _ := bson.Marshal(stopPoint)
-			_, err := stopsCollection.ReplaceOne(context.Background(), bson.M{"naptancode": stopPoint.NaptanCode}, bsonRep)
+		if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
+			bsonRep, _ := bson.Marshal(ctdfStop)
+			_, err := stopsCollection.ReplaceOne(context.Background(), bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier}, bsonRep)
 
 			if err != nil {
 				pretty.Println(err)
@@ -100,13 +99,14 @@ func (naptanDoc *NaPTAN) ImportIntoMongo() {
 
 	// The same but for StopAreas
 	for i := 0; i < len(naptanDoc.StopAreas); i++ {
-		stopArea := naptanDoc.StopAreas[i]
+		naptanStopArea := naptanDoc.StopAreas[i]
+		ctdfStopGroup := naptanStopArea.ToCTDF()
 
-		var existingStopArea *StopArea
-		stopAreasCollection.FindOne(context.Background(), bson.M{"stopareacode": stopArea.StopAreaCode}).Decode(&existingStopArea)
+		var existingStopGroup *ctdf.StopGroup
+		stopAreasCollection.FindOne(context.Background(), bson.M{"identifier": ctdfStopGroup.Identifier}).Decode(&existingStopGroup)
 
-		if existingStopArea == nil {
-			bsonRep, _ := bson.Marshal(stopArea)
+		if existingStopGroup == nil {
+			bsonRep, _ := bson.Marshal(ctdfStopGroup)
 			_, err := stopAreasCollection.InsertOne(context.Background(), bsonRep)
 
 			if err != nil {
@@ -116,9 +116,9 @@ func (naptanDoc *NaPTAN) ImportIntoMongo() {
 			continue
 		}
 
-		if existingStopArea.ModificationDateTime != stopArea.ModificationDateTime {
-			bsonRep, _ := bson.Marshal(stopArea)
-			_, err := stopAreasCollection.ReplaceOne(context.Background(), bson.M{"stopareacode": stopArea.StopAreaCode}, bsonRep)
+		if existingStopGroup.ModificationDateTime != ctdfStopGroup.ModificationDateTime {
+			bsonRep, _ := bson.Marshal(ctdfStopGroup)
+			_, err := stopAreasCollection.ReplaceOne(context.Background(), bson.M{"identifier": ctdfStopGroup.Identifier}, bsonRep)
 
 			if err != nil {
 				pretty.Println(err)
