@@ -23,7 +23,7 @@ type StopArea struct {
 
 func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 	ctdfStopGroup := ctdf.StopGroup{
-		Identifier:           fmt.Sprintf("UK%s", orig.StopAreaCode),
+		Identifier:           fmt.Sprintf("UK:%s", orig.StopAreaCode),
 		Name:                 orig.Name,
 		Status:               orig.Status,
 		CreationDateTime:     orig.CreationDateTime,

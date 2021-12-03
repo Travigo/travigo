@@ -1,6 +1,8 @@
 package transxchange
 
 type Operator struct {
+	ID string `xml:"id,attr"`
+
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
 

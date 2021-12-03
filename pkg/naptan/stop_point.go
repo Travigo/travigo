@@ -46,7 +46,7 @@ type StopPointStopAreaRef struct {
 
 func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	ctdfStop := ctdf.Stop{
-		PrimaryIdentifier: fmt.Sprintf("UK%s", orig.AtcoCode),
+		PrimaryIdentifier: fmt.Sprintf("UK:%s", orig.AtcoCode),
 		OtherIdentifiers: map[string]string{
 			"AtcoCode":   orig.AtcoCode,
 			"NaptanCode": orig.NaptanCode,
@@ -78,7 +78,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 		ctdfStop.Associations = append(ctdfStop.Associations, ctdf.StopAssociation{
 			Type:                 "stop_group",
-			AssociatedIdentifier: fmt.Sprintf("UK%s", stopArea.StopAreaCode),
+			AssociatedIdentifier: fmt.Sprintf("UK:%s", stopArea.StopAreaCode),
 		})
 	}
 

@@ -7,11 +7,12 @@ type Stop struct {
 	CreationDateTime     string
 	ModificationDateTime string
 
+	DataSource *DataSource
+
 	PrimaryName string
 	OtherNames  map[string]string
 	Type        string // or an enum
 	Status      string
-	DataSource  *DataSource
 
 	Location *Location
 

@@ -14,6 +14,8 @@ type StopGroup struct {
 	CreationDateTime     string
 	ModificationDateTime string
 
+	DataSource *DataSource
+
 	Name   string
 	Type   string
 	Status string

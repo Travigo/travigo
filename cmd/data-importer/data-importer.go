@@ -2,17 +2,21 @@ package main
 
 import (
 	"errors"
-	"log"
 	"os"
+	"time"
 
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/transxchange"
-	"github.com/kr/pretty"
 	"github.com/urfave/cli/v2"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
 	app := &cli.App{
 		Name: "data-importer",
 		Commands: []*cli.Command{
@@ -30,7 +34,7 @@ func main() {
 							}
 
 							if err := database.Connect(); err != nil {
-								log.Fatal(err)
+								log.Fatal().Err(err).Msg("Failed to connect to database")
 							}
 
 							filePath := c.Args().Get(0)
@@ -60,20 +64,20 @@ func main() {
 								return errors.New("file path must be provided")
 							}
 
+							log.Print("hello world")
+
 							// if err := database.Connect(); err != nil {
-							// 	log.Fatal(err)
+							// 	log.Fatal().Err(err).Msg("Failed to connect to database")
 							// }
 
 							filePath := c.Args().Get(0)
-							tranxXChangeDoc, err := transxchange.ParseXMLFile(filePath)
+							transXChangeDoc, err := transxchange.ParseXMLFile(filePath)
 
 							if err != nil {
 								return err
 							}
 
-							pretty.Println(tranxXChangeDoc)
-
-							// naptanDoc.ImportIntoMongo()
+							transXChangeDoc.ImportIntoMongoAsCTDF()
 
 							return nil
 						},
@@ -85,6 +89,6 @@ func main() {
 
 	err := app.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Send()
 	}
 }
