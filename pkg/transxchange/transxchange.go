@@ -43,7 +43,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF() {
 	for i := 0; i < len(doc.Operators); i++ {
 		operator := doc.Operators[i]
 
-		operatorLocalMapping[operator.ID] = fmt.Sprintf("UK:%s", operator.NationalOperatorCode)
+		operatorLocalMapping[operator.ID] = fmt.Sprintf("UK:NOC:%s", operator.NationalOperatorCode)
 	}
 
 	// Get CTDF services from TransXChange Services & Lines
@@ -56,7 +56,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF() {
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
 
 			ctdfService := ctdf.Service{
-				PrimaryIdentifier: fmt.Sprintf("UK:%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID),
+				PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID),
 				OtherIdentifiers: map[string]string{
 					"ServiceCode": txcService.ServiceCode,
 					"LineID":      txcLine.ID,

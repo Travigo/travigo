@@ -12,8 +12,13 @@ type Operator struct {
 	PrimaryName string
 	OtherNames  map[string]string
 
-	LegalEntity string
+	OperatorGroup string
+
+	Licence string
+
+	// LegalEntity string
 	Website     string
 	Address     string
+	PhoneNumber string
 	SocialMedia map[string]string
 }
