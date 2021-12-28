@@ -10,7 +10,8 @@ type Operator struct {
 	DataSource *DataSource
 
 	PrimaryName string
-	OtherNames  map[string]string
+	// OtherNames  map[string]string
+	OtherNames []string
 
 	OperatorGroup string
 

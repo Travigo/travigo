@@ -98,7 +98,7 @@ func main() {
 
 							// pretty.Println(travelineData)
 
-							// travelineData.ImportIntoMongoAsCTDF()
+							travelineData.ImportIntoMongoAsCTDF()
 
 							log.Info().Msgf("Successfully imported into MongoDB")
 
