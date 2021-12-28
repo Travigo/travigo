@@ -1,12 +1,15 @@
 package travelinenoc
 
 import (
+	"context"
 	"fmt"
-	"log"
+	"regexp"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/kr/pretty"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type TravelineData struct {
@@ -58,6 +61,7 @@ func (t *TravelineData) convertToCTDF() []*ctdf.Operator {
 		ctdfRecord.PrimaryName = nocLineRecord.PublicName
 		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 		ctdfRecord.Licence = nocLineRecord.Licence
+		ctdfRecord.TransportType = []string{nocLineRecord.Mode}
 	}
 
 	// NOCTableRecords
@@ -86,6 +90,7 @@ func (t *TravelineData) convertToCTDF() []*ctdf.Operator {
 	}
 
 	// PublicNameRecords
+	websiteRegex, _ := regexp.Compile("#(.+)#")
 	for i := 0; i < len(t.PublicNameRecords); i++ {
 		publicNameRecord := t.PublicNameRecords[i]
 		var ctdfRecord *ctdf.Operator
@@ -93,13 +98,27 @@ func (t *TravelineData) convertToCTDF() []*ctdf.Operator {
 
 		ctdfRecord.PrimaryName = publicNameRecord.OperatorPublicName
 		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, publicNameRecord.OperatorPublicName)
-		ctdfRecord.Website = publicNameRecord.Website
+
+		if websiteMatch := websiteRegex.FindStringSubmatch(publicNameRecord.Website); len(websiteMatch) > 1 {
+			ctdfRecord.Website = websiteMatch[1]
+		}
+		ctdfRecord.SocialMedia = map[string]string{}
+
+		if publicNameRecord.Twitter != "" {
+			ctdfRecord.SocialMedia["Twitter"] = publicNameRecord.Twitter
+		}
+		if publicNameRecord.Facebook != "" {
+			ctdfRecord.SocialMedia["Facebook"] = publicNameRecord.Facebook
+		}
+		if publicNameRecord.YouTube != "" {
+			ctdfRecord.SocialMedia["YouTube"] = publicNameRecord.YouTube
+		}
 	}
 
 	// Filter the generated CTDF Operators
 	filteredOperators := []*ctdf.Operator{}
 	for _, operator := range operators {
-		operator.OtherNames = util.RemoveDuplicateStrings(operator.OtherNames)
+		operator.OtherNames = util.RemoveDuplicateStrings(operator.OtherNames, []string{operator.PrimaryName})
 
 		if operator.PrimaryIdentifier != "" {
 			filteredOperators = append(filteredOperators, operator)
@@ -112,6 +131,33 @@ func (t *TravelineData) convertToCTDF() []*ctdf.Operator {
 func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	operators := t.convertToCTDF()
 
+	operatorsCollection := database.GetCollection("operators")
+
+	for i := 0; i < len(operators); i++ {
+		operator := operators[i]
+
+		var existingCtdfOperator *ctdf.Operator
+		operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
+
+		if existingCtdfOperator == nil {
+			bsonRep, _ := bson.Marshal(operator)
+			_, err := operatorsCollection.InsertOne(context.Background(), bsonRep)
+
+			if err != nil {
+				pretty.Println(err)
+			}
+
+			continue
+		} else {
+			bsonRep, _ := bson.Marshal(operator)
+			_, err := operatorsCollection.ReplaceOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}, bsonRep)
+
+			if err != nil {
+				pretty.Println(err)
+			}
+		}
+	}
+
 	pretty.Println(operators)
-	log.Println(len(operators))
+	// log.Println(len(operators))
 }

@@ -10,15 +10,17 @@ type Operator struct {
 	DataSource *DataSource
 
 	PrimaryName string
-	// OtherNames  map[string]string
-	OtherNames []string
+	OtherNames  []string
 
 	OperatorGroup string
+
+	TransportType []string
 
 	Licence string
 
 	// LegalEntity string
 	Website     string
+	Email       string
 	Address     string
 	PhoneNumber string
 	SocialMedia map[string]string
