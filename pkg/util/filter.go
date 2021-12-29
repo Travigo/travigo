@@ -9,7 +9,7 @@ func RemoveDuplicateStrings(strings []string, ignoreList []string) []string {
 	}
 
 	for _, item := range strings {
-		if _, value := presentStrings[item]; !value {
+		if _, value := presentStrings[item]; !value && item != "" {
 			presentStrings[item] = true
 			list = append(list, item)
 		}

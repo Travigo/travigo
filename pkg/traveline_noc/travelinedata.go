@@ -10,6 +10,9 @@ import (
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/kr/pretty"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 type TravelineData struct {
@@ -36,6 +39,20 @@ func findOrCreateCTDFRecord(operators []*ctdf.Operator, idMap map[string]int, id
 		idMap[identifier] = newID
 
 		return operators, ctdfRecord, newID
+	}
+}
+
+func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
+	emailRegex, _ := regexp.Compile("^[^@]+@[^@]+.[^@]+$")
+	phoneRegex, _ := regexp.Compile("^[\\d ]+$")
+	addressRegex, _ := regexp.Compile("^[a-zA-Z\\d ,]+$")
+
+	if emailRegex.MatchString(value) {
+		ctdfOperator.Email = value
+	} else if phoneRegex.MatchString(value) {
+		ctdfOperator.PhoneNumber = value
+	} else if addressRegex.MatchString(value) {
+		ctdfOperator.Address = value
 	}
 }
 
@@ -113,6 +130,12 @@ func (t *TravelineData) convertToCTDF() []*ctdf.Operator {
 		if publicNameRecord.YouTube != "" {
 			ctdfRecord.SocialMedia["YouTube"] = publicNameRecord.YouTube
 		}
+
+		extractContactDetails(publicNameRecord.LostPropEnq, ctdfRecord)
+		extractContactDetails(publicNameRecord.DisruptEnq, ctdfRecord)
+		extractContactDetails(publicNameRecord.ComplEnq, ctdfRecord)
+		extractContactDetails(publicNameRecord.FareEnq, ctdfRecord)
+		extractContactDetails(publicNameRecord.TTRteEnq, ctdfRecord)
 	}
 
 	// Filter the generated CTDF Operators
@@ -132,6 +155,19 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	operators := t.convertToCTDF()
 
 	operatorsCollection := database.GetCollection("operators")
+
+	// TODO: Doesnt really make sense for the traveline package to be managing CTDF tables and indexes
+	stopGroupsIndex := []mongo.IndexModel{
+		{
+			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+		},
+	}
+
+	opts := options.CreateIndexes()
+	_, err := operatorsCollection.Indexes().CreateMany(context.Background(), stopGroupsIndex, opts)
+	if err != nil {
+		panic(err)
+	}
 
 	for i := 0; i < len(operators); i++ {
 		operator := operators[i]
