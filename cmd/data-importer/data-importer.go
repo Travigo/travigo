@@ -46,7 +46,8 @@ func main() {
 
 							log.Info().Msgf("Successfully parsed document")
 							log.Info().Msgf(" - Last modified %s", naptanDoc.ModificationDateTime)
-							log.Info().Msgf(" - Contains %d stops and %d stop areas", len(naptanDoc.StopPoints), len(naptanDoc.StopAreas))
+							log.Info().Msgf(" - Contains %d stops", len(naptanDoc.StopPoints))
+							log.Info().Msgf(" - Contains %d stop areas", len(naptanDoc.StopAreas))
 
 							if err != nil {
 								return err
@@ -95,8 +96,6 @@ func main() {
 							if err != nil {
 								return err
 							}
-
-							// pretty.Println(travelineData)
 
 							travelineData.ImportIntoMongoAsCTDF()
 

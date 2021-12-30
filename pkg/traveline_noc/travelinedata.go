@@ -8,7 +8,6 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/util"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -215,51 +214,81 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
+	operatorOperations := []mongo.WriteModel{}
+	operatorOperationInsert := 0
+	operatorOperationUpdate := 0
+
 	for _, operator := range operators {
 		var existingCtdfOperator *ctdf.Operator
 		operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
 		bsonRep, _ := bson.Marshal(operator)
 
 		if existingCtdfOperator == nil {
-			_, err := operatorsCollection.InsertOne(context.Background(), bsonRep)
+			insertModel := mongo.NewInsertOneModel()
+			insertModel.SetDocument(bsonRep)
 
-			if err != nil {
-				pretty.Println(err)
-			}
+			operatorOperations = append(operatorOperations, insertModel)
 
-			continue
+			operatorOperationInsert += 1
 		} else {
-			_, err := operatorsCollection.ReplaceOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}, bsonRep)
+			updateModel := mongo.NewReplaceOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
+			updateModel.SetReplacement(bsonRep)
 
-			if err != nil {
-				pretty.Println(err)
-			}
+			operatorOperations = append(operatorOperations, updateModel)
+
+			operatorOperationUpdate += 1
 		}
 	}
-	log.Info().Msg("Imported CTDF Operators into Mongo")
+
+	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
+	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
+
+	if len(operatorOperations) > 0 {
+		_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Operators")
+		}
+		log.Info().Msg(" - Written to MongoDB")
+	}
 
 	// Import operator groups
 	log.Info().Msg("Importing CTDF OperatorGroups into Mongo")
+	operatorGroupOperations := []mongo.WriteModel{}
+	operatorGroupOperationInsert := 0
+	operatorGroupOperationUpdate := 0
+
 	for _, operatorGroup := range operatorGroups {
 		var existingCtdfOperatorGroup *ctdf.OperatorGroup
 		operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
 		bsonRep, _ := bson.Marshal(operatorGroup)
 
 		if existingCtdfOperatorGroup == nil {
-			_, err := operatorGroupsCollection.InsertOne(context.Background(), bsonRep)
+			insertModel := mongo.NewInsertOneModel()
+			insertModel.SetDocument(bsonRep)
 
-			if err != nil {
-				pretty.Println(err)
-			}
+			operatorGroupOperations = append(operatorGroupOperations, insertModel)
 
-			continue
+			operatorGroupOperationInsert += 1
 		} else {
-			_, err := operatorGroupsCollection.ReplaceOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}, bsonRep)
+			updateModel := mongo.NewReplaceOneModel()
+			updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
+			updateModel.SetReplacement(bsonRep)
 
-			if err != nil {
-				pretty.Println(err)
-			}
+			operatorGroupOperations = append(operatorGroupOperations, updateModel)
+
+			operatorGroupOperationUpdate += 1
 		}
 	}
-	log.Info().Msg("Imported CTDF OperatorGroups into Mongo")
+
+	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
+	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
+
+	if len(operatorGroupOperations) > 0 {
+		_, err = operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write OperatorGroups")
+		}
+		log.Info().Msg(" - Written to MongoDB")
+	}
 }
