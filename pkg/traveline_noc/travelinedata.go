@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -87,17 +88,17 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	for i := 0; i < len(t.NOCLinesRecords); i++ {
 		nocLineRecord := t.NOCLinesRecords[i]
 
-		ctdfRecord := &ctdf.Operator{
-			OtherNames: []string{},
-		}
-		operators = append(operators, ctdfRecord)
-		operatorNOCCodes[nocLineRecord.NOCCode] = len(operators) - 1
+		var ctdfRecord *ctdf.Operator
+		// var index int
+		operators, ctdfRecord, _ = findOrCreateCTDFRecord(operators, operatorNOCCodes, nocLineRecord.NOCCode)
 
 		ctdfRecord.PrimaryIdentifier = fmt.Sprintf("UK:NOC:%s", nocLineRecord.NOCCode)
 		ctdfRecord.PrimaryName = nocLineRecord.PublicName
 		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 		ctdfRecord.Licence = nocLineRecord.Licence
 		ctdfRecord.TransportType = []string{nocLineRecord.Mode}
+
+		// operatorNOCCodes[nocLineRecord.NOCCode] = index
 	}
 
 	// NOCTableRecords
@@ -221,19 +222,28 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	for _, operator := range operators {
 		var existingCtdfOperator *ctdf.Operator
 		operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
-		bsonRep, _ := bson.Marshal(operator)
 
 		if existingCtdfOperator == nil {
+			operator.CreationDateTime = time.Now()
+			operator.ModificationDateTime = time.Now()
+
 			insertModel := mongo.NewInsertOneModel()
+
+			bsonRep, _ := bson.Marshal(operator)
 			insertModel.SetDocument(bsonRep)
 
 			operatorOperations = append(operatorOperations, insertModel)
 
 			operatorOperationInsert += 1
-		} else {
-			updateModel := mongo.NewReplaceOneModel()
+		} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
+			operator.CreationDateTime = existingCtdfOperator.CreationDateTime
+			operator.ModificationDateTime = time.Now()
+
+			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
-			updateModel.SetReplacement(bsonRep)
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
+			updateModel.SetUpdate(bsonRep)
 
 			operatorOperations = append(operatorOperations, updateModel)
 
@@ -243,6 +253,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
+
+	// pretty.Println(operatorOperations)
 
 	if len(operatorOperations) > 0 {
 		_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
@@ -261,19 +273,28 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	for _, operatorGroup := range operatorGroups {
 		var existingCtdfOperatorGroup *ctdf.OperatorGroup
 		operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
-		bsonRep, _ := bson.Marshal(operatorGroup)
 
 		if existingCtdfOperatorGroup == nil {
+			operatorGroup.CreationDateTime = time.Now()
+			operatorGroup.ModificationDateTime = time.Now()
+
 			insertModel := mongo.NewInsertOneModel()
+
+			bsonRep, _ := bson.Marshal(operatorGroup)
 			insertModel.SetDocument(bsonRep)
 
 			operatorGroupOperations = append(operatorGroupOperations, insertModel)
 
 			operatorGroupOperationInsert += 1
-		} else {
-			updateModel := mongo.NewReplaceOneModel()
+		} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
+			operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
+			operatorGroup.ModificationDateTime = time.Now()
+
+			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
-			updateModel.SetReplacement(bsonRep)
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": operatorGroup})
+			updateModel.SetUpdate(bsonRep)
 
 			operatorGroupOperations = append(operatorGroupOperations, updateModel)
 

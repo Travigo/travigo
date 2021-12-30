@@ -63,8 +63,8 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			"Landmark":        orig.Descriptor.Landmark,
 		},
 
-		CreationDateTime:     &creationTime,
-		ModificationDateTime: &modificationTime,
+		CreationDateTime:     creationTime,
+		ModificationDateTime: modificationTime,
 		Status:               orig.Status,
 		Type:                 "bus", //true for now
 		Location: &ctdf.Location{

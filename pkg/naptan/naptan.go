@@ -91,7 +91,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 			stopOperations = append(stopOperations, insertModel)
 			stopOperationInsert += 1
-		} else if *existingCtdfStop.ModificationDateTime != *ctdfStop.ModificationDateTime {
+		} else if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
 			updateModel := mongo.NewReplaceOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
 			updateModel.SetReplacement(bsonRep)
@@ -121,22 +121,26 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 	for i := 0; i < len(naptanDoc.StopAreas); i++ {
 		naptanStopArea := naptanDoc.StopAreas[i]
 		ctdfStopGroup := naptanStopArea.ToCTDF()
-		bsonRep, _ := bson.Marshal(ctdfStopGroup)
 
 		var existingStopGroup *ctdf.StopGroup
 		stopGroupsCollection.FindOne(context.Background(), bson.M{"identifier": ctdfStopGroup.Identifier}).Decode(&existingStopGroup)
 
 		if existingStopGroup == nil {
 			insertModel := mongo.NewInsertOneModel()
+
+			bsonRep, _ := bson.Marshal(ctdfStopGroup)
 			insertModel.SetDocument(bsonRep)
 
 			stopGroupOperations = append(stopGroupOperations, insertModel)
 
 			stopGroupsOperationInsert += 1
 		} else if existingStopGroup.ModificationDateTime != ctdfStopGroup.ModificationDateTime {
-			updateModel := mongo.NewReplaceOneModel()
+			updateModel := mongo.NewUpdateOneModel()
+
 			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStopGroup.Identifier})
-			updateModel.SetReplacement(bsonRep)
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStopGroup})
+			updateModel.SetUpdate(bsonRep)
 
 			stopGroupOperations = append(stopGroupOperations, updateModel)
 

@@ -30,8 +30,8 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 		Identifier:           fmt.Sprintf("UK:STOPGRP:%s", orig.StopAreaCode),
 		Name:                 orig.Name,
 		Status:               orig.Status,
-		CreationDateTime:     &creationTime,
-		ModificationDateTime: &modificationTime,
+		CreationDateTime:     creationTime,
+		ModificationDateTime: modificationTime,
 	}
 
 	switch orig.StopAreaType {

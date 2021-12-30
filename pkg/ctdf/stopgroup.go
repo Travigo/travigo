@@ -12,8 +12,8 @@ import (
 type StopGroup struct {
 	Identifier string
 
-	CreationDateTime     *time.Time
-	ModificationDateTime *time.Time
+	CreationDateTime     time.Time
+	ModificationDateTime time.Time
 
 	DataSource *DataSource
 
