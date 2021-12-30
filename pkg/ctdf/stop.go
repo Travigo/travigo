@@ -1,11 +1,13 @@
 package ctdf
 
+import "time"
+
 type Stop struct {
 	PrimaryIdentifier string
 	OtherIdentifiers  map[string]string
 
-	CreationDateTime     string
-	ModificationDateTime string
+	CreationDateTime     *time.Time
+	ModificationDateTime *time.Time
 
 	DataSource *DataSource
 

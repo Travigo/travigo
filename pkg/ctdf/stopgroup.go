@@ -3,6 +3,7 @@ package ctdf
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/britbus/britbus/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -11,8 +12,8 @@ import (
 type StopGroup struct {
 	Identifier string
 
-	CreationDateTime     string
-	ModificationDateTime string
+	CreationDateTime     *time.Time
+	ModificationDateTime *time.Time
 
 	DataSource *DataSource
 

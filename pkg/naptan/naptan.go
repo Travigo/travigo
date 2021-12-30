@@ -13,6 +13,8 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
+const DateTimeFormat string = "2006-01-02T15:04:05"
+
 type NaPTAN struct {
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
@@ -89,7 +91,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 			stopOperations = append(stopOperations, insertModel)
 			stopOperationInsert += 1
-		} else if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
+		} else if *existingCtdfStop.ModificationDateTime != *ctdfStop.ModificationDateTime {
 			updateModel := mongo.NewReplaceOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
 			updateModel.SetReplacement(bsonRep)

@@ -2,6 +2,7 @@ package naptan
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 )
@@ -22,12 +23,15 @@ type StopArea struct {
 }
 
 func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
+	creationTime, _ := time.Parse(DateTimeFormat, orig.CreationDateTime)
+	modificationTime, _ := time.Parse(DateTimeFormat, orig.ModificationDateTime)
+
 	ctdfStopGroup := ctdf.StopGroup{
-		Identifier:           fmt.Sprintf("UK:%s", orig.StopAreaCode),
+		Identifier:           fmt.Sprintf("UK:STOPGRP:%s", orig.StopAreaCode),
 		Name:                 orig.Name,
 		Status:               orig.Status,
-		CreationDateTime:     orig.CreationDateTime,
-		ModificationDateTime: orig.ModificationDateTime,
+		CreationDateTime:     &creationTime,
+		ModificationDateTime: &modificationTime,
 	}
 
 	switch orig.StopAreaType {

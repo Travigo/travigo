@@ -2,6 +2,7 @@ package naptan
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 )
@@ -45,8 +46,11 @@ type StopPointStopAreaRef struct {
 }
 
 func (orig *StopPoint) ToCTDF() *ctdf.Stop {
+	creationTime, _ := time.Parse(DateTimeFormat, orig.CreationDateTime)
+	modificationTime, _ := time.Parse(DateTimeFormat, orig.ModificationDateTime)
+
 	ctdfStop := ctdf.Stop{
-		PrimaryIdentifier: fmt.Sprintf("UK:%s", orig.AtcoCode),
+		PrimaryIdentifier: fmt.Sprintf("UK:ATCO:%s", orig.AtcoCode),
 		OtherIdentifiers: map[string]string{
 			"AtcoCode":   orig.AtcoCode,
 			"NaptanCode": orig.NaptanCode,
@@ -59,8 +63,8 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			"Landmark":        orig.Descriptor.Landmark,
 		},
 
-		CreationDateTime:     orig.CreationDateTime,
-		ModificationDateTime: orig.ModificationDateTime,
+		CreationDateTime:     &creationTime,
+		ModificationDateTime: &modificationTime,
 		Status:               orig.Status,
 		Type:                 "bus", //true for now
 		Location: &ctdf.Location{
@@ -78,7 +82,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 		ctdfStop.Associations = append(ctdfStop.Associations, ctdf.StopAssociation{
 			Type:                 "stop_group",
-			AssociatedIdentifier: fmt.Sprintf("UK:%s", stopArea.StopAreaCode),
+			AssociatedIdentifier: fmt.Sprintf("UK:STOPGRP:%s", stopArea.StopAreaCode),
 		})
 	}
 
