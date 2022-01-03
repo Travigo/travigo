@@ -3,29 +3,23 @@ package naptan
 import (
 	"encoding/xml"
 	"io"
-	"log"
-	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
-func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, error) {
+func ParseXMLFile(reader io.Reader, matchesFilter func(interface{}) bool) (*NaPTAN, error) {
 	naptan := NaPTAN{}
 	naptan.StopPoints = []*StopPoint{}
 	naptan.StopAreas = []*StopArea{}
 
-	f, err := os.Open(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	d := xml.NewDecoder(f)
+	d := xml.NewDecoder(reader)
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break
 		} else if err != nil {
-			log.Fatalf("Error decoding token: %s", err)
+			log.Fatal().Msgf("Error decoding token: %s", err)
 			return nil, err
 		}
 
@@ -53,7 +47,7 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 				var stopPoint StopPoint
 
 				if err = d.DecodeElement(&stopPoint, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else if matchesFilter(&stopPoint) {
 					stopPoint.Location.UpdateCoordinates()
 					naptan.StopPoints = append(naptan.StopPoints, &stopPoint)
@@ -62,7 +56,7 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 				var stopArea StopArea
 
 				if err = d.DecodeElement(&stopArea, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else if matchesFilter(&stopArea) {
 					stopArea.Location.UpdateCoordinates()
 					naptan.StopAreas = append(naptan.StopAreas, &stopArea)
@@ -71,6 +65,11 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 		default:
 		}
 	}
+
+	log.Info().Msgf("Successfully parsed document")
+	log.Info().Msgf(" - Last modified %s", naptan.ModificationDateTime)
+	log.Info().Msgf(" - Contains %d stops", len(naptan.StopPoints))
+	log.Info().Msgf(" - Contains %d stop areas", len(naptan.StopAreas))
 
 	return &naptan, nil
 }

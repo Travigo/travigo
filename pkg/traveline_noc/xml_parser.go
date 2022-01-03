@@ -3,29 +3,22 @@ package travelinenoc
 import (
 	"encoding/xml"
 	"io"
-	"log"
-	"os"
 
 	"github.com/britbus/britbus/pkg/util"
+	"github.com/rs/zerolog/log"
 )
 
-func ParseXMLFile(file string) (*TravelineData, error) {
+func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 	travelineData := TravelineData{}
 
-	f, err := os.Open(file)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	d := xml.NewDecoder(util.NewValidUTF8Reader(f))
+	d := xml.NewDecoder(util.NewValidUTF8Reader(reader))
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break
 		} else if err != nil {
-			log.Fatalf("Error decoding token: %s", err)
+			log.Fatal().Msgf("Error decoding token: %s", err)
 			return nil, err
 		}
 
@@ -35,7 +28,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var NOCLinesRecord NOCLinesRecord
 
 				if err = d.DecodeElement(&NOCLinesRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.NOCLinesRecords = append(travelineData.NOCLinesRecords, NOCLinesRecord)
 				}
@@ -43,7 +36,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var NOCTableRecord NOCTableRecord
 
 				if err = d.DecodeElement(&NOCTableRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.NOCTableRecords = append(travelineData.NOCTableRecords, NOCTableRecord)
 				}
@@ -51,7 +44,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var operatorRecord OperatorsRecord
 
 				if err = d.DecodeElement(&operatorRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.OperatorsRecords = append(travelineData.OperatorsRecords, operatorRecord)
 				}
@@ -59,7 +52,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var groupRecord GroupsRecord
 
 				if err = d.DecodeElement(&groupRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.GroupsRecords = append(travelineData.GroupsRecords, groupRecord)
 				}
@@ -67,7 +60,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var managementRecord ManagementDivisionsRecord
 
 				if err = d.DecodeElement(&managementRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.ManagementDivisionsRecords = append(travelineData.ManagementDivisionsRecords, managementRecord)
 				}
@@ -75,7 +68,7 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 				var publicNameRecord PublicNameRecord
 
 				if err = d.DecodeElement(&publicNameRecord, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					travelineData.PublicNameRecords = append(travelineData.PublicNameRecords, publicNameRecord)
 				}
@@ -83,6 +76,14 @@ func ParseXMLFile(file string) (*TravelineData, error) {
 		default:
 		}
 	}
+
+	log.Info().Msgf("Successfully parsed document")
+	log.Info().Msgf(" - Contains %d NOCLinesRecords", len(travelineData.NOCLinesRecords))
+	log.Info().Msgf(" - Contains %d NOCTableRecords", len(travelineData.NOCTableRecords))
+	log.Info().Msgf(" - Contains %d OperatorRecords", len(travelineData.OperatorsRecords))
+	log.Info().Msgf(" - Contains %d GroupsRecords", len(travelineData.GroupsRecords))
+	log.Info().Msgf(" - Contains %d ManagementDivisionsRecords", len(travelineData.ManagementDivisionsRecords))
+	log.Info().Msgf(" - Contains %d PublicNameRecords", len(travelineData.PublicNameRecords))
 
 	return &travelineData, nil
 }

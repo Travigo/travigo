@@ -383,4 +383,6 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
+
+	log.Info().Msgf("Successfully imported into MongoDB")
 }

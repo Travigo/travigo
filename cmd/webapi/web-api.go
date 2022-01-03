@@ -24,7 +24,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "listen",
 						Value: ":8080",
-						Usage: "lsiten target for the web server",
+						Usage: "listen target for the web server",
 					},
 				},
 				Action: func(c *cli.Context) error {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net/http"
 	"os"
 	"time"
 
@@ -18,6 +19,10 @@ import (
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
+	if err := database.Connect(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to database")
+	}
+
 	app := &cli.App{
 		Name: "data-importer",
 		Commands: []*cli.Command{
@@ -27,27 +32,24 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name:      "import-file",
-						Usage:     "import an XML file",
+						Usage:     "import a local XML file",
 						ArgsUsage: "<file path>",
 						Action: func(c *cli.Context) error {
 							if c.Args().Len() == 0 {
 								return errors.New("file path must be provided")
 							}
 
-							if err := database.Connect(); err != nil {
-								log.Fatal().Err(err).Msg("Failed to connect to database")
-							}
-
 							filePath := c.Args().Get(0)
 
 							log.Info().Msgf("NaPTAN file import from %s", filePath)
 
-							naptanDoc, err := naptan.ParseXMLFile(filePath, naptan.BusFilter)
+							file, err := os.Open(filePath)
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer file.Close()
 
-							log.Info().Msgf("Successfully parsed document")
-							log.Info().Msgf(" - Last modified %s", naptanDoc.ModificationDateTime)
-							log.Info().Msgf(" - Contains %d stops", len(naptanDoc.StopPoints))
-							log.Info().Msgf(" - Contains %d stop areas", len(naptanDoc.StopAreas))
+							naptanDoc, err := naptan.ParseXMLFile(file, naptan.BusFilter)
 
 							if err != nil {
 								return err
@@ -55,7 +57,38 @@ func main() {
 
 							naptanDoc.ImportIntoMongoAsCTDF()
 
-							log.Info().Msgf("Successfully imported into MongoDB")
+							return nil
+						},
+					},
+					{
+						Name:      "import-http",
+						Usage:     "import a remote XML file over HTTP",
+						ArgsUsage: "<file path>",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "url",
+								Value: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml",
+								Usage: "HTTP location of the XML file",
+							},
+						},
+						Action: func(c *cli.Context) error {
+							url := c.String("url")
+							log.Info().Msgf("NaPTAN file import from %s", url)
+
+							resp, err := http.Get(url)
+
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer resp.Body.Close()
+
+							naptanDoc, err := naptan.ParseXMLFile(resp.Body, naptan.BusFilter)
+
+							if err != nil {
+								return err
+							}
+
+							naptanDoc.ImportIntoMongoAsCTDF()
 
 							return nil
 						},
@@ -68,30 +101,24 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name:      "import-file",
-						Usage:     "import an XML file",
+						Usage:     "import a local XML file",
 						ArgsUsage: "<file path>",
 						Action: func(c *cli.Context) error {
 							if c.Args().Len() == 0 {
 								return errors.New("file path must be provided")
 							}
 
-							if err := database.Connect(); err != nil {
-								log.Fatal().Err(err).Msg("Failed to connect to database")
-							}
-
 							filePath := c.Args().Get(0)
 
 							log.Info().Msgf("Traveline NOC file import from %s", filePath)
 
-							travelineData, err := travelinenoc.ParseXMLFile(filePath)
+							file, err := os.Open(filePath)
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer file.Close()
 
-							log.Info().Msgf("Successfully parsed document")
-							log.Info().Msgf(" - Contains %d NOCLinesRecords", len(travelineData.NOCLinesRecords))
-							log.Info().Msgf(" - Contains %d NOCTableRecords", len(travelineData.NOCTableRecords))
-							log.Info().Msgf(" - Contains %d OperatorRecords", len(travelineData.OperatorsRecords))
-							log.Info().Msgf(" - Contains %d GroupsRecords", len(travelineData.GroupsRecords))
-							log.Info().Msgf(" - Contains %d ManagementDivisionsRecords", len(travelineData.ManagementDivisionsRecords))
-							log.Info().Msgf(" - Contains %d PublicNameRecords", len(travelineData.PublicNameRecords))
+							travelineData, err := travelinenoc.ParseXMLFile(file)
 
 							if err != nil {
 								return err
@@ -99,7 +126,37 @@ func main() {
 
 							travelineData.ImportIntoMongoAsCTDF()
 
-							log.Info().Msgf("Successfully imported into MongoDB")
+							return nil
+						},
+					},
+					{
+						Name:  "import-http",
+						Usage: "import a remote XML file over HTTP",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "url",
+								Value: "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
+								Usage: "HTTP location of the XML file",
+							},
+						},
+						Action: func(c *cli.Context) error {
+							url := c.String("url")
+							log.Info().Msgf("Traveline NOC HTTP import from %s", url)
+
+							resp, err := http.Get(url)
+
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer resp.Body.Close()
+
+							travelineData, err := travelinenoc.ParseXMLFile(resp.Body)
+
+							if err != nil {
+								return err
+							}
+
+							travelineData.ImportIntoMongoAsCTDF()
 
 							return nil
 						},

@@ -3,6 +3,7 @@ package naptan
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -37,7 +38,7 @@ func (n *NaPTAN) Validate() error {
 		return errors.New("ModificationDateTime must be set")
 	}
 	if n.SchemaVersion != "2.4" {
-		return errors.New("SchemaVersion must be 2.4")
+		return errors.New(fmt.Sprintf("SchemaVersion must be 2.4 but is %s", n.SchemaVersion))
 	}
 
 	return nil
@@ -208,4 +209,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stopGroupsOperationInsert)
 	log.Info().Msgf(" - %d updates", stopGroupsOperationUpdate)
+
+	log.Info().Msgf("Successfully imported into MongoDB")
 }
