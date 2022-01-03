@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -239,9 +240,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
-	operatorOperations := []mongo.WriteModel{}
-	operatorOperationInsert := 0
-	operatorOperationUpdate := 0
+	var operatorOperationInsert uint64
+	var operatorOperationUpdate uint64
 
 	maxBatchSize := int(len(operators) / runtime.NumCPU())
 	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
@@ -260,6 +260,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 		batchSlice := operators[lower:upper]
 
 		go func(operatorsBatch []*ctdf.Operator) {
+			operatorOperations := []mongo.WriteModel{}
+
 			for _, operator := range operatorsBatch {
 				var existingCtdfOperator *ctdf.Operator
 				operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
@@ -275,7 +277,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 					operatorOperations = append(operatorOperations, insertModel)
 
-					operatorOperationInsert += 1
+					atomic.AddUint64(&operatorOperationInsert, 1)
 				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
 					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
 					operator.ModificationDateTime = time.Now()
@@ -288,31 +290,31 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 					operatorOperations = append(operatorOperations, updateModel)
 
-					operatorOperationUpdate += 1
+					atomic.AddUint64(&operatorOperationUpdate, 1)
 				}
 			}
+
+			if len(operatorOperations) > 0 {
+				_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to bulk write Operators")
+				}
+			}
+
 			processingGroup.Done()
 		}(batchSlice)
 	}
 
 	processingGroup.Wait()
 
+	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
 
-	if len(operatorOperations) > 0 {
-		_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write Operators")
-		}
-		log.Info().Msg(" - Written to MongoDB")
-	}
-
 	// Import operator groups
 	log.Info().Msg("Importing CTDF OperatorGroups into Mongo")
-	operatorGroupOperations := []mongo.WriteModel{}
-	operatorGroupOperationInsert := 0
-	operatorGroupOperationUpdate := 0
+	var operatorGroupOperationInsert uint64
+	var operatorGroupOperationUpdate uint64
 
 	maxBatchSize = int(len(operatorGroups) / runtime.NumCPU())
 	numBatches = int(math.Ceil(float64(len(operatorGroups)) / float64(maxBatchSize)))
@@ -331,6 +333,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 		batchSlice := operatorGroups[lower:upper]
 
 		go func(operatorGroupsBatch []*ctdf.OperatorGroup) {
+			operatorGroupOperations := []mongo.WriteModel{}
+
 			for _, operatorGroup := range operatorGroupsBatch {
 				var existingCtdfOperatorGroup *ctdf.OperatorGroup
 				operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
@@ -346,7 +350,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 					operatorGroupOperations = append(operatorGroupOperations, insertModel)
 
-					operatorGroupOperationInsert += 1
+					atomic.AddUint64(&operatorGroupOperationInsert, 1)
 				} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
 					operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
 					operatorGroup.ModificationDateTime = time.Now()
@@ -359,23 +363,24 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 
 					operatorGroupOperations = append(operatorGroupOperations, updateModel)
 
-					operatorGroupOperationUpdate += 1
+					atomic.AddUint64(&operatorGroupOperationUpdate, 1)
 				}
 			}
+
+			if len(operatorGroupOperations) > 0 {
+				_, err = operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to bulk write OperatorGroups")
+				}
+			}
+
 			processingGroup.Done()
 		}(batchSlice)
 	}
 
 	processingGroup.Wait()
 
+	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
-
-	if len(operatorGroupOperations) > 0 {
-		_, err = operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write OperatorGroups")
-		}
-		log.Info().Msg(" - Written to MongoDB")
-	}
 }

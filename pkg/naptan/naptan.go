@@ -6,6 +6,7 @@ import (
 	"math"
 	"runtime"
 	"sync"
+	"sync/atomic"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -76,9 +77,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 	// StopPoints
 	log.Info().Msg("Converting & Importing CTDF Stops into Mongo")
-	stopOperations := []mongo.WriteModel{}
-	stopOperationInsert := 0
-	stopOperationUpdate := 0
+	var stopOperationInsert uint64
+	var stopOperationUpdate uint64
 
 	maxBatchSize := int(len(naptanDoc.StopPoints) / runtime.NumCPU())
 	numBatches := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(maxBatchSize)))
@@ -97,6 +97,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 		batchSlice := naptanDoc.StopPoints[lower:upper]
 
 		go func(stopPoints []StopPoint) {
+			stopOperations := []mongo.WriteModel{}
+
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
 				bsonRep, _ := bson.Marshal(ctdfStop)
@@ -109,38 +111,38 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 					insertModel.SetDocument(bsonRep)
 
 					stopOperations = append(stopOperations, insertModel)
-					stopOperationInsert += 1
+					atomic.AddUint64(&stopOperationInsert, 1)
 				} else if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
 
 					stopOperations = append(stopOperations, updateModel)
-					stopOperationUpdate += 1
+					atomic.AddUint64(&stopOperationUpdate, 1)
 				}
 			}
+
+			if len(stopOperations) > 0 {
+				_, err = stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to bulk write Stops")
+				}
+			}
+
 			processingGroup.Done()
 		}(batchSlice)
 	}
 
 	processingGroup.Wait()
 
+	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stopOperationInsert)
 	log.Info().Msgf(" - %d updates", stopOperationUpdate)
 
-	if len(stopOperations) > 0 {
-		_, err = stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write Stops")
-		}
-		log.Info().Msg(" - Written to MongoDB")
-	}
-
 	// StopAreas
 	log.Info().Msg("Converting & Importing CTDF StopGroups into Mongo")
-	stopGroupOperations := []mongo.WriteModel{}
-	stopGroupsOperationInsert := 0
-	stopGroupsOperationUpdate := 0
+	var stopGroupsOperationInsert uint64
+	var stopGroupsOperationUpdate uint64
 
 	maxBatchSize = int(len(naptanDoc.StopAreas) / runtime.NumCPU())
 	numBatches = int(math.Ceil(float64(len(naptanDoc.StopAreas)) / float64(maxBatchSize)))
@@ -159,6 +161,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 		batchSlice := naptanDoc.StopAreas[lower:upper]
 
 		go func(stopAreas []StopArea) {
+			stopGroupOperations := []mongo.WriteModel{}
+
 			for _, naptanStopArea := range stopAreas {
 				ctdfStopGroup := naptanStopArea.ToCTDF()
 
@@ -173,7 +177,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 					stopGroupOperations = append(stopGroupOperations, insertModel)
 
-					stopGroupsOperationInsert += 1
+					atomic.AddUint64(&stopGroupsOperationInsert, 1)
 				} else if existingStopGroup.ModificationDateTime != ctdfStopGroup.ModificationDateTime {
 					updateModel := mongo.NewUpdateOneModel()
 
@@ -184,23 +188,24 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 					stopGroupOperations = append(stopGroupOperations, updateModel)
 
-					stopGroupsOperationUpdate += 1
+					atomic.AddUint64(&stopGroupsOperationUpdate, 1)
 				}
 			}
+
+			if len(stopGroupOperations) > 0 {
+				_, err = stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to bulk write StopGroups")
+				}
+			}
+
 			processingGroup.Done()
 		}(batchSlice)
 	}
 
 	processingGroup.Wait()
 
+	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stopGroupsOperationInsert)
 	log.Info().Msgf(" - %d updates", stopGroupsOperationUpdate)
-
-	if len(stopGroupOperations) > 0 {
-		_, err = stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write StopGroups")
-		}
-		log.Info().Msg(" - Written to MongoDB")
-	}
 }
