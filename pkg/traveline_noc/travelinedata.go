@@ -3,7 +3,10 @@ package travelinenoc
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
+	"runtime"
+	"sync"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -240,42 +243,62 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	operatorOperationInsert := 0
 	operatorOperationUpdate := 0
 
-	for _, operator := range operators {
-		var existingCtdfOperator *ctdf.Operator
-		operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
+	maxBatchSize := int(len(operators) / runtime.NumCPU())
+	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
 
-		if existingCtdfOperator == nil {
-			operator.CreationDateTime = time.Now()
-			operator.ModificationDateTime = time.Now()
+	processingGroup := sync.WaitGroup{}
+	processingGroup.Add(numBatches)
 
-			insertModel := mongo.NewInsertOneModel()
+	for i := 0; i < numBatches; i++ {
+		lower := maxBatchSize * i
+		upper := maxBatchSize * (i + 1)
 
-			bsonRep, _ := bson.Marshal(operator)
-			insertModel.SetDocument(bsonRep)
-
-			operatorOperations = append(operatorOperations, insertModel)
-
-			operatorOperationInsert += 1
-		} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
-			operator.CreationDateTime = existingCtdfOperator.CreationDateTime
-			operator.ModificationDateTime = time.Now()
-
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
-
-			bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
-			updateModel.SetUpdate(bsonRep)
-
-			operatorOperations = append(operatorOperations, updateModel)
-
-			operatorOperationUpdate += 1
+		if upper > len(operators) {
+			upper = len(operators)
 		}
+
+		batchSlice := operators[lower:upper]
+
+		go func(operatorsBatch []*ctdf.Operator) {
+			for _, operator := range operatorsBatch {
+				var existingCtdfOperator *ctdf.Operator
+				operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
+
+				if existingCtdfOperator == nil {
+					operator.CreationDateTime = time.Now()
+					operator.ModificationDateTime = time.Now()
+
+					insertModel := mongo.NewInsertOneModel()
+
+					bsonRep, _ := bson.Marshal(operator)
+					insertModel.SetDocument(bsonRep)
+
+					operatorOperations = append(operatorOperations, insertModel)
+
+					operatorOperationInsert += 1
+				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
+					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
+					operator.ModificationDateTime = time.Now()
+
+					updateModel := mongo.NewUpdateOneModel()
+					updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
+
+					bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
+					updateModel.SetUpdate(bsonRep)
+
+					operatorOperations = append(operatorOperations, updateModel)
+
+					operatorOperationUpdate += 1
+				}
+			}
+			processingGroup.Done()
+		}(batchSlice)
 	}
+
+	processingGroup.Wait()
 
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
-
-	// pretty.Println(operatorOperations)
 
 	if len(operatorOperations) > 0 {
 		_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
@@ -291,37 +314,59 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 	operatorGroupOperationInsert := 0
 	operatorGroupOperationUpdate := 0
 
-	for _, operatorGroup := range operatorGroups {
-		var existingCtdfOperatorGroup *ctdf.OperatorGroup
-		operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
+	maxBatchSize = int(len(operatorGroups) / runtime.NumCPU())
+	numBatches = int(math.Ceil(float64(len(operatorGroups)) / float64(maxBatchSize)))
 
-		if existingCtdfOperatorGroup == nil {
-			operatorGroup.CreationDateTime = time.Now()
-			operatorGroup.ModificationDateTime = time.Now()
+	processingGroup = sync.WaitGroup{}
+	processingGroup.Add(numBatches)
 
-			insertModel := mongo.NewInsertOneModel()
+	for i := 0; i < numBatches; i++ {
+		lower := maxBatchSize * i
+		upper := maxBatchSize * (i + 1)
 
-			bsonRep, _ := bson.Marshal(operatorGroup)
-			insertModel.SetDocument(bsonRep)
-
-			operatorGroupOperations = append(operatorGroupOperations, insertModel)
-
-			operatorGroupOperationInsert += 1
-		} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
-			operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
-			operatorGroup.ModificationDateTime = time.Now()
-
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
-
-			bsonRep, _ := bson.Marshal(bson.M{"$set": operatorGroup})
-			updateModel.SetUpdate(bsonRep)
-
-			operatorGroupOperations = append(operatorGroupOperations, updateModel)
-
-			operatorGroupOperationUpdate += 1
+		if upper > len(operatorGroups) {
+			upper = len(operatorGroups)
 		}
+
+		batchSlice := operatorGroups[lower:upper]
+
+		go func(operatorGroupsBatch []*ctdf.OperatorGroup) {
+			for _, operatorGroup := range operatorGroupsBatch {
+				var existingCtdfOperatorGroup *ctdf.OperatorGroup
+				operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
+
+				if existingCtdfOperatorGroup == nil {
+					operatorGroup.CreationDateTime = time.Now()
+					operatorGroup.ModificationDateTime = time.Now()
+
+					insertModel := mongo.NewInsertOneModel()
+
+					bsonRep, _ := bson.Marshal(operatorGroup)
+					insertModel.SetDocument(bsonRep)
+
+					operatorGroupOperations = append(operatorGroupOperations, insertModel)
+
+					operatorGroupOperationInsert += 1
+				} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
+					operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
+					operatorGroup.ModificationDateTime = time.Now()
+
+					updateModel := mongo.NewUpdateOneModel()
+					updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
+
+					bsonRep, _ := bson.Marshal(bson.M{"$set": operatorGroup})
+					updateModel.SetUpdate(bsonRep)
+
+					operatorGroupOperations = append(operatorGroupOperations, updateModel)
+
+					operatorGroupOperationUpdate += 1
+				}
+			}
+			processingGroup.Done()
+		}(batchSlice)
 	}
+
+	processingGroup.Wait()
 
 	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
