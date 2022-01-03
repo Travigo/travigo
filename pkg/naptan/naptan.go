@@ -25,8 +25,8 @@ type NaPTAN struct {
 
 	SchemaVersion string `xml:",attr"`
 
-	StopPoints []StopPoint
-	StopAreas  []StopArea
+	StopPoints []*StopPoint
+	StopAreas  []*StopArea
 }
 
 func (n *NaPTAN) Validate() error {
@@ -96,7 +96,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 		batchSlice := naptanDoc.StopPoints[lower:upper]
 
-		go func(stopPoints []StopPoint) {
+		go func(stopPoints []*StopPoint) {
 			stopOperations := []mongo.WriteModel{}
 
 			for _, naptanStopPoint := range stopPoints {
@@ -160,7 +160,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 		batchSlice := naptanDoc.StopAreas[lower:upper]
 
-		go func(stopAreas []StopArea) {
+		go func(stopAreas []*StopArea) {
 			stopGroupOperations := []mongo.WriteModel{}
 
 			for _, naptanStopArea := range stopAreas {

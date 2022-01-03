@@ -9,8 +9,8 @@ import (
 
 func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, error) {
 	naptan := NaPTAN{}
-	naptan.StopPoints = []StopPoint{}
-	naptan.StopAreas = []StopArea{}
+	naptan.StopPoints = []*StopPoint{}
+	naptan.StopAreas = []*StopArea{}
 
 	f, err := os.Open(file)
 	if err != nil {
@@ -56,7 +56,7 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 					log.Fatalf("Error decoding item: %s", err)
 				} else if matchesFilter(&stopPoint) {
 					stopPoint.Location.UpdateCoordinates()
-					naptan.StopPoints = append(naptan.StopPoints, stopPoint)
+					naptan.StopPoints = append(naptan.StopPoints, &stopPoint)
 				}
 			} else if ty.Name.Local == "StopArea" {
 				var stopArea StopArea
@@ -65,7 +65,7 @@ func ParseXMLFile(file string, matchesFilter func(interface{}) bool) (*NaPTAN, e
 					log.Fatalf("Error decoding item: %s", err)
 				} else if matchesFilter(&stopArea) {
 					stopArea.Location.UpdateCoordinates()
-					naptan.StopAreas = append(naptan.StopAreas, stopArea)
+					naptan.StopAreas = append(naptan.StopAreas, &stopArea)
 				}
 			}
 		default:
