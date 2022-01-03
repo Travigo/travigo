@@ -27,7 +27,7 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 	modificationTime, _ := time.Parse(DateTimeFormat, orig.ModificationDateTime)
 
 	ctdfStopGroup := ctdf.StopGroup{
-		Identifier:           fmt.Sprintf("UK:STOPGRP:%s", orig.StopAreaCode),
+		Identifier:           fmt.Sprintf(ctdf.StopGroupIDFormat, orig.StopAreaCode),
 		Name:                 orig.Name,
 		Status:               orig.Status,
 		CreationDateTime:     creationTime,

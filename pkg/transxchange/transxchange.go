@@ -43,7 +43,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF() {
 	for i := 0; i < len(doc.Operators); i++ {
 		operator := doc.Operators[i]
 
-		operatorLocalMapping[operator.ID] = fmt.Sprintf("UK:NOC:%s", operator.NationalOperatorCode)
+		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorIDFormat, operator.NationalOperatorCode)
 	}
 
 	// Get CTDF services from TransXChange Services & Lines

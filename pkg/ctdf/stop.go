@@ -2,6 +2,8 @@ package ctdf
 
 import "time"
 
+const StopIDFormat = "UK:ATCO:%s"
+
 type Stop struct {
 	PrimaryIdentifier string
 	OtherIdentifiers  map[string]string

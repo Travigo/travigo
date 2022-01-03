@@ -73,7 +73,7 @@ func main() {
 						},
 						Action: func(c *cli.Context) error {
 							url := c.String("url")
-							log.Info().Msgf("NaPTAN file import from %s", url)
+							log.Info().Msgf("NaPTAN HTTP import from %s", url)
 
 							resp, err := http.Get(url)
 

@@ -96,7 +96,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 		groupRecord := t.GroupsRecords[i]
 
 		ctdfRecord := &ctdf.OperatorGroup{
-			Identifier: fmt.Sprintf("UK:NOCGRPID:%s", groupRecord.GroupID),
+			Identifier: fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupRecord.GroupID),
 			Name:       groupRecord.GroupName,
 		}
 		operatorGroups = append(operatorGroups, ctdfRecord)
@@ -116,7 +116,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 		var ctdfRecord *ctdf.Operator
 		operators, ctdfRecord, _ = findOrCreateCTDFRecord(operators, operatorNOCCodes, nocLineRecord.NOCCode)
 
-		ctdfRecord.PrimaryIdentifier = fmt.Sprintf("UK:NOC:%s", nocLineRecord.NOCCode)
+		ctdfRecord.PrimaryIdentifier = fmt.Sprintf(ctdf.OperatorIDFormat, nocLineRecord.NOCCode)
 		ctdfRecord.PrimaryName = nocLineRecord.PublicName
 		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 		ctdfRecord.Licence = nocLineRecord.Licence
@@ -148,7 +148,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 			if operatorRecord.ManagementDivisionID != "" {
 				groupID := mgmtDivisionGroupIDs[operatorRecord.ManagementDivisionID]
 
-				ctdfRecord.OperatorGroup = fmt.Sprintf("UK:NOCGRPID:%s", groupID)
+				ctdfRecord.OperatorGroup = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
 			}
 		}
 	}

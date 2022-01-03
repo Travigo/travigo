@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const OperatorIDFormat = "UK:NOC:%s"
+
 type Operator struct {
 	PrimaryIdentifier string
 	OtherIdentifiers  map[string]string

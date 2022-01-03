@@ -50,7 +50,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	modificationTime, _ := time.Parse(DateTimeFormat, orig.ModificationDateTime)
 
 	ctdfStop := ctdf.Stop{
-		PrimaryIdentifier: fmt.Sprintf("UK:ATCO:%s", orig.AtcoCode),
+		PrimaryIdentifier: fmt.Sprintf(ctdf.StopIDFormat, orig.AtcoCode),
 		OtherIdentifiers: map[string]string{
 			"AtcoCode":   orig.AtcoCode,
 			"NaptanCode": orig.NaptanCode,
@@ -82,7 +82,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 		ctdfStop.Associations = append(ctdfStop.Associations, ctdf.StopAssociation{
 			Type:                 "stop_group",
-			AssociatedIdentifier: fmt.Sprintf("UK:STOPGRP:%s", stopArea.StopAreaCode),
+			AssociatedIdentifier: fmt.Sprintf(ctdf.StopGroupIDFormat, stopArea.StopAreaCode),
 		})
 	}
 

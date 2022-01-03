@@ -9,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+const StopGroupIDFormat = "UK:STOPGRP:%s"
+
 type StopGroup struct {
 	Identifier string
 
