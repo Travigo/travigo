@@ -12,6 +12,8 @@ type OperatorGroup struct {
 	Identifier string
 	Name       string
 
+	DataSource *DataSource
+
 	CreationDateTime     time.Time
 	ModificationDateTime time.Time
 }

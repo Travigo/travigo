@@ -21,6 +21,7 @@ import (
 )
 
 type TravelineData struct {
+	GenerationDate             string `xml:",attr"`
 	NOCLinesRecords            []NOCLinesRecord
 	NOCTableRecords            []NOCTableRecord
 	OperatorsRecords           []OperatorsRecord
@@ -36,7 +37,8 @@ func findOrCreateCTDFRecord(operators []*ctdf.Operator, idMap map[string]int, id
 		return operators, ctdfRecord, idMap[identifier]
 	} else {
 		ctdfRecord := &ctdf.Operator{
-			OtherNames: []string{},
+			OtherNames:       []string{},
+			OtherIdentifiers: map[string]string{},
 		}
 		operators = append(operators, ctdfRecord)
 
@@ -57,7 +59,8 @@ func findManyOrCreateCTDFRecord(operators []*ctdf.Operator, idMap map[string][]i
 		return operators, ctdfRecords
 	} else {
 		ctdfRecord := &ctdf.Operator{
-			OtherNames: []string{},
+			OtherNames:       []string{},
+			OtherIdentifiers: map[string]string{},
 		}
 		operators = append(operators, ctdfRecord)
 
@@ -117,6 +120,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 		operators, ctdfRecord, _ = findOrCreateCTDFRecord(operators, operatorNOCCodes, nocLineRecord.NOCCode)
 
 		ctdfRecord.PrimaryIdentifier = fmt.Sprintf(ctdf.OperatorIDFormat, nocLineRecord.NOCCode)
+		ctdfRecord.OtherIdentifiers["NOC"] = nocLineRecord.NOCCode
 		ctdfRecord.PrimaryName = nocLineRecord.PublicName
 		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 		ctdfRecord.Licence = nocLineRecord.Licence
@@ -200,7 +204,11 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	return filteredOperators, operatorGroups
 }
 
-func (t *TravelineData) ImportIntoMongoAsCTDF() {
+func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+	datasource.OriginalFormat = "traveline-noc"
+	datasource.Provider = "traveline"
+	datasource.Identifier = t.GenerationDate
+
 	log.Info().Msg("Coverting to CTDF")
 	operators, operatorGroups := t.convertToCTDF()
 	log.Info().Msgf(" - %d Operators", len(operators))
@@ -269,6 +277,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 				if existingCtdfOperator == nil {
 					operator.CreationDateTime = time.Now()
 					operator.ModificationDateTime = time.Now()
+					operator.DataSource = datasource
 
 					insertModel := mongo.NewInsertOneModel()
 
@@ -281,6 +290,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
 					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
 					operator.ModificationDateTime = time.Now()
+					operator.DataSource = datasource
 
 					updateModel := mongo.NewUpdateOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
@@ -342,6 +352,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 				if existingCtdfOperatorGroup == nil {
 					operatorGroup.CreationDateTime = time.Now()
 					operatorGroup.ModificationDateTime = time.Now()
+					operatorGroup.DataSource = datasource
 
 					insertModel := mongo.NewInsertOneModel()
 
@@ -354,6 +365,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF() {
 				} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
 					operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
 					operatorGroup.ModificationDateTime = time.Now()
+					operatorGroup.DataSource = datasource
 
 					updateModel := mongo.NewUpdateOneModel()
 					updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})

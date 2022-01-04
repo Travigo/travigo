@@ -44,7 +44,10 @@ func (n *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
+func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+	datasource.OriginalFormat = "naptan"
+	datasource.Identifier = naptanDoc.ModificationDateTime
+
 	stopsCollection := database.GetCollection("stops")
 	stopGroupsCollection := database.GetCollection("stop_groups")
 
@@ -102,6 +105,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
+				ctdfStop.DataSource = datasource
 				bsonRep, _ := bson.Marshal(ctdfStop)
 
 				var existingCtdfStop *ctdf.Stop
@@ -166,6 +170,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF() {
 
 			for _, naptanStopArea := range stopAreas {
 				ctdfStopGroup := naptanStopArea.ToCTDF()
+				ctdfStopGroup.DataSource = datasource
 
 				var existingStopGroup *ctdf.StopGroup
 				stopGroupsCollection.FindOne(context.Background(), bson.M{"identifier": ctdfStopGroup.Identifier}).Decode(&existingStopGroup)

@@ -15,7 +15,7 @@ func StopsRouter(router fiber.Router) {
 }
 
 func listStops(c *fiber.Ctx) error {
-	c.SendString("List stops")
+	c.SendString("NOT IMPLEMENTED")
 	return nil
 }
 

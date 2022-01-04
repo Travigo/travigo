@@ -24,7 +24,16 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 
 		switch ty := tok.(type) {
 		case xml.StartElement:
-			if ty.Name.Local == "NOCLinesRecord" {
+			if ty.Name.Local == "travelinedata" {
+				for i := 0; i < len(ty.Attr); i++ {
+					attr := ty.Attr[i]
+
+					switch attr.Name.Local {
+					case "generationDate":
+						travelineData.GenerationDate = attr.Value
+					}
+				}
+			} else if ty.Name.Local == "NOCLinesRecord" {
 				var NOCLinesRecord NOCLinesRecord
 
 				if err = d.DecodeElement(&NOCLinesRecord, &ty); err != nil {

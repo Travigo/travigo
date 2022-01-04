@@ -71,10 +71,6 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			Type:        "Point",
 			Coordinates: []float64{orig.Location.Longitude, orig.Location.Latitude},
 		},
-
-		DataSource: &ctdf.DataSource{
-			OriginalFormat: "naptan",
-		},
 	}
 
 	for i := 0; i < len(orig.StopAreas); i++ {

@@ -10,11 +10,11 @@ func SetupServer(listen string) {
 
 	webApp.Get("version", routes.APIVersion)
 
-	stopsGroup := webApp.Group("/stops")
-	routes.StopsRouter(stopsGroup)
+	routes.StopsRouter(webApp.Group("/stops"))
+	routes.StopGroupsRouter(webApp.Group("/stop_groups"))
 
-	stopGroupsGroup := webApp.Group("/stopgroups")
-	routes.StopGroupsRouter(stopGroupsGroup)
+	routes.OperatorsRouter(webApp.Group("/operators"))
+	routes.OperatorGroupsRouter(webApp.Group("/operator_groups"))
 
 	webApp.Listen(listen)
 }

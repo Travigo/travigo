@@ -2,10 +2,12 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/transxchange"
@@ -55,7 +57,10 @@ func main() {
 								return err
 							}
 
-							naptanDoc.ImportIntoMongoAsCTDF()
+							naptanDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+								Provider: "Department of Transport",
+								Dataset:  fmt.Sprintf("local-file:%s", filePath),
+							})
 
 							return nil
 						},
@@ -88,7 +93,10 @@ func main() {
 								return err
 							}
 
-							naptanDoc.ImportIntoMongoAsCTDF()
+							naptanDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+								Provider: "Department of Transport",
+								Dataset:  url,
+							})
 
 							return nil
 						},
@@ -124,7 +132,9 @@ func main() {
 								return err
 							}
 
-							travelineData.ImportIntoMongoAsCTDF()
+							travelineData.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+								Dataset: fmt.Sprintf("local-file:%s", filePath),
+							})
 
 							return nil
 						},
@@ -156,7 +166,9 @@ func main() {
 								return err
 							}
 
-							travelineData.ImportIntoMongoAsCTDF()
+							travelineData.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+								Dataset: url,
+							})
 
 							return nil
 						},
