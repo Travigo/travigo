@@ -2,7 +2,7 @@ package ctdf
 
 import "time"
 
-const StopIDFormat = "UK:ATCO:%s"
+const StopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
 	PrimaryIdentifier string

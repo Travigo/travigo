@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const OperatorGroupIDFormat = "UK:NOCGRPID:%s"
+const OperatorGroupIDFormat = "GB:NOCGRPID:%s"
 
 type OperatorGroup struct {
 	Identifier string
