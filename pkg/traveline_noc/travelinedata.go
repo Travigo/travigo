@@ -206,7 +206,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 
 func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "traveline-noc"
-	datasource.Provider = "traveline"
+	datasource.Provider = "Traveline"
 	datasource.Identifier = t.GenerationDate
 
 	log.Info().Msg("Coverting to CTDF")
