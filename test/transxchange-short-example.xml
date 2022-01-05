@@ -6746,6 +6746,1567 @@
         <RunTime>PT0S</RunTime>
       </JourneyPatternTimingLink>
     </JourneyPatternSection>
+    <JourneyPatternSection id="JPS9">
+      <JourneyPatternTimingLink id="JPTL384">
+        <From SequenceNumber="1" id="JPSU767">
+          <Activity>pickUp</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB020</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </From>
+        <To SequenceNumber="2" id="JPSU768">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL203</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL385">
+        <From SequenceNumber="2" id="JPSU769">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="3" id="JPSU770">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB011</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL204</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL386">
+        <From SequenceNumber="3" id="JPSU771">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB011</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="4" id="JPSU772">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB024</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL205</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL387">
+        <From SequenceNumber="4" id="JPSU773">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB024</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="5" id="JPSU774">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL206</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL388">
+        <From SequenceNumber="5" id="JPSU775">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="6" id="JPSU776">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB015</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL207</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL389">
+        <From SequenceNumber="6" id="JPSU777">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB015</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </From>
+        <To SequenceNumber="7" id="JPSU778">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB028</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>849</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL208</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL390">
+        <From SequenceNumber="7" id="JPSU779">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB028</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>849</FareStageNumber>
+        </From>
+        <To SequenceNumber="8" id="JPSU780">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB031</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL209</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL391">
+        <From SequenceNumber="8" id="JPSU781">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB031</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </From>
+        <To SequenceNumber="9" id="JPSU782">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB025</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL210</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL392">
+        <From SequenceNumber="9" id="JPSU783">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB025</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="10" id="JPSU784">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL211</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL393">
+        <From SequenceNumber="10" id="JPSU785">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </From>
+        <To SequenceNumber="12" id="JPSU786">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB008</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL212</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL394">
+        <From SequenceNumber="12" id="JPSU787">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB008</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </From>
+        <To SequenceNumber="13" id="JPSU788">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL213</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL395">
+        <From SequenceNumber="13" id="JPSU789">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="14" id="JPSU790">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL214</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL396">
+        <From SequenceNumber="14" id="JPSU791">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="15" id="JPSU792">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE013</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL215</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL397">
+        <From SequenceNumber="15" id="JPSU793">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE013</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </From>
+        <To SequenceNumber="16" id="JPSU794">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE012</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL216</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL398">
+        <From SequenceNumber="16" id="JPSU795">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE012</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </From>
+        <To SequenceNumber="17" id="JPSU796">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL217</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL399">
+        <From SequenceNumber="17" id="JPSU797">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="18" id="JPSU798">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY353</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL218</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL400">
+        <From SequenceNumber="18" id="JPSU799">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY353</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="19" id="JPSU800">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY342</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL219</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL401">
+        <From SequenceNumber="19" id="JPSU801">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY342</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="20" id="JPSU802">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY344</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL220</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL402">
+        <From SequenceNumber="20" id="JPSU803">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY344</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="21" id="JPSU804">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY348</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL221</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL403">
+        <From SequenceNumber="21" id="JPSU805">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY348</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </From>
+        <To SequenceNumber="22" id="JPSU806">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY259</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>18</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL222</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL404">
+        <From SequenceNumber="22" id="JPSU807">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY259</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>18</FareStageNumber>
+        </From>
+        <To SequenceNumber="23" id="JPSU808">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY322</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL223</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL405">
+        <From SequenceNumber="23" id="JPSU809">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY322</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="24" id="JPSU810">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY271</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL224</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL406">
+        <From SequenceNumber="24" id="JPSU811">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY271</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="25" id="JPSU812">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY268</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL225</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL407">
+        <From SequenceNumber="25" id="JPSU813">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY268</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="26" id="JPSU814">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY079</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL226</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL408">
+        <From SequenceNumber="26" id="JPSU815">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY079</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="27" id="JPSU816">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY294</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>10</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL227</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL409">
+        <From SequenceNumber="27" id="JPSU817">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY294</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>10</FareStageNumber>
+        </From>
+        <To SequenceNumber="28" id="JPSU818">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY049</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL228</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL410">
+        <From SequenceNumber="28" id="JPSU819">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY049</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="29" id="JPSU820">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY059</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>2</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL229</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL411">
+        <From SequenceNumber="29" id="JPSU821">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY059</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>2</FareStageNumber>
+        </From>
+        <To SequenceNumber="30" id="JPSU822">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY064</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>9</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL230</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL412">
+        <From SequenceNumber="30" id="JPSU823">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY064</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>9</FareStageNumber>
+        </From>
+        <To SequenceNumber="31" id="JPSU824">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY063</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>8</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL231</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL413">
+        <From SequenceNumber="31" id="JPSU825">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY063</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>8</FareStageNumber>
+        </From>
+        <To SequenceNumber="32" id="JPSU826">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY528</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>7</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL232</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL414">
+        <From SequenceNumber="32" id="JPSU827">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY528</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>7</FareStageNumber>
+        </From>
+        <To SequenceNumber="33" id="JPSU828">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY201</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL233</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL415">
+        <From SequenceNumber="33" id="JPSU829">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY201</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="34" id="JPSU830">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY222</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>6</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL234</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL416">
+        <From SequenceNumber="34" id="JPSU831">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY222</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>6</FareStageNumber>
+        </From>
+        <To SequenceNumber="35" id="JPSU832">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY321</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL235</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL417">
+        <From SequenceNumber="35" id="JPSU833">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY321</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </From>
+        <To SequenceNumber="36" id="JPSU834">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY495</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL236</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL418">
+        <From SequenceNumber="36" id="JPSU835">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY495</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="37" id="JPSU836">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY494</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL237</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL419">
+        <From SequenceNumber="37" id="JPSU837">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY494</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="38" id="JPSU838">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY111</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL238</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL420">
+        <From SequenceNumber="38" id="JPSU839">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY111</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="39" id="JPSU840">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY110</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL239</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL421">
+        <From SequenceNumber="39" id="JPSU841">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY110</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </From>
+        <To SequenceNumber="40" id="JPSU842">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY387</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>4</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL240</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL422">
+        <From SequenceNumber="40" id="JPSU843">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY387</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>4</FareStageNumber>
+        </From>
+        <To SequenceNumber="41" id="JPSU844">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY406</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>14</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL241</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL423">
+        <From SequenceNumber="41" id="JPSU845">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY406</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>14</FareStageNumber>
+        </From>
+        <To SequenceNumber="42" id="JPSU846">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY408</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL242</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL424">
+        <From SequenceNumber="42" id="JPSU847">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY408</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="43" id="JPSU848">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY386</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL243</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL425">
+        <From SequenceNumber="43" id="JPSU849">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY386</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="44" id="JPSU850">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY314</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL244</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL426">
+        <From SequenceNumber="44" id="JPSU851">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY314</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </From>
+        <To SequenceNumber="45" id="JPSU852">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY302</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL245</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL427">
+        <From SequenceNumber="45" id="JPSU853">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY302</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="46" id="JPSU854">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY305</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL246</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL428">
+        <From SequenceNumber="46" id="JPSU855">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY305</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="47" id="JPSU856">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY293</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL247</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL429">
+        <From SequenceNumber="47" id="JPSU857">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY293</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="48" id="JPSU858">
+          <Activity>setDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY242</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL248</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+    </JourneyPatternSection>
+    <JourneyPatternSection id="JPS6">
+      <JourneyPatternTimingLink id="JPTL238">
+        <From SequenceNumber="1" id="JPSU475">
+          <Activity>pickUp</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB020</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </From>
+        <To SequenceNumber="2" id="JPSU476">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL203</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL239">
+        <From SequenceNumber="2" id="JPSU477">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="3" id="JPSU478">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB011</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL204</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL240">
+        <From SequenceNumber="3" id="JPSU479">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB011</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="4" id="JPSU480">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB024</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL205</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL241">
+        <From SequenceNumber="4" id="JPSU481">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB024</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="5" id="JPSU482">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL206</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL242">
+        <From SequenceNumber="5" id="JPSU483">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="6" id="JPSU484">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB015</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL207</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL243">
+        <From SequenceNumber="6" id="JPSU485">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB015</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>13</FareStageNumber>
+        </From>
+        <To SequenceNumber="7" id="JPSU486">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB028</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>849</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL208</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL244">
+        <From SequenceNumber="7" id="JPSU487">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB028</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>849</FareStageNumber>
+        </From>
+        <To SequenceNumber="8" id="JPSU488">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB031</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL209</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL245">
+        <From SequenceNumber="8" id="JPSU489">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB031</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </From>
+        <To SequenceNumber="9" id="JPSU490">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB025</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL210</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL246">
+        <From SequenceNumber="9" id="JPSU491">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB025</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="10" id="JPSU492">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL211</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL247">
+        <From SequenceNumber="10" id="JPSU493">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>848</FareStageNumber>
+        </From>
+        <To SequenceNumber="12" id="JPSU494">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB008</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL212</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL248">
+        <From SequenceNumber="12" id="JPSU495">
+          <WaitTime>PT0S</WaitTime>
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500SFULB008</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </From>
+        <To SequenceNumber="13" id="JPSU496">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL213</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL249">
+        <From SequenceNumber="13" id="JPSU497">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE010</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="14" id="JPSU498">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL214</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL250">
+        <From SequenceNumber="14" id="JPSU499">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE001</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="15" id="JPSU500">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE013</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL215</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL251">
+        <From SequenceNumber="15" id="JPSU501">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE013</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>24</FareStageNumber>
+        </From>
+        <To SequenceNumber="16" id="JPSU502">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE012</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL216</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL252">
+        <From SequenceNumber="16" id="JPSU503">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE012</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </From>
+        <To SequenceNumber="17" id="JPSU504">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL217</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL253">
+        <From SequenceNumber="17" id="JPSU505">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500STEVE007</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="18" id="JPSU506">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY353</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL218</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL254">
+        <From SequenceNumber="18" id="JPSU507">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY353</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="19" id="JPSU508">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY342</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL219</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL255">
+        <From SequenceNumber="19" id="JPSU509">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY342</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="20" id="JPSU510">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY344</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL220</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL256">
+        <From SequenceNumber="20" id="JPSU511">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY344</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="21" id="JPSU512">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY348</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL221</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL257">
+        <From SequenceNumber="21" id="JPSU513">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY348</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>12</FareStageNumber>
+        </From>
+        <To SequenceNumber="22" id="JPSU514">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY259</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>18</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL222</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL258">
+        <From SequenceNumber="22" id="JPSU515">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY259</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>18</FareStageNumber>
+        </From>
+        <To SequenceNumber="23" id="JPSU516">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY322</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL223</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL259">
+        <From SequenceNumber="23" id="JPSU517">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY322</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="24" id="JPSU518">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY271</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL224</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL260">
+        <From SequenceNumber="24" id="JPSU519">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY271</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="25" id="JPSU520">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY268</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL225</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL261">
+        <From SequenceNumber="25" id="JPSU521">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY268</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="26" id="JPSU522">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY079</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL226</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL262">
+        <From SequenceNumber="26" id="JPSU523">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY079</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="27" id="JPSU524">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY294</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>10</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL227</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL263">
+        <From SequenceNumber="27" id="JPSU525">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY294</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>10</FareStageNumber>
+        </From>
+        <To SequenceNumber="28" id="JPSU526">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY049</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL228</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL264">
+        <From SequenceNumber="28" id="JPSU527">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY049</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="29" id="JPSU528">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY059</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>2</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL229</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL265">
+        <From SequenceNumber="29" id="JPSU529">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY059</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>2</FareStageNumber>
+        </From>
+        <To SequenceNumber="30" id="JPSU530">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY064</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>9</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL230</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL266">
+        <From SequenceNumber="30" id="JPSU531">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY064</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>9</FareStageNumber>
+        </From>
+        <To SequenceNumber="31" id="JPSU532">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY063</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>8</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL231</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL267">
+        <From SequenceNumber="31" id="JPSU533">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY063</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>8</FareStageNumber>
+        </From>
+        <To SequenceNumber="32" id="JPSU534">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY528</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>7</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL232</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL268">
+        <From SequenceNumber="32" id="JPSU535">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY528</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>7</FareStageNumber>
+        </From>
+        <To SequenceNumber="33" id="JPSU536">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY201</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL233</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL269">
+        <From SequenceNumber="33" id="JPSU537">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY201</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="34" id="JPSU538">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY222</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>6</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL234</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL270">
+        <From SequenceNumber="34" id="JPSU539">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY222</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>6</FareStageNumber>
+        </From>
+        <To SequenceNumber="35" id="JPSU540">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY321</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL235</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL271">
+        <From SequenceNumber="35" id="JPSU541">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY321</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </From>
+        <To SequenceNumber="36" id="JPSU542">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY495</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL236</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL272">
+        <From SequenceNumber="36" id="JPSU543">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY495</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="37" id="JPSU544">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY494</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL237</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL273">
+        <From SequenceNumber="37" id="JPSU545">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY494</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="38" id="JPSU546">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY111</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL238</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL274">
+        <From SequenceNumber="38" id="JPSU547">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY111</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="39" id="JPSU548">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY110</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL239</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL275">
+        <From SequenceNumber="39" id="JPSU549">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY110</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>5</FareStageNumber>
+        </From>
+        <To SequenceNumber="40" id="JPSU550">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY387</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>4</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL240</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL276">
+        <From SequenceNumber="40" id="JPSU551">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY387</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>4</FareStageNumber>
+        </From>
+        <To SequenceNumber="41" id="JPSU552">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY406</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>14</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL241</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL277">
+        <From SequenceNumber="41" id="JPSU553">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY406</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>14</FareStageNumber>
+        </From>
+        <To SequenceNumber="42" id="JPSU554">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY408</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL242</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL278">
+        <From SequenceNumber="42" id="JPSU555">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY408</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="43" id="JPSU556">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY386</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL243</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL279">
+        <From SequenceNumber="43" id="JPSU557">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY386</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="44" id="JPSU558">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY314</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL244</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL280">
+        <From SequenceNumber="44" id="JPSU559">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY314</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </From>
+        <To SequenceNumber="45" id="JPSU560">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY302</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL245</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL281">
+        <From SequenceNumber="45" id="JPSU561">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY302</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="46" id="JPSU562">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY305</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL246</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL282">
+        <From SequenceNumber="46" id="JPSU563">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY305</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="47" id="JPSU564">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY293</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </To>
+        <RouteLinkRef>RL247</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+      <JourneyPatternTimingLink id="JPTL283">
+        <From SequenceNumber="47" id="JPSU565">
+          <Activity>pickUpAndSetDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY293</StopPointRef>
+          <TimingStatus>otherPoint</TimingStatus>
+        </From>
+        <To SequenceNumber="48" id="JPSU566">
+          <Activity>setDown</Activity>
+          <DynamicDestinationDisplay>Arbury</DynamicDestinationDisplay>
+          <StopPointRef>0500CCITY242</StopPointRef>
+          <TimingStatus>principalTimingPoint</TimingStatus>
+          <FareStageNumber>1</FareStageNumber>
+        </To>
+        <RouteLinkRef>RL248</RouteLinkRef>
+        <RunTime>PT0S</RunTime>
+      </JourneyPatternTimingLink>
+    </JourneyPatternSection>
   </JourneyPatternSections>
   <Operators>
     <Operator id="1" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">

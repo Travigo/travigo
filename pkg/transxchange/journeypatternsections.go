@@ -1,9 +1,23 @@
 package transxchange
 
+import (
+	"errors"
+)
+
 type JourneyPatternSection struct {
 	ID string `xml:"id,attr"`
 
 	JourneyPatternTimingLinks []JourneyPatternTimingLink `xml:"JourneyPatternTimingLink"`
+}
+
+func (jp *JourneyPatternSection) GetTimingLink(ID string) (*JourneyPatternTimingLink, error) {
+	for _, timingLink := range jp.JourneyPatternTimingLinks {
+		if timingLink.ID == ID {
+			return &timingLink, nil
+		}
+	}
+
+	return nil, errors.New("Unable to find timing link")
 }
 
 type JourneyPatternTimingLink struct {

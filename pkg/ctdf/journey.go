@@ -1,6 +1,8 @@
 package ctdf
 
-import "time"
+import (
+	"time"
+)
 
 type Journey struct {
 	PrimaryIdentifier string
@@ -26,6 +28,6 @@ type JourneyPathItem struct {
 	OriginStopRef      string
 	DestinationStopRef string
 
-	Distance            string
+	Distance            float64
 	EstimatedTravelTime string
 }

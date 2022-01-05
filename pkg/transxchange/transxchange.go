@@ -3,6 +3,7 @@ package transxchange
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/kr/pretty"
@@ -46,6 +47,12 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	for _, operator := range doc.Operators {
 		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorIDFormat, operator.NationalOperatorCode)
+	}
+
+	// Create reference map for JourneyPatternSections
+	journeyPatternSectionReferences := map[string]JourneyPatternSection{}
+	for _, journeyPatternSection := range doc.JourneyPatternSections {
+		journeyPatternSectionReferences[journeyPatternSection.ID] = journeyPatternSection
 	}
 
 	// Get CTDF services from TransXChange Services & Lines
@@ -105,7 +112,11 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	for _, txcJourney := range doc.VehicleJourneys {
 		operatorRef := operatorLocalMapping[txcJourney.OperatorRef]
 		serviceRef := fmt.Sprintf("%s:%s:%s", operatorRef, txcJourney.ServiceRef, txcJourney.LineRef)
+
 		journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
+		journeyPatternSection := journeyPatternSectionReferences[journeyPattern.JourneyPatternSectionRefs]
+
+		departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
 		ctdfJourney := ctdf.Journey{
 			PrimaryIdentifier: fmt.Sprintf("%s:%s", operatorRef, txcJourney.PrivateCode),
@@ -119,15 +130,29 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 			DataSource: datasource,
 
-			ServiceRef:  serviceRef,
-			OperatorRef: operatorRef,
-			Direction:   txcJourney.Direction,
-			// DeperatureTime     string // should be some sort of time type
+			ServiceRef:         serviceRef,
+			OperatorRef:        operatorRef,
+			Direction:          txcJourney.Direction,
+			DeperatureTime:     departureTime,
 			DestinationDisplay: journeyPattern.DestinationDisplay,
 
 			// Availability *Availability
 
-			// Path []JourneyPathItem
+			Path: []ctdf.JourneyPathItem{},
+		}
+
+		for _, vehicleJourneyTimingLink := range txcJourney.VehicleJourneyTimingLinks {
+			journeyPatternTimingLink, _ := journeyPatternSection.GetTimingLink(vehicleJourneyTimingLink.JourneyPatternTimingLinkRef)
+
+			pathItem := ctdf.JourneyPathItem{
+				OriginStopRef:      journeyPatternTimingLink.From.StopPointRef,
+				DestinationStopRef: journeyPatternTimingLink.To.StopPointRef,
+
+				EstimatedTravelTime: vehicleJourneyTimingLink.RunTime, // also need to handle wait times
+				Distance:            0,
+			}
+
+			ctdfJourney.Path = append(ctdfJourney.Path, pathItem)
 		}
 
 		journeys = append(journeys, &ctdfJourney)
