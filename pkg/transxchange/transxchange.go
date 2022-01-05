@@ -6,6 +6,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/kr/pretty"
+	"github.com/rs/zerolog/log"
 )
 
 type TransXChange struct {
@@ -36,7 +37,10 @@ func (n *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) ImportIntoMongoAsCTDF() {
+func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+	datasource.OriginalFormat = "transxchange"
+	datasource.Identifier = doc.ModificationDateTime
+
 	// Map the local operator references to glboally unique operator codes based on NOC
 	operatorLocalMapping := map[string]string{}
 
@@ -62,6 +66,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF() {
 					"LineID":      txcLine.ID,
 				},
 
+				DataSource: datasource,
+
 				ServiceName:          txcLine.LineName,
 				CreationDateTime:     txcService.CreationDateTime,
 				ModificationDateTime: txcService.ModificationDateTime,
@@ -86,4 +92,6 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF() {
 			pretty.Println(ctdfService)
 		}
 	}
+
+	log.Info().Msgf("Successfully imported into MongoDB")
 }

@@ -192,31 +192,19 @@ func main() {
 								return errors.New("file path must be provided")
 							}
 
-							// if err := database.Connect(); err != nil {
-							// 	log.Fatal().Err(err).Msg("Failed to connect to database")
-							// }
-
 							filePath := c.Args().Get(0)
 
 							log.Info().Msgf("TransXChange file import from %s", filePath)
 
 							transXChangeDoc, err := transxchange.ParseXMLFile(filePath)
 
-							log.Info().Msgf("Successfully parsed document")
-							log.Info().Msgf(" - Last modified %s", transXChangeDoc.ModificationDateTime)
-							log.Info().Msgf(" - Contains %d operators", len(transXChangeDoc.Operators))
-							log.Info().Msgf(" - Contains %d services", len(transXChangeDoc.Services))
-							log.Info().Msgf(" - Contains %d routes", len(transXChangeDoc.Routes))
-							log.Info().Msgf(" - Contains %d route sections", len(transXChangeDoc.RouteSections))
-							log.Info().Msgf(" - Contains %d vehicle journeys", len(transXChangeDoc.VehicleJourneys))
-
 							if err != nil {
 								return err
 							}
 
-							transXChangeDoc.ImportIntoMongoAsCTDF()
-
-							log.Info().Msgf("Successfully imported into MongoDB")
+							transXChangeDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+								Dataset: fmt.Sprintf("local-file:%s", filePath),
+							})
 
 							return nil
 						},

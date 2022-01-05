@@ -3,8 +3,9 @@ package transxchange
 import (
 	"encoding/xml"
 	"io"
-	"log"
 	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
 func ParseXMLFile(file string) (*TransXChange, error) {
@@ -13,7 +14,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 
 	f, err := os.Open(file)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 	defer f.Close()
 
@@ -24,7 +25,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 			// EOF means we're done.
 			break
 		} else if err != nil {
-			log.Fatalf("Error decoding token: %s", err)
+			log.Fatal().Msgf("Error decoding token: %s", err)
 			return nil, err
 		}
 
@@ -52,7 +53,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var operator Operator
 
 				if err = d.DecodeElement(&operator, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					transXChange.Operators = append(transXChange.Operators, operator)
 				}
@@ -60,7 +61,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var route Route
 
 				if err = d.DecodeElement(&route, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					transXChange.Routes = append(transXChange.Routes, route)
 				}
@@ -68,7 +69,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var service Service
 
 				if err = d.DecodeElement(&service, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					transXChange.Services = append(transXChange.Services, service)
 				}
@@ -76,7 +77,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var jps JourneyPatternSection
 
 				if err = d.DecodeElement(&jps, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					transXChange.JourneyPatternSections = append(transXChange.JourneyPatternSections, jps)
 				}
@@ -84,7 +85,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var routeSection RouteSection
 
 				if err = d.DecodeElement(&routeSection, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					transXChange.RouteSections = append(transXChange.RouteSections, routeSection)
 				}
@@ -92,7 +93,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				var vehicleJourney VehicleJourney
 
 				if err = d.DecodeElement(&vehicleJourney, &ty); err != nil {
-					log.Fatalf("Error decoding item: %s", err)
+					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					vehicleJourney.OperatingProfile.ParseXMLValue()
 					transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, vehicleJourney)
@@ -103,6 +104,14 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 		default:
 		}
 	}
+
+	log.Info().Msgf("Successfully parsed document")
+	log.Info().Msgf(" - Last modified %s", transXChange.ModificationDateTime)
+	log.Info().Msgf(" - Contains %d operators", len(transXChange.Operators))
+	log.Info().Msgf(" - Contains %d services", len(transXChange.Services))
+	log.Info().Msgf(" - Contains %d routes", len(transXChange.Routes))
+	log.Info().Msgf(" - Contains %d route sections", len(transXChange.RouteSections))
+	log.Info().Msgf(" - Contains %d vehicle journeys", len(transXChange.VehicleJourneys))
 
 	return &transXChange, nil
 }
