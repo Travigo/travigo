@@ -12,6 +12,7 @@ import (
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
+	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/urfave/cli/v2"
 
 	"github.com/rs/zerolog"
@@ -24,6 +25,9 @@ func main() {
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
+
+	// Setup the notifications client
+	notify_client.Setup()
 
 	app := &cli.App{
 		Name: "data-importer",
@@ -223,6 +227,9 @@ func main() {
 	}
 
 	err := app.Run(os.Args)
+
+	notify_client.Await()
+
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}

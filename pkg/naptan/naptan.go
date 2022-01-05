@@ -11,6 +11,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -102,6 +103,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		go func(stopPoints []*StopPoint) {
 			stopOperations := []mongo.WriteModel{}
+			var localOperationInsert uint64
+			var localOperationUpdate uint64
 
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
@@ -116,16 +119,19 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					insertModel.SetDocument(bsonRep)
 
 					stopOperations = append(stopOperations, insertModel)
-					atomic.AddUint64(&stopOperationInsert, 1)
+					localOperationInsert += 1
 				} else if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
 
 					stopOperations = append(stopOperations, updateModel)
-					atomic.AddUint64(&stopOperationUpdate, 1)
+					localOperationUpdate += 1
 				}
 			}
+
+			atomic.AddUint64(&stopOperationInsert, localOperationInsert)
+			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
 				_, err = stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
@@ -167,6 +173,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		go func(stopAreas []*StopArea) {
 			stopGroupOperations := []mongo.WriteModel{}
+			var localOperationInsert uint64
+			var localOperationUpdate uint64
 
 			for _, naptanStopArea := range stopAreas {
 				ctdfStopGroup := naptanStopArea.ToCTDF()
@@ -182,8 +190,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					insertModel.SetDocument(bsonRep)
 
 					stopGroupOperations = append(stopGroupOperations, insertModel)
-
-					atomic.AddUint64(&stopGroupsOperationInsert, 1)
+					localOperationInsert += 1
 				} else if existingStopGroup.ModificationDateTime != ctdfStopGroup.ModificationDateTime {
 					updateModel := mongo.NewUpdateOneModel()
 
@@ -193,10 +200,12 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					updateModel.SetUpdate(bsonRep)
 
 					stopGroupOperations = append(stopGroupOperations, updateModel)
-
-					atomic.AddUint64(&stopGroupsOperationUpdate, 1)
+					localOperationUpdate += 1
 				}
 			}
+
+			atomic.AddUint64(&stopOperationInsert, localOperationInsert)
+			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
 
 			if len(stopGroupOperations) > 0 {
 				_, err = stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
@@ -216,4 +225,16 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", stopGroupsOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
+
+	// Send a notification reporting the latest changes
+	notify_client.SendEvent("britbus/naptan/import", bson.M{
+		"Stops": bson.M{
+			"Inserts": stopOperationInsert,
+			"Updates": stopOperationUpdate,
+		},
+		"Stop_Groups": bson.M{
+			"Inserts": stopGroupsOperationInsert,
+			"Updates": stopGroupsOperationUpdate,
+		},
+	})
 }

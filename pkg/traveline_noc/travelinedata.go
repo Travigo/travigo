@@ -13,6 +13,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/util"
+	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -269,6 +270,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		go func(operatorsBatch []*ctdf.Operator) {
 			operatorOperations := []mongo.WriteModel{}
+			var localOperationInsert uint64
+			var localOperationUpdate uint64
 
 			for _, operator := range operatorsBatch {
 				var existingCtdfOperator *ctdf.Operator
@@ -285,8 +288,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					insertModel.SetDocument(bsonRep)
 
 					operatorOperations = append(operatorOperations, insertModel)
-
-					atomic.AddUint64(&operatorOperationInsert, 1)
+					localOperationInsert += 1
 				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
 					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
 					operator.ModificationDateTime = time.Now()
@@ -299,10 +301,12 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					updateModel.SetUpdate(bsonRep)
 
 					operatorOperations = append(operatorOperations, updateModel)
-
-					atomic.AddUint64(&operatorOperationUpdate, 1)
+					localOperationUpdate += 1
 				}
 			}
+
+			atomic.AddUint64(&operatorOperationInsert, localOperationInsert)
+			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
 				_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
@@ -344,6 +348,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		go func(operatorGroupsBatch []*ctdf.OperatorGroup) {
 			operatorGroupOperations := []mongo.WriteModel{}
+			var localOperationInsert uint64
+			var localOperationUpdate uint64
 
 			for _, operatorGroup := range operatorGroupsBatch {
 				var existingCtdfOperatorGroup *ctdf.OperatorGroup
@@ -360,8 +366,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					insertModel.SetDocument(bsonRep)
 
 					operatorGroupOperations = append(operatorGroupOperations, insertModel)
-
-					atomic.AddUint64(&operatorGroupOperationInsert, 1)
+					localOperationInsert += 1
 				} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
 					operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
 					operatorGroup.ModificationDateTime = time.Now()
@@ -374,10 +379,12 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					updateModel.SetUpdate(bsonRep)
 
 					operatorGroupOperations = append(operatorGroupOperations, updateModel)
-
-					atomic.AddUint64(&operatorGroupOperationUpdate, 1)
+					localOperationUpdate += 1
 				}
 			}
+
+			atomic.AddUint64(&operatorGroupOperationInsert, localOperationInsert)
+			atomic.AddUint64(&operatorGroupOperationUpdate, localOperationUpdate)
 
 			if len(operatorGroupOperations) > 0 {
 				_, err = operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
@@ -397,4 +404,16 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
+
+	// Send a notification reporting the latest changes
+	notify_client.SendEvent("britbus/traveline/import", bson.M{
+		"Operators": bson.M{
+			"Inserts": operatorOperationInsert,
+			"Updates": operatorOperationUpdate,
+		},
+		"Operator_Groups": bson.M{
+			"Inserts": operatorGroupOperationInsert,
+			"Updates": operatorGroupOperationUpdate,
+		},
+	})
 }
