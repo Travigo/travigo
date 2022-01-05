@@ -41,26 +41,26 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "transxchange"
 	datasource.Identifier = doc.ModificationDateTime
 
-	// Map the local operator references to glboally unique operator codes based on NOC
+	// Map the local operator references to globally unique operator codes based on NOC
 	operatorLocalMapping := map[string]string{}
 
-	for i := 0; i < len(doc.Operators); i++ {
-		operator := doc.Operators[i]
-
+	for _, operator := range doc.Operators {
 		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorIDFormat, operator.NationalOperatorCode)
 	}
 
 	// Get CTDF services from TransXChange Services & Lines
-	for serviceID := 0; serviceID < len(doc.Services); serviceID++ {
-		txcService := doc.Services[serviceID]
+	services := []*ctdf.Service{}
 
-		for lineID := 0; lineID < len(txcService.Lines); lineID++ {
-			txcLine := txcService.Lines[lineID]
+	journeyPatternReferences := map[string]map[string]JourneyPattern{}
 
+	for _, txcService := range doc.Services {
+		for _, txcLine := range txcService.Lines {
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
 
+			serviceIdentifier := fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID)
+
 			ctdfService := ctdf.Service{
-				PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID),
+				PrimaryIdentifier: serviceIdentifier,
 				OtherIdentifiers: map[string]string{
 					"ServiceCode": txcService.ServiceCode,
 					"LineID":      txcLine.ID,
@@ -89,9 +89,50 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				},
 			}
 
-			pretty.Println(ctdfService)
+			// Add JourneyPatterns into reference map
+			journeyPatternReferences[serviceIdentifier] = map[string]JourneyPattern{}
+			for _, journeyPattern := range txcService.JourneyPatterns {
+				journeyPatternReferences[serviceIdentifier][journeyPattern.ID] = journeyPattern
+			}
+
+			services = append(services, &ctdfService)
 		}
 	}
+	pretty.Println(services)
+
+	// Get CTDF Journeys from TransXChange VehicleJourneys
+	journeys := []*ctdf.Journey{}
+	for _, txcJourney := range doc.VehicleJourneys {
+		operatorRef := operatorLocalMapping[txcJourney.OperatorRef]
+		serviceRef := fmt.Sprintf("%s:%s:%s", operatorRef, txcJourney.ServiceRef, txcJourney.LineRef)
+		journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
+
+		ctdfJourney := ctdf.Journey{
+			PrimaryIdentifier: fmt.Sprintf("%s:%s", operatorRef, txcJourney.PrivateCode),
+			OtherIdentifiers: map[string]string{
+				"PrivateCode": txcJourney.PrivateCode,
+				"JourneyCode": txcJourney.VehicleJourneyCode,
+			},
+
+			CreationDateTime:     txcJourney.CreationDateTime,
+			ModificationDateTime: txcJourney.ModificationDateTime,
+
+			DataSource: datasource,
+
+			ServiceRef:  serviceRef,
+			OperatorRef: operatorRef,
+			Direction:   txcJourney.Direction,
+			// DeperatureTime     string // should be some sort of time type
+			DestinationDisplay: journeyPattern.DestinationDisplay,
+
+			// Availability *Availability
+
+			// Path []JourneyPathItem
+		}
+
+		journeys = append(journeys, &ctdfJourney)
+	}
+	pretty.Println(journeys)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
 }

@@ -1,5 +1,7 @@
 package ctdf
 
+import "time"
+
 type Journey struct {
 	PrimaryIdentifier string
 	OtherIdentifiers  map[string]string
@@ -12,7 +14,7 @@ type Journey struct {
 	ServiceRef         string
 	OperatorRef        string
 	Direction          string
-	DeperatureTime     string // should be some sort of time type
+	DeperatureTime     time.Time
 	DestinationDisplay string
 
 	Availability *Availability

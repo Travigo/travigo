@@ -5349,6 +5349,36 @@
       <Description>Arbury - City Centre - Cherry Hinton - Fulbourn</Description>
       <RouteSectionRef>RS1</RouteSectionRef>
     </Route>
+    <Route id="RT2" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-2</PrivateCode>
+      <Description>Arbury - City Centre - Cherry Hinton</Description>
+      <RouteSectionRef>RS2</RouteSectionRef>
+    </Route>
+    <Route id="RT3" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-3</PrivateCode>
+      <Description>Arbury - City Centre - Cherry Hinton - Fulbourn</Description>
+      <RouteSectionRef>RS3</RouteSectionRef>
+    </Route>
+    <Route id="RT4" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-4</PrivateCode>
+      <Description>Fulbourn - Cherry Hinton - City Centre - Arbury</Description>
+      <RouteSectionRef>RS4</RouteSectionRef>
+    </Route>
+    <Route id="RT5" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-5</PrivateCode>
+      <Description>Fulbourn - Cherry Hinton - City Centre - Arbury</Description>
+      <RouteSectionRef>RS5</RouteSectionRef>
+    </Route>
+    <Route id="RT6" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-6</PrivateCode>
+      <Description>Cherry Hinton - City Centre - Arbury</Description>
+      <RouteSectionRef>RS6</RouteSectionRef>
+    </Route>
+    <Route id="RT7" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
+      <PrivateCode>1-7</PrivateCode>
+      <Description>Fulbourn - Cherry Hinton - City Centre - Arbury</Description>
+      <RouteSectionRef>RS7</RouteSectionRef>
+    </Route>
   </Routes>
   <VehicleJourneys>
     <VehicleJourney SequenceNumber="1" CreationDateTime="2020-11-22T11:00:00" ModificationDateTime="2021-10-19T09:53:01" Modification="revise" RevisionNumber="152">
