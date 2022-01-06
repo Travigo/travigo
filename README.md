@@ -12,11 +12,11 @@ BritBus is currently a heavy WIP and only has the following features implemented
 * Import bus stops & bus stop groups
 * Import bus operators & operator groups
 * Very basic web API providing imported data
+* Import bus lines
+* Import bus timetables (partial)
 
 The following are in the TODO list
 
-* Import bus lines
-* Import bus timetables
 * Endpoint for providing timetable for a given stop/line on each day
 * Calculate realtime bus progress and stop estimates
 * Import fares
@@ -32,7 +32,7 @@ All of Great Britain
 All of Great Britain
 
 #### Lines/Timetables
-None
+Cambridge Stagecoach (partial)
 
 #### Realtime Bus Tracking
 None

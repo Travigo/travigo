@@ -306,7 +306,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			if len(stopOperations) > 0 {
 				_, err = journeysCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
 				if err != nil {
-					log.Fatal().Err(err).Msg("Failed to bulk write Stops")
+					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 				}
 			}
 

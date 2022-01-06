@@ -16,5 +16,8 @@ func SetupServer(listen string) {
 	routes.OperatorsRouter(webApp.Group("/operators"))
 	routes.OperatorGroupsRouter(webApp.Group("/operator_groups"))
 
+	routes.ServicesRouter(webApp.Group("/services"))
+	routes.JourneysRouter(webApp.Group("/journeys"))
+
 	webApp.Listen(listen)
 }
