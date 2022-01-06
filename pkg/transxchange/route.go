@@ -1,7 +1,7 @@
 package transxchange
 
 type Route struct {
-	ID                   string `xml:",attr"`
+	ID                   string `xml:"id,attr"`
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
 

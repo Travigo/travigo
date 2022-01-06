@@ -1,9 +1,21 @@
 package transxchange
 
+import "errors"
+
 type RouteSection struct {
 	ID string `xml:"id,attr"`
 
 	RouteLinks []RouteLink `xml:"RouteLink"`
+}
+
+func (r *RouteSection) GetRouteLink(ID string) (*RouteLink, error) {
+	for _, routeLink := range r.RouteLinks {
+		if routeLink.ID == ID {
+			return &routeLink, nil
+		}
+	}
+
+	return nil, errors.New("could not find route link")
 }
 
 type RouteLink struct {

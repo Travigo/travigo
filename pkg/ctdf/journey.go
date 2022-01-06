@@ -28,6 +28,13 @@ type JourneyPathItem struct {
 	OriginStopRef      string
 	DestinationStopRef string
 
-	Distance            float64
-	EstimatedTravelTime string
+	Distance int
+
+	OriginArivalTime      time.Time
+	DestinationArivalTime time.Time
+
+	OriginDepartureTime time.Time
+
+	// OriginWaitTime      string
+	// DestinationWaitTime string
 }

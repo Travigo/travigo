@@ -55,7 +55,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				if err = d.DecodeElement(&operator, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					transXChange.Operators = append(transXChange.Operators, operator)
+					transXChange.Operators = append(transXChange.Operators, &operator)
 				}
 			} else if ty.Name.Local == "Route" {
 				var route Route
@@ -63,7 +63,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				if err = d.DecodeElement(&route, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					transXChange.Routes = append(transXChange.Routes, route)
+					transXChange.Routes = append(transXChange.Routes, &route)
 				}
 			} else if ty.Name.Local == "Service" {
 				var service Service
@@ -71,7 +71,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				if err = d.DecodeElement(&service, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					transXChange.Services = append(transXChange.Services, service)
+					transXChange.Services = append(transXChange.Services, &service)
 				}
 			} else if ty.Name.Local == "JourneyPatternSection" {
 				var jps JourneyPatternSection
@@ -79,7 +79,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				if err = d.DecodeElement(&jps, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					transXChange.JourneyPatternSections = append(transXChange.JourneyPatternSections, jps)
+					transXChange.JourneyPatternSections = append(transXChange.JourneyPatternSections, &jps)
 				}
 			} else if ty.Name.Local == "RouteSection" {
 				var routeSection RouteSection
@@ -87,7 +87,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 				if err = d.DecodeElement(&routeSection, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					transXChange.RouteSections = append(transXChange.RouteSections, routeSection)
+					transXChange.RouteSections = append(transXChange.RouteSections, &routeSection)
 				}
 			} else if ty.Name.Local == "VehicleJourney" {
 				var vehicleJourney VehicleJourney
@@ -96,7 +96,7 @@ func ParseXMLFile(file string) (*TransXChange, error) {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					vehicleJourney.OperatingProfile.ParseXMLValue()
-					transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, vehicleJourney)
+					transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, &vehicleJourney)
 				}
 				// vehicleJourney := parseVehicleJourney(&tok)
 				// transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, vehicleJourney)
