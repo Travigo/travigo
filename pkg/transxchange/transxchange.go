@@ -264,7 +264,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
 				ctdfJourney := ctdf.Journey{
-					PrimaryIdentifier: fmt.Sprintf("%s:%s", operatorRef, txcJourney.VehicleJourneyCode),
+					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
 					OtherIdentifiers: map[string]string{
 						"PrivateCode": txcJourney.PrivateCode,
 						"JourneyCode": txcJourney.VehicleJourneyCode,
@@ -288,10 +288,16 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
-				for _, vehicleJourneyTimingLink := range txcJourney.VehicleJourneyTimingLinks {
-					journeyPatternTimingLink, _ := journeyPatternSection.GetTimingLink(vehicleJourneyTimingLink.JourneyPatternTimingLinkRef)
-
+				// Create CTDF Journey path based on TXC VehicleJourney referenced JourneyPatternSection
+				for _, journeyPatternTimingLink := range journeyPatternSection.JourneyPatternTimingLinks {
+					vehicleJourneyTimingLink := txcJourney.GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(journeyPatternTimingLink.ID)
 					routeLink, _ := routeSection.GetRouteLink(journeyPatternTimingLink.RouteLinkRef)
+
+					runTime := journeyPatternTimingLink.RunTime
+					// pretty.Println(runTime, vehicleJourneyTimingLink, journeyPatternTimingLink.ID)
+					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.RunTime != "" {
+						runTime = vehicleJourneyTimingLink.RunTime
+					}
 
 					// Calculate timings
 					originArivalTime := timeCursor
@@ -299,7 +305,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					// TODO: wait time calculation here
 					originDepartureTime := timeCursor // TODO: also need to handle wait times
 
-					travelTime, _ := iso8601.ParseISO8601(vehicleJourneyTimingLink.RunTime)
+					travelTime, _ := iso8601.ParseISO8601(runTime)
 					destinationArivalTime := travelTime.Shift(originDepartureTime)
 					timeCursor = destinationArivalTime
 
@@ -316,6 +322,10 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					}
 
 					ctdfJourney.Path = append(ctdfJourney.Path, pathItem)
+				}
+
+				if len(ctdfJourney.Path) == 0 {
+					log.Error().Msgf("Journey %s has a nil path", ctdfJourney.PrimaryIdentifier) //TODO: not an error condition?
 				}
 
 				bsonRep, _ := bson.Marshal(ctdfJourney)

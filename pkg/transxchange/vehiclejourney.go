@@ -27,6 +27,16 @@ type VehicleJourney struct {
 	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`
 }
 
+func (v *VehicleJourney) GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(ID string) *VehicleJourneyTimingLink {
+	for _, vehicleJourneyTimingLink := range v.VehicleJourneyTimingLinks {
+		if vehicleJourneyTimingLink.JourneyPatternTimingLinkRef == ID {
+			return &vehicleJourneyTimingLink
+		}
+	}
+
+	return nil
+}
+
 type VehicleJourneyTimingLink struct {
 	ID string `xml:"id,attr"`
 
