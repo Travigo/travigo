@@ -106,7 +106,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var serviceOperationInsert uint64
 	var serviceOperationUpdate uint64
 
-	journeyPatternReferences := map[string]map[string]JourneyPattern{} // TODO: all these should be pointers instead
+	journeyPatternReferences := map[string]map[string]*JourneyPattern{} // TODO: all these should be pointers instead
+	servicesReferences := map[string]*Service{}
 
 	// There should be so few services (probably just 1) services defined per document that there is no point of batch processing them
 	for _, txcService := range doc.Services {
@@ -115,6 +116,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
 
 			serviceIdentifier := fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID)
+			localServiceIdentifier := fmt.Sprintf("%s:%s", txcService.ServiceCode, txcLine.ID)
+
+			servicesReferences[localServiceIdentifier] = txcService
 
 			ctdfService := ctdf.Service{
 				PrimaryIdentifier: serviceIdentifier,
@@ -147,9 +151,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			}
 
 			// Add JourneyPatterns into reference map
-			journeyPatternReferences[serviceIdentifier] = map[string]JourneyPattern{}
+			journeyPatternReferences[localServiceIdentifier] = map[string]*JourneyPattern{}
 			for _, journeyPattern := range txcService.JourneyPatterns {
-				journeyPatternReferences[serviceIdentifier][journeyPattern.ID] = journeyPattern
+				journeyPatternReferences[localServiceIdentifier][journeyPattern.ID] = journeyPattern
 			}
 
 			// Check if we want to add this service to the list of MongoDB operations
@@ -213,19 +217,54 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			var localOperationUpdate uint64
 
 			for _, txcJourney := range vehicleJourneys {
-				operatorRef := operatorLocalMapping[txcJourney.OperatorRef]
-				serviceRef := fmt.Sprintf("%s:%s:%s", operatorRef, txcJourney.ServiceRef, txcJourney.LineRef)
+				serviceRef := fmt.Sprintf("%s:%s", txcJourney.ServiceRef, txcJourney.LineRef)
+				service := servicesReferences[serviceRef]
+
+				if service == nil {
+					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
+					break
+				}
+
+				var txcJourneyOperatorRef string
+				if txcJourney.OperatorRef != "" {
+					txcJourneyOperatorRef = txcJourney.OperatorRef
+				} else if service.RegisteredOperatorRef != "" {
+					txcJourneyOperatorRef = service.RegisteredOperatorRef
+				} else {
+					log.Error().Msgf("Failed to find referenced operator in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
+					break
+				}
+
+				operatorRef := operatorLocalMapping[txcJourneyOperatorRef] // NOT ALWAYS THERE, could be in SERVICE DEFINITION
 
 				journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
+				if journeyPattern == nil {
+					log.Error().Msgf("Failed to find referenced journeyPattern %s in vehicle journey %s", txcJourney.JourneyPatternRef, txcJourney.VehicleJourneyCode)
+					break
+				}
+
 				journeyPatternSection := journeyPatternSectionReferences[journeyPattern.JourneyPatternSectionRefs]
+				if journeyPatternSection == nil {
+					log.Error().Msgf("Failed to find referenced journeyPatternSection %s for journeyPattern %s in vehicle journey %s", journeyPattern.JourneyPatternSectionRefs, txcJourney.JourneyPatternRef, txcJourney.VehicleJourneyCode)
+					break
+				}
 
 				route := routeReferences[journeyPattern.RouteRef]
+				if route == nil {
+					log.Error().Msgf("Failed to find referenced route %s in vehicle journey %s", journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
+					break
+				}
+
 				routeSection := routeSectionReferences[route.RouteSectionRef]
+				if routeSection == nil {
+					log.Error().Msgf("Failed to find referenced routeSection %s for route %s in vehicle journey %s", route.RouteSectionRef, journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
+					break
+				}
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
 				ctdfJourney := ctdf.Journey{
-					PrimaryIdentifier: fmt.Sprintf("%s:%s", operatorRef, txcJourney.PrivateCode),
+					PrimaryIdentifier: fmt.Sprintf("%s:%s", operatorRef, txcJourney.VehicleJourneyCode),
 					OtherIdentifiers: map[string]string{
 						"PrivateCode": txcJourney.PrivateCode,
 						"JourneyCode": txcJourney.VehicleJourneyCode,

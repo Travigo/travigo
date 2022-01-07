@@ -95,7 +95,11 @@ func main() {
 						defer archive.Close()
 
 						for _, zipFile := range archive.File {
-							file, _ := zipFile.Open()
+							file, err := zipFile.Open()
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer file.Close()
 
 							dataFiles = append(dataFiles, DataFile{
 								Name:   fmt.Sprintf("%s:%s", source, zipFile.Name),

@@ -11,13 +11,15 @@ type Service struct {
 	StartDate                string `xml:"OperatingPeriod>StartDate"`
 	EndDate                  string `xml:"OperatingPeriod>EndDate"`
 
+	OperatingProfile OperatingProfile
+
 	Lines []Line `xml:"Lines>Line"`
 
 	Origin           string `xml:"StandardService>Origin"`
 	Destination      string `xml:"StandardService>Destination"`
 	UseAllStopPoints string `xml:"StandardService>UseAllStopPoints"`
 
-	JourneyPatterns []JourneyPattern `xml:"StandardService>JourneyPattern"`
+	JourneyPatterns []*JourneyPattern `xml:"StandardService>JourneyPattern"`
 }
 
 type Line struct {
