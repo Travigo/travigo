@@ -32,6 +32,7 @@ func getStop(c *fiber.Ctx) error {
 			"error": "Could not find Stop matching Stop Identifier",
 		})
 	} else {
+		stop.GetServices()
 		return c.JSON(stop)
 	}
 }

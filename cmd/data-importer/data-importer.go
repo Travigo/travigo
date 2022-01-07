@@ -1,10 +1,13 @@
 package main
 
 import (
+	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -13,11 +16,17 @@ import (
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/notify/pkg/notify_client"
+	"github.com/kr/pretty"
 	"github.com/urfave/cli/v2"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
+
+type DataFile struct {
+	Name   string
+	Reader io.Reader
+}
 
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
@@ -193,18 +202,57 @@ func main() {
 							}
 
 							filePath := c.Args().Get(0)
+							fileExtension := filepath.Ext(filePath)
 
-							log.Info().Msgf("TransXChange file import from %s", filePath)
+							files := []DataFile{}
 
-							transXChangeDoc, err := transxchange.ParseXMLFile(filePath)
+							if fileExtension == ".xml" {
+								pretty.Println("lovely xml file")
 
-							if err != nil {
-								return err
+								file, err := os.Open(filePath)
+								if err != nil {
+									log.Fatal().Err(err)
+								}
+								defer file.Close()
+
+								files = append(files, DataFile{
+									Name:   "",
+									Reader: file,
+								})
+							} else if fileExtension == ".zip" {
+								pretty.Println("lovely zip file")
+
+								archive, err := zip.OpenReader(filePath)
+								if err != nil {
+									panic(err)
+								}
+								defer archive.Close()
+
+								for _, zipFile := range archive.File {
+									file, _ := zipFile.Open()
+
+									files = append(files, DataFile{
+										Name:   zipFile.Name,
+										Reader: file,
+									})
+								}
+							} else {
+								return errors.New(fmt.Sprintf("Unsupport file extension %s", fileExtension))
 							}
 
-							transXChangeDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
-								Dataset: fmt.Sprintf("local-file:%s", filePath),
-							})
+							for _, file := range files {
+								log.Info().Msgf("TransXChange file import from %s %s", filePath, file.Name)
+
+								transXChangeDoc, err := transxchange.ParseXMLFile(file.Reader)
+
+								if err != nil {
+									return err
+								}
+
+								transXChangeDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+									Dataset: fmt.Sprintf("local-file:%s %s", filePath, file.Name),
+								})
+							}
 
 							return nil
 						},

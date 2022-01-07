@@ -3,22 +3,14 @@ package transxchange
 import (
 	"encoding/xml"
 	"io"
-	"os"
 
 	"github.com/rs/zerolog/log"
 )
 
-func ParseXMLFile(file string) (*TransXChange, error) {
+func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 	transXChange := TransXChange{}
-	// naptan.StopPoints = []StopPoint{}
 
-	f, err := os.Open(file)
-	if err != nil {
-		log.Fatal().Err(err)
-	}
-	defer f.Close()
-
-	d := xml.NewDecoder(f)
+	d := xml.NewDecoder(reader)
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {

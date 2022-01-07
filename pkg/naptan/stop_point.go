@@ -76,7 +76,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	for i := 0; i < len(orig.StopAreas); i++ {
 		stopArea := orig.StopAreas[i]
 
-		ctdfStop.Associations = append(ctdfStop.Associations, ctdf.StopAssociation{
+		ctdfStop.Associations = append(ctdfStop.Associations, &ctdf.StopAssociation{
 			Type:                 "stop_group",
 			AssociatedIdentifier: fmt.Sprintf(ctdf.StopGroupIDFormat, stopArea.StopAreaCode),
 		})
