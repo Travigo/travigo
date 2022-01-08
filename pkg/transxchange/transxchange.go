@@ -275,7 +275,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					DataSource: datasource,
 
-					ServiceRef:         serviceRef,
+					ServiceRef:         fmt.Sprintf("%s:%s", operatorRef, serviceRef),
 					OperatorRef:        operatorRef,
 					Direction:          txcJourney.Direction,
 					DeperatureTime:     departureTime,
