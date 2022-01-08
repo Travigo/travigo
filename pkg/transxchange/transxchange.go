@@ -70,6 +70,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
+		{
+			Keys: bsonx.Doc{{Key: "serviceref", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "path.originstopref", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "path.destinationstopref", Value: bsonx.Int32(1)}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		panic(err)
