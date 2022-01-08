@@ -291,10 +291,16 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				// Create CTDF Journey path based on TXC VehicleJourney referenced JourneyPatternSection
 				for _, journeyPatternTimingLink := range journeyPatternSection.JourneyPatternTimingLinks {
 					vehicleJourneyTimingLink := txcJourney.GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(journeyPatternTimingLink.ID)
+
 					routeLink, _ := routeSection.GetRouteLink(journeyPatternTimingLink.RouteLinkRef)
 
+					if routeLink == nil {
+						log.Error().Msgf("Failed to find referenced routeLink %s for JPTL %s in vehicle journey %s", journeyPatternTimingLink.RouteLinkRef, journeyPatternTimingLink.ID, txcJourney.VehicleJourneyCode)
+						break
+					}
+
 					runTime := journeyPatternTimingLink.RunTime
-					// pretty.Println(runTime, vehicleJourneyTimingLink, journeyPatternTimingLink.ID)
+
 					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.RunTime != "" {
 						runTime = vehicleJourneyTimingLink.RunTime
 					}

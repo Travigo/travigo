@@ -17,8 +17,12 @@ BritBus is currently a heavy WIP and only has the following features implemented
 
 The following are in the TODO list
 
+* Import bus lines from TfL API
+* Import bus lines from TfE API
 * Endpoint for providing timetable for a given stop/line on each day
-* Calculate realtime bus progress and stop estimates
+* Calculate realtime bus progress and stop estimates using BODS SIRI-VM
+* Calculate realtime bus progress and stop estimates using TfL API
+* Calculate realtime bus progress and stop estimates using TfE API
 * Import fares
 * Historical bus reliability analysis
 * Subscribe to changes in a bus line
@@ -26,16 +30,19 @@ The following are in the TODO list
 ### Areas Supported
 
 #### Stops
-All of Great Britain
+* All of Great Britain
 
 #### Operators
-All of Great Britain
+* All of Great Britain
 
 #### Lines/Timetables
-Cambridge Stagecoach (partial)
+* England
+  * Some Operators data fails to parse
+  * Availability/Scheduling is not currently imported
+  * Except London
 
 #### Realtime Bus Tracking
-None
+* None
 
 #### Fares
-None
+* None
