@@ -40,6 +40,9 @@ The following are in the TODO list
   * Some Operators data fails to parse
   * Availability/Scheduling is not currently imported
   * Except London
+* Scotland & Wales
+  * Some Operators do provide data for these and will be included
+  * But not guaranteed to have all the data
 
 #### Realtime Bus Tracking
 * None

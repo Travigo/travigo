@@ -7,5 +7,5 @@ type Route struct {
 
 	PrivateCode     string
 	Description     string
-	RouteSectionRef string
+	RouteSectionRef []string
 }

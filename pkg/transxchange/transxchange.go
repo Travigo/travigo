@@ -264,9 +264,21 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					break
 				}
 
-				routeSection := routeSectionReferences[route.RouteSectionRef]
-				if routeSection == nil {
-					log.Error().Msgf("Failed to find referenced routeSection %s for route %s in vehicle journey %s", route.RouteSectionRef, journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
+				// A Route can have many RouteSectionRefs
+				// Create an array of references to all the RouteSections for iterating over later
+				var routeSections []*RouteSection
+
+				for _, routeSectionRef := range route.RouteSectionRef {
+					routeSection := routeSectionReferences[routeSectionRef]
+					if routeSection == nil {
+						log.Error().Msgf("Failed to find referenced routeSection %s for route %s in vehicle journey %s", route.RouteSectionRef, journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
+						break
+					}
+					routeSections = append(routeSections, routeSection)
+				}
+
+				if len(routeSections) == 0 {
+					log.Error().Msgf("Failed to find any referenced routeSections for route %s in vehicle journey %s", journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
 					break
 				}
 
@@ -301,7 +313,16 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				for _, journeyPatternTimingLink := range journeyPatternSection.JourneyPatternTimingLinks {
 					vehicleJourneyTimingLink := txcJourney.GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(journeyPatternTimingLink.ID)
 
-					routeLink, _ := routeSection.GetRouteLink(journeyPatternTimingLink.RouteLinkRef)
+					// Search for the RouteLink in the many RouteSections assigned with the Route
+					var routeLink *RouteLink
+					for _, routeSection := range routeSections {
+						checkRouteLink, _ := routeSection.GetRouteLink(journeyPatternTimingLink.RouteLinkRef)
+
+						if checkRouteLink != nil {
+							routeLink = checkRouteLink
+							break
+						}
+					}
 
 					if routeLink == nil {
 						log.Error().Msgf("Failed to find referenced routeLink %s for JPTL %s in vehicle journey %s", journeyPatternTimingLink.RouteLinkRef, journeyPatternTimingLink.ID, txcJourney.VehicleJourneyCode)
@@ -354,7 +375,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					stopOperations = append(stopOperations, insertModel)
 					localOperationInsert += 1
-				} else if existingCtdfJourney.ModificationDateTime != ctdfJourney.ModificationDateTime {
+				} else if existingCtdfJourney.ModificationDateTime != ctdfJourney.ModificationDateTime { // should be > not !=
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
