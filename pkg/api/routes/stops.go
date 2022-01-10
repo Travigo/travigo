@@ -43,8 +43,8 @@ func listStops(c *fiber.Ctx) error {
 
 	stopsCollection := database.GetCollection("stops")
 
-	//{location: { $geoWithin: { $box:  [ [ 0.002753078006207943, 52.12346747820989 ], [ 0.36976510193198925, 52.24976035425812 ] ] } }}
-	query := bson.M{"location": bson.M{"$geoWithin": bson.M{"$box": bson.A{bson.A{bottomLeftLon, bottomLeftLat}, bson.A{topRightLon, topRightLat}}}}}
+	locationQuery := bson.M{"location": bson.M{"$geoWithin": bson.M{"$box": bson.A{bson.A{bottomLeftLon, bottomLeftLat}, bson.A{topRightLon, topRightLat}}}}}
+	query := bson.M{"$and": bson.A{bson.M{"status": "active"}, locationQuery}}
 	cursor, _ := stopsCollection.Find(context.Background(), query)
 
 	for cursor.Next(context.TODO()) {
