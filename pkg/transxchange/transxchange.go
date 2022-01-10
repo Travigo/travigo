@@ -12,7 +12,6 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -285,7 +284,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
-				pretty.Println(txcJourney.OperatingProfile)
+				availability, err := txcJourney.OperatingProfile.ToCTDF()
+				if err != nil {
+					log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
+					break
+				}
+
+				if len(availability.Match) == 0 && len(availability.Exclude) == 0 {
+					log.Error().Msgf("Hehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
+				}
 
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
@@ -305,7 +312,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					DeperatureTime:     departureTime,
 					DestinationDisplay: journeyPattern.DestinationDisplay,
 
-					// Availability *Availability
+					Availability: availability,
 
 					Path: []ctdf.JourneyPathItem{},
 				}

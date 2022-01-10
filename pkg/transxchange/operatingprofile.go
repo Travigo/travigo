@@ -2,11 +2,13 @@ package transxchange
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 )
 
@@ -45,7 +47,7 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 		switch ty := tok.(type) {
 		case xml.StartElement:
 			elementChain = append(elementChain, ty.Name.Local)
-
+			pretty.Println(elementChain)
 			switch elementChain[0] {
 			case "RegularDayType":
 				if len(elementChain) == 1 {
@@ -78,6 +80,8 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 							Value:       otherPublicHoliday.Date,
 							Description: otherPublicHoliday.Description,
 						}
+
+						elementChain = elementChain[:len(elementChain)-1] // Using decodeElement means we skip the end element for this
 					} else {
 						record = ctdf.AvailabilityRecord{
 							Type:  ctdf.AvailabilitySpecialDay,
@@ -91,8 +95,47 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 						ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, record)
 					}
 				}
-			case "SpecialDaysOperation", "PeriodicDayType", "ServicedOrganisationDayType":
-				log.Error().Msgf("Cannot parse OperatingProfile type %s", elementChain[0])
+			case "SpecialDaysOperation":
+				if len(elementChain) == 1 {
+					type DateRange struct {
+						StartDate string
+						EndDate   string
+						Note      string
+					}
+					type SpecialDaysOperation struct {
+						DaysOfOperation    []DateRange `xml:"DaysOfOperation>DateRange"`
+						DaysOfNonOperation []DateRange `xml:"DaysOfNonOperation>DateRange"`
+					}
+
+					var specialDaysOperation SpecialDaysOperation
+
+					if err = d.DecodeElement(&specialDaysOperation, &ty); err != nil {
+						log.Fatal().Msgf("Error decoding item: %s", err)
+					}
+
+					for _, dayOfOperation := range specialDaysOperation.DaysOfOperation {
+						ctdfAvailability.Match = append(ctdfAvailability.Match, ctdf.AvailabilityRecord{
+							Type:        ctdf.AvailabilityDateRange,
+							Value:       fmt.Sprintf("%s:%s", dayOfOperation.StartDate, dayOfOperation.EndDate),
+							Description: dayOfOperation.Note,
+						})
+					}
+					for _, dayOfNonOperation := range specialDaysOperation.DaysOfNonOperation {
+						ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+							Type:        ctdf.AvailabilityDateRange,
+							Value:       fmt.Sprintf("%s:%s", dayOfNonOperation.StartDate, dayOfNonOperation.EndDate),
+							Description: dayOfNonOperation.Note,
+						})
+					}
+
+					elementChain = elementChain[:len(elementChain)-1] // Using decodeElement means we skip the end element for this
+				}
+			case "PeriodicDayType":
+				return nil, errors.New(fmt.Sprintf("WIP OperatingProfile record type %s", elementChain[0]))
+			case "ServicedOrganisationDayType":
+				return nil, errors.New(fmt.Sprintf("OperatingProfile record type %s cannot be parsed", elementChain[0]))
+			default:
+				return nil, errors.New(fmt.Sprintf("Cannot parse OperatingProfile record type %s", elementChain[0]))
 			}
 		case xml.EndElement:
 			elementChain = elementChain[:len(elementChain)-1]
