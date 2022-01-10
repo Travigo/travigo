@@ -12,6 +12,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -283,6 +284,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
+
+				pretty.Println(txcJourney.OperatingProfile)
 
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),

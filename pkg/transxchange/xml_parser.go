@@ -87,7 +87,7 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 				if err = d.DecodeElement(&vehicleJourney, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					vehicleJourney.OperatingProfile.ParseXMLValue()
+					// vehicleJourney.OperatingProfile.ParseXMLValue()
 					transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, &vehicleJourney)
 				}
 				// vehicleJourney := parseVehicleJourney(&tok)
