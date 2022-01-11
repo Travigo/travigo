@@ -31,6 +31,7 @@ type TransXChange struct {
 	JourneyPatternSections []*JourneyPatternSection
 	RouteSections          []*RouteSection
 	VehicleJourneys        []*VehicleJourney
+	ServicedOrganisations  []*ServicedOrganisation
 
 	SchemaVersion string `xml:",attr"`
 }
@@ -285,7 +286,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				var availability *ctdf.Availability
 
 				if service.OperatingProfile.XMLValue != "" {
-					serviceAvailability, err := service.OperatingProfile.ToCTDF()
+					serviceAvailability, err := service.OperatingProfile.ToCTDF(doc.ServicedOrganisations)
 					if err != nil {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
 					} else {
@@ -294,7 +295,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 
 				if journeyPattern.OperatingProfile.XMLValue != "" {
-					journeyPatternAvailability, err := journeyPattern.OperatingProfile.ToCTDF()
+					journeyPatternAvailability, err := journeyPattern.OperatingProfile.ToCTDF(doc.ServicedOrganisations)
 					if err != nil {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
 					} else {
@@ -303,7 +304,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 
 				if txcJourney.OperatingProfile.XMLValue != "" {
-					journeyAvailability, err := txcJourney.OperatingProfile.ToCTDF()
+					journeyAvailability, err := txcJourney.OperatingProfile.ToCTDF(doc.ServicedOrganisations)
 					if err != nil {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
 					} else {
@@ -321,7 +322,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					})
 				}
 
-				if availability == nil || len(availability.Match) == 0 {
+				if availability == nil || (len(availability.Match) == 0 && len(availability.MatchSecondary) == 0) {
 					log.Error().Msgf("Vehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
 				}
 

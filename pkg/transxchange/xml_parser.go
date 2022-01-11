@@ -87,11 +87,16 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 				if err = d.DecodeElement(&vehicleJourney, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					// vehicleJourney.OperatingProfile.ParseXMLValue()
 					transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, &vehicleJourney)
 				}
-				// vehicleJourney := parseVehicleJourney(&tok)
-				// transXChange.VehicleJourneys = append(transXChange.VehicleJourneys, vehicleJourney)
+			} else if ty.Name.Local == "ServicedOrganisation" {
+				var org ServicedOrganisation
+
+				if err = d.DecodeElement(&org, &ty); err != nil {
+					log.Fatal().Msgf("Error decoding item: %s", err)
+				} else {
+					transXChange.ServicedOrganisations = append(transXChange.ServicedOrganisations, &org)
+				}
 			}
 		default:
 		}

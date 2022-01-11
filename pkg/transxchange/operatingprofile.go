@@ -29,7 +29,7 @@ type DateRange struct {
 }
 
 // This is a bit hacky and doesn't seem like the best way of doing it but it works
-func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
+func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*ServicedOrganisation) (*ctdf.Availability, error) {
 	ctdfAvailability := ctdf.Availability{}
 
 	operatingProfile.RegularDayType = []string{}
@@ -134,7 +134,97 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 			case "PeriodicDayType":
 				return nil, errors.New(fmt.Sprintf("WIP OperatingProfile record type %s", elementChain[0]))
 			case "ServicedOrganisationDayType":
-				return nil, errors.New(fmt.Sprintf("OperatingProfile record type %s cannot be parsed", elementChain[0]))
+				if len(elementChain) == 1 {
+					type ServicedOrganisationDaysMode struct {
+						Holidays    string `xml:"Holidays>ServicedOrganisationRef"`
+						WorkingDays string `xml:"WorkingDays>ServicedOrganisationRef"`
+					}
+					type ServicedOrganisationDayType struct {
+						DaysOfOperation    ServicedOrganisationDaysMode
+						DaysOfNonOperation ServicedOrganisationDaysMode
+					}
+
+					var servicedOrganisationDayType ServicedOrganisationDayType
+
+					if err = d.DecodeElement(&servicedOrganisationDayType, &ty); err != nil {
+						log.Fatal().Msgf("Error decoding item: %s", err)
+					}
+
+					operationHolidays := findServicedOrganisation(servicedOrganisationDayType.DaysOfOperation.Holidays, servicedOrganisations)
+					operationWorkingDays := findServicedOrganisation(servicedOrganisationDayType.DaysOfOperation.WorkingDays, servicedOrganisations)
+
+					nonOperationHolidays := findServicedOrganisation(servicedOrganisationDayType.DaysOfNonOperation.Holidays, servicedOrganisations)
+					nonOperationWorkingDays := findServicedOrganisation(servicedOrganisationDayType.DaysOfNonOperation.WorkingDays, servicedOrganisations)
+
+					if operationHolidays != nil {
+						// If the referenced object is empty then just kill off this journey
+						if len(operationHolidays.Holidays.DateRange) == 0 {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityMatchAll,
+								Description: operationHolidays.Name,
+							})
+						}
+
+						for _, dateRange := range operationHolidays.Holidays.DateRange {
+							ctdfAvailability.MatchSecondary = append(ctdfAvailability.MatchSecondary, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityDateRange,
+								Value:       fmt.Sprintf("%s:%s", dateRange.StartDate, dateRange.EndDate),
+								Description: operationHolidays.Name,
+							})
+						}
+					}
+					if operationWorkingDays != nil {
+						// If the referenced object is empty then just kill off this journey
+						if len(operationWorkingDays.WorkingDays.DateRange) == 0 {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityMatchAll,
+								Description: operationWorkingDays.Name,
+							})
+						}
+
+						for _, dateRange := range operationWorkingDays.WorkingDays.DateRange {
+							ctdfAvailability.MatchSecondary = append(ctdfAvailability.MatchSecondary, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityDateRange,
+								Value:       fmt.Sprintf("%s:%s", dateRange.StartDate, dateRange.EndDate),
+								Description: operationWorkingDays.Name,
+							})
+						}
+					}
+					if nonOperationHolidays != nil {
+						// If the referenced object is empty then just kill off this journey
+						if len(nonOperationHolidays.Holidays.DateRange) == 0 {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityMatchAll,
+								Description: nonOperationHolidays.Name,
+							})
+						}
+
+						for _, dateRange := range nonOperationHolidays.Holidays.DateRange {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityDateRange,
+								Value:       fmt.Sprintf("%s:%s", dateRange.StartDate, dateRange.EndDate),
+								Description: nonOperationHolidays.Name,
+							})
+						}
+					}
+					if nonOperationWorkingDays != nil {
+						// If the referenced object is empty then just kill off this journey
+						if len(nonOperationWorkingDays.WorkingDays.DateRange) == 0 {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityMatchAll,
+								Description: nonOperationWorkingDays.Name,
+							})
+						}
+
+						for _, dateRange := range nonOperationWorkingDays.WorkingDays.DateRange {
+							ctdfAvailability.Exclude = append(ctdfAvailability.Exclude, ctdf.AvailabilityRecord{
+								Type:        ctdf.AvailabilityDateRange,
+								Value:       fmt.Sprintf("%s:%s", dateRange.StartDate, dateRange.EndDate),
+								Description: nonOperationWorkingDays.Name,
+							})
+						}
+					}
+				}
 			default:
 				return nil, errors.New(fmt.Sprintf("Cannot parse OperatingProfile record type %s", elementChain[0]))
 			}

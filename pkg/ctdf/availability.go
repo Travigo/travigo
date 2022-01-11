@@ -1,9 +1,10 @@
 package ctdf
 
 type Availability struct {
-	Match     []AvailabilityRecord // Must match at last one
-	Condition []AvailabilityRecord // Must match all
-	Exclude   []AvailabilityRecord // Must not match one
+	Match          []AvailabilityRecord // Must match at least one
+	MatchSecondary []AvailabilityRecord // Must match at least one if exists
+	Condition      []AvailabilityRecord // Must match all
+	Exclude        []AvailabilityRecord // Must not match one
 }
 
 type AvailabilityRecord struct {
