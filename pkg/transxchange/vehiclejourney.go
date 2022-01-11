@@ -15,6 +15,14 @@ type VehicleJourney struct {
 	JourneyPatternRef  string
 	DepartureTime      string
 
+	Frequency *struct {
+		EndTime  string
+		Interval *struct {
+			ScheduledFrequency string
+		}
+		// MinutesPastTheHour string
+	}
+
 	VehicleJourneyTimingLinks []VehicleJourneyTimingLink `xml:"VehicleJourneyTimingLink"`
 
 	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`

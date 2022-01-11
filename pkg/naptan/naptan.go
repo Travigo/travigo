@@ -85,7 +85,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var stopOperationInsert uint64
 	var stopOperationUpdate uint64
 
-	maxBatchSize := int(len(naptanDoc.StopPoints) / runtime.NumCPU())
+	maxBatchSize := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(maxBatchSize)))
 
 	processingGroup := sync.WaitGroup{}
@@ -155,7 +155,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var stopGroupsOperationInsert uint64
 	var stopGroupsOperationUpdate uint64
 
-	maxBatchSize = int(len(naptanDoc.StopAreas) / runtime.NumCPU())
+	maxBatchSize = int(math.Ceil(float64(len(naptanDoc.StopAreas)) / float64(runtime.NumCPU())))
 	numBatches = int(math.Ceil(float64(len(naptanDoc.StopAreas)) / float64(maxBatchSize)))
 
 	processingGroup = sync.WaitGroup{}

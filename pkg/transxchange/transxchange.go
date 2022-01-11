@@ -12,6 +12,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/jinzhu/copier"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -199,10 +200,35 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	// Get CTDF Journeys from TransXChange VehicleJourneys
 	log.Info().Msg("Converting & Importing CTDF Journeys into Mongo")
+
+	// A little cheat for handling frequent services by just duplicating the VehicleJourney record for each frequent run
+	for _, txcJourney := range doc.VehicleJourneys {
+		if txcJourney.Frequency != nil && txcJourney.Frequency.Interval != nil {
+			departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
+			endTime, _ := time.Parse("15:04:05", txcJourney.Frequency.EndTime)
+			interval, _ := iso8601.ParseISO8601(txcJourney.Frequency.Interval.ScheduledFrequency)
+
+			for newDepartureTime := interval.Shift(departureTime); newDepartureTime.Sub(endTime) <= 0; newDepartureTime = interval.Shift(newDepartureTime) {
+				var copiedJourney VehicleJourney
+				err := copier.CopyWithOption(&copiedJourney, *txcJourney, copier.Option{IgnoreEmpty: true, DeepCopy: true})
+
+				if err != nil {
+					log.Error().Err(err).Msgf("Failed to copy VehicleJourney %s", txcJourney.VehicleJourneyCode)
+					break
+				}
+
+				copiedJourney.DepartureTime = newDepartureTime.Format("15:04:05")
+				copiedJourney.VehicleJourneyCode = fmt.Sprintf("%s-%s", copiedJourney.VehicleJourneyCode, copiedJourney.DepartureTime)
+
+				doc.VehicleJourneys = append(doc.VehicleJourneys, &copiedJourney)
+			}
+		}
+	}
+
 	var journeyOperationInsert uint64
 	var journeyOperationUpdate uint64
 
-	maxBatchSize := int(len(doc.VehicleJourneys) / runtime.NumCPU())
+	maxBatchSize := int(math.Ceil(float64(len(doc.VehicleJourneys)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(doc.VehicleJourneys)) / float64(maxBatchSize)))
 
 	processingGroup := sync.WaitGroup{}

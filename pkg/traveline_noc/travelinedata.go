@@ -252,7 +252,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var operatorOperationInsert uint64
 	var operatorOperationUpdate uint64
 
-	maxBatchSize := int(len(operators) / runtime.NumCPU())
+	maxBatchSize := int(math.Ceil(float64(len(operators)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
 
 	processingGroup := sync.WaitGroup{}
@@ -330,7 +330,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var operatorGroupOperationInsert uint64
 	var operatorGroupOperationUpdate uint64
 
-	maxBatchSize = int(len(operatorGroups) / runtime.NumCPU())
+	maxBatchSize = int(math.Ceil(float64(len(operatorGroups)) / float64(runtime.NumCPU())))
 	numBatches = int(math.Ceil(float64(len(operatorGroups)) / float64(maxBatchSize)))
 
 	processingGroup = sync.WaitGroup{}
