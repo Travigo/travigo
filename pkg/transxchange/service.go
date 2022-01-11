@@ -11,7 +11,7 @@ type Service struct {
 	StartDate                string `xml:"OperatingPeriod>StartDate"`
 	EndDate                  string `xml:"OperatingPeriod>EndDate"`
 
-	OperatingProfile OperatingProfile
+	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`
 
 	Lines []Line `xml:"Lines>Line"`
 

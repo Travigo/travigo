@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 )
 
@@ -47,7 +46,7 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 		switch ty := tok.(type) {
 		case xml.StartElement:
 			elementChain = append(elementChain, ty.Name.Local)
-			pretty.Println(elementChain)
+
 			switch elementChain[0] {
 			case "RegularDayType":
 				if len(elementChain) == 1 {

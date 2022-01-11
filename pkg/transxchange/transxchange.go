@@ -284,13 +284,29 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
-				availability, err := txcJourney.OperatingProfile.ToCTDF()
-				if err != nil {
-					log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
-					break
+				var availability *ctdf.Availability
+
+				if service.OperatingProfile.XMLValue != "" {
+					serviceAvailability, err := service.OperatingProfile.ToCTDF()
+					if err != nil {
+						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
+						break
+					} else {
+						availability = serviceAvailability
+					}
 				}
 
-				if len(availability.Match) == 0 && len(availability.Exclude) == 0 {
+				if txcJourney.OperatingProfile.XMLValue != "" {
+					journeyAvailability, err := txcJourney.OperatingProfile.ToCTDF()
+					if err != nil {
+						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
+						break
+					} else {
+						availability = journeyAvailability
+					}
+				}
+
+				if len(availability.Match) == 0 {
 					log.Error().Msgf("Hehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
 				}
 
