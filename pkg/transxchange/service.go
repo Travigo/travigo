@@ -8,13 +8,13 @@ type Service struct {
 	TicketMachineServiceCode string
 	RegisteredOperatorRef    string
 	PublicUse                bool
-	StartDate                string `xml:"OperatingPeriod>StartDate"`
-	EndDate                  string `xml:"OperatingPeriod>EndDate"`
+	OperatingPeriod          DateRange
 
 	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`
 
 	Lines []Line `xml:"Lines>Line"`
 
+	//TODO: Handle Flexible service
 	Origin           string `xml:"StandardService>Origin"`
 	Destination      string `xml:"StandardService>Destination"`
 	UseAllStopPoints string `xml:"StandardService>UseAllStopPoints"`
@@ -39,6 +39,8 @@ type JourneyPattern struct {
 	ID                   string `xml:"id,attr"`
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
+
+	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`
 
 	DestinationDisplay        string
 	OperatorRef               string

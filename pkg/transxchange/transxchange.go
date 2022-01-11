@@ -142,9 +142,6 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				CreationDateTime:     txcService.CreationDateTime,
 				ModificationDateTime: txcService.ModificationDateTime,
 
-				StartDate: txcService.StartDate,
-				EndDate:   txcService.EndDate,
-
 				OperatorRef: operatorRef,
 
 				InboundDescription: &ctdf.ServiceDescription{
@@ -284,6 +281,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
+				// Calculate availability from OperatingProfiles
 				var availability *ctdf.Availability
 
 				if service.OperatingProfile.XMLValue != "" {
@@ -292,6 +290,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
 					} else {
 						availability = serviceAvailability
+					}
+				}
+
+				if journeyPattern.OperatingProfile.XMLValue != "" {
+					journeyPatternAvailability, err := journeyPattern.OperatingProfile.ToCTDF()
+					if err != nil {
+						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
+					} else {
+						availability = journeyPatternAvailability
 					}
 				}
 
@@ -304,10 +311,21 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					}
 				}
 
-				if availability == nil || len(availability.Match) == 0 {
-					log.Error().Msgf("Hehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
+				//Append to Availability Condition based on OperatingPeriod
+				// Add if either StartDate or EndDate exists (it can be open ended)
+				// If availability doesnt already exist then dont bother as we don't care for this journey at the moment
+				if availability != nil && !(service.OperatingPeriod.StartDate == "" && service.OperatingPeriod.EndDate == "") {
+					availability.Condition = append(availability.Condition, ctdf.AvailabilityRecord{
+						Type:  ctdf.AvailabilityDateRange,
+						Value: fmt.Sprintf("%s:%s", service.OperatingPeriod.StartDate, service.OperatingPeriod.EndDate),
+					})
 				}
 
+				if availability == nil || len(availability.Match) == 0 {
+					log.Error().Msgf("Vehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
+				}
+
+				// Create CTDF Journey record
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
 					OtherIdentifiers: map[string]string{

@@ -11,9 +11,6 @@ type Service struct {
 
 	ServiceName string
 
-	StartDate string
-	EndDate   string
-
 	OperatorRef string
 	// Operator *Operator
 

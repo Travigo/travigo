@@ -22,6 +22,12 @@ type OperatingProfile struct {
 	SpecialDaysOperation        []string
 }
 
+type DateRange struct {
+	StartDate string
+	EndDate   string
+	Note      string
+}
+
 // This is a bit hacky and doesn't seem like the best way of doing it but it works
 func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 	ctdfAvailability := ctdf.Availability{}
@@ -96,11 +102,6 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 				}
 			case "SpecialDaysOperation":
 				if len(elementChain) == 1 {
-					type DateRange struct {
-						StartDate string
-						EndDate   string
-						Note      string
-					}
 					type SpecialDaysOperation struct {
 						DaysOfOperation    []DateRange `xml:"DaysOfOperation>DateRange"`
 						DaysOfNonOperation []DateRange `xml:"DaysOfNonOperation>DateRange"`
