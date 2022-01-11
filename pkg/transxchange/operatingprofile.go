@@ -129,6 +129,7 @@ func (operatingProfile *OperatingProfile) ToCTDF() (*ctdf.Availability, error) {
 
 					elementChain = elementChain[:len(elementChain)-1] // Using decodeElement means we skip the end element for this
 				}
+			// No data seems to have one of these currently so no point adding support for it
 			case "PeriodicDayType":
 				return nil, errors.New(fmt.Sprintf("WIP OperatingProfile record type %s", elementChain[0]))
 			case "ServicedOrganisationDayType":

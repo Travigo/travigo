@@ -290,7 +290,6 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					serviceAvailability, err := service.OperatingProfile.ToCTDF()
 					if err != nil {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
-						break
 					} else {
 						availability = serviceAvailability
 					}
@@ -300,13 +299,12 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					journeyAvailability, err := txcJourney.OperatingProfile.ToCTDF()
 					if err != nil {
 						log.Error().Err(err).Msgf("Error parsing availability for vehicle journey %s", txcJourney.VehicleJourneyCode)
-						break
 					} else {
 						availability = journeyAvailability
 					}
 				}
 
-				if len(availability.Match) == 0 {
+				if availability == nil || len(availability.Match) == 0 {
 					log.Error().Msgf("Hehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
 				}
 
