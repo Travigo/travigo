@@ -45,10 +45,11 @@ func importFile(dataFormat string, source string) error {
 		defer resp.Body.Close()
 
 		_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-		if err != nil {
-			log.Fatal().Err(err).Msg("Cannot work out file download name")
+		if err == nil {
+			fileExtension = filepath.Ext(params["filename"])
+		} else {
+			fileExtension = filepath.Ext(source)
 		}
-		fileExtension = filepath.Ext(params["filename"])
 
 		tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-")
 		if err != nil {
