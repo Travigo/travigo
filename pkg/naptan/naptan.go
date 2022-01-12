@@ -204,8 +204,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 			}
 
-			atomic.AddUint64(&stopOperationInsert, localOperationInsert)
-			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
+			atomic.AddUint64(&stopGroupsOperationInsert, localOperationInsert)
+			atomic.AddUint64(&stopGroupsOperationUpdate, localOperationUpdate)
 
 			if len(stopGroupOperations) > 0 {
 				_, err = stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
