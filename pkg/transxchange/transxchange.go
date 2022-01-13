@@ -214,7 +214,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				if err != nil {
 					log.Error().Err(err).Msgf("Failed to copy VehicleJourney %s", txcJourney.VehicleJourneyCode)
-					break
+					continue
 				}
 
 				copiedJourney.DepartureTime = newDepartureTime.Format("15:04:05")
@@ -255,7 +255,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				if service == nil {
 					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
-					break
+					continue
 				}
 
 				var txcJourneyOperatorRef string
@@ -265,7 +265,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					txcJourneyOperatorRef = service.RegisteredOperatorRef
 				} else {
 					log.Error().Msgf("Failed to find referenced operator in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
-					break
+					continue
 				}
 
 				operatorRef := operatorLocalMapping[txcJourneyOperatorRef] // NOT ALWAYS THERE, could be in SERVICE DEFINITION
@@ -273,19 +273,19 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
 				if journeyPattern == nil {
 					log.Error().Msgf("Failed to find referenced journeyPattern %s in vehicle journey %s", txcJourney.JourneyPatternRef, txcJourney.VehicleJourneyCode)
-					break
+					continue
 				}
 
 				journeyPatternSection := journeyPatternSectionReferences[journeyPattern.JourneyPatternSectionRefs]
 				if journeyPatternSection == nil {
 					log.Error().Msgf("Failed to find referenced journeyPatternSection %s for journeyPattern %s in vehicle journey %s", journeyPattern.JourneyPatternSectionRefs, txcJourney.JourneyPatternRef, txcJourney.VehicleJourneyCode)
-					break
+					continue
 				}
 
 				route := routeReferences[journeyPattern.RouteRef]
 				if route == nil {
 					log.Error().Msgf("Failed to find referenced route %s in vehicle journey %s", journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
-					break
+					continue
 				}
 
 				// A Route can have many RouteSectionRefs
@@ -296,14 +296,14 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					routeSection := routeSectionReferences[routeSectionRef]
 					if routeSection == nil {
 						log.Error().Msgf("Failed to find referenced routeSection %s for route %s in vehicle journey %s", route.RouteSectionRef, journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
-						break
+						continue
 					}
 					routeSections = append(routeSections, routeSection)
 				}
 
 				if len(routeSections) == 0 {
 					log.Error().Msgf("Failed to find any referenced routeSections for route %s in vehicle journey %s", journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
-					break
+					continue
 				}
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
@@ -342,7 +342,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				// Add if either StartDate or EndDate exists (it can be open ended)
 				// If availability doesnt already exist then dont bother as we don't care for this journey at the moment
 				if availability != nil && !(service.OperatingPeriod.StartDate == "" && service.OperatingPeriod.EndDate == "") {
-					availability.Condition = append(availability.Condition, ctdf.AvailabilityRecord{
+					availability.Condition = append(availability.Condition, ctdf.AvailabilityRule{
 						Type:  ctdf.AvailabilityDateRange,
 						Value: fmt.Sprintf("%s:%s", service.OperatingPeriod.StartDate, service.OperatingPeriod.EndDate),
 					})
@@ -395,7 +395,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					if routeLink == nil {
 						log.Error().Msgf("Failed to find referenced routeLink %s for JPTL %s in vehicle journey %s", journeyPatternTimingLink.RouteLinkRef, journeyPatternTimingLink.ID, txcJourney.VehicleJourneyCode)
-						break
+						continue
 					}
 
 					runTime := journeyPatternTimingLink.RunTime

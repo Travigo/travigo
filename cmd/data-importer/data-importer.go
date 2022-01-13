@@ -62,7 +62,7 @@ func importFile(dataFormat string, source string) error {
 		source = tmpFile.Name()
 	}
 
-	// Ccheck if its an XML file or ZIP file
+	// Check if its an XML file or ZIP file
 
 	if fileExtension == ".xml" {
 		file, err := os.Open(source)
