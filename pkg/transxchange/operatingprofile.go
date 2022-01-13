@@ -55,15 +55,48 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 
 			switch elementChain[0] {
 			case "RegularDayType":
-				if len(elementChain) == 1 {
+				if len(elementChain) != 3 {
 					continue
 				}
 
-				if elementChain[1] == "DaysOfWeek" && len(elementChain) == 3 {
-					ctdfAvailability.Match = append(ctdfAvailability.Match, ctdf.AvailabilityRule{
-						Type:  ctdf.AvailabilityDayOfWeek,
-						Value: elementChain[2],
-					})
+				if elementChain[1] == "DaysOfWeek" {
+					dayValue := elementChain[2]
+
+					days := []string{}
+
+					switch dayValue {
+					case "MondayToSunday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+					case "MondayToSatuday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+					case "MondayToFriday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"}
+					case "Weekend":
+						days = []string{"Saturday", "Sunday"}
+					case "NotMonday":
+						days = []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+					case "NotTuesday":
+						days = []string{"Monday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
+					case "NotWednesday":
+						days = []string{"Monday", "Tuesday", "Thursday", "Friday", "Saturday", "Sunday"}
+					case "NotThursday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Friday", "Saturday", "Sunday"}
+					case "NotFriday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Saturday", "Sunday"}
+					case "NotSaturday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Sunday"}
+					case "NotSunday":
+						days = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
+					default:
+						days = []string{dayValue}
+					}
+
+					for _, day := range days {
+						ctdfAvailability.Match = append(ctdfAvailability.Match, ctdf.AvailabilityRule{
+							Type:  ctdf.AvailabilityDayOfWeek,
+							Value: day,
+						})
+					}
 				}
 			case "BankHolidayOperation":
 				if len(elementChain) == 1 {

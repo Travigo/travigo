@@ -368,7 +368,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					ServiceRef:         fmt.Sprintf("%s:%s", operatorRef, serviceRef),
 					OperatorRef:        operatorRef,
 					Direction:          txcJourney.Direction,
-					DeperatureTime:     departureTime,
+					DepartureTime:      departureTime,
 					DestinationDisplay: journeyPattern.DestinationDisplay,
 
 					Availability: availability,

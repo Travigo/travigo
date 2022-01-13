@@ -16,7 +16,7 @@ type Journey struct {
 	ServiceRef         string
 	OperatorRef        string
 	Direction          string
-	DeperatureTime     time.Time
+	DepartureTime      time.Time
 	DestinationDisplay string
 
 	Availability *Availability

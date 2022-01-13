@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -15,6 +16,7 @@ import (
 func StopsRouter(router fiber.Router) {
 	router.Get("/", listStops)
 	router.Get("/:identifier", getStop)
+	router.Get("/:identifier/departure_board", getStopDepartureBoard)
 }
 
 func listStops(c *fiber.Ctx) error {
@@ -77,4 +79,43 @@ func getStop(c *fiber.Ctx) error {
 		stop.GetServices()
 		return c.JSON(stop)
 	}
+}
+
+func getStopDepartureBoard(c *fiber.Ctx) error {
+	stopIdentifier := c.Params("identifier")
+
+	stopsCollection := database.GetCollection("stops")
+	var stop *ctdf.Stop
+	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": stopIdentifier}).Decode(&stop)
+
+	if stop == nil {
+		c.SendStatus(fiber.StatusNotFound)
+		return c.JSON(fiber.Map{
+			"error": "Could not find Stop matching Stop Identifier",
+		})
+	}
+
+	currentDateTime := time.Now()
+	// currentTime, _ := time.Parse("15:04:05", currentDateTime.Format("15:04:05"))
+
+	journeys := []*ctdf.Journey{}
+
+	journeysCollection := database.GetCollection("journeys")
+	// departureTimeQuery := bson.M{"deperaturetime": bson.M{"$gte": currentTime}}
+	// query := bson.M{"$and": bson.A{bson.M{"path.originstopref": stopIdentifier}, departureTimeQuery}}
+	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": stopIdentifier})
+
+	for cursor.Next(context.TODO()) {
+		var journey ctdf.Journey
+		err := cursor.Decode(&journey)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		journeys = append(journeys, &journey)
+	}
+
+	journeysTimetable := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, currentDateTime)
+
+	return c.JSON(journeysTimetable)
 }
