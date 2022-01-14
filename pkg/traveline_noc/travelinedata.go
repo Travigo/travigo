@@ -153,7 +153,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 			if operatorRecord.ManagementDivisionID != "" {
 				groupID := mgmtDivisionGroupIDs[operatorRecord.ManagementDivisionID]
 
-				ctdfRecord.OperatorGroup = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
+				ctdfRecord.OperatorGroupRef = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
 			}
 		}
 	}
