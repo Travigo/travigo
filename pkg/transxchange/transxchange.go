@@ -120,6 +120,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	journeyPatternReferences := map[string]map[string]*JourneyPattern{} // TODO: all these should be pointers instead
 	servicesReferences := map[string]*Service{}
 
+	ignoredServices := map[string]bool{}
+
 	// There should be so few services (probably just 1) services defined per document that there is no point of batch processing them
 	for _, txcService := range doc.Services {
 		for _, txcLine := range txcService.Lines {
@@ -156,6 +158,17 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					Destination: txcLine.OutboundDestination,
 					Description: txcLine.OutboundDescription,
 				},
+			}
+
+			// Check if Service end date is before today and skip over it if that is true
+			// We get a lot of duplicate documents included in BODS with expired data so this should ignore them
+			if txcService.OperatingPeriod.EndDate != "" {
+				endDate, err := time.Parse(ctdf.YearMonthDayFormat, txcService.OperatingPeriod.EndDate)
+
+				if err == nil && endDate.Before(time.Now()) {
+					ignoredServices[localServiceIdentifier] = true
+					continue
+				}
 			}
 
 			// Add JourneyPatterns into reference map
@@ -255,6 +268,11 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				if service == nil {
 					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
+					continue
+				}
+
+				// If this service is in the ignore list (eg. expired serviced) then just silently skip over it
+				if ignoredServices[serviceRef] {
 					continue
 				}
 
