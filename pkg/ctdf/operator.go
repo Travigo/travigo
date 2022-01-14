@@ -9,29 +9,28 @@ import (
 const OperatorIDFormat = "GB:NOC:%s"
 
 type Operator struct {
-	PrimaryIdentifier string
-	OtherIdentifiers  map[string]string
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     time.Time
-	ModificationDateTime time.Time
+	CreationDateTime     time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"internal"`
 
-	PrimaryName string
-	OtherNames  []string
+	PrimaryName string   `groups:"basic"`
+	OtherNames  []string `groups:"basic"`
 
-	OperatorGroup string
+	OperatorGroupRef string `groups:"detailed"`
 
-	TransportType []string
+	TransportType []string `groups:"detailed"`
 
-	Licence string
+	Licence string `groups:"detailed"`
 
-	// LegalEntity string
-	Website     string
-	Email       string
-	Address     string
-	PhoneNumber string
-	SocialMedia map[string]string
+	Website     string            `groups:"detailed"`
+	Email       string            `groups:"detailed"`
+	Address     string            `groups:"detailed"`
+	PhoneNumber string            `groups:"detailed"`
+	SocialMedia map[string]string `groups:"detailed"`
 }
 
 func (operator *Operator) UniqueHash() string {
@@ -42,7 +41,7 @@ func (operator *Operator) UniqueHash() string {
 		operator.OtherIdentifiers,
 		operator.PrimaryName,
 		operator.OtherNames,
-		operator.OperatorGroup,
+		operator.OperatorGroupRef,
 		operator.TransportType,
 		operator.Licence,
 		operator.Website,

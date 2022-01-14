@@ -22,6 +22,8 @@ github.com/golang/snappy v0.0.3/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEW
 github.com/google/go-cmp v0.5.2 h1:X2ev0eStA3AbceY54o37/0PQ/UWqKEiiO2dKL5OPaFM=
 github.com/google/go-cmp v0.5.2/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/hashicorp/go-version v0.0.0-20161031182605-e96d38404026 h1:qWx/DcC6l4ZzuS+JBAzI5XjtLFDCc08zYeZ0kLnaH2g=
+github.com/hashicorp/go-version v0.0.0-20161031182605-e96d38404026/go.mod h1:fltr4n8CU8Ke44wwGCBoEymUuxUHl09ZGVZPK5anwXA=
 github.com/jinzhu/copier v0.3.4 h1:mfU6jI9PtCeUjkjQ322dlff9ELjGDu975C2p/nrubVI=
 github.com/jinzhu/copier v0.3.4/go.mod h1:DfbEm0FYsaqBcKcFuvmOZb218JkPGtvSHsKg8S8hyyg=
 github.com/klauspost/compress v1.13.4/go.mod h1:8dP1Hq4DHOhN9w426knH3Rhby4rFm6D8eO+e+Dq5Gzg=
@@ -34,6 +36,8 @@ github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
 github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
+github.com/liip/sheriff v0.11.1 h1:52YGzskXFPSEnwfEtXnbPiMKKXJGm5IP45s8Ogw0Wyk=
+github.com/liip/sheriff v0.11.1/go.mod h1:nVTQYHxfdIfOHnk5FREt4j6cnaSlJPUfXFVORfgGmTo=
 github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe/go.mod h1:wL8QJuTMNUDYhXwkmfOly8iTdp5TEcJFWZD2D7SIkUc=
 github.com/paulcager/osgridref v1.3.0 h1:15ocrJgW/yw7/dkwvQ9tM4+wYsLO9tyoH4fh6K91PHU=
 github.com/paulcager/osgridref v1.3.0/go.mod h1:ufyaMOUx5kOvX4naQZy2JxXME4RnN0y7lec+eIaAt2E=

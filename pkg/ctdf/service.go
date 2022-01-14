@@ -1,23 +1,23 @@
 package ctdf
 
 type Service struct {
-	PrimaryIdentifier string
-	OtherIdentifiers  map[string]string
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     string
-	ModificationDateTime string
+	CreationDateTime     string `groups:"detailed"`
+	ModificationDateTime string `groups:"detailed"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"internal"`
 
-	ServiceName string
+	ServiceName string `groups:"basic"`
 
-	OperatorRef string
+	OperatorRef string `groups:"internal"`
 	// Operator *Operator
 
-	Routes []Route
+	Routes []Route `groups:"detailed"`
 
-	OutboundDescription *ServiceDescription
-	InboundDescription  *ServiceDescription
+	OutboundDescription *ServiceDescription `groups:"basic"`
+	InboundDescription  *ServiceDescription `groups:"basic"`
 }
 
 type Route struct {
@@ -25,7 +25,7 @@ type Route struct {
 }
 
 type ServiceDescription struct {
-	Origin      string
-	Destination string
-	Description string
+	Origin      string `groups:"basic"`
+	Destination string `groups:"basic"`
+	Description string `groups:"basic"`
 }

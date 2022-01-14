@@ -1,27 +1,48 @@
 package ctdf
 
 import (
+	"context"
 	"time"
+
+	"github.com/britbus/britbus/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Journey struct {
-	PrimaryIdentifier string
-	OtherIdentifiers  map[string]string
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     string
-	ModificationDateTime string
+	CreationDateTime     string `groups:"detailed"`
+	ModificationDateTime string `groups:"detailed"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"detailed"`
 
-	ServiceRef         string
-	OperatorRef        string
-	Direction          string
-	DepartureTime      time.Time
-	DestinationDisplay string
+	ServiceRef string   `groups:"internal"`
+	Service    *Service `groups:"basic" json:",omitempty"`
 
-	Availability *Availability
+	OperatorRef string    `groups:"internal"`
+	Operator    *Operator `groups:"basic" json:",omitempty"`
 
-	Path []JourneyPathItem
+	Direction          string    `groups:"detailed"`
+	DepartureTime      time.Time `groups:"basic"`
+	DestinationDisplay string    `groups:"basic"`
+
+	Availability *Availability `groups:"detailed"`
+
+	Path []JourneyPathItem `groups:"detailed"`
+}
+
+func (j *Journey) GetReferences() {
+	j.GetOperator()
+	j.GetService()
+}
+func (j *Journey) GetOperator() {
+	operatorsCollection := database.GetCollection("operators")
+	operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.OperatorRef}).Decode(&j.Operator)
+}
+func (j *Journey) GetService() {
+	servicesCollection := database.GetCollection("services")
+	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.ServiceRef}).Decode(&j.Service)
 }
 
 type JourneyPathItem struct {

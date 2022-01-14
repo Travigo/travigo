@@ -6,11 +6,11 @@ import (
 )
 
 type TimetableRecord struct {
-	Journey  *Journey
-	Service  *Service
-	Operator *Operator
+	Journey *Journey `groups:"basic"`
+	// Service *Service `groups:"basic"`
+	// Operator *Operator `groups:"basic"`
 
-	Time time.Time
+	Time time.Time `groups:"basic"`
 }
 
 const YearMonthDayFormat = "2006-01-02"
@@ -123,6 +123,8 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 		}
 
 		if matchHit && matchSecondaryHit && conditionHit && !excludeHit {
+			journey.GetReferences()
+
 			timetable = append(timetable, &TimetableRecord{
 				Journey: journey,
 				Time:    stopDeperatureTime,

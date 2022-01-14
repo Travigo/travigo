@@ -11,6 +11,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"go.mongodb.org/mongo-driver/bson"
 
 	iso8601 "github.com/senseyeio/duration"
@@ -19,7 +20,7 @@ import (
 func StopsRouter(router fiber.Router) {
 	router.Get("/", listStops)
 	router.Get("/:identifier", getStop)
-	router.Get("/:identifier/departure_board", getStopDepartureBoard)
+	router.Get("/:identifier/departures", getStopDepartures)
 }
 
 func listStops(c *fiber.Ctx) error {
@@ -84,7 +85,7 @@ func getStop(c *fiber.Ctx) error {
 	}
 }
 
-func getStopDepartureBoard(c *fiber.Ctx) error {
+func getStopDepartures(c *fiber.Ctx) error {
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
 
@@ -145,5 +146,16 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 		journeysTimetable = journeysTimetable[:count]
 	}
 
-	return c.JSON(journeysTimetable)
+	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"basic"},
+	}, journeysTimetable)
+
+	if err != nil {
+		c.SendStatus(fiber.StatusInternalServerError)
+		return c.JSON(fiber.Map{
+			"error": "Sherrif could not reduce journeysTimetable",
+		})
+	}
+
+	return c.JSON(journeysTimetableReduced)
 }
