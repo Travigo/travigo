@@ -15,7 +15,7 @@ type TimetableRecord struct {
 
 const YearMonthDayFormat = "2006-01-02"
 
-var daysOfWeek = []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Friday", "Saturday"}
+var daysOfWeek = []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 
 func datesMatch(a time.Time, b time.Time) bool {
 	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()

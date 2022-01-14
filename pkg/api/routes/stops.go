@@ -11,6 +11,8 @@ import (
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
 	"go.mongodb.org/mongo-driver/bson"
+
+	iso8601 "github.com/senseyeio/duration"
 )
 
 func StopsRouter(router fiber.Router) {
@@ -96,7 +98,11 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 	}
 
 	currentDateTime := time.Now()
-	// currentTime, _ := time.Parse("15:04:05", currentDateTime.Format("15:04:05"))
+	nextDayDuration, _ := iso8601.ParseISO8601("P1D")
+	tomorrowDateTime := nextDayDuration.Shift(currentDateTime)
+	tomorrowDateTime = time.Date(
+		tomorrowDateTime.Year(), tomorrowDateTime.Month(), tomorrowDateTime.Day(), 0, 0, 0, 0, tomorrowDateTime.Location(),
+	)
 
 	journeys := []*ctdf.Journey{}
 
@@ -115,7 +121,10 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 		journeys = append(journeys, &journey)
 	}
 
-	journeysTimetable := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, currentDateTime)
+	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, currentDateTime)
+	journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, tomorrowDateTime)
+
+	journeysTimetable := append(journeysTimetableToday, journeysTimetableTomorrow...)
 
 	return c.JSON(journeysTimetable)
 }
