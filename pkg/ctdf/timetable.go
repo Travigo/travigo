@@ -52,7 +52,7 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 	case AvailabilityMatchAll:
 		return true
 	default:
-		// pretty.Println("Cant parse rule", rule)
+		// log.Error().Msgf("Cannot parse rule type %s", rule.Type)
 		return false
 	}
 }
@@ -67,22 +67,21 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 	// TODO: add dynamic destination display
 
-	// This is a bit of a cheat to just get the time object without the date
-	currentTime, _ := time.Parse("15:04:05", dateTime.Format("15:04:05"))
-
-	// TODO: also do for next day for when we're bordering the days
-
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
 
 		for _, path := range journey.Path {
 			if path.OriginStopRef == stopRef {
+				refTime := path.OriginDepartureTime
 				stopDeperatureTime = path.OriginDepartureTime
+				stopDeperatureTime = time.Date(
+					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), refTime.Location(),
+				)
 				break
 			}
 		}
 
-		if stopDeperatureTime.Before(currentTime) {
+		if stopDeperatureTime.Before(dateTime) {
 			continue
 		}
 

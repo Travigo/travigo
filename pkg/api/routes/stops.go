@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"log"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,14 @@ func getStop(c *fiber.Ctx) error {
 
 func getStopDepartureBoard(c *fiber.Ctx) error {
 	stopIdentifier := c.Params("identifier")
+	count, err := strconv.Atoi(c.Query("count", "25"))
+
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter count should be an integer",
+		})
+	}
 
 	stopsCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
@@ -98,6 +107,8 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 	}
 
 	currentDateTime := time.Now()
+
+	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
 	nextDayDuration, _ := iso8601.ParseISO8601("P1D")
 	tomorrowDateTime := nextDayDuration.Shift(currentDateTime)
 	tomorrowDateTime = time.Date(
@@ -107,8 +118,6 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 	journeys := []*ctdf.Journey{}
 
 	journeysCollection := database.GetCollection("journeys")
-	// departureTimeQuery := bson.M{"deperaturetime": bson.M{"$gte": currentTime}}
-	// query := bson.M{"$and": bson.A{bson.M{"path.originstopref": stopIdentifier}, departureTimeQuery}}
 	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": stopIdentifier})
 
 	for cursor.Next(context.TODO()) {
@@ -125,6 +134,16 @@ func getStopDepartureBoard(c *fiber.Ctx) error {
 	journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, tomorrowDateTime)
 
 	journeysTimetable := append(journeysTimetableToday, journeysTimetableTomorrow...)
+
+	// Sort timetable by TimetableRecord time
+	sort.Slice(journeysTimetable, func(i, j int) bool {
+		return journeysTimetable[i].Time.Before(journeysTimetable[j].Time)
+	})
+
+	// Once sorted cut off any records higher than our max count
+	if len(journeysTimetable) > count {
+		journeysTimetable = journeysTimetable[:count]
+	}
 
 	return c.JSON(journeysTimetable)
 }
