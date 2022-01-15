@@ -88,6 +88,7 @@ func getStop(c *fiber.Ctx) error {
 func getStopDepartures(c *fiber.Ctx) error {
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
+	startDateTimeString := c.Query("datetime")
 
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -107,13 +108,25 @@ func getStopDepartures(c *fiber.Ctx) error {
 		})
 	}
 
-	currentDateTime := time.Now()
+	var startDateTime time.Time
+	if startDateTimeString == "" {
+		startDateTime = time.Now()
+	} else {
+		startDateTime, err = time.Parse(time.RFC3339, startDateTimeString)
+
+		if err != nil {
+			c.SendStatus(fiber.StatusBadRequest)
+			return c.JSON(fiber.Map{
+				"error": "Parameter datetime should be an RFS3339/ISO8601 datetime",
+			})
+		}
+	}
 
 	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
 	nextDayDuration, _ := iso8601.ParseISO8601("P1D")
-	tomorrowDateTime := nextDayDuration.Shift(currentDateTime)
-	tomorrowDateTime = time.Date(
-		tomorrowDateTime.Year(), tomorrowDateTime.Month(), tomorrowDateTime.Day(), 0, 0, 0, 0, tomorrowDateTime.Location(),
+	dayAfterDateTime := nextDayDuration.Shift(startDateTime)
+	dayAfterDateTime = time.Date(
+		dayAfterDateTime.Year(), dayAfterDateTime.Month(), dayAfterDateTime.Day(), 0, 0, 0, 0, dayAfterDateTime.Location(),
 	)
 
 	journeys := []*ctdf.Journey{}
@@ -131,8 +144,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 		journeys = append(journeys, &journey)
 	}
 
-	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, currentDateTime)
-	journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, tomorrowDateTime)
+	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, startDateTime)
+	journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, dayAfterDateTime)
 
 	journeysTimetable := append(journeysTimetableToday, journeysTimetableTomorrow...)
 
