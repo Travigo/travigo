@@ -34,6 +34,7 @@ type JourneyPatternTimingLinkPoint struct {
 	ID             string `xml:"id,attr"`
 	SequenceNumber string `xml:",attr"`
 
+	WaitTime                  string
 	Activity                  string
 	DynamicDestinationDisplay string
 	StopPointRef              string

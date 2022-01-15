@@ -43,4 +43,7 @@ type VehicleJourneyTimingLink struct {
 
 	JourneyPatternTimingLinkRef string
 	RunTime                     string
+
+	From JourneyPatternTimingLinkPoint
+	To   JourneyPatternTimingLinkPoint
 }
