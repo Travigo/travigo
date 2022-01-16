@@ -8,4 +8,4 @@ RUN chmod +x /web-api
 
 EXPOSE 8080
 
-ENTRYPOINT ["/web-api"]
+ENTRYPOINT ["/web-api", "run"]
