@@ -452,6 +452,52 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						destinationDisplay = vehicleJourneyTimingLink.From.DynamicDestinationDisplay
 					}
 
+					// Get the activities at this stop (eg. pickup, setdown, both)
+					var originActivity []ctdf.JourneyPathItemActivity
+					var destinationActivity []ctdf.JourneyPathItemActivity
+
+					txcFromActivity := "pickUpAndSetDown"
+					txcToActivity := "pickUpAndSetDown"
+
+					if journeyPatternTimingLink.From.Activity != "" {
+						txcFromActivity = journeyPatternTimingLink.From.Activity
+					}
+					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.From.Activity != "" {
+						txcFromActivity = vehicleJourneyTimingLink.From.Activity
+					}
+					if journeyPatternTimingLink.To.Activity != "" {
+						txcToActivity = journeyPatternTimingLink.To.Activity
+					}
+					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.To.Activity != "" {
+						txcToActivity = vehicleJourneyTimingLink.To.Activity
+					}
+
+					if txcFromActivity == "pickUpAndSetDown" {
+						originActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup, ctdf.JourneyPathItemActivitySetdown}
+					}
+					if txcFromActivity == "pickUp" {
+						originActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}
+					}
+					if txcFromActivity == "setDown" {
+						originActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown}
+					}
+					if txcFromActivity == "pass" {
+						originActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}
+					}
+
+					if txcToActivity == "pickUpAndSetDown" {
+						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup, ctdf.JourneyPathItemActivitySetdown}
+					}
+					if txcToActivity == "pickUp" {
+						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}
+					}
+					if txcToActivity == "setDown" {
+						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown}
+					}
+					if txcToActivity == "pass" {
+						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}
+					}
+
 					pathItem := ctdf.JourneyPathItem{
 						OriginStopRef:      fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.From.StopPointRef),
 						DestinationStopRef: fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.To.StopPointRef),
@@ -464,6 +510,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						DestinationArivalTime: destinationArivalTime,
 
 						DestinationDisplay: destinationDisplay,
+
+						OriginActivity:      originActivity,
+						DestinationActivity: destinationActivity,
 					}
 
 					ctdfJourney.Path = append(ctdfJourney.Path, pathItem)

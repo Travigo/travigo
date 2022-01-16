@@ -56,6 +56,16 @@ type JourneyPathItem struct {
 
 	OriginDepartureTime time.Time
 
-	// OriginWaitTime      string
-	// DestinationWaitTime string
+	DestinationDisplay string
+
+	OriginActivity      []JourneyPathItemActivity
+	DestinationActivity []JourneyPathItemActivity
 }
+
+type JourneyPathItemActivity string
+
+const (
+	JourneyPathItemActivityPickup  = "Pickup"
+	JourneyPathItemActivitySetdown = "Setdown"
+	JourneyPathItemActivityPass    = "Pass"
+)
