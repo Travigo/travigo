@@ -1,0 +1,58 @@
+# Default values for britbus-data-importer.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+database:
+  connectionString: mongodb://britbus:kjefkjfksdjf903r9wejds98s90df9sdfk@mongodb-headless:27017/?authSource=britbus&readPreference=primary&appname=MongoDB%20Compass&ssl=false
+  database: britbus
+
+travelinenoc:
+  image:
+    repository: ghcr.io/britbus/britbus/data-importer
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: pr-27
+
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  podAnnotations: {}
+
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""

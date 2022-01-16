@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "britbus-data-importer.fullname" . }}-traveline-noc
+  labels:
+    {{- include "britbus-data-importer.labels" . | nindent 4 }}
+spec:
+  schedule: "17 * * * *"
+  jobTemplate:
+    metadata:
+      {{- with .Values.travelinenoc.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "britbus-data-importer.selectorLabels" . | nindent 8 }}
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "britbus-data-importer.serviceAccountName" . }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ .Chart.Name }}-traveline-noc
+              securityContext:
+                {{- toYaml .Values.travelinenoc.securityContext | nindent 16 }}
+              image: "{{ .Values.travelinenoc.image.repository }}:{{ .Values.travelinenoc.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.travelinenoc.image.pullPolicy }}
+              args: ["file", "traveline-noc", "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"]
+              env:
+                - name: BRITBUS_MONGODB_CONNECTION
+                  value: {{ .Values.database.connectionString }}
+                - name: BRITBUS_MONGODB_DATABASE
+                  value: {{ .Values.database.database }}
+              resources:
+                {{- toYaml .Values.travelinenoc.resources | nindent 16 }}
+          {{- with .Values.travelinenoc.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.travelinenoc.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.travelinenoc.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

@@ -6,6 +6,6 @@ COPY ./web-api /web-api
 
 RUN chmod +x /web-api
 
-EXPOSE 8080
+EXPOSE 80
 
-ENTRYPOINT ["/web-api", "run"]
+ENTRYPOINT ["/web-api", "run", "--listen", ":80"]

@@ -40,7 +40,7 @@ func importFile(dataFormat string, source string) error {
 		resp, err := http.Get(source)
 
 		if err != nil {
-			log.Fatal().Err(err)
+			log.Fatal().Err(err).Msg("Download file")
 		}
 		defer resp.Body.Close()
 
