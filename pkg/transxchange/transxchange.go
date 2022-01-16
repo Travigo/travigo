@@ -431,13 +431,13 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					if journeyPatternTimingLink.From.WaitTime != "" {
 						originWaitTime, _ = iso8601.ParseISO8601(journeyPatternTimingLink.From.WaitTime)
 					}
-					if vehicleJourneyTimingLink.From.WaitTime != "" {
+					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.From.WaitTime != "" {
 						originWaitTime, _ = iso8601.ParseISO8601(vehicleJourneyTimingLink.From.WaitTime)
 					}
 
 					timeCursor = originWaitTime.Shift(timeCursor)
 
-					originDepartureTime := timeCursor // TODO: also need to handle wait times
+					originDepartureTime := timeCursor
 
 					travelTime, _ := iso8601.ParseISO8601(runTime)
 					destinationArivalTime := travelTime.Shift(originDepartureTime)

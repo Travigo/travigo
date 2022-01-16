@@ -164,46 +164,48 @@ func main() {
 		Description: "Manages ingesting and verifying data in BritBus",
 		Commands: []*cli.Command{
 			{
-				Name:      "import",
+				Name:      "file",
 				Usage:     "Import a dataset into BritBus",
-				ArgsUsage: "<data-format> <source-format> <source>",
+				ArgsUsage: "<data-format> <source>",
 				Action: func(c *cli.Context) error {
-					if c.Args().Len() != 3 {
-						return errors.New("<data-format>, <source-format>, and <source> must be provided")
+					if c.Args().Len() != 2 {
+						return errors.New("<data-format> and <source> must be provided")
 					}
 
 					dataFormat := c.Args().Get(0)
-					sourceFormat := c.Args().Get(1)
-					source := c.Args().Get(2)
+					source := c.Args().Get(1)
 
-					if sourceFormat == "file" {
-						err := importFile(dataFormat, source)
+					err := importFile(dataFormat, source)
 
+					return err
+				},
+			},
+			{
+				Name:  "bods-timetable",
+				Usage: "Import TransXChange Timetable datasets from BODS into BritBus",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "URL for the BODS Timetable API",
+						Required: true,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					source := c.String("url")
+					log.Info().Msgf("TransXChange API import from %s ", source)
+					timeTableDataset, err := bods.GetTimetableDataset(source)
+					log.Info().Msgf(" - %d datasets", len(timeTableDataset))
+
+					if err != nil {
 						return err
-					} else if sourceFormat == "api" {
-						switch dataFormat {
-						case "transxchange":
-							log.Info().Msgf("TransXChange API import from %s ", source)
-							timeTableDataset, err := bods.GetTimetableDataset(source)
-							log.Info().Msgf(" - %d datasets", len(timeTableDataset))
+					}
 
-							if err != nil {
-								return err
-							}
+					for _, dataset := range timeTableDataset {
+						err = importFile("transxchange", dataset.URL)
 
-							for _, dataset := range timeTableDataset {
-								err = importFile(dataFormat, dataset.URL)
-
-								if err != nil {
-									log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
-								}
-							}
-						default:
-							return errors.New(fmt.Sprintf("Unsupported api data-format %s", dataFormat))
+						if err != nil {
+							log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
 						}
-
-					} else {
-						return errors.New(fmt.Sprintf("Unsupported source-format %s", sourceFormat))
 					}
 
 					return nil
