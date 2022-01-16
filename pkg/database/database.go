@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/britbus/britbus/pkg/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -17,11 +18,24 @@ type MongoInstance struct {
 var mongoDb MongoInstance
 
 // Database settings (insert your own database name and connection URI)
-const dbName = "britbus"
-const mongoURI = "mongodb://localhost:27017/" + dbName
+const defaultConnectionString = "mongodb://localhost:27017/"
+const defaultDatabase = "britbus"
 
 func Connect() error {
-	client, err := mongo.NewClient(options.Client().ApplyURI(mongoURI))
+	connectionString := defaultConnectionString
+	dbName := defaultDatabase
+
+	env := util.GetEnvironmentVariables()
+
+	if env["BRITBUS_MONGODB_CONNECTION"] != "" {
+		connectionString = env["BRITBUS_MONGODB_CONNECTION"]
+	}
+
+	if env["BRITBUS_MONGODB_DATABASE"] != "" {
+		dbName = env["BRITBUS_MONGODB_DATABASE"]
+	}
+
+	client, err := mongo.NewClient(options.Client().ApplyURI(connectionString))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
