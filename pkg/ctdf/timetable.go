@@ -6,7 +6,8 @@ import (
 )
 
 type TimetableRecord struct {
-	Journey *Journey `groups:"basic"`
+	Journey            *Journey `groups:"basic"`
+	DestinationDisplay string   `groups:"basic"`
 	// Service *Service `groups:"basic"`
 	// Operator *Operator `groups:"basic"`
 
@@ -69,6 +70,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
+		var destinationDisplay string
 
 		for _, path := range journey.Path {
 			if path.OriginStopRef == stopRef {
@@ -77,6 +79,8 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				stopDeperatureTime = time.Date(
 					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), refTime.Location(),
 				)
+
+				destinationDisplay = path.DestinationDisplay
 				break
 			}
 		}
@@ -126,8 +130,9 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 			journey.GetReferences()
 
 			timetable = append(timetable, &TimetableRecord{
-				Journey: journey,
-				Time:    stopDeperatureTime,
+				Journey:            journey,
+				Time:               stopDeperatureTime,
+				DestinationDisplay: destinationDisplay,
 			})
 		}
 	}

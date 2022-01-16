@@ -443,6 +443,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					destinationArivalTime := travelTime.Shift(originDepartureTime)
 					timeCursor = destinationArivalTime
 
+					// Calculate the destination display at this stop
+					destinationDisplay := journeyPattern.DestinationDisplay
+					if journeyPatternTimingLink.From.DynamicDestinationDisplay != "" {
+						destinationDisplay = journeyPatternTimingLink.From.DynamicDestinationDisplay
+					}
+					if vehicleJourneyTimingLink != nil && vehicleJourneyTimingLink.From.DynamicDestinationDisplay != "" {
+						destinationDisplay = vehicleJourneyTimingLink.From.DynamicDestinationDisplay
+					}
+
 					pathItem := ctdf.JourneyPathItem{
 						OriginStopRef:      fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.From.StopPointRef),
 						DestinationStopRef: fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.To.StopPointRef),
@@ -453,6 +462,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						OriginDepartureTime: originDepartureTime,
 
 						DestinationArivalTime: destinationArivalTime,
+
+						DestinationDisplay: destinationDisplay,
 					}
 
 					ctdfJourney.Path = append(ctdfJourney.Path, pathItem)
