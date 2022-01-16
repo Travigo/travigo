@@ -4,7 +4,8 @@ WORKDIR /
 
 COPY ./data-importer /data-importer
 
-EXPOSE 8080
+RUN chown nonroot /data-importer
+RUN chmod +x /data-importer
 
 USER nonroot:nonroot
 

@@ -4,6 +4,9 @@ WORKDIR /
 
 COPY ./web-api /web-api
 
+RUN chown nonroot /web-api
+RUN chmod +x /web-api
+
 EXPOSE 8080
 
 USER nonroot:nonroot
