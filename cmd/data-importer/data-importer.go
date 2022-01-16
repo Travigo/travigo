@@ -2,7 +2,6 @@ package main
 
 import (
 	"archive/zip"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -151,9 +150,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 }
 
 func main() {
-	// DEBUG TEST
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	if err := database.Connect(); err != nil {
