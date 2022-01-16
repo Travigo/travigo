@@ -1,12 +1,9 @@
-FROM gcr.io/distroless/base-debian10
+FROM busybox:latest
 
 WORKDIR /
 
 COPY ./data-importer /data-importer
 
-RUN chown nonroot /data-importer
 RUN chmod +x /data-importer
-
-USER nonroot:nonroot
 
 ENTRYPOINT ["/data-importer"]
