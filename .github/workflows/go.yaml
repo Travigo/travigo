@@ -48,6 +48,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    needs:
+      - data-importer-build
 
     steps:
       - name: Checkout repository
@@ -86,6 +88,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    needs:
+      - web-api-build
 
     steps:
       - name: Checkout repository
