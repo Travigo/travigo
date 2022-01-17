@@ -1,9 +1,13 @@
 package ctdf
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"time"
+
+	"github.com/britbus/britbus/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const OperatorNOCFormat = "GB:NOC:%s"
@@ -21,7 +25,8 @@ type Operator struct {
 	PrimaryName string   `groups:"basic"`
 	OtherNames  []string `groups:"basic"`
 
-	OperatorGroupRef string `groups:"detailed"`
+	OperatorGroupRef string         `groups:"detailed"`
+	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
 
 	TransportType []string `groups:"detailed"`
 
@@ -32,6 +37,14 @@ type Operator struct {
 	Address     string            `groups:"detailed"`
 	PhoneNumber string            `groups:"detailed"`
 	SocialMedia map[string]string `groups:"detailed"`
+}
+
+func (operator *Operator) GetReferences() {
+	operator.GetOperatorGroup()
+}
+func (operator *Operator) GetOperatorGroup() {
+	operatorGroupsCollection := database.GetCollection("operator_groups")
+	operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operator.OperatorGroupRef}).Decode(&operator.OperatorGroup)
 }
 
 func (operator *Operator) UniqueHash() string {

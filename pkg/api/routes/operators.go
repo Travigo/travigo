@@ -32,6 +32,7 @@ func getOperator(c *fiber.Ctx) error {
 			"error": "Could not find Operator matching Operator Identifier",
 		})
 	} else {
+		operator.GetReferences()
 		return c.JSON(operator)
 	}
 }

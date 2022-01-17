@@ -18,10 +18,10 @@ type Journey struct {
 	DataSource *DataSource `groups:"detailed"`
 
 	ServiceRef string   `groups:"internal"`
-	Service    *Service `groups:"basic" json:",omitempty"`
+	Service    *Service `groups:"basic" json:",omitempty" bson:"-"`
 
 	OperatorRef string    `groups:"internal"`
-	Operator    *Operator `groups:"basic" json:",omitempty"`
+	Operator    *Operator `groups:"basic" json:",omitempty" bson:"-"`
 
 	Direction          string    `groups:"detailed"`
 	DepartureTime      time.Time `groups:"basic"`

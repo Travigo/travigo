@@ -26,7 +26,7 @@ func getOperatorGroup(c *fiber.Ctx) error {
 			"error": "Could not find Operator Group matching Identifier",
 		})
 	} else {
-		// operatorGroup.GetOperators()
+		operatorGroup.GetReferences()
 		return c.JSON(operatorGroup)
 	}
 }
