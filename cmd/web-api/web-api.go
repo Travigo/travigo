@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/api"
+	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -31,6 +32,8 @@ func main() {
 					if err := database.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
 					}
+
+					ctdf.LoadSpecialDayCache()
 
 					api.SetupServer(c.String("listen"))
 

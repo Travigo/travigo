@@ -121,9 +121,25 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 
 						elementChain = elementChain[:len(elementChain)-1] // Using decodeElement means we skip the end element for this
 					} else {
+						bankHolidayName := elementChain[2]
+
+						// If its one of the variable days then just set it to normal day
+						// Our timetable can handle variable holiday days
+						if bankHolidayName == "ChristmasDayHoliday" {
+							bankHolidayName = "ChristmasDay"
+						} else if bankHolidayName == "BoxingDayHoliday" {
+							bankHolidayName = "BoxingDay"
+						} else if bankHolidayName == "NewYearsDayHoliday" {
+							bankHolidayName = "NewYearsDay"
+						} else if bankHolidayName == "Jan2ndScotlandHoliday" {
+							bankHolidayName = "Jan2ndScotland"
+						} else if bankHolidayName == "StAndrewsDayHoliday" {
+							bankHolidayName = "StAndrewsDay"
+						}
+
 						record = ctdf.AvailabilityRule{
 							Type:  ctdf.AvailabilitySpecialDay,
-							Value: fmt.Sprintf("GB:BankHoliday:%s", elementChain[2]),
+							Value: fmt.Sprintf("GB:BankHoliday:%s", bankHolidayName),
 						}
 					}
 

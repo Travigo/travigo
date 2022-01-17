@@ -3,13 +3,13 @@ package ctdf
 import (
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type TimetableRecord struct {
 	Journey            *Journey `groups:"basic"`
 	DestinationDisplay string   `groups:"basic"`
-	// Service *Service `groups:"basic"`
-	// Operator *Operator `groups:"basic"`
 
 	Time time.Time `groups:"basic"`
 }
@@ -49,24 +49,32 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 		}
 
 		return (dateTime.After(startDate) && dateTime.Before(endDate)) || datesMatch(startDate, dateTime) || datesMatch(endDate, dateTime)
-	// case AvailabilitySpecialDay:
+	case AvailabilitySpecialDay:
+		specialDayDateYear := SpecialDays[dateTime.Year()]
+
+		if specialDayDateYear == nil {
+			log.Error().Msgf("Looks like year %d doesnt exist in SpecialDays", dateTime.Year())
+			return false
+		}
+
+		specialDateTime := SpecialDays[dateTime.Year()][rule.Value]
+
+		if specialDateTime.Year() == 1 {
+			log.Error().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
+			return false
+		}
+
+		return datesMatch(specialDateTime, dateTime)
 	case AvailabilityMatchAll:
 		return true
 	default:
-		// log.Error().Msgf("Cannot parse rule type %s", rule.Type)
+		log.Error().Msgf("Cannot parse rule type %s", rule.Type)
 		return false
 	}
 }
 
 func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time) []*TimetableRecord {
 	timetable := []*TimetableRecord{}
-
-	// pretty.Println(checkRule(&AvailabilityRule{
-	// 	Type:  AvailabilityDateRange,
-	// 	Value: "2022-01-11:",
-	// }, dateTime))
-
-	// TODO: add dynamic destination display
 
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
