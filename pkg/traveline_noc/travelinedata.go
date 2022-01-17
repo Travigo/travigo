@@ -31,47 +31,6 @@ type TravelineData struct {
 	PublicNameRecords          []PublicNameRecord
 }
 
-func findOrCreateCTDFRecord(operators []*ctdf.Operator, idMap map[string]int, identifier string) ([]*ctdf.Operator, *ctdf.Operator, int) {
-	if val, ok := idMap[identifier]; ok {
-		ctdfRecord := operators[val]
-
-		return operators, ctdfRecord, idMap[identifier]
-	} else {
-		ctdfRecord := &ctdf.Operator{
-			OtherNames:       []string{},
-			OtherIdentifiers: map[string]string{},
-		}
-		operators = append(operators, ctdfRecord)
-
-		newID := len(operators) - 1
-		idMap[identifier] = newID
-
-		return operators, ctdfRecord, newID
-	}
-}
-func findManyOrCreateCTDFRecord(operators []*ctdf.Operator, idMap map[string][]int, identifier string) ([]*ctdf.Operator, []*ctdf.Operator) {
-	if val, ok := idMap[identifier]; ok {
-		var ctdfRecords []*ctdf.Operator
-
-		for _, id := range val {
-			ctdfRecords = append(ctdfRecords, operators[id])
-		}
-
-		return operators, ctdfRecords
-	} else {
-		ctdfRecord := &ctdf.Operator{
-			OtherNames:       []string{},
-			OtherIdentifiers: map[string]string{},
-		}
-		operators = append(operators, ctdfRecord)
-
-		newID := len(operators) - 1
-		idMap[identifier] = append(idMap[identifier], newID)
-
-		return operators, []*ctdf.Operator{ctdfRecord}
-	}
-}
-
 func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 	emailRegex, _ := regexp.Compile("^[^@]+@[^@]+.[^@]+$")
 	phoneRegex, _ := regexp.Compile("^[\\d ]+$")
@@ -91,14 +50,12 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	operatorGroups := []*ctdf.OperatorGroup{}
 
 	mgmtDivisionGroupIDs := map[string]string{}
-	operatorNOCCodes := map[string]int{}
-	operatorsIDs := map[string][]int{}
-	publicNameIDs := map[string][]int{}
+	operatorNOCCodeRef := map[string]*ctdf.Operator{}
+	operatorsIDRef := map[string]*ctdf.Operator{}
+	publicNameIDRef := map[string]*ctdf.Operator{}
 
 	// GroupsRecords
-	for i := 0; i < len(t.GroupsRecords); i++ {
-		groupRecord := t.GroupsRecords[i]
-
+	for _, groupRecord := range t.GroupsRecords {
 		ctdfRecord := &ctdf.OperatorGroup{
 			Identifier: fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupRecord.GroupID),
 			Name:       groupRecord.GroupName,
@@ -107,102 +64,98 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	}
 
 	// ManagementDivisionsRecord
-	for i := 0; i < len(t.ManagementDivisionsRecords); i++ {
-		mgmtDivisionRecord := t.ManagementDivisionsRecords[i]
-
+	for _, mgmtDivisionRecord := range t.ManagementDivisionsRecords {
+		// Create a reference between the Management Division ID and the Group ID
 		mgmtDivisionGroupIDs[mgmtDivisionRecord.ManagementDivisionID] = mgmtDivisionRecord.GroupID
 	}
 
-	// NOCLinesRecords
-	for i := 0; i < len(t.NOCLinesRecords); i++ {
-		nocLineRecord := t.NOCLinesRecords[i]
+	// OperatorsRecords
+	for _, operatorRecord := range t.OperatorsRecords {
+		ctdfRecord := &ctdf.Operator{
+			PrimaryName:       operatorRecord.OperatorName,
+			PrimaryIdentifier: fmt.Sprintf(ctdf.OperatorNOCIDFormat, operatorRecord.OperatorID),
+			OtherIdentifiers:  []string{},
+			OtherNames:        []string{},
+		}
 
-		var ctdfRecord *ctdf.Operator
-		operators, ctdfRecord, _ = findOrCreateCTDFRecord(operators, operatorNOCCodes, nocLineRecord.NOCCode)
+		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, operatorRecord.OperatorName)
 
-		ctdfRecord.PrimaryIdentifier = fmt.Sprintf(ctdf.OperatorIDFormat, nocLineRecord.NOCCode)
-		ctdfRecord.OtherIdentifiers["NOC"] = nocLineRecord.NOCCode
-		ctdfRecord.PrimaryName = nocLineRecord.PublicName
-		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
-		ctdfRecord.Licence = nocLineRecord.Licence
-		ctdfRecord.TransportType = []string{nocLineRecord.Mode}
+		if operatorRecord.ManagementDivisionID != "" {
+			groupID := mgmtDivisionGroupIDs[operatorRecord.ManagementDivisionID]
+
+			ctdfRecord.OperatorGroupRef = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
+		}
+
+		operators = append(operators, ctdfRecord)
+		operatorsIDRef[operatorRecord.OperatorID] = ctdfRecord
 	}
 
 	// NOCTableRecords
-	for i := 0; i < len(t.NOCTableRecords); i++ {
-		nocTableRecord := t.NOCTableRecords[i]
-		var ctdfRecord *ctdf.Operator
-		var index int
-		operators, ctdfRecord, index = findOrCreateCTDFRecord(operators, operatorNOCCodes, nocTableRecord.NOCCode)
+	for _, nocTableRecord := range t.NOCTableRecords {
+		operator := operatorsIDRef[nocTableRecord.OperatorID]
 
-		ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, nocTableRecord.OperatorPublicName, nocTableRecord.VOSA_PSVLicenseName)
+		if operator != nil {
+			operator.PrimaryName = nocTableRecord.OperatorPublicName
 
-		operatorsIDs[nocTableRecord.OperatorID] = append(operatorsIDs[nocTableRecord.OperatorID], index)
-		publicNameIDs[nocTableRecord.PublicNameID] = append(publicNameIDs[nocTableRecord.PublicNameID], index)
+			operator.OtherIdentifiers = append(operator.OtherIdentifiers, fmt.Sprintf(ctdf.OperatorNOCFormat, nocTableRecord.NOCCode))
+			operator.OtherNames = append(operator.OtherNames, nocTableRecord.OperatorPublicName, nocTableRecord.VOSA_PSVLicenseName)
+
+			operatorNOCCodeRef[nocTableRecord.NOCCode] = operator
+			publicNameIDRef[nocTableRecord.PublicNameID] = operator
+		}
 	}
 
-	// OperatorsRecords
-	for i := 0; i < len(t.OperatorsRecords); i++ {
-		operatorRecord := t.OperatorsRecords[i]
-		var ctdfRecords []*ctdf.Operator
-		operators, ctdfRecords = findManyOrCreateCTDFRecord(operators, operatorsIDs, operatorRecord.OperatorID)
+	// NOCLinesRecords
+	for _, nocLineRecord := range t.NOCLinesRecords {
+		operator := operatorNOCCodeRef[nocLineRecord.NOCCode]
 
-		for _, ctdfRecord := range ctdfRecords {
-			ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, operatorRecord.OperatorName)
-
-			if operatorRecord.ManagementDivisionID != "" {
-				groupID := mgmtDivisionGroupIDs[operatorRecord.ManagementDivisionID]
-
-				ctdfRecord.OperatorGroupRef = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
-			}
+		if operator != nil {
+			operator.PrimaryName = nocLineRecord.PublicName
+			operator.OtherNames = append(operator.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
+			operator.Licence = nocLineRecord.Licence
+			operator.TransportType = []string{nocLineRecord.Mode}
 		}
 	}
 
 	// PublicNameRecords
 	websiteRegex, _ := regexp.Compile("#(.+)#")
-	for i := 0; i < len(t.PublicNameRecords); i++ {
-		publicNameRecord := t.PublicNameRecords[i]
-		var ctdfRecords []*ctdf.Operator
-		operators, ctdfRecords = findManyOrCreateCTDFRecord(operators, publicNameIDs, publicNameRecord.PublicNameID)
+	for _, publicNameRecord := range t.PublicNameRecords {
+		operator := publicNameIDRef[publicNameRecord.PublicNameID]
 
-		for _, ctdfRecord := range ctdfRecords {
-			ctdfRecord.PrimaryName = publicNameRecord.OperatorPublicName
-			ctdfRecord.OtherNames = append(ctdfRecord.OtherNames, publicNameRecord.OperatorPublicName)
+		if operator != nil {
+			operator.PrimaryName = publicNameRecord.OperatorPublicName
+			operator.OtherNames = append(operator.OtherNames, publicNameRecord.OperatorPublicName)
 
 			if websiteMatch := websiteRegex.FindStringSubmatch(publicNameRecord.Website); len(websiteMatch) > 1 {
-				ctdfRecord.Website = websiteMatch[1]
+				operator.Website = websiteMatch[1]
 			}
-			ctdfRecord.SocialMedia = map[string]string{}
+			operator.SocialMedia = map[string]string{}
 
 			if publicNameRecord.Twitter != "" {
-				ctdfRecord.SocialMedia["Twitter"] = publicNameRecord.Twitter
+				operator.SocialMedia["Twitter"] = publicNameRecord.Twitter
 			}
 			if publicNameRecord.Facebook != "" {
-				ctdfRecord.SocialMedia["Facebook"] = publicNameRecord.Facebook
+				operator.SocialMedia["Facebook"] = publicNameRecord.Facebook
 			}
 			if publicNameRecord.YouTube != "" {
-				ctdfRecord.SocialMedia["YouTube"] = publicNameRecord.YouTube
+				operator.SocialMedia["YouTube"] = publicNameRecord.YouTube
 			}
 
-			extractContactDetails(publicNameRecord.LostPropEnq, ctdfRecord)
-			extractContactDetails(publicNameRecord.DisruptEnq, ctdfRecord)
-			extractContactDetails(publicNameRecord.ComplEnq, ctdfRecord)
-			extractContactDetails(publicNameRecord.FareEnq, ctdfRecord)
-			extractContactDetails(publicNameRecord.TTRteEnq, ctdfRecord)
+			extractContactDetails(publicNameRecord.LostPropEnq, operator)
+			extractContactDetails(publicNameRecord.DisruptEnq, operator)
+			extractContactDetails(publicNameRecord.ComplEnq, operator)
+			extractContactDetails(publicNameRecord.FareEnq, operator)
+			extractContactDetails(publicNameRecord.TTRteEnq, operator)
 		}
 	}
 
-	// Filter the generated CTDF Operators
-	filteredOperators := []*ctdf.Operator{}
+	// Filter the generated CTDF Operators for duplicate strings
 	for _, operator := range operators {
+		operator.OtherIdentifiers = util.RemoveDuplicateStrings(operator.OtherIdentifiers, []string{})
 		operator.OtherNames = util.RemoveDuplicateStrings(operator.OtherNames, []string{operator.PrimaryName})
-
-		if operator.PrimaryIdentifier != "" {
-			filteredOperators = append(filteredOperators, operator)
-		}
 	}
 
-	return filteredOperators, operatorGroups
+	return operators, operatorGroups
 }
 
 func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {

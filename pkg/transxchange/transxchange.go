@@ -90,7 +90,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	operatorLocalMapping := map[string]string{}
 
 	for _, operator := range doc.Operators {
-		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorIDFormat, operator.NationalOperatorCode)
+		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorNOCFormat, operator.NationalOperatorCode)
 	}
 
 	// Create reference map for JourneyPatternSections

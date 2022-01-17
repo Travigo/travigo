@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-const OperatorIDFormat = "GB:NOC:%s"
+const OperatorNOCFormat = "GB:NOC:%s"
+const OperatorNOCIDFormat = "GB:NOCID:%s"
 
 type Operator struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string   `groups:"basic"`
+	OtherIdentifiers  []string `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
