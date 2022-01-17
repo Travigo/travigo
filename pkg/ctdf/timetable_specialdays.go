@@ -56,16 +56,16 @@ func loadGBBankHolidayCache() {
 		eventDate, _ := time.Parse(YearMonthDayFormat, event.Date)
 
 		specialDayMapping := map[string]string{
-			"Christmas Day":          "GB:BankHoliday:ChristmasDay",
-			"Boxing Day":             "GB:BankHoliday:BoxingDay",
-			"New Year’s Day":         "GB:BankHoliday:NewYearsDay",
+			"Christmas Day":          "GB:BankHoliday:ChristmasDayHoliday",
+			"Boxing Day":             "GB:BankHoliday:BoxingDayHoliday",
+			"New Year’s Day":         "GB:BankHoliday:NewYearsDayHoliday",
 			"Good Friday":            "GB:BankHoliday:GoodFriday",
 			"Easter Monday":          "GB:BankHoliday:EasterMonday",
 			"Early May bank holiday": "GB:BankHoliday:MayDay",
 			"Spring bank holiday":    "GB:BankHoliday:SpringBank",
 			"Summer bank holiday":    "GB:BankHoliday:LateSummerBankHolidayNotScotland",
-			"St Andrew's Day":        "GB:BankHoliday:StAndrewsDay",
-			"2nd January":            "GB:BankHoliday:Jan2ndScotland",
+			"St Andrew's Day":        "GB:BankHoliday:StAndrewsDayHoliday",
+			"2nd January":            "GB:BankHoliday:Jan2ndScotlandHoliday",
 		}
 
 		if specialDayMapping[event.Title] != "" {
@@ -77,9 +77,15 @@ func loadGBBankHolidayCache() {
 		}
 	}
 
-	// Make them up for christmas and new years eve
+	// Hardcoded set days
 	for year, yearMap := range SpecialDays {
 		yearMap["GB:BankHoliday:ChristmasEve"] = time.Date(year, 12, 24, 0, 0, 0, 0, time.UTC)
 		yearMap["GB:BankHoliday:NewYearsEve"] = time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+
+		yearMap["GB:BankHoliday:ChristmasDay"] = time.Date(year, 12, 25, 0, 0, 0, 0, time.UTC)
+		yearMap["GB:BankHoliday:BoxingDay"] = time.Date(year, 12, 26, 0, 0, 0, 0, time.UTC)
+		yearMap["GB:BankHoliday:NewYearsDay"] = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		yearMap["GB:BankHoliday:Jan2ndScotland"] = time.Date(year, 1, 2, 0, 0, 0, 0, time.UTC)
+		yearMap["GB:BankHoliday:StAndrewsDay"] = time.Date(year, 11, 30, 0, 0, 0, 0, time.UTC)
 	}
 }
