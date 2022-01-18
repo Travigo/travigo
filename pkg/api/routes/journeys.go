@@ -32,6 +32,8 @@ func getJourney(c *fiber.Ctx) error {
 			"error": "Could not find Journey matching Journey Identifier",
 		})
 	} else {
+		journey.GetReferences()
+		journey.GetDeepReferences()
 		return c.JSON(journey)
 	}
 }

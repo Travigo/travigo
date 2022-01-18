@@ -29,7 +29,7 @@ type Journey struct {
 
 	Availability *Availability `groups:"detailed"`
 
-	Path []JourneyPathItem `groups:"detailed"`
+	Path []*JourneyPathItem `groups:"detailed"`
 }
 
 func (j *Journey) GetReferences() {
@@ -45,10 +45,18 @@ func (j *Journey) GetService() {
 	servicesCollection := database.GetCollection("services")
 	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.ServiceRef}).Decode(&j.Service)
 }
+func (j *Journey) GetDeepReferences() {
+	for _, path := range j.Path {
+		path.GetReferences()
+	}
+}
 
 type JourneyPathItem struct {
 	OriginStopRef      string
 	DestinationStopRef string
+
+	OriginStop      *Stop
+	DestinationStop *Stop
 
 	Distance int
 
@@ -61,6 +69,19 @@ type JourneyPathItem struct {
 
 	OriginActivity      []JourneyPathItemActivity
 	DestinationActivity []JourneyPathItemActivity
+}
+
+func (jpi *JourneyPathItem) GetReferences() {
+	jpi.GetOriginStop()
+	jpi.GetDestinationStop()
+}
+func (jpi *JourneyPathItem) GetOriginStop() {
+	stopsCollection := database.GetCollection("stops")
+	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": jpi.OriginStopRef}).Decode(&jpi.OriginStop)
+}
+func (jpi *JourneyPathItem) GetDestinationStop() {
+	stopsCollection := database.GetCollection("stops")
+	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": jpi.DestinationStopRef}).Decode(&jpi.DestinationStop)
 }
 
 type JourneyPathItemActivity string

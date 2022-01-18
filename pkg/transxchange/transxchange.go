@@ -391,7 +391,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					Availability: availability,
 
-					Path: []ctdf.JourneyPathItem{},
+					Path: []*ctdf.JourneyPathItem{},
 				}
 
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
@@ -515,7 +515,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						DestinationActivity: destinationActivity,
 					}
 
-					ctdfJourney.Path = append(ctdfJourney.Path, pathItem)
+					ctdfJourney.Path = append(ctdfJourney.Path, &pathItem)
 				}
 
 				if len(ctdfJourney.Path) == 0 {
