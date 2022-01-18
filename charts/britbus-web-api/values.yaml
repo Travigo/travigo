@@ -8,7 +8,7 @@ image:
   repository: ghcr.io/britbus/britbus/web-api
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: pr-27
+  tag: main
 
 database:
   connectionString: mongodb://britbus:kjefkjfksdjf903r9wejds98s90df9sdfk@mongodb-headless:27017/?authSource=britbus&readPreference=primary&appname=MongoDB%20Compass&ssl=false
@@ -50,15 +50,18 @@ ingress:
   annotations:
     kubernetes.io/ingress.class: traefik
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: default-cors-header@kubernetescrd
   hosts:
-    - host: api.britbus.claydonlee.com
+    - host: api.britbus.devspace.app
       paths:
         - path: /
           pathType: ImplementationSpecific
   tls:
-    - secretName: britbus-web-api-tls
+    - secretName: britbus-web-api-devspaceapp-tls
       hosts:
-        - api.britbus.claydonlee.com
+        - api.britbus.devspace.app
+  cors_allow_hosts:
+    - "https://britbus.devspace.app"
 
 
 resources: {}

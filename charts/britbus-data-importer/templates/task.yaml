@@ -1,0 +1,37 @@
+{{- range .Values.tasks }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "britbus-data-importer.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "britbus-data-importer.labels" $ | nindent 4 }}
+spec:
+  schedule: {{ .schedule }}
+  jobTemplate:
+    metadata:
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "britbus-data-importer.selectorLabels" $ | nindent 8 }}
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "britbus-data-importer.serviceAccountName" $ }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ $.Chart.Name }}-{{ .name }}
+              image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              args: 
+                {{- toYaml .args | nindent 16 }}
+              env:
+                - name: BRITBUS_MONGODB_CONNECTION
+                  value: {{ $.Values.database.connectionString }}
+                - name: BRITBUS_MONGODB_DATABASE
+                  value: {{ $.Values.database.database }}
+              resources:
+                {{- toYaml $.Values.resources | nindent 16 }}
+{{- end }}
