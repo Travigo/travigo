@@ -69,6 +69,8 @@ type JourneyPathItem struct {
 
 	OriginActivity      []JourneyPathItemActivity
 	DestinationActivity []JourneyPathItemActivity
+
+	Track []Location
 }
 
 func (jpi *JourneyPathItem) GetReferences() {

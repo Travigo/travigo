@@ -120,7 +120,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					stopOperations = append(stopOperations, insertModel)
 					localOperationInsert += 1
-				} else if existingCtdfStop.ModificationDateTime != ctdfStop.ModificationDateTime {
+				} else if existingCtdfStop.ModificationDateTime.Before(ctdfStop.ModificationDateTime) || existingCtdfStop.ModificationDateTime.Year() == 0 {
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
@@ -191,7 +191,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					stopGroupOperations = append(stopGroupOperations, insertModel)
 					localOperationInsert += 1
-				} else if existingStopGroup.ModificationDateTime != ctdfStopGroup.ModificationDateTime {
+				} else if existingStopGroup.ModificationDateTime.Before(ctdfStopGroup.ModificationDateTime) || existingStopGroup.ModificationDateTime.Year() == 0 {
 					updateModel := mongo.NewUpdateOneModel()
 
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStopGroup.Identifier})

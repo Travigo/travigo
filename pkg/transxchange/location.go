@@ -1,7 +1,15 @@
 package transxchange
 
 type Location struct {
-	ID        string `xml:",attr"`
-	Longitude string
-	Latitude  string
+	LocationInner
+
+	Translation *LocationInner
+}
+type LocationInner struct {
+	Longitude float64
+	Latitude  float64
+
+	GridType string
+	Easting  string
+	Northing string
 }

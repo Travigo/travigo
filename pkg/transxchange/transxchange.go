@@ -13,6 +13,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/jinzhu/copier"
+	"github.com/paulcager/osgridref"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -194,7 +195,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 				serviceOperations = append(serviceOperations, insertModel)
 				serviceOperationInsert += 1
-			} else if existingCtdfService.ModificationDateTime != ctdfService.ModificationDateTime {
+			} else if existingCtdfService.ModificationDateTime.Before(ctdfService.ModificationDateTime) || existingCtdfService.ModificationDateTime.Year() == 0 {
 				updateModel := mongo.NewReplaceOneModel()
 				updateModel.SetFilter(bson.M{"primaryidentifier": ctdfService.PrimaryIdentifier})
 				updateModel.SetReplacement(bsonRep)
@@ -506,6 +507,41 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}
 					}
 
+					// Convert the track
+					track := []ctdf.Location{}
+					for _, point := range routeLink.Track {
+						// Have a wide range of different places the location can be defined
+						longitude := point.Longitude
+						latitude := point.Latitude
+
+						if longitude == 0 && point.Translation.Longitude != 0 {
+							longitude = point.Translation.Longitude
+						}
+
+						if latitude == 0 && point.Translation.Latitude != 0 {
+							latitude = point.Translation.Latitude
+						}
+
+						if longitude == 0 && latitude == 0 && point.Easting != "" && point.Northing != "" {
+							gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Easting, point.Northing))
+							if err == nil {
+								latitude, longitude = gridRef.ToLatLon()
+							}
+						}
+
+						if longitude == 0 && latitude == 0 && point.Translation.Easting != "" && point.Translation.Northing != "" {
+							gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Translation.Easting, point.Translation.Northing))
+							if err == nil {
+								latitude, longitude = gridRef.ToLatLon()
+							}
+						}
+
+						track = append(track, ctdf.Location{
+							Type:        "Point",
+							Coordinates: []float64{longitude, latitude},
+						})
+					}
+
 					pathItem := ctdf.JourneyPathItem{
 						OriginStopRef:      fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.From.StopPointRef),
 						DestinationStopRef: fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.To.StopPointRef),
@@ -521,6 +557,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 						OriginActivity:      originActivity,
 						DestinationActivity: destinationActivity,
+
+						Track: track,
 					}
 
 					ctdfJourney.Path = append(ctdfJourney.Path, &pathItem)
@@ -541,7 +579,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					stopOperations = append(stopOperations, insertModel)
 					localOperationInsert += 1
-				} else if existingCtdfJourney.ModificationDateTime != ctdfJourney.ModificationDateTime { // should be > not !=
+				} else if existingCtdfJourney.ModificationDateTime.Before(ctdfJourney.ModificationDateTime) || existingCtdfJourney.ModificationDateTime.Year() == 0 {
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
