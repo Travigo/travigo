@@ -1,11 +1,13 @@
 package ctdf
 
+import "time"
+
 type Service struct {
 	PrimaryIdentifier string            `groups:"basic"`
 	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     string `groups:"detailed"`
-	ModificationDateTime string `groups:"detailed"`
+	CreationDateTime     time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"detailed"`
 
 	DataSource *DataSource `groups:"internal"`
 

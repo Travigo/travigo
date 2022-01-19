@@ -15,7 +15,6 @@ func LoadSpecialDayCache() {
 }
 
 func loadGBBankHolidayCache() {
-	// TODO: Handle substitute christmas days as they still wont be working
 	type BankHolidayEventsSchema struct {
 		Title string
 		Date  string

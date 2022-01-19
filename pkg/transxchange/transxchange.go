@@ -22,6 +22,8 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 )
 
+const DateTimeFormat = "2006-01-02T15:04:05"
+
 type TransXChange struct {
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
@@ -133,6 +135,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 			servicesReferences[localServiceIdentifier] = txcService
 
+			creationTime, _ := time.Parse(DateTimeFormat, txcService.CreationDateTime)
+			modificationTime, _ := time.Parse(DateTimeFormat, txcService.ModificationDateTime)
+
 			ctdfService := ctdf.Service{
 				PrimaryIdentifier: serviceIdentifier,
 				OtherIdentifiers: map[string]string{
@@ -143,8 +148,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				DataSource: datasource,
 
 				ServiceName:          txcLine.LineName,
-				CreationDateTime:     txcService.CreationDateTime,
-				ModificationDateTime: txcService.ModificationDateTime,
+				CreationDateTime:     creationTime,
+				ModificationDateTime: modificationTime,
 
 				OperatorRef: operatorRef,
 
@@ -371,6 +376,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 
 				// Create CTDF Journey record
+				creationTime, _ := time.Parse(DateTimeFormat, txcJourney.CreationDateTime)
+				modificationTime, _ := time.Parse(DateTimeFormat, txcJourney.ModificationDateTime)
+
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
 					OtherIdentifiers: map[string]string{
@@ -378,8 +386,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						"JourneyCode": txcJourney.VehicleJourneyCode,
 					},
 
-					CreationDateTime:     txcJourney.CreationDateTime,
-					ModificationDateTime: txcJourney.ModificationDateTime,
+					CreationDateTime:     creationTime,
+					ModificationDateTime: modificationTime,
 
 					DataSource: datasource,
 
