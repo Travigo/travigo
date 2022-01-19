@@ -12,18 +12,18 @@ import (
 const StopGroupIDFormat = "GB:STOPGRP:%s"
 
 type StopGroup struct {
-	Identifier string
+	Identifier string `groups:"basic"`
 
-	CreationDateTime     time.Time
-	ModificationDateTime time.Time
+	CreationDateTime     time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"internal"`
 
-	Name   string
-	Type   string
-	Status string
+	Name   string `groups:"basic"`
+	Type   string `groups:"basic"`
+	Status string `groups:"basic"`
 
-	Stops []Stop `bson:"-"`
+	Stops []Stop `bson:"-" groups:"detailed"`
 }
 
 func (stopGroup *StopGroup) GetStops() {

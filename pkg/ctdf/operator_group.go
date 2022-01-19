@@ -14,15 +14,15 @@ import (
 const OperatorGroupIDFormat = "GB:NOCGRPID:%s"
 
 type OperatorGroup struct {
-	Identifier string
-	Name       string
+	Identifier string `groups:"basic"`
+	Name       string `groups:"basic"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"internal"`
 
-	Operators []*Operator `bson:"-"`
+	Operators []*Operator `bson:"-" groups:"detailed"`
 
-	CreationDateTime     time.Time
-	ModificationDateTime time.Time
+	CreationDateTime     time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"detailed"`
 }
 
 func (group *OperatorGroup) GetReferences() {

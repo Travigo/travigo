@@ -6,6 +6,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -34,6 +35,18 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-		return c.JSON(journey)
+
+		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
+			Groups: []string{"basic", "detailed"},
+		}, journey)
+
+		if err != nil {
+			c.SendStatus(fiber.StatusInternalServerError)
+			return c.JSON(fiber.Map{
+				"error": "Sherrif could not reduce Journey",
+			})
+		}
+
+		return c.JSON(journeyReduced)
 	}
 }

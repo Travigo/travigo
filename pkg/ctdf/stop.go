@@ -11,24 +11,24 @@ import (
 const StopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
-	PrimaryIdentifier string
-	OtherIdentifiers  map[string]string
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     time.Time
-	ModificationDateTime time.Time
+	CreationDateTime     time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource
+	DataSource *DataSource `groups:"internal"`
 
-	PrimaryName string
-	OtherNames  map[string]string
-	Type        string // or an enum
-	Status      string
+	PrimaryName string            `groups:"basic"`
+	OtherNames  map[string]string `groups:"basic"`
+	Type        string            `groups:"detailed"` // or an enum
+	Status      string            `groups:"detailed"`
 
-	Location *Location
+	Location *Location `groups:"detailed"`
 
-	Services []*Service `bson:"-"`
+	Services []*Service `bson:"-" groups:"detailed"`
 
-	Associations []*StopAssociation
+	Associations []*StopAssociation `groups:"detailed"`
 }
 
 func (s *Stop) GetServices() {

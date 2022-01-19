@@ -1,16 +1,16 @@
 package ctdf
 
 type Availability struct {
-	Match          []AvailabilityRule // Must match at least one
-	MatchSecondary []AvailabilityRule // Must match at least one if exists
-	Condition      []AvailabilityRule // Must match all
-	Exclude        []AvailabilityRule // Must not match one
+	Match          []AvailabilityRule `groups:"basic"` // Must match at least one
+	MatchSecondary []AvailabilityRule `groups:"basic"` // Must match at least one if exists
+	Condition      []AvailabilityRule `groups:"basic"` // Must match all
+	Exclude        []AvailabilityRule `groups:"basic"` // Must not match one
 }
 
 type AvailabilityRule struct {
-	Type        AvailabilityRecordType
-	Value       string
-	Description string
+	Type        AvailabilityRecordType `groups:"basic"`
+	Value       string                 `groups:"basic"`
+	Description string                 `groups:"basic"`
 }
 
 type AvailabilityRecordType string

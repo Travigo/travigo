@@ -52,25 +52,25 @@ func (j *Journey) GetDeepReferences() {
 }
 
 type JourneyPathItem struct {
-	OriginStopRef      string
-	DestinationStopRef string
+	OriginStopRef      string `groups:"basic"`
+	DestinationStopRef string `groups:"basic"`
 
-	OriginStop      *Stop
-	DestinationStop *Stop
+	OriginStop      *Stop `groups:"basic"`
+	DestinationStop *Stop `groups:"basic"`
 
-	Distance int
+	Distance int `groups:"basic"`
 
-	OriginArivalTime      time.Time
-	DestinationArivalTime time.Time
+	OriginArivalTime      time.Time `groups:"basic"`
+	DestinationArivalTime time.Time `groups:"basic"`
 
-	OriginDepartureTime time.Time
+	OriginDepartureTime time.Time `groups:"basic"`
 
-	DestinationDisplay string
+	DestinationDisplay string `groups:"basic"`
 
-	OriginActivity      []JourneyPathItemActivity
-	DestinationActivity []JourneyPathItemActivity
+	OriginActivity      []JourneyPathItemActivity `groups:"basic"`
+	DestinationActivity []JourneyPathItemActivity `groups:"basic"`
 
-	Track []Location
+	Track []Location `groups:"basic"`
 }
 
 func (jpi *JourneyPathItem) GetReferences() {

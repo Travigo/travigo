@@ -1,6 +1,6 @@
 package ctdf
 
 type Location struct {
-	Type        string    `json:"-"`
-	Coordinates []float64 `json:"coordinates"`
+	Type        string    `json:"-" groups:"basic"`
+	Coordinates []float64 `json:"coordinates" groups:"basic"`
 }
