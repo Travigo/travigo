@@ -9,7 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// MongoInstance contains the Mongo client and database objects
 type MongoInstance struct {
 	Client   *mongo.Client
 	Database *mongo.Database
@@ -17,7 +16,6 @@ type MongoInstance struct {
 
 var mongoDb MongoInstance
 
-// Database settings (insert your own database name and connection URI)
 const defaultConnectionString = "mongodb://localhost:27017/"
 const defaultDatabase = "britbus"
 

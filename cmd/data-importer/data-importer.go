@@ -17,8 +17,10 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
+	"github.com/britbus/britbus/pkg/rabbitmq"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
+	"github.com/britbus/britbus/siri_vm"
 	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/urfave/cli/v2"
 
@@ -99,7 +101,11 @@ func importFile(dataFormat string, source string) error {
 	}
 
 	for _, dataFile := range dataFiles {
-		parseDataFile(dataFormat, &dataFile)
+		err := parseDataFile(dataFormat, &dataFile)
+
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -142,6 +148,18 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 			Provider: "Department of Transport", // This may not always be true
 			Dataset:  dataFile.Name,
 		})
+	case "siri-vm":
+		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
+		siriVMdoc, err := siri_vm.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		siriVMdoc.SubmitToProcessQueue(&ctdf.DataSource{
+			Provider: "Department of Transport", // This may not always be true
+			Dataset:  dataFile.Name,
+		})
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
@@ -154,6 +172,9 @@ func main() {
 
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
+	}
+	if err := rabbitmq.Connect(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
 	}
 
 	// Setup the notifications client
