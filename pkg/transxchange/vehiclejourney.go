@@ -23,6 +23,12 @@ type VehicleJourney struct {
 		// MinutesPastTheHour string
 	}
 
+	Operational struct {
+		TicketMachine struct {
+			JourneyCode string
+		}
+	}
+
 	VehicleJourneyTimingLinks []VehicleJourneyTimingLink `xml:"VehicleJourneyTimingLink"`
 
 	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`

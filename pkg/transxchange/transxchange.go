@@ -403,6 +403,17 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					Path: []*ctdf.JourneyPathItem{},
 				}
 
+				// Get the realtime journey reference code
+				var realtimeJourneyCode string
+
+				if txcJourney.Operational.TicketMachine.JourneyCode != "" {
+					realtimeJourneyCode = txcJourney.Operational.TicketMachine.JourneyCode
+				}
+
+				if realtimeJourneyCode != "" {
+					ctdfJourney.OtherIdentifiers["RealtimeJourneyCode"] = realtimeJourneyCode
+				}
+
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
 				// Create CTDF Journey path based on TXC VehicleJourney referenced JourneyPatternSection

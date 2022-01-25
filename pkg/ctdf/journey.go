@@ -2,6 +2,8 @@ package ctdf
 
 import (
 	"context"
+	"errors"
+	"log"
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
@@ -48,6 +50,103 @@ func (j *Journey) GetService() {
 func (j *Journey) GetDeepReferences() {
 	for _, path := range j.Path {
 		path.GetReferences()
+	}
+}
+
+func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
+	// Get the directly referenced Operator
+	var referencedOperator *Operator
+	operatorRef := identifyingInformation["OperatorRef"]
+	operatorsCollection := database.GetCollection("operators")
+	query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": operatorRef}, bson.M{"otheridentifiers": operatorRef}}}
+	operatorsCollection.FindOne(context.Background(), query).Decode(&referencedOperator)
+
+	if referencedOperator == nil {
+		return nil, errors.New("Could not find referenced Operator")
+	}
+	referencedOperator.GetOperatorGroup()
+
+	// Get all potential Operators that belong in the Operator group
+	// This is because *some* operator groups have incorrect operator IDs for a service
+	var operators []string
+	if referencedOperator.OperatorGroup == nil {
+		operators = append(operators, referencedOperator.OtherIdentifiers...)
+	} else {
+		referencedOperator.OperatorGroup.GetOperators()
+		for _, operator := range referencedOperator.OperatorGroup.Operators {
+			operators = append(operators, operator.OtherIdentifiers...)
+		}
+	}
+
+	// Get the relevant Services
+	var services []string
+	serviceName := identifyingInformation["ServiceNameRef"]
+	servicesCollection := database.GetCollection("services")
+
+	query = bson.M{
+		"$and": bson.A{bson.M{"servicename": serviceName},
+			bson.M{"operatorref": bson.M{"$in": operators}},
+		},
+	}
+	cursor, _ := servicesCollection.Find(context.Background(), query)
+
+	for cursor.Next(context.TODO()) {
+		var service *Service
+		err := cursor.Decode(&service)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		services = append(services, service.PrimaryIdentifier)
+	}
+
+	if len(services) == 0 {
+		return nil, errors.New("Could not find related Service")
+	}
+
+	// Get the relevant Journeys
+	var journeys []*Journey
+	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
+	journeysCollection := database.GetCollection("journeys")
+	query = bson.M{
+		"$and": bson.A{
+			bson.M{"serviceref": bson.M{"$in": services}},
+			bson.M{"otheridentifiers.RealtimeJourneyCode": vehicleJourneyRef},
+		},
+	}
+
+	cursor, _ = journeysCollection.Find(context.Background(), query)
+
+	for cursor.Next(context.TODO()) {
+		var journey *Journey
+		err := cursor.Decode(&journey)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		journeys = append(journeys, journey)
+	}
+
+	if len(journeys) == 0 {
+		return nil, errors.New("Could not find related Journeys")
+	} else if len(journeys) == 1 {
+		return journeys[0], nil
+	} else {
+		filteredJourneys := []*Journey{}
+
+		for _, journey := range journeys {
+			if journey.Path[0].OriginStopRef == identifyingInformation["OriginRef"] {
+				filteredJourneys = append(filteredJourneys, journey)
+			}
+		}
+
+		if len(filteredJourneys) == 0 {
+			return nil, errors.New("Could not narrow down to single Journey with matching Origin Stop")
+		} else if len(filteredJourneys) == 1 {
+			return filteredJourneys[0], nil
+		} else {
+			return nil, errors.New("Could not narrow down to single Journey")
+		}
 	}
 }
 
