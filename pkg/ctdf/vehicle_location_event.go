@@ -3,7 +3,7 @@ package ctdf
 import "time"
 
 type VehicleLocationEvent struct {
-	IdentifyingInformation map[string]string
+	JourneyRef string
 
 	CreationDateTime time.Time `groups:"detailed"`
 
