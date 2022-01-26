@@ -2,6 +2,7 @@ package siri_vm
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/kr/pretty"
@@ -45,56 +46,66 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 	// if err != nil {
 	// 	log.Error().Err(err).Msg("Failed to create RabbitMQ Queue")
 	// }
+	var wg sync.WaitGroup
 
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
-		vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
+		wg.Add(1)
 
-		if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
-			vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
-		}
+		go func(wg *sync.WaitGroup, vehicle *VehicleActivity) {
+			defer wg.Done()
 
-		localJourneyID := fmt.Sprintf(
-			"%s:%s:%s:%s",
-			fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
-			vehicle.MonitoredVehicleJourney.LineRef,
-			fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-			vehicleJourneyRef,
-		)
+			vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
 
-		journeyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
-		if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
-			journeyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
-		}
+			if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
+				vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
+			}
 
-		journey, err := ctdf.IdentifyJourney(map[string]string{
-			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
-			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
-			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
-			"VehicleJourneyRef":        journeyRef,
-			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
-			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
-			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
-		})
+			localJourneyID := fmt.Sprintf(
+				"%s:%s:%s:%s",
+				fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+				vehicle.MonitoredVehicleJourney.LineRef,
+				fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+				vehicleJourneyRef,
+			)
 
-		if err != nil {
-			log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
-			continue
-		}
+			journeyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
+			if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
+				journeyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
+			}
 
-		pretty.Println(localJourneyID, journey.PrimaryIdentifier)
+			journey, err := ctdf.IdentifyJourney(map[string]string{
+				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+				"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+				"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+				"VehicleJourneyRef":        journeyRef,
+				"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+				"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+				"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+				"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+			})
 
-		// locationEventJSON, _ := json.Marshal(locationEvent)
-		// err = channel.Publish(
-		// 	"",         // exchange
-		// 	queue.Name, // routing key
-		// 	false,      // mandatory
-		// 	false,
-		// 	amqp.Publishing{
-		// 		DeliveryMode: amqp.Persistent,
-		// 		ContentType:  "text/plain",
-		// 		Body:         []byte(locationEventJSON),
-		// 	})
+			if err != nil {
+				log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+				// continue
+				return
+			}
+
+			pretty.Println(localJourneyID, journey.PrimaryIdentifier)
+
+			// locationEventJSON, _ := json.Marshal(locationEvent)
+			// err = channel.Publish(
+			// 	"",         // exchange
+			// 	queue.Name, // routing key
+			// 	false,      // mandatory
+			// 	false,
+			// 	amqp.Publishing{
+			// 		DeliveryMode: amqp.Persistent,
+			// 		ContentType:  "text/plain",
+			// 		Body:         []byte(locationEventJSON),
+			// 	})
+		}(&wg, vehicle)
 	}
+
+	wg.Wait()
 }

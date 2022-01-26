@@ -76,6 +76,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
+			Keys: bsonx.Doc{{Key: "otheridentifiers.RealtimeJourneyCode", Value: bsonx.Int32(1)}},
+		},
+		{
 			Keys: bsonx.Doc{{Key: "serviceref", Value: bsonx.Int32(1)}},
 		},
 		{
