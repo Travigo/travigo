@@ -105,6 +105,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	}
 
 	// Get the relevant Journeys
+	framedVehicleJourneyDate, _ := time.Parse(YearMonthDayFormat, identifyingInformation["FramedVehicleJourneyDate"])
 	var journeys []*Journey
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
 	journeysCollection := database.GetCollection("journeys")
@@ -124,7 +125,9 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 			log.Fatal(err)
 		}
 
-		journeys = append(journeys, journey)
+		if journey.Availability.MatchDate(framedVehicleJourneyDate) {
+			journeys = append(journeys, journey)
+		}
 	}
 
 	if len(journeys) == 0 {
@@ -132,20 +135,34 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	} else if len(journeys) == 1 {
 		return journeys[0], nil
 	} else {
-		filteredJourneys := []*Journey{}
-
+		stopFilteredJourneys := []*Journey{}
 		for _, journey := range journeys {
 			if journey.Path[0].OriginStopRef == identifyingInformation["OriginRef"] {
-				filteredJourneys = append(filteredJourneys, journey)
+				stopFilteredJourneys = append(stopFilteredJourneys, journey)
 			}
 		}
 
-		if len(filteredJourneys) == 0 {
-			return nil, errors.New("Could not narrow down to single Journey with matching Origin Stop")
-		} else if len(filteredJourneys) == 1 {
-			return filteredJourneys[0], nil
+		if len(stopFilteredJourneys) == 0 {
+			return nil, errors.New("Could not narrow down to single Journey with stop. Now zero")
+		} else if len(stopFilteredJourneys) == 1 {
+			return stopFilteredJourneys[0], nil
 		} else {
-			return nil, errors.New("Could not narrow down to single Journey")
+			timeFilteredJourneys := []*Journey{}
+
+			for _, journey := range stopFilteredJourneys {
+				originAimedDepartureTime, _ := time.Parse(time.RFC3339, identifyingInformation["OriginAimedDepartureTime"])
+				if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
+					timeFilteredJourneys = append(timeFilteredJourneys, journey)
+				}
+			}
+
+			if len(timeFilteredJourneys) == 0 {
+				return nil, errors.New("Could not narrow down to single Journey with departure time. Now zero")
+			} else if len(timeFilteredJourneys) == 1 {
+				return timeFilteredJourneys[0], nil
+			} else {
+				return nil, errors.New("Could not narrow down to single Journey by time. Still many remaining")
+			}
 		}
 	}
 }

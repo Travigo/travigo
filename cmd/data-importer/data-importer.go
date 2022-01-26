@@ -150,6 +150,8 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 		})
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
+		ctdf.LoadSpecialDayCache()
+
 		siriVMdoc, err := siri_vm.ParseXMLFile(dataFile.Reader)
 
 		if err != nil {
