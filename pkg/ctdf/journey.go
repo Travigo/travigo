@@ -116,8 +116,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 			bson.M{"$or": bson.A{
 				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
 				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-				// bson.M{"path.originstopref": identifyingInformation["DestinationRef"]},
-				// bson.M{"path.destinationstopref": identifyingInformation["OriginRef"]},
 			}},
 		},
 	}

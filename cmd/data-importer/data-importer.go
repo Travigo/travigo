@@ -22,11 +22,16 @@ import (
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/siri_vm"
 	"github.com/britbus/notify/pkg/notify_client"
+	"github.com/dgraph-io/ristretto"
+	"github.com/eko/gocache/v2/cache"
+	"github.com/eko/gocache/v2/store"
 	"github.com/urfave/cli/v2"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
+
+var GlobalCacheManager *cache.Cache
 
 type DataFile struct {
 	Name   string
@@ -161,7 +166,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 		siriVMdoc.SubmitToProcessQueue(&ctdf.DataSource{
 			Provider: "Department of Transport", // This may not always be true
 			Dataset:  dataFile.Name,
-		})
+		}, GlobalCacheManager)
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
@@ -181,6 +186,8 @@ func main() {
 
 	// Setup the notifications client
 	notify_client.Setup()
+
+	initGlobalCache()
 
 	app := &cli.App{
 		Name:        "data-importer",
@@ -231,6 +238,8 @@ func main() {
 						}
 
 						executionDuration := time.Since(startTime)
+						log.Info().Msgf("Operation took %s", executionDuration.String())
+
 						waitTime := repeatDuration - executionDuration
 
 						if waitTime.Seconds() > 0 {
@@ -282,6 +291,22 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
+}
+
+func initGlobalCache() {
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 10000,
+		MaxCost:     1 << 29,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
+	}
+	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	GlobalCacheManager = cache.New(ristrettoStore)
 }
 
 func isValidUrl(toTest string) bool {

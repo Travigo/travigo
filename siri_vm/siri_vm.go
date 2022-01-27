@@ -1,6 +1,7 @@
 package siri_vm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/rabbitmq"
+	"github.com/eko/gocache/v2/cache"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
@@ -28,7 +30,7 @@ type SiriVM struct {
 	}
 }
 
-func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
+func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager *cache.Cache) {
 	datasource.OriginalFormat = "siri-vm"
 	log.Info().Msgf("Submitting the %d activity records in %s to processing queue", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
 
@@ -54,7 +56,7 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
 		wg.Add(1)
 
-		go func(wg *sync.WaitGroup, vehicle *VehicleActivity) {
+		go func(wg *sync.WaitGroup, vehicle *VehicleActivity, cache *cache.Cache) {
 			defer wg.Done()
 
 			vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
@@ -71,27 +73,38 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 				vehicleJourneyRef,
 			)
 
-			journey, err := ctdf.IdentifyJourney(map[string]string{
-				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
-				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
-				"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-				"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
-				"VehicleJourneyRef":        vehicleJourneyRef,
-				"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-				"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
-				"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
-				"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
-			})
+			var journeyID string
 
-			if err != nil {
-				log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
-				return
+			cachedJourneyMapping, _ := cache.Get(context.Background(), localJourneyID)
+
+			if cachedJourneyMapping == nil {
+				journey, err := ctdf.IdentifyJourney(map[string]string{
+					"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+					"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+					"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+					"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+					"VehicleJourneyRef":        vehicleJourneyRef,
+					"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+					"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+					"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+					"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+				})
+
+				if err != nil {
+					// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+					return
+				}
+				journeyID = journey.PrimaryIdentifier
+
+				cache.Set(context.Background(), localJourneyID, journeyID, nil)
+			} else {
+				journeyID = cachedJourneyMapping.(string)
 			}
 
-			// pretty.Println(localJourneyID, journey.PrimaryIdentifier)
+			// pretty.Println(localJourneyID, journeyID)
 
 			locationEventJSON, _ := json.Marshal(ctdf.VehicleLocationEvent{
-				JourneyRef:       journey.PrimaryIdentifier,
+				JourneyRef:       journeyID,
 				CreationDateTime: responseTime,
 
 				DataSource: datasource,
@@ -115,7 +128,7 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 					ContentType:  "text/plain",
 					Body:         []byte(locationEventJSON),
 				})
-		}(&wg, vehicle)
+		}(&wg, vehicle, cacheManager)
 	}
 
 	wg.Wait()
