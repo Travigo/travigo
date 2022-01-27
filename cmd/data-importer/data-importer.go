@@ -187,20 +187,58 @@ func main() {
 		Description: "Manages ingesting and verifying data in BritBus",
 		Commands: []*cli.Command{
 			{
-				Name:      "file",
-				Usage:     "Import a dataset into BritBus",
+				Name:  "file",
+				Usage: "Import a dataset into BritBus",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "repeat-every",
+						Usage:    "Repeat this file import every X seconds",
+						Required: false,
+					},
+				},
 				ArgsUsage: "<data-format> <source>",
 				Action: func(c *cli.Context) error {
 					if c.Args().Len() != 2 {
 						return errors.New("<data-format> and <source> must be provided")
 					}
 
-					dataFormat := c.Args().Get(0)
-					source := c.Args().Get(1)
+					repeatEvery := c.String("repeat-every")
+					repeat := repeatEvery != ""
+					var repeatDuration time.Duration
+					if repeat {
+						var err error
+						repeatDuration, err = time.ParseDuration(repeatEvery)
 
-					err := importFile(dataFormat, source)
+						if err != nil {
+							return err
+						}
+					}
 
-					return err
+					for {
+						dataFormat := c.Args().Get(0)
+						source := c.Args().Get(1)
+
+						startTime := time.Now()
+
+						err := importFile(dataFormat, source)
+
+						if err != nil {
+							return err
+						}
+
+						if !repeat {
+							break
+						}
+
+						executionDuration := time.Since(startTime)
+						waitTime := repeatDuration - executionDuration
+
+						if waitTime.Seconds() > 0 {
+							time.Sleep(waitTime)
+						}
+					}
+
+					return nil
 				},
 			},
 			{
