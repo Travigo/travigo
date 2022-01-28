@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -53,6 +54,10 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 	}
 	var wg sync.WaitGroup
 
+	var newlyIdentifiedHits uint32
+	var cacheHits uint32
+	var unidentifiedJourneys uint32
+
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
 		wg.Add(1)
 
@@ -91,14 +96,17 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 				})
 
 				if err != nil {
+					atomic.AddUint32(&unidentifiedJourneys, 1)
 					// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 					return
 				}
 				journeyID = journey.PrimaryIdentifier
 
 				cache.Set(context.Background(), localJourneyID, journeyID, nil)
+				atomic.AddUint32(&newlyIdentifiedHits, 1)
 			} else {
 				journeyID = cachedJourneyMapping.(string)
+				atomic.AddUint32(&cacheHits, 1)
 			}
 
 			// pretty.Println(localJourneyID, journeyID)
@@ -132,4 +140,6 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 	}
 
 	wg.Wait()
+
+	log.Info().Int("length", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity)).Uint32("unidentified_journeys", unidentifiedJourneys).Uint32("newly_identified", newlyIdentifiedHits).Uint32("cache_hits", cacheHits).Msg("Siri-VM event publishing complete")
 }
