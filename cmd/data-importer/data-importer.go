@@ -38,7 +38,7 @@ type DataFile struct {
 	Reader io.Reader
 }
 
-func importFile(dataFormat string, source string) error {
+func importFile(dataFormat string, source string, fileFormat string) error {
 	dataFiles := []DataFile{}
 	fileExtension := filepath.Ext(source)
 
@@ -67,6 +67,10 @@ func importFile(dataFormat string, source string) error {
 		io.Copy(tmpFile, resp.Body)
 
 		source = tmpFile.Name()
+	}
+
+	if fileFormat != "" {
+		fileExtension = fmt.Sprintf(".%s", fileFormat)
 	}
 
 	// Check if its an XML file or ZIP file
@@ -202,12 +206,19 @@ func main() {
 						Usage:    "Repeat this file import every X seconds",
 						Required: false,
 					},
+					&cli.StringFlag{
+						Name:     "file-format",
+						Usage:    "Overwrite the file format (eg. zip or xml)",
+						Required: false,
+					},
 				},
 				ArgsUsage: "<data-format> <source>",
 				Action: func(c *cli.Context) error {
 					if c.Args().Len() != 2 {
 						return errors.New("<data-format> and <source> must be provided")
 					}
+
+					fileFormat := c.String("file-format")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
@@ -227,7 +238,7 @@ func main() {
 
 						startTime := time.Now()
 
-						err := importFile(dataFormat, source)
+						err := importFile(dataFormat, source, fileFormat)
 
 						if err != nil {
 							return err
@@ -271,7 +282,7 @@ func main() {
 					}
 
 					for _, dataset := range timeTableDataset {
-						err = importFile("transxchange", dataset.URL)
+						err = importFile("transxchange", dataset.URL, "")
 
 						if err != nil {
 							log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
