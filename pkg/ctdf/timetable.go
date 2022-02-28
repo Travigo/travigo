@@ -8,7 +8,8 @@ type TimetableRecord struct {
 	Journey            *Journey `groups:"basic"`
 	DestinationDisplay string   `groups:"basic"`
 
-	Time time.Time `groups:"basic"`
+	Time     time.Time `groups:"basic"`
+	Realtime bool      `groups:"basic"`
 }
 
 func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time) []*TimetableRecord {
@@ -44,6 +45,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				Journey:            journey,
 				Time:               stopDeperatureTime,
 				DestinationDisplay: destinationDisplay,
+				Realtime:           false,
 			})
 		}
 	}
