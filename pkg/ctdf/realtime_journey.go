@@ -3,7 +3,7 @@ package ctdf
 import "time"
 
 type RealtimeJourney struct {
-	RealtimeJourneyID string
+	PrimaryIdentifier string
 
 	JourneyRef string   `groups:"internal"`
 	Journey    *Journey `groups:"basic"`
@@ -16,13 +16,13 @@ type RealtimeJourney struct {
 	VehicleLocation Location `groups:"basic"`
 	VehicleBearing  float64  `groups:"basic"`
 
-	DepartedStopRef string
-	DepartedStop    *Stop
+	DepartedStopRef string `groups:"basic"`
+	DepartedStop    *Stop  `groups:"basic"`
 
-	NextStopRef string
-	NextStop    *Stop
+	NextStopRef string `groups:"basic"`
+	NextStop    *Stop  `groups:"basic"`
 
-	StopHistory []*RealtimeJourneyStopHistory
+	StopHistory []*RealtimeJourneyStopHistory `groups:"basic"`
 }
 
 type RealtimeJourneyStopHistory struct {

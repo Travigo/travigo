@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -27,6 +29,13 @@ func getJourney(c *fiber.Ctx) error {
 	var journey *ctdf.Journey
 	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&journey)
 
+	// Get the related RealtimeJourney
+	realtimeJourneyIdentifier := fmt.Sprintf("REALTIME:%s:%s", time.Now().Format("2006-01-02"), journey.PrimaryIdentifier)
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+	var realtimeJourney *ctdf.RealtimeJourney
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
+
 	if journey == nil {
 		c.SendStatus(404)
 		return c.JSON(fiber.Map{
@@ -47,6 +56,9 @@ func getJourney(c *fiber.Ctx) error {
 			})
 		}
 
-		return c.JSON(journeyReduced)
+		return c.JSON(map[string]interface{}{
+			"Journey":         journeyReduced,
+			"RealtimeJourney": realtimeJourney,
+		})
 	}
 }
