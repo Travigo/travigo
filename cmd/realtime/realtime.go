@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"math"
+	"fmt"
 	"os"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
@@ -30,6 +31,8 @@ func main() {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
 					}
 
+					journeyID := "GB:NOC:SCCM:PF0000459:27:SCCM:PF0000459:27:1::VJ300"
+					timeframe := "2022-03-01"
 					vehicleLocation := ctdf.Location{
 						Type:        "Point",
 						Coordinates: []float64{0.1725319, 52.1852036},
@@ -37,7 +40,7 @@ func main() {
 
 					journeysCollection := database.GetCollection("journeys")
 					var journey *ctdf.Journey
-					journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": "GB:NOC:SCCM:PF0000459:27:SCCM:PF0000459:27:1::VJ300"}).Decode(&journey)
+					journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}).Decode(&journey)
 
 					closestDistance := 999999999999.0
 					var closestDistanceJourneyPath *ctdf.JourneyPathItem
@@ -49,7 +52,7 @@ func main() {
 							a := journeyPathItem.Track[i]
 							b := journeyPathItem.Track[i+1]
 
-							distance := pDistance(vehicleLocation, a, b)
+							distance := vehicleLocation.DistanceFromLine(a, b)
 
 							if distance < journeyPathClosestDistance {
 								journeyPathClosestDistance = distance
@@ -64,6 +67,36 @@ func main() {
 
 					pretty.Println(closestDistanceJourneyPath.OriginStopRef, closestDistanceJourneyPath.DestinationStopRef)
 
+					// Update database
+					realtimeJourneyIdentifier := fmt.Sprintf("REALTIME:%s:%s", timeframe, journeyID)
+
+					realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+					searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
+
+					var realtimeJourney *ctdf.RealtimeJourney
+					realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&journey)
+
+					if realtimeJourney == nil {
+						realtimeJourney = &ctdf.RealtimeJourney{
+							RealtimeJourneyID: realtimeJourneyIdentifier,
+							JourneyRef:        journeyID,
+
+							CreationDateTime: time.Now(),
+							// DataSource: ,
+
+							StopHistory: []*ctdf.RealtimeJourneyStopHistory{},
+						}
+					}
+
+					realtimeJourney.ModificationDateTime = time.Now()
+					realtimeJourney.VehicleLocation = vehicleLocation
+					realtimeJourney.VehicleBearing = 0.0 //TODO real
+					realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
+					realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+
+					opts := options.Update().SetUpsert(true)
+					realtimeJourneysCollection.UpdateOne(context.Background(), searchQuery, bson.M{"$set": realtimeJourney}, opts)
+
 					return nil
 				},
 			},
@@ -74,37 +107,4 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
-}
-
-func pDistance(p ctdf.Location, a ctdf.Location, b ctdf.Location) float64 {
-	A := p.Coordinates[0] - a.Coordinates[0]
-	B := p.Coordinates[1] - a.Coordinates[1]
-	C := b.Coordinates[0] - a.Coordinates[0]
-	D := b.Coordinates[1] - b.Coordinates[1]
-
-	dot := A*C + B*D
-	len_sq := C*C + D*D
-
-	var param float64
-	param = -1
-	if len_sq != 0 {
-		param = dot / len_sq
-	}
-
-	var xx, yy float64
-
-	if param < 0 {
-		xx = a.Coordinates[0]
-		yy = a.Coordinates[1]
-	} else if param > 1 {
-		xx = b.Coordinates[0]
-		yy = b.Coordinates[1]
-	} else {
-		xx = a.Coordinates[0] + param*C
-		yy = a.Coordinates[1] + param*D
-	}
-
-	var dx = p.Coordinates[0] - xx
-	var dy = p.Coordinates[1] - yy
-	return math.Sqrt(dx*dx + dy*dy)
 }

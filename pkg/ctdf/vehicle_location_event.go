@@ -9,6 +9,8 @@ type VehicleLocationEvent struct {
 
 	DataSource *DataSource `groups:"internal"`
 
+	Timeframe string
+
 	VehicleLocation Location `groups:"basic"`
 	VehicleBearing  float64
 }

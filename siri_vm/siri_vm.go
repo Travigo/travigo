@@ -111,8 +111,14 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 
 			// pretty.Println(localJourneyID, journeyID)
 
+			timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
+			if timeframe == "" {
+				timeframe = time.Now().Format("01-02-2006")
+			}
+
 			locationEventJSON, _ := json.Marshal(ctdf.VehicleLocationEvent{
 				JourneyRef:       journeyID,
+				Timeframe:        timeframe,
 				CreationDateTime: responseTime,
 
 				DataSource: datasource,
