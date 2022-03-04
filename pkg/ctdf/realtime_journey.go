@@ -2,6 +2,8 @@ package ctdf
 
 import "time"
 
+var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
+
 type RealtimeJourney struct {
 	PrimaryIdentifier string
 

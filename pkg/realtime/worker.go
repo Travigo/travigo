@@ -9,6 +9,9 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/rabbitmq"
+	"github.com/dgraph-io/ristretto"
+	"github.com/eko/gocache/v2/cache"
+	"github.com/eko/gocache/v2/store"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,8 +19,29 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
+var Cache *cache.Cache
+
+func initCache() {
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 10000,
+		MaxCost:     1 << 29,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
+	}
+	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	Cache = cache.New(ristrettoStore)
+}
+
 func StartWorker() {
 	log.Info().Msg("Starting Realtime calculator worker")
+
+	initCache()
+
 	// Mongo indexes
 	//TODO: Doesnt really make sense for this package to be managing indexes
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -77,9 +101,17 @@ func StartWorker() {
 }
 
 func UpdateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) error {
-	journeysCollection := database.GetCollection("journeys")
 	var journey *ctdf.Journey
-	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+	cachedJourney, _ := Cache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
+
+	if cachedJourney == nil {
+		journeysCollection := database.GetCollection("journeys")
+		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+
+		Cache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
+	} else {
+		journey = cachedJourney.(*ctdf.Journey)
+	}
 
 	closestDistance := 999999999999.0
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem
@@ -105,7 +137,7 @@ func UpdateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	}
 
 	// Update database
-	realtimeJourneyIdentifier := fmt.Sprintf("REALTIME:%s:%s", vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
@@ -119,7 +151,7 @@ func UpdateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 			JourneyRef:        vehicleLocationEvent.JourneyRef,
 
 			CreationDateTime: time.Now(),
-			// DataSource: ,
+			DataSource:       vehicleLocationEvent.DataSource,
 
 			StopHistory: []*ctdf.RealtimeJourneyStopHistory{},
 		}

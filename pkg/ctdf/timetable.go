@@ -48,7 +48,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 			journey.GetReferences()
 
 			// Get the related RealtimeJourney
-			realtimeJourneyIdentifier := fmt.Sprintf("REALTIME:%s:%s", realtimeTimeframe, journey.PrimaryIdentifier)
+			realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, realtimeTimeframe, journey.PrimaryIdentifier)
 			realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 			var realtimeJourney *RealtimeJourney

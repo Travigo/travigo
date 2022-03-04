@@ -30,7 +30,7 @@ func getJourney(c *fiber.Ctx) error {
 	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&journey)
 
 	// Get the related RealtimeJourney
-	realtimeJourneyIdentifier := fmt.Sprintf("REALTIME:%s:%s", time.Now().Format("2006-01-02"), journey.PrimaryIdentifier)
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, time.Now().Format("2006-01-02"), journey.PrimaryIdentifier)
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 	var realtimeJourney *ctdf.RealtimeJourney

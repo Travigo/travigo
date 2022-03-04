@@ -97,13 +97,20 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 
 				if err != nil {
 					atomic.AddUint32(&unidentifiedJourneys, 1)
-					// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+					log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+
+					// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
+					cache.Set(context.Background(), localJourneyID, "N/A", nil)
 					return
 				}
 				journeyID = journey.PrimaryIdentifier
 
 				cache.Set(context.Background(), localJourneyID, journeyID, nil)
 				atomic.AddUint32(&newlyIdentifiedHits, 1)
+			} else if cachedJourneyMapping == "N/A" {
+				atomic.AddUint32(&unidentifiedJourneys, 1)
+
+				return
 			} else {
 				journeyID = cachedJourneyMapping.(string)
 				atomic.AddUint32(&cacheHits, 1)
