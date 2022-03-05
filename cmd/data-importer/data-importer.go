@@ -184,9 +184,6 @@ func main() {
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
-	if err := rabbitmq.Connect(); err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
-	}
 
 	// Setup the notifications client
 	notify_client.Setup()
@@ -232,10 +229,17 @@ func main() {
 						}
 					}
 
-					for {
-						dataFormat := c.Args().Get(0)
-						source := c.Args().Get(1)
+					dataFormat := c.Args().Get(0)
+					source := c.Args().Get(1)
 
+					// Currently only need rabbitmq for siri-vm
+					if dataFormat == "siri-vm" {
+						if err := rabbitmq.Connect(); err != nil {
+							log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
+						}
+					}
+
+					for {
 						startTime := time.Now()
 
 						err := importFile(dataFormat, source, fileFormat)
