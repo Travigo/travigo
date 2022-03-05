@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,8 @@ import (
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/urfave/cli/v2"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -277,7 +280,7 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					source := c.String("url")
-					log.Info().Msgf("TransXChange API import from %s ", source)
+					log.Info().Msgf("Bus Open Data Service Timetable API import from %s ", source)
 					timeTableDataset, err := bods.GetTimetableDataset(source)
 					log.Info().Msgf(" - %d datasets", len(timeTableDataset))
 
@@ -285,11 +288,36 @@ func main() {
 						return err
 					}
 
-					for _, dataset := range timeTableDataset {
-						err = importFile("transxchange", dataset.URL, "")
+					datasetVersionsCollection := database.GetCollection("dataset_versions")
 
-						if err != nil {
-							log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
+					for _, dataset := range timeTableDataset {
+						var datasetVersion *ctdf.DatasetVersion
+
+						query := bson.M{"$and": bson.A{
+							bson.M{"dataset": "GB-BODS"},
+							bson.M{"identifier": fmt.Sprintf("%d", dataset.ID)},
+						}}
+						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
+
+						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
+							err = importFile("transxchange", dataset.URL, "")
+
+							if err != nil {
+								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
+							}
+
+							if datasetVersion == nil {
+								datasetVersion = &ctdf.DatasetVersion{
+									Dataset:    "GB-BODS",
+									Identifier: fmt.Sprintf("%d", dataset.ID),
+								}
+							}
+							datasetVersion.LastModified = dataset.Modified
+
+							opts := options.Update().SetUpsert(true)
+							datasetVersionsCollection.UpdateOne(context.Background(), query, bson.M{"$set": datasetVersion}, opts)
+						} else {
+							log.Info().Int("id", dataset.ID).Msg("Dataset not changed")
 						}
 					}
 
