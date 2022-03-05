@@ -18,6 +18,9 @@ tasks:
   - name: naptan
     schedule: "0 3 * * 6"
     args: ["file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]
+  - name: bods-timetable
+    schedule: "0 5 * * 6"
+    args: ["bods-timetable", "--url", "https://data.bus-data.dft.gov.uk/api/v1/dataset/?limit=25&offset=0&status=published&api_key=NOPE"]
 
 resources: {}
 podAnnotations: {}

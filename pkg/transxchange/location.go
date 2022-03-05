@@ -3,7 +3,7 @@ package transxchange
 type Location struct {
 	LocationInner
 
-	Translation *LocationInner
+	Translation LocationInner
 }
 type LocationInner struct {
 	Longitude float64

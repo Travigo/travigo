@@ -29,13 +29,6 @@ func getJourney(c *fiber.Ctx) error {
 	var journey *ctdf.Journey
 	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&journey)
 
-	// Get the related RealtimeJourney
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, time.Now().Format("2006-01-02"), journey.PrimaryIdentifier)
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-	var realtimeJourney *ctdf.RealtimeJourney
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
-
 	if journey == nil {
 		c.SendStatus(404)
 		return c.JSON(fiber.Map{
@@ -44,6 +37,13 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
+
+		// Get the related RealtimeJourney
+		realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, time.Now().Format("2006-01-02"), journey.PrimaryIdentifier)
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+		var realtimeJourney *ctdf.RealtimeJourney
+		realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
 
 		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
 			Groups: []string{"basic", "detailed"},
