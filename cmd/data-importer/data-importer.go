@@ -304,6 +304,7 @@ func main() {
 
 							if err != nil {
 								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
+								continue
 							}
 
 							if datasetVersion == nil {
