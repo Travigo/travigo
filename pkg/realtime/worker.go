@@ -143,6 +143,7 @@ func UpdateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
 	var realtimeJourney *ctdf.RealtimeJourney
+
 	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
 	if realtimeJourney == nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/rabbitmq"
 	"github.com/eko/gocache/v2/cache"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
@@ -97,7 +98,7 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 
 				if err != nil {
 					atomic.AddUint32(&unidentifiedJourneys, 1)
-					log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+					// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 
 					// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 					cache.Set(context.Background(), localJourneyID, "N/A", nil)
@@ -119,6 +120,13 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource, cacheManager 
 			timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
 			if timeframe == "" {
 				timeframe = time.Now().Format("2006-01-02")
+			}
+
+			// if vehicle.MonitoredVehicleJourney.PublishedLineName == "1" {
+			// 	pretty.Println(journeyID)
+			// }
+			if journeyID == "GB:NOC:SCCM:PF0000459:27:SCCM:PF0000459:27:1::VJ400" {
+				pretty.Println(vehicle.MonitoredVehicleJourney.OriginRef, vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime)
 			}
 
 			locationEventJSON, _ := json.Marshal(ctdf.VehicleLocationEvent{

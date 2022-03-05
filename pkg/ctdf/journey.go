@@ -3,6 +3,7 @@ package ctdf
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -32,6 +33,8 @@ type Journey struct {
 	Availability *Availability `groups:"detailed"`
 
 	Path []*JourneyPathItem `groups:"detailed"`
+
+	RealtimeJourney *RealtimeJourney `groups:"basic"`
 }
 
 func (j *Journey) GetReferences() {
@@ -51,6 +54,12 @@ func (j *Journey) GetDeepReferences() {
 	for _, path := range j.Path {
 		path.GetReferences()
 	}
+}
+func (j *Journey) GetRealtimeJourney() {
+	realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, time.Now().Format("2006-01-02"), j.PrimaryIdentifier)
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&j.RealtimeJourney)
 }
 
 func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
