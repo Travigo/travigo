@@ -12,7 +12,7 @@ func (l *Location) DistanceFromLine(a Location, b Location) float64 {
 	A := l.Coordinates[0] - a.Coordinates[0]
 	B := l.Coordinates[1] - a.Coordinates[1]
 	C := b.Coordinates[0] - a.Coordinates[0]
-	D := b.Coordinates[1] - b.Coordinates[1]
+	D := b.Coordinates[1] - a.Coordinates[1]
 
 	dot := A*C + B*D
 	len_sq := C*C + D*D
