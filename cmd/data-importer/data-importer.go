@@ -230,9 +230,6 @@ func main() {
 
 					// Some initial setup for Siri-VM
 					if dataFormat == "siri-vm" {
-						// if err := rabbitmq.Connect(); err != nil {
-						// 	log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
-						// }
 						realtime.StartConsumers()
 						go siri_vm.StartIdentificationConsumers()
 					}
