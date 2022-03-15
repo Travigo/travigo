@@ -2,13 +2,11 @@ package realtime
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/rabbitmq"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -19,9 +17,13 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
-var Cache *cache.Cache
+const numConsumers = 5
 
-func initCache() {
+var vehicleLocationEventQueue chan *ctdf.VehicleLocationEvent = make(chan *ctdf.VehicleLocationEvent, 2000)
+var journeyCache *cache.Cache
+
+func StartConsumers() {
+	// Create Cache
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 10000,
 		MaxCost:     1 << 29,
@@ -33,82 +35,49 @@ func initCache() {
 	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
 		Expiration: 30 * time.Minute,
 	})
-
-	Cache = cache.New(ristrettoStore)
-}
-
-func StartWorker() {
-	log.Info().Msg("Starting Realtime calculator worker")
-
-	initCache()
+	journeyCache = cache.New(ristrettoStore)
 
 	// Mongo indexes
 	//TODO: Doesnt really make sense for this package to be managing indexes
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		panic(err)
+		log.Error().Err(err)
 	}
 
-	// Open RabbitMQ channel and keep polling for messages
-	channel, err := rabbitmq.GetChannel()
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create RabbitMQ Channel")
+	// Start the background consumers
+	log.Info().Msgf("Starting realtime consumers")
+
+	for i := 0; i < numConsumers; i++ {
+		go startRealtimeConsumer(i)
 	}
-	queue, err := channel.QueueDeclare(
-		"vehicle_location_events",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create RabbitMQ Queue")
-	}
-
-	messages, err := channel.Consume(
-		queue.Name, // queue
-		"",         // consumer
-		true,       // auto-ack
-		false,      // exclusive
-		false,      // no-local
-		false,      // no-wait
-		nil,        // args
-	)
-
-	forever := make(chan bool)
-
-	go func() {
-		for message := range messages {
-			var vehicleLocationEvent *ctdf.VehicleLocationEvent
-			err := json.Unmarshal(message.Body, &vehicleLocationEvent)
-
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to unmarshal VehicleLocationEvent")
-				continue
-			}
-
-			go UpdateRealtimeJourney(vehicleLocationEvent)
-		}
-	}()
-
-	<-forever
 }
 
-func UpdateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) error {
+func AddToQueue(vehicleLocationEvent *ctdf.VehicleLocationEvent) {
+	vehicleLocationEventQueue <- vehicleLocationEvent
+}
+
+func startRealtimeConsumer(id int) {
+	log.Info().Msgf("Realtime consumer %d started", id)
+
+	for vehicleLocationEvent := range vehicleLocationEventQueue {
+		updateRealtimeJourney(vehicleLocationEvent)
+	}
+}
+
+func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) error {
 	var journey *ctdf.Journey
-	cachedJourney, _ := Cache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
+	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
 	if cachedJourney == nil {
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
-		Cache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
+		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
 	} else {
 		journey = cachedJourney.(*ctdf.Journey)
 	}

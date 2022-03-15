@@ -23,7 +23,6 @@ require (
 	github.com/paulcager/osgridref v1.3.0
 	github.com/rs/zerolog v1.26.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
-	github.com/streadway/amqp v1.0.0
 	go.mongodb.org/mongo-driver v1.8.0
 )
 

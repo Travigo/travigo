@@ -18,14 +18,11 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
-	"github.com/britbus/britbus/pkg/rabbitmq"
+	"github.com/britbus/britbus/pkg/realtime"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/siri_vm"
 	"github.com/britbus/notify/pkg/notify_client"
-	"github.com/dgraph-io/ristretto"
-	"github.com/eko/gocache/v2/cache"
-	"github.com/eko/gocache/v2/store"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -33,8 +30,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
-
-var GlobalCacheManager *cache.Cache
 
 type DataFile struct {
 	Name   string
@@ -173,7 +168,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 		siriVMdoc.SubmitToProcessQueue(&ctdf.DataSource{
 			Provider: "Department of Transport", // This may not always be true
 			Dataset:  dataFile.Name,
-		}, GlobalCacheManager)
+		})
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
@@ -190,8 +185,6 @@ func main() {
 
 	// Setup the notifications client
 	notify_client.Setup()
-
-	initGlobalCache()
 
 	app := &cli.App{
 		Name:        "data-importer",
@@ -235,11 +228,13 @@ func main() {
 					dataFormat := c.Args().Get(0)
 					source := c.Args().Get(1)
 
-					// Currently only need rabbitmq for siri-vm
+					// Some initial setup for Siri-VM
 					if dataFormat == "siri-vm" {
-						if err := rabbitmq.Connect(); err != nil {
-							log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
-						}
+						// if err := rabbitmq.Connect(); err != nil {
+						// 	log.Fatal().Err(err).Msg("Failed to connect to RabbitMQ")
+						// }
+						realtime.StartConsumers()
+						go siri_vm.StartIdentificationConsumers()
 					}
 
 					for {
@@ -335,22 +330,6 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
-}
-
-func initGlobalCache() {
-	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 10000,
-		MaxCost:     1 << 29,
-		BufferItems: 64,
-	})
-	if err != nil {
-		panic(err)
-	}
-	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-		Expiration: 30 * time.Minute,
-	})
-
-	GlobalCacheManager = cache.New(ristrettoStore)
 }
 
 func isValidUrl(toTest string) bool {
