@@ -17,7 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
-const numConsumers = 5
+const numConsumers = 10
 
 var vehicleLocationEventQueue chan *ctdf.VehicleLocationEvent = make(chan *ctdf.VehicleLocationEvent, 2000)
 var journeyCache *cache.Cache

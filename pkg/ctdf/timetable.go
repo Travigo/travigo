@@ -1,12 +1,7 @@
 package ctdf
 
 import (
-	"context"
-	"fmt"
 	"time"
-
-	"github.com/britbus/britbus/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type TimetableRecord struct {
@@ -14,8 +9,6 @@ type TimetableRecord struct {
 	DestinationDisplay string   `groups:"basic"`
 
 	Time time.Time `groups:"basic"`
-
-	RealtimeJourney *RealtimeJourney `groups:"basic"`
 }
 
 func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string) []*TimetableRecord {
@@ -28,7 +21,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 		for _, path := range journey.Path {
 			if path.OriginStopRef == stopRef {
 				refTime := path.OriginDepartureTime
-				stopDeperatureTime = path.OriginDepartureTime
+
 				stopDeperatureTime = time.Date(
 					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), refTime.Location(),
 				)
@@ -46,19 +39,12 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 		if availability.MatchDate(dateTime) {
 			journey.GetReferences()
-
-			// Get the related RealtimeJourney
-			realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, realtimeTimeframe, journey.PrimaryIdentifier)
-			realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-			var realtimeJourney *RealtimeJourney
-			realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
+			journey.GetRealtimeJourney()
 
 			timetable = append(timetable, &TimetableRecord{
 				Journey:            journey,
 				Time:               stopDeperatureTime,
 				DestinationDisplay: destinationDisplay,
-				RealtimeJourney:    realtimeJourney,
 			})
 		}
 	}

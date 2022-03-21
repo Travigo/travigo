@@ -8,7 +8,7 @@ type RealtimeJourney struct {
 	PrimaryIdentifier string
 
 	JourneyRef string   `groups:"internal"`
-	Journey    *Journey `groups:"basic"`
+	Journey    *Journey `groups:"basic" bson:"-"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
@@ -19,10 +19,13 @@ type RealtimeJourney struct {
 	VehicleBearing  float64  `groups:"basic"`
 
 	DepartedStopRef string `groups:"basic"`
-	DepartedStop    *Stop  `groups:"basic"`
+	DepartedStop    *Stop  `groups:"basic" bson:"-"`
 
 	NextStopRef string `groups:"basic"`
-	NextStop    *Stop  `groups:"basic"`
+	NextStop    *Stop  `groups:"basic" bson:"-"`
+
+	NextStopArrival   time.Time `groups:"basic"`
+	NextStopDeparture time.Time `groups:"basic"`
 
 	StopHistory []*RealtimeJourneyStopHistory `groups:"basic"`
 }
