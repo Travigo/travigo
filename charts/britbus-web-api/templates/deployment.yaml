@@ -35,7 +35,11 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: BRITBUS_MONGODB_CONNECTION
-              value: {{ .Values.database.connectionString }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
             - name: BRITBUS_MONGODB_DATABASE
               value: {{ .Values.database.database }}
           ports:

@@ -140,6 +140,45 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+  data-importer-deploy-helm:
+    if: github.ref == 'refs/heads/main'
+  
+    name: Deploy data-importer to GCP
+    runs-on: ubuntu-latest
+    environment: production
+
+    needs: data-importer-docker
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # Configure Workload Identity Federation and generate an access token.
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0'
+      with:
+        token_format: 'access_token'
+        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
+        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
+
+    - name: Helm tool installer
+      uses: Azure/setup-helm@v2.0
+  
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v0
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
+
+    - name: Helm upgrade
+      run: |-
+        helm upgrade -i britbus-data-importer ./charts/britbus-data-importer --set image.tag=sha-${{ github.sha }}
+
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
   

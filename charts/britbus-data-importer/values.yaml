@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 database:
-  connectionString: mongodb://britbus:kjefkjfksdjf903r9wejds98s90df9sdfk@mongodb-headless:27017/?authSource=britbus&readPreference=primary&appname=MongoDB%20Compass&ssl=false
+  connectionStringSecret: britbus-mongodb-admin-britbus
   database: britbus
 
 image:
