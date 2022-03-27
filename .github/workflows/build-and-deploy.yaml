@@ -141,7 +141,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   web-api-deploy-helm:
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
   
     name: Deploy web-api to GCP
     runs-on: ubuntu-latest
