@@ -151,7 +151,9 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "siri-vm"
 	log.Info().Msgf("Submitting the %d activity records in %s to processing queue", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
 
-	responseTime, _ := time.Parse(time.RFC3339, s.ServiceDelivery.ResponseTimestamp)
+	// Offset the response to the correct current timezone
+	responseTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, s.ServiceDelivery.ResponseTimestamp)
+	responseTime := responseTimeNoOffset.In(time.Now().Location())
 
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
 		identificationQueue <- &SiriVMVehicleIdentificationEvent{

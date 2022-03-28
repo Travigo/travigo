@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+const XSDDateTimeFormat = "2006-01-02T15:04:05.999999-07:00"
+
 type Journey struct {
 	PrimaryIdentifier string            `groups:"basic"`
 	OtherIdentifiers  map[string]string `groups:"basic"`
@@ -63,6 +65,8 @@ func (j *Journey) GetRealtimeJourney() {
 }
 
 func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
+	currentTime := time.Now()
+
 	// Get the directly referenced Operator
 	var referencedOperator *Operator
 	operatorRef := identifyingInformation["OperatorRef"]
@@ -151,7 +155,9 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		timeFilteredJourneys := []*Journey{}
 
 		for _, journey := range journeys {
-			originAimedDepartureTime, _ := time.Parse(time.RFC3339, identifyingInformation["OriginAimedDepartureTime"])
+			originAimedDepartureTimeNoOffset, _ := time.Parse(XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
+			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
+
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)
 			}
