@@ -28,6 +28,9 @@ spec:
               args: 
                 {{- toYaml .args | nindent 16 }}
               env:
+                {{- with .env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
                 - name: BRITBUS_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:

@@ -21,6 +21,7 @@ import (
 	"github.com/britbus/britbus/pkg/realtime"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
+	"github.com/britbus/britbus/pkg/util"
 	"github.com/britbus/britbus/siri_vm"
 	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/urfave/cli/v2"
@@ -266,13 +267,26 @@ func main() {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "url",
-						Usage:    "URL for the BODS Timetable API",
-						Required: true,
+						Usage:    "Overwrite URL for the BODS Timetable API",
+						Required: false,
 					},
 				},
 				Action: func(c *cli.Context) error {
 					source := c.String("url")
+
+					// Default source of all published busses
+					if source == "" {
+						source = "https://data.bus-data.dft.gov.uk/api/v1/dataset/?limit=25&offset=0&status=published"
+					}
+
 					log.Info().Msgf("Bus Open Data Service Timetable API import from %s ", source)
+
+					// Get the API key from the environment variables and append to the source URL
+					env := util.GetEnvironmentVariables()
+					if env["BRITBUS_BODS_API_KEY"] != "" {
+						source += fmt.Sprintf("&api_key=%s", env["BRITBUS_BODS_API_KEY"])
+					}
+
 					timeTableDataset, err := bods.GetTimetableDataset(source)
 					log.Info().Msgf(" - %d datasets", len(timeTableDataset))
 
