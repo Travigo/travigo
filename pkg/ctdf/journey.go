@@ -11,7 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const XSDDateTimeFormat = "2006-01-02T15:04:05.999999-07:00"
+const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
+const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
 	PrimaryIdentifier string            `groups:"basic"`
