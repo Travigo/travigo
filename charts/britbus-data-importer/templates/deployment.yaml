@@ -1,0 +1,40 @@
+{{- range .Values.deployments }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "britbus-data-importer.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "britbus-data-importer.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "britbus-data-importer.fullname" $ }}-{{ .name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "britbus-data-importer.fullname" $ }}-{{ .name }}
+    spec:
+      serviceAccountName: {{ include "britbus-data-importer.serviceAccountName" $ }}
+      containers:
+        - name: {{ $.Chart.Name }}-{{ .name }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: 
+            {{- toYaml .args | nindent 12 }}
+          env:
+            {{- with .env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: BRITBUS_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: BRITBUS_MONGODB_DATABASE
+              value: {{ $.Values.database.database }}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+{{- end }}

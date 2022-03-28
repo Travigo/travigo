@@ -233,6 +233,13 @@ func main() {
 					if dataFormat == "siri-vm" {
 						realtime.StartConsumers()
 						go siri_vm.StartIdentificationConsumers()
+
+						//TODO: TEMPORARY
+						// Get the API key from the environment variables and append to the source URL
+						env := util.GetEnvironmentVariables()
+						if env["BRITBUS_BODS_API_KEY"] != "" {
+							source += fmt.Sprintf("?api_key=%s", env["BRITBUS_BODS_API_KEY"])
+						}
 					}
 
 					for {
