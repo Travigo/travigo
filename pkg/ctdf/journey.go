@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/kr/pretty"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -65,6 +66,8 @@ func (j *Journey) GetRealtimeJourney() {
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&j.RealtimeJourney)
 }
 
+// The CTDF abstraction fails here are we only use siri-vm identifyinginformation
+//  currently no other kind so is fine for now (TODO)
 func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
 	currentTime := time.Now()
 
@@ -158,6 +161,8 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		for _, journey := range journeys {
 			originAimedDepartureTimeNoOffset, _ := time.Parse(XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
 			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
+
+			pretty.Println(identifyingInformation["OriginAimedDepartureTime"], originAimedDepartureTime)
 
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)

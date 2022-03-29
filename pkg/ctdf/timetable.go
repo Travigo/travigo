@@ -23,7 +23,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				refTime := path.OriginDepartureTime
 
 				stopDeperatureTime = time.Date(
-					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), refTime.Location(),
+					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 				)
 
 				destinationDisplay = path.DestinationDisplay
