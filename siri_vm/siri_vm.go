@@ -158,7 +158,6 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 	responseTime := responseTimeNoOffset.In(currentTime.Location())
 
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
-		// TODO: filter out responses with RecordedAtTime > 30 minutes
 		recordedAtTime, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
 
 		if err == nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -104,6 +105,53 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 			closestDistanceJourneyPath = journeyPathItem
 		}
 	}
+
+	// Calculate new stop arrival times
+	currentTime := time.Now()
+	realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to parse realtime time frame")
+	}
+
+	// Get the arrival & departure times with date of the journey
+	destinationArrivalTimeWithDate := time.Date(
+		realtimeTimeframe.Year(),
+		realtimeTimeframe.Month(),
+		realtimeTimeframe.Day(),
+		closestDistanceJourneyPath.DestinationArivalTime.Hour(),
+		closestDistanceJourneyPath.DestinationArivalTime.Minute(),
+		closestDistanceJourneyPath.DestinationArivalTime.Second(),
+		closestDistanceJourneyPath.DestinationArivalTime.Nanosecond(),
+		currentTime.Location(),
+	)
+	originDepartureTimeWithDate := time.Date(
+		realtimeTimeframe.Year(),
+		realtimeTimeframe.Month(),
+		realtimeTimeframe.Day(),
+		closestDistanceJourneyPath.OriginDepartureTime.Hour(),
+		closestDistanceJourneyPath.OriginDepartureTime.Minute(),
+		closestDistanceJourneyPath.OriginDepartureTime.Second(),
+		closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
+		currentTime.Location(),
+	)
+
+	// How long it take to travel between origin & destination
+	currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
+
+	// How far we are between origin & departure (% of journey path, NOT time or metres)
+	currentPathPercentageComplete := 0.5
+
+	// Calculate what the expected time of the current position of the vehicle should be
+	currentPathPositionExpectedTime := originDepartureTimeWithDate.Add(
+		time.Duration(int(currentPathPercentageComplete * float64(currentPathTraversalTime.Nanoseconds()))))
+
+	// Offset is how far behind or ahead the vehicle is from its positions expected time
+	offset := currentTime.Sub(currentPathPositionExpectedTime)
+
+	pretty.Println(originDepartureTimeWithDate, destinationArrivalTimeWithDate)
+	pretty.Println(currentPathPositionExpectedTime)
+	pretty.Println(currentTime)
+	pretty.Println(offset.Minutes())
 
 	// Update database
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
