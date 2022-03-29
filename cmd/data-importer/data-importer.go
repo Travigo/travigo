@@ -24,6 +24,7 @@ import (
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/britbus/britbus/siri_vm"
 	"github.com/britbus/notify/pkg/notify_client"
+	"github.com/kr/pretty"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -183,6 +184,8 @@ func main() {
 	// Overwrite internal timezone location to UK time
 	loc, _ := time.LoadLocation("Europe/London")
 	time.Local = loc
+
+	pretty.Println(time.Now())
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 

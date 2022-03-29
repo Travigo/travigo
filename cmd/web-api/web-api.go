@@ -13,6 +13,10 @@ import (
 )
 
 func main() {
+	// Overwrite internal timezone location to UK time
+	loc, _ := time.LoadLocation("Europe/London")
+	time.Local = loc
+
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	app := &cli.App{
