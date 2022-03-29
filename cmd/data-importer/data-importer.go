@@ -30,6 +30,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	_ "time/tzdata"
 )
 
 type DataFile struct {
@@ -178,6 +180,10 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 }
 
 func main() {
+	// Overwrite internal timezone location to UK time
+	loc, _ := time.LoadLocation("Europe/London")
+	time.Local = loc
+
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	if err := database.Connect(); err != nil {
