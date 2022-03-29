@@ -151,12 +151,24 @@ func (s *SiriVM) SubmitToProcessQueue(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "siri-vm"
 	log.Info().Msgf("Submitting the %d activity records in %s to processing queue", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
 
+	currentTime := time.Now()
+
 	// Offset the response to the correct current timezone
 	responseTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeWithFractionalFormat, s.ServiceDelivery.ResponseTimestamp)
-	responseTime := responseTimeNoOffset.In(time.Now().Location())
+	responseTime := responseTimeNoOffset.In(currentTime.Location())
 
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
 		// TODO: filter out responses with RecordedAtTime > 30 minutes
+		recordedAtTime, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
+
+		if err == nil {
+			recordedAtDifference := currentTime.Sub(recordedAtTime)
+
+			// Skip any records that haven't been updated in over 20 minutes
+			if recordedAtDifference.Minutes() > 20 {
+				continue
+			}
+		}
 
 		identificationQueue <- &SiriVMVehicleIdentificationEvent{
 			VehicleActivity: vehicle,

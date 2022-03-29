@@ -123,7 +123,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 			CreationDateTime: time.Now(),
 			DataSource:       vehicleLocationEvent.DataSource,
 
-			StopHistory: []*ctdf.RealtimeJourneyStopHistory{},
+			Stops: []*ctdf.RealtimeJourneyStops{},
 		}
 	}
 

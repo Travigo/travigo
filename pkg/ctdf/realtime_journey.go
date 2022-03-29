@@ -27,10 +27,10 @@ type RealtimeJourney struct {
 	NextStopArrival   time.Time `groups:"basic"`
 	NextStopDeparture time.Time `groups:"basic"`
 
-	StopHistory []*RealtimeJourneyStopHistory `groups:"basic"`
+	Stops []*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 }
 
-type RealtimeJourneyStopHistory struct {
+type RealtimeJourneyStops struct {
 	StopRef string
 	// Stop    *Stop
 
