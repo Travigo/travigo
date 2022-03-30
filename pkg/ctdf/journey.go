@@ -62,7 +62,12 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 	realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, timeframe, j.PrimaryIdentifier)
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&j.RealtimeJourney)
+	var realtimeJourney *RealtimeJourney
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
+
+	if realtimeJourney != nil && (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() < 10 {
+		j.RealtimeJourney = realtimeJourney
+	}
 }
 
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
