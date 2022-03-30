@@ -186,7 +186,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.github.com
+      url: https://api.britbus.app
 
     needs: web-api-docker
 
