@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -35,7 +36,7 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-		journey.GetRealtimeJourney()
+		journey.GetRealtimeJourney(time.Now().Format("2006-01-02"))
 
 		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
 			Groups: []string{"basic", "detailed"},

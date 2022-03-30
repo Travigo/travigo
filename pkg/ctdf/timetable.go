@@ -18,7 +18,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 		var stopDeperatureTime time.Time
 		var destinationDisplay string
 
-		journey.GetRealtimeJourney()
+		journey.GetRealtimeJourney(realtimeTimeframe)
 
 		for _, path := range journey.Path {
 			if path.OriginStopRef == stopRef {
@@ -46,7 +46,6 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 		if availability.MatchDate(dateTime) {
 			journey.GetReferences()
-			journey.GetRealtimeJourney()
 
 			timetable = append(timetable, &TimetableRecord{
 				Journey:            journey,

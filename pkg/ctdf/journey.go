@@ -58,8 +58,8 @@ func (j *Journey) GetDeepReferences() {
 		path.GetReferences()
 	}
 }
-func (j *Journey) GetRealtimeJourney() {
-	realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, time.Now().Format("2006-01-02"), j.PrimaryIdentifier)
+func (j *Journey) GetRealtimeJourney(timeframe string) {
+	realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, timeframe, j.PrimaryIdentifier)
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&j.RealtimeJourney)
