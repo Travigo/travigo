@@ -10,7 +10,6 @@ import (
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -85,8 +84,10 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 
 	closestDistance := 999999999999.0
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem
+	var closestDistanceJourneyPathIndex int
+	var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
 
-	for _, journeyPathItem := range journey.Path {
+	for i, journeyPathItem := range journey.Path {
 		journeyPathClosestDistance := 99999999999999.0 // TODO do this better
 
 		for i := 0; i < len(journeyPathItem.Track)-1; i++ {
@@ -103,6 +104,11 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 		if journeyPathClosestDistance < closestDistance {
 			closestDistance = journeyPathClosestDistance
 			closestDistanceJourneyPath = journeyPathItem
+			closestDistanceJourneyPathIndex = i
+
+			// TODO: this is a hack, replace with actual distance
+			// this is a rough estimation based on what part of path item track we are on
+			closestDistanceJourneyPathPercentComplete = float64(i) / float64(len(journeyPathItem.Track))
 		}
 	}
 
@@ -139,7 +145,8 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
 
 	// How far we are between origin & departure (% of journey path, NOT time or metres)
-	currentPathPercentageComplete := 0.5
+	// TODO: this is a hack, replace with actual distance
+	currentPathPercentageComplete := closestDistanceJourneyPathPercentComplete
 
 	// Calculate what the expected time of the current position of the vehicle should be
 	currentPathPositionExpectedTime := originDepartureTimeWithDate.Add(
@@ -148,10 +155,18 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	// Offset is how far behind or ahead the vehicle is from its positions expected time
 	offset := currentTime.Sub(currentPathPositionExpectedTime)
 
-	pretty.Println(originDepartureTimeWithDate, destinationArrivalTimeWithDate)
-	pretty.Println(currentPathPositionExpectedTime)
-	pretty.Println(currentTime)
-	pretty.Println(offset.Minutes())
+	// Calculate all the estimated stop arrival & departure times
+	estimatedJourneyStops := map[string]*ctdf.RealtimeJourneyStops{}
+	for i := closestDistanceJourneyPathIndex; i < len(journey.Path); i++ {
+		path := journey.Path[i]
+
+		estimatedJourneyStops[path.DestinationStopRef] = &ctdf.RealtimeJourneyStops{
+			StopRef:  path.DestinationStopRef,
+			TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+
+			ArrivalTime: path.DestinationArivalTime.Add(offset).Round(time.Minute),
+		}
+	}
 
 	// Update database
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
@@ -170,8 +185,6 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 
 			CreationDateTime: time.Now(),
 			DataSource:       vehicleLocationEvent.DataSource,
-
-			Stops: []*ctdf.RealtimeJourneyStops{},
 		}
 	}
 
@@ -180,6 +193,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	realtimeJourney.VehicleBearing = vehicleLocationEvent.VehicleBearing
 	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
 	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+	realtimeJourney.Stops = estimatedJourneyStops
 
 	opts := options.Update().SetUpsert(true)
 	realtimeJourneysCollection.UpdateOne(context.Background(), searchQuery, bson.M{"$set": realtimeJourney}, opts)

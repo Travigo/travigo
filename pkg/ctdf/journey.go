@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/kr/pretty"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -161,8 +160,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		for _, journey := range journeys {
 			originAimedDepartureTimeNoOffset, _ := time.Parse(XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
 			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
-
-			pretty.Println(identifyingInformation["OriginAimedDepartureTime"], originAimedDepartureTime)
 
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)

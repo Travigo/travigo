@@ -5,7 +5,7 @@ import "time"
 var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
 
 type RealtimeJourney struct {
-	PrimaryIdentifier string
+	PrimaryIdentifier string `groups:"basic"`
 
 	JourneyRef string   `groups:"internal"`
 	Journey    *Journey `groups:"basic" bson:"-"`
@@ -27,13 +27,23 @@ type RealtimeJourney struct {
 	NextStopArrival   time.Time `groups:"basic"`
 	NextStopDeparture time.Time `groups:"basic"`
 
-	Stops []*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 }
 
 type RealtimeJourneyStops struct {
-	StopRef string
-	// Stop    *Stop
+	StopRef string `groups:"basic"`
+	Stop    *Stop  `groups:"basic" bson:"-"`
 
-	ArrivalTime   time.Time
-	DepartureTime time.Time
+	ArrivalTime   time.Time `groups:"basic"`
+	DepartureTime time.Time `groups:"basic"`
+
+	TimeType RealtimeJourneyStopTimeType `groups:"basic"`
 }
+
+type RealtimeJourneyStopTimeType string
+
+const (
+	// Unknown         RealtimeJourneyStopTimeType = "Unknown"
+	RealtimeJourneyStopTimeHistorical      RealtimeJourneyStopTimeType = "Historical"
+	RealtimeJourneyStopTimeEstimatedFuture                             = "EstimatedFuture"
+)
