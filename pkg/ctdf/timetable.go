@@ -18,13 +18,15 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 		var stopDeperatureTime time.Time
 		var destinationDisplay string
 
+		journey.GetRealtimeJourney()
+
 		for _, path := range journey.Path {
 			if path.OriginStopRef == stopRef {
 				refTime := path.OriginDepartureTime
 
 				// Use the realtime estimated stop time based if realtime is available
-				if journey.RealtimeJourney != nil {
-					refTime = journey.RealtimeJourney.Stops[path.DestinationStopRef].ArrivalTime // TODO: this should be departure time
+				if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+					refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].ArrivalTime // TODO: this should be departure time
 				}
 
 				stopDeperatureTime = time.Date(
