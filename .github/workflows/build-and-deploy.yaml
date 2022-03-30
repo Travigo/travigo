@@ -184,7 +184,9 @@ jobs:
   
     name: Deploy web-api to GCP
     runs-on: ubuntu-latest
-    environment: production
+    environment: 
+      name: production
+      url: https://api.github.com
 
     needs: web-api-docker
 
