@@ -25,8 +25,8 @@ var journeyCache *cache.Cache
 func StartConsumers() {
 	// Create Cache
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 10000,
-		MaxCost:     1 << 29,
+		NumCounters: 8000,
+		MaxCost:     300000000,
 		BufferItems: 64,
 	})
 	if err != nil {
@@ -77,7 +77,9 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
-		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
+		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, &store.Options{
+			Expiration: 30 * time.Minute,
+		})
 	} else {
 		journey = cachedJourney.(*ctdf.Journey)
 	}

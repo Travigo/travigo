@@ -33,7 +33,7 @@ type Journey struct {
 	DepartureTime      time.Time `groups:"basic"`
 	DestinationDisplay string    `groups:"basic"`
 
-	Availability *Availability `groups:"detailed"`
+	Availability *Availability `groups:"internal"`
 
 	Path []*JourneyPathItem `groups:"detailed"`
 
