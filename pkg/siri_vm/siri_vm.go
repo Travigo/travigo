@@ -45,7 +45,7 @@ func StartIdentificationConsumers() {
 	// Create cache
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 10000,
-		MaxCost:     1 << 29,
+		MaxCost:     50000000,
 		BufferItems: 64,
 	})
 	if err != nil {
@@ -103,7 +103,9 @@ func startIdentificationConsumer(id int) {
 				// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 
 				// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-				identificationCache.Set(context.Background(), localJourneyID, "N/A", nil)
+				identificationCache.Set(context.Background(), localJourneyID, "N/A", &store.Options{
+					Expiration: 30 * time.Minute,
+				})
 				continue
 			}
 			journeyID = journey.PrimaryIdentifier

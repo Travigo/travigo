@@ -26,7 +26,7 @@ func StartConsumers() {
 	// Create Cache
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 8000,
-		MaxCost:     300000000,
+		MaxCost:     150000000,
 		BufferItems: 64,
 	})
 	if err != nil {
