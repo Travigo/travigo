@@ -37,6 +37,8 @@ type Operator struct {
 	Address     string            `groups:"detailed"`
 	PhoneNumber string            `groups:"detailed"`
 	SocialMedia map[string]string `groups:"detailed"`
+
+	Regions []string `groups:"detailed"`
 }
 
 func (operator *Operator) GetReferences() {
@@ -50,7 +52,7 @@ func (operator *Operator) GetOperatorGroup() {
 func (operator *Operator) UniqueHash() string {
 	hash := sha256.New()
 
-	hash.Write([]byte(fmt.Sprintf("%s %s %s %s %s %s %s %s %s %s %s %s",
+	hash.Write([]byte(fmt.Sprintf("%s %s %s %s %s %s %s %s %s %s %s %s %s",
 		operator.PrimaryIdentifier,
 		operator.OtherIdentifiers,
 		operator.PrimaryName,
@@ -63,6 +65,7 @@ func (operator *Operator) UniqueHash() string {
 		operator.Address,
 		operator.PhoneNumber,
 		operator.SocialMedia,
+		operator.Regions,
 	)))
 
 	return fmt.Sprintf("%x", hash.Sum(nil))

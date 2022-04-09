@@ -114,6 +114,43 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 			operator.OtherNames = append(operator.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 			operator.Licence = nocLineRecord.Licence
 			operator.TransportType = []string{nocLineRecord.Mode}
+
+			if nocLineRecord.London != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:LONDON")
+			}
+			if nocLineRecord.SouthWest != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:SOUTHWEST")
+			}
+			if nocLineRecord.WestMidlands != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:WESTMIDLANDS")
+			}
+			if nocLineRecord.Wales != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:WALES")
+			}
+			if nocLineRecord.Yorkshire != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:YORKSHIRE")
+			}
+			if nocLineRecord.NorthWest != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:NORTHWEST")
+			}
+			if nocLineRecord.NorthEast != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:NORTHEAST")
+			}
+			if nocLineRecord.Scotland != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:SCOTLAND")
+			}
+			if nocLineRecord.SouthEast != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:SOUTHEAST")
+			}
+			if nocLineRecord.EastAnglia != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:EASTANGLIA")
+			}
+			if nocLineRecord.EastMidlands != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:EASTMIDLANDS")
+			}
+			if nocLineRecord.NorthernIreland != "" {
+				operator.Regions = append(operator.Regions, "UK:REGION:NORTHERNIRELAND")
+			}
 		}
 	}
 
