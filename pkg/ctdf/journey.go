@@ -65,7 +65,7 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 	var realtimeJourney *RealtimeJourney
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
 
-	if realtimeJourney != nil && (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() < 10 {
+	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
 	}
 }
@@ -190,8 +190,8 @@ type JourneyPathItem struct {
 
 	Distance int `groups:"basic"`
 
-	OriginArivalTime      time.Time `groups:"basic"`
-	DestinationArivalTime time.Time `groups:"basic"`
+	OriginArrivalTime      time.Time `groups:"basic"`
+	DestinationArrivalTime time.Time `groups:"basic"`
 
 	OriginDepartureTime time.Time `groups:"basic"`
 

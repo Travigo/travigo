@@ -446,7 +446,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					}
 
 					// Calculate timings
-					originArivalTime := timeCursor
+					originArrivalTime := timeCursor
 
 					// Add on any wait times
 					var originWaitTime iso8601.Duration
@@ -463,8 +463,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					originDepartureTime := timeCursor
 
 					travelTime, _ := iso8601.ParseISO8601(runTime)
-					destinationArivalTime := travelTime.Shift(originDepartureTime)
-					timeCursor = destinationArivalTime
+					destinationArrivalTime := travelTime.Shift(originDepartureTime)
+					timeCursor = destinationArrivalTime
 
 					// Calculate the destination display at this stop
 					destinationDisplay := journeyPattern.DestinationDisplay
@@ -562,10 +562,10 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 						Distance: routeLink.Distance,
 
-						OriginArivalTime:    originArivalTime,
+						OriginArrivalTime:   originArrivalTime,
 						OriginDepartureTime: originDepartureTime,
 
-						DestinationArivalTime: destinationArivalTime,
+						DestinationArrivalTime: destinationArrivalTime,
 
 						DestinationDisplay: destinationDisplay,
 

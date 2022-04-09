@@ -30,6 +30,10 @@ type RealtimeJourney struct {
 	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 }
 
+func (r *RealtimeJourney) IsActive() bool {
+	return (time.Now().Sub(r.ModificationDateTime)).Minutes() < 10
+}
+
 type RealtimeJourneyStops struct {
 	StopRef string `groups:"basic"`
 	Stop    *Stop  `groups:"basic" bson:"-"`

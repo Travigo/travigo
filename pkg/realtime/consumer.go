@@ -126,10 +126,10 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 		realtimeTimeframe.Year(),
 		realtimeTimeframe.Month(),
 		realtimeTimeframe.Day(),
-		closestDistanceJourneyPath.DestinationArivalTime.Hour(),
-		closestDistanceJourneyPath.DestinationArivalTime.Minute(),
-		closestDistanceJourneyPath.DestinationArivalTime.Second(),
-		closestDistanceJourneyPath.DestinationArivalTime.Nanosecond(),
+		closestDistanceJourneyPath.DestinationArrivalTime.Hour(),
+		closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
+		closestDistanceJourneyPath.DestinationArrivalTime.Second(),
+		closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
 		currentTime.Location(),
 	)
 	originDepartureTimeWithDate := time.Date(
@@ -162,11 +162,25 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	for i := closestDistanceJourneyPathIndex; i < len(journey.Path); i++ {
 		path := journey.Path[i]
 
+		arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
+		var departureTime time.Time
+
+		if i < len(journey.Path)-1 {
+			nextPath := journey.Path[i+1]
+
+			if arrivalTime.Before(nextPath.OriginDepartureTime) {
+				departureTime = nextPath.OriginDepartureTime
+			} else {
+				departureTime = arrivalTime
+			}
+		}
+
 		estimatedJourneyStops[path.DestinationStopRef] = &ctdf.RealtimeJourneyStops{
 			StopRef:  path.DestinationStopRef,
 			TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 
-			ArrivalTime: path.DestinationArivalTime.Add(offset).Round(time.Minute),
+			ArrivalTime:   arrivalTime,
+			DepartureTime: departureTime,
 		}
 	}
 
