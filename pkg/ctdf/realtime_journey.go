@@ -1,6 +1,12 @@
 package ctdf
 
-import "time"
+import (
+	"context"
+	"time"
+
+	"github.com/britbus/britbus/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+)
 
 var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
 
@@ -28,6 +34,14 @@ type RealtimeJourney struct {
 	NextStopDeparture time.Time `groups:"basic"`
 
 	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+}
+
+func (r *RealtimeJourney) GetReferences() {
+	r.GetJourney()
+}
+func (r *RealtimeJourney) GetJourney() {
+	journeysCollection := database.GetCollection("journeys")
+	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": r.JourneyRef}).Decode(&r.Journey)
 }
 
 func (r *RealtimeJourney) IsActive() bool {

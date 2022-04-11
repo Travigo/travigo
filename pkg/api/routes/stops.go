@@ -2,16 +2,15 @@ package routes
 
 import (
 	"context"
-	"log"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 
 	iso8601 "github.com/senseyeio/duration"
@@ -24,40 +23,26 @@ func StopsRouter(router fiber.Router) {
 }
 
 func listStops(c *fiber.Ctx) error {
-	boundsQuery := c.Query("bounds")
-
-	if boundsQuery == "" {
+	boundsQuery, err := getBoundsQuery(c)
+	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
-			"error": "A filter must be applied to the request",
+			"error": err.Error(),
 		})
 	}
-
-	boundsQuerySplit := strings.Split(boundsQuery, ",")
-	if len(boundsQuerySplit) != 4 {
-		c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"error": "Bounds must contain 4 co-ordinates",
-		})
-	}
-	bottomLeftLon, _ := strconv.ParseFloat(boundsQuerySplit[0], 32)
-	bottomLeftLat, _ := strconv.ParseFloat(boundsQuerySplit[1], 32)
-	topRightLon, _ := strconv.ParseFloat(boundsQuerySplit[2], 32)
-	topRightLat, _ := strconv.ParseFloat(boundsQuerySplit[3], 32)
 
 	stops := []ctdf.Stop{}
 
 	stopsCollection := database.GetCollection("stops")
 
-	locationQuery := bson.M{"location": bson.M{"$geoWithin": bson.M{"$box": bson.A{bson.A{bottomLeftLon, bottomLeftLat}, bson.A{topRightLon, topRightLat}}}}}
-	query := bson.M{"$and": bson.A{bson.M{"status": "active"}, locationQuery}}
+	query := bson.M{"$and": bson.A{bson.M{"status": "active"}, bson.M{"location": boundsQuery}}}
 	cursor, _ := stopsCollection.Find(context.Background(), query)
 
 	for cursor.Next(context.TODO()) {
 		var stop *ctdf.Stop
 		err := cursor.Decode(&stop)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
 		stops = append(stops, *stop)
@@ -138,7 +123,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
 		journeys = append(journeys, &journey)
