@@ -49,24 +49,32 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	operators := []*ctdf.Operator{}
 	operatorGroups := []*ctdf.OperatorGroup{}
 
+	groupExists := map[string]bool{}
 	mgmtDivisionGroupIDs := map[string]string{}
 	operatorNOCCodeRef := map[string]*ctdf.Operator{}
 	operatorsIDRef := map[string]*ctdf.Operator{}
 	publicNameIDRef := map[string]*ctdf.Operator{}
 
 	// GroupsRecords
+	noGroupRegex, _ := regexp.Compile("NoGroup_*")
 	for _, groupRecord := range t.GroupsRecords {
-		ctdfRecord := &ctdf.OperatorGroup{
-			Identifier: fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupRecord.GroupID),
-			Name:       groupRecord.GroupName,
+		if !noGroupRegex.Match([]byte(groupRecord.GroupName)) {
+			ctdfRecord := &ctdf.OperatorGroup{
+				Identifier: fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupRecord.GroupID),
+				Name:       groupRecord.GroupName,
+			}
+			operatorGroups = append(operatorGroups, ctdfRecord)
+
+			groupExists[groupRecord.GroupID] = true
 		}
-		operatorGroups = append(operatorGroups, ctdfRecord)
 	}
 
 	// ManagementDivisionsRecord
 	for _, mgmtDivisionRecord := range t.ManagementDivisionsRecords {
 		// Create a reference between the Management Division ID and the Group ID
-		mgmtDivisionGroupIDs[mgmtDivisionRecord.ManagementDivisionID] = mgmtDivisionRecord.GroupID
+		if groupExists[mgmtDivisionRecord.GroupID] {
+			mgmtDivisionGroupIDs[mgmtDivisionRecord.ManagementDivisionID] = mgmtDivisionRecord.GroupID
+		}
 	}
 
 	// OperatorsRecords
@@ -83,7 +91,9 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 		if operatorRecord.ManagementDivisionID != "" {
 			groupID := mgmtDivisionGroupIDs[operatorRecord.ManagementDivisionID]
 
-			ctdfRecord.OperatorGroupRef = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
+			if groupID != "" {
+				ctdfRecord.OperatorGroupRef = fmt.Sprintf(ctdf.OperatorGroupIDFormat, groupID)
+			}
 		}
 
 		operators = append(operators, ctdfRecord)
