@@ -15,7 +15,7 @@ const OperatorNOCIDFormat = "GB:NOCID:%s"
 
 type Operator struct {
 	PrimaryIdentifier string   `groups:"basic"`
-	OtherIdentifiers  []string `groups:"basic"`
+	OtherIdentifiers  []string `groups:"detailed"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
@@ -23,7 +23,7 @@ type Operator struct {
 	DataSource *DataSource `groups:"internal"`
 
 	PrimaryName string   `groups:"basic"`
-	OtherNames  []string `groups:"basic"`
+	OtherNames  []string `groups:"detailed"`
 
 	OperatorGroupRef string         `groups:"detailed"`
 	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`

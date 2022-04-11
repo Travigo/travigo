@@ -6,8 +6,14 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+type operatorRegions struct {
+	Name      string
+	Operators []interface{}
+}
 
 func OperatorsRouter(router fiber.Router) {
 	router.Get("/", listOperators)
@@ -15,8 +21,62 @@ func OperatorsRouter(router fiber.Router) {
 }
 
 func listOperators(c *fiber.Ctx) error {
-	c.SendString("NOT IMPLEMENTED")
-	return nil
+	regions := map[string]string{
+		"UK:REGION:LONDON":       "London",
+		"UK:REGION:SOUTHWEST":    "South West England",
+		"UK:REGION:WESTMIDLANDS": "West Midlands",
+		"UK:REGION:WALES":        "Wales",
+		"UK:REGION:YORKSHIRE":    "Yorkshire",
+		"UK:REGION:NORTHWEST":    "North West England",
+		"UK:REGION:NORTHEAST":    "North East England",
+		"UK:REGION:SCOTLAND":     "Scotland",
+		"UK:REGION:SOUTHEAST":    "South East England",
+		"UK:REGION:EASTANGLIA":   "East Anglia",
+		"UK:REGION:EASTMIDLANDS": "East Midlands",
+		// "UK:REGION:NORTHERNIRELAND": "Northern Ireland",
+	}
+	regionOperators := map[string]*operatorRegions{} //[]*ctdf.Operator{}
+	// The below query can return the same operator many times
+	// this map allows us to efficiently check if we've already added operator to a region
+	operatorInRegionCheck := map[string]map[string]bool{} // REGION OPERATOR BOOL
+	for key, name := range regions {
+		regionOperators[key] = &operatorRegions{
+			Name:      name,
+			Operators: []interface{}{},
+		}
+		operatorInRegionCheck[key] = map[string]bool{}
+	}
+
+	operatorsCollection := database.GetCollection("operators")
+	servicesCollection := database.GetCollection("services")
+
+	operatorNames, _ := servicesCollection.Distinct(context.Background(), "operatorref", bson.D{})
+	operatorNamesArray := bson.A{}
+	for _, name := range operatorNames {
+		operatorNamesArray = append(operatorNamesArray, name)
+	}
+
+	operators, _ := operatorsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$in": operatorNamesArray}})
+
+	for operators.Next(context.TODO()) {
+		var operator *ctdf.Operator
+		operators.Decode(&operator)
+
+		for _, region := range operator.Regions {
+
+			if !operatorInRegionCheck[region][operator.PrimaryIdentifier] {
+				reducedOperator, _ := sheriff.Marshal(&sheriff.Options{
+					Groups: []string{"basic"},
+				}, operator)
+
+				regionOperators[region].Operators = append(regionOperators[region].Operators, reducedOperator)
+				operatorInRegionCheck[region][operator.PrimaryIdentifier] = true
+			}
+		}
+
+	}
+
+	return c.JSON(regionOperators)
 }
 
 func getOperator(c *fiber.Ctx) error {
