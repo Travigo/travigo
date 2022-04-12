@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -119,6 +120,11 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to parse realtime time frame")
+	}
+
+	if closestDistanceJourneyPath == nil {
+		// https://github.com/BritBus/britbus/issues/35
+		return errors.New("Could not identify closet journey path")
 	}
 
 	// Get the arrival & departure times with date of the journey
