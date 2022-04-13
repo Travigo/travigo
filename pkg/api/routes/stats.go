@@ -10,6 +10,9 @@ import (
 )
 
 func Stats(c *fiber.Ctx) error {
+	stopsCollection := database.GetCollection("stops")
+	numberStops, _ := stopsCollection.CountDocuments(context.Background(), bson.D{})
+
 	operatorsCollection := database.GetCollection("operators")
 	numberOperators, _ := operatorsCollection.CountDocuments(context.Background(), bson.D{})
 
@@ -27,6 +30,7 @@ func Stats(c *fiber.Ctx) error {
 	numberHistoricRealtimeJourneys := numberRealtimeJourneys - numberActiveRealtimeJourneys
 
 	return c.JSON(fiber.Map{
+		"stops":                        numberStops,
 		"operators":                    numberOperators,
 		"services":                     numberServices,
 		"active_realtime_journeys":     numberActiveRealtimeJourneys,
