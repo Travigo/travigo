@@ -65,3 +65,7 @@ const (
 	RealtimeJourneyStopTimeHistorical      RealtimeJourneyStopTimeType = "Historical"
 	RealtimeJourneyStopTimeEstimatedFuture                             = "EstimatedFuture"
 )
+
+func GetActiveRealtimeJourneyCutOffDate() time.Time {
+	return time.Now().Add(-10 * time.Minute)
+}

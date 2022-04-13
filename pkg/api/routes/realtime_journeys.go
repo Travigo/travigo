@@ -27,8 +27,13 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 	realtimeJourneys := []ctdf.RealtimeJourney{}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{"vehiclelocation": boundsQuery})
+	cursor, _ := realtimeJourneysCollection.Find(context.Background(),
+		bson.M{"$and": bson.A{bson.M{"vehiclelocation": boundsQuery}, bson.M{
+			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+		}}},
+	)
 
 	for cursor.Next(context.TODO()) {
 		var realtimeJourney *ctdf.RealtimeJourney
@@ -37,13 +42,11 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		if realtimeJourney.IsActive() {
-			realtimeJourney.GetReferences()
-			realtimeJourney.Journey.GetService()
-			realtimeJourney.Journey.GetOperator()
+		realtimeJourney.GetReferences()
+		realtimeJourney.Journey.GetService()
+		realtimeJourney.Journey.GetOperator()
 
-			realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
-		}
+		realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
 	}
 
 	c.JSON(realtimeJourneys)
