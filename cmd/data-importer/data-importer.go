@@ -19,6 +19,7 @@ import (
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/realtime"
+	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
@@ -237,8 +238,11 @@ func main() {
 
 					// Some initial setup for Siri-VM
 					if dataFormat == "siri-vm" {
-						realtime.StartConsumers()
-						go siri_vm.StartIdentificationConsumers()
+						if err := redis_client.Connect(); err != nil {
+							log.Fatal().Err(err).Msg("Failed to connect to Redis")
+						}
+						realtime.StartConsumers("redis")
+						go siri_vm.StartIdentificationConsumers("redis")
 
 						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL

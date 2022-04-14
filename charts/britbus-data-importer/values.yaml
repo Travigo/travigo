@@ -6,6 +6,13 @@ database:
   connectionStringSecret: britbus-mongodb-admin-britbus
   database: britbus
 
+redis:
+  address: "redis-headless.redis:6379"
+  passwordSecret: redis-password
+
+bods:
+  apiKeySecret: britbus-bods-api
+
 image:
   repository: ghcr.io/britbus/britbus/data-importer
   pullPolicy: Always
@@ -21,44 +28,16 @@ cronjobs:
   - name: bods-timetable
     schedule: "0 5 * * 6"
     args: ["bods-timetable"]
-    env:
-      - name: BRITBUS_BODS_API_KEY
-        valueFrom:
-          secretKeyRef:
-            name: britbus-bods-api
-            key: api_key
-            optional: false
 
 # TODO: temporary method of deploying siri-vm runners
 # this wont scale for the hundreds of siri-vm sources
 deployments:
   - name: sirivm-stagecoach-east
     args: ["file", "--repeat-every", "30s", "--file-format", "xml", "siri-vm", "https://data.bus-data.dft.gov.uk/api/v1/datafeed/1696/"]
-    env:
-      - name: BRITBUS_BODS_API_KEY
-        valueFrom:
-          secretKeyRef:
-            name: britbus-bods-api
-            key: api_key
-            optional: false
   - name: sirivm-firstbus-york
     args: ["file", "--repeat-every", "30s", "--file-format", "xml", "siri-vm", "https://data.bus-data.dft.gov.uk/api/v1/datafeed/702/"]
-    env:
-      - name: BRITBUS_BODS_API_KEY
-        valueFrom:
-          secretKeyRef:
-            name: britbus-bods-api
-            key: api_key
-            optional: false
   - name: sirivm-arriva-thameside
     args: ["file", "--repeat-every", "30s", "--file-format", "xml", "siri-vm", "https://data.bus-data.dft.gov.uk/api/v1/datafeed/711/"]
-    env:
-      - name: BRITBUS_BODS_API_KEY
-        valueFrom:
-          secretKeyRef:
-            name: britbus-bods-api
-            key: api_key
-            optional: false
 
 resources: {}
 podAnnotations: {}

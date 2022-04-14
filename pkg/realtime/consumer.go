@@ -2,12 +2,14 @@ package realtime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -23,25 +25,36 @@ const numConsumers = 10
 var vehicleLocationEventQueue chan *ctdf.VehicleLocationEvent = make(chan *ctdf.VehicleLocationEvent, 2000)
 var journeyCache *cache.Cache
 
-func StartConsumers() {
+func StartConsumers(cacheMode string) {
 	// Create Cache
-	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 8000,
-		MaxCost:     150000000,
-		BufferItems: 64,
-	})
-	if err != nil {
-		panic(err)
+
+	if cacheMode == "local" {
+		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+			NumCounters: 8000,
+			MaxCost:     150000000,
+			BufferItems: 64,
+		})
+		if err != nil {
+			panic(err)
+		}
+		ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+			Expiration: 30 * time.Minute,
+		})
+		journeyCache = cache.New(ristrettoStore)
+	} else if cacheMode == "redis" {
+		redisStore := store.NewRedis(redis_client.Client, &store.Options{
+			Expiration: 30 * time.Minute,
+		})
+
+		journeyCache = cache.New(redisStore)
+	} else {
+		log.Fatal().Str("cacheMode", cacheMode).Msg("Unknown cache mode")
 	}
-	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-		Expiration: 30 * time.Minute,
-	})
-	journeyCache = cache.New(ristrettoStore)
 
 	// Mongo indexes
 	//TODO: Doesnt really make sense for this package to be managing indexes
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
@@ -74,7 +87,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	var journey *ctdf.Journey
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
-	if cachedJourney == nil {
+	if cachedJourney == nil || cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
@@ -82,7 +95,13 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 			Expiration: 30 * time.Minute,
 		})
 	} else {
-		journey = cachedJourney.(*ctdf.Journey)
+		switch cachedJourney.(type) {
+		default:
+			journey = cachedJourney.(*ctdf.Journey)
+		case string:
+			json.Unmarshal([]byte(cachedJourney.(string)), &journey)
+		}
+
 	}
 
 	closestDistance := 999999999999.0

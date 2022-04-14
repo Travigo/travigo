@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -68,6 +69,9 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
 	}
+}
+func (j Journey) MarshalBinary() ([]byte, error) {
+	return json.Marshal(j)
 }
 
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation

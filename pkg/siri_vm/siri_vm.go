@@ -7,6 +7,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/realtime"
+	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -41,21 +42,32 @@ type SiriVMVehicleIdentificationEvent struct {
 	ResponseTime    time.Time
 }
 
-func StartIdentificationConsumers() {
+func StartIdentificationConsumers(cacheMode string) {
 	// Create cache
-	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 10000,
-		MaxCost:     50000000,
-		BufferItems: 64,
-	})
-	if err != nil {
-		panic(err)
-	}
-	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-		Expiration: 30 * time.Minute,
-	})
 
-	identificationCache = cache.New(ristrettoStore)
+	if cacheMode == "local" {
+		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+			NumCounters: 10000,
+			MaxCost:     50000000,
+			BufferItems: 64,
+		})
+		if err != nil {
+			panic(err)
+		}
+		ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+			Expiration: 30 * time.Minute,
+		})
+
+		identificationCache = cache.New(ristrettoStore)
+	} else if cacheMode == "redis" {
+		redisStore := store.NewRedis(redis_client.Client, &store.Options{
+			Expiration: 30 * time.Minute,
+		})
+
+		identificationCache = cache.New(redisStore)
+	} else {
+		log.Fatal().Str("cacheMode", cacheMode).Msg("Unknown cache mode")
+	}
 
 	// Start the background consumers
 	log.Info().Msgf("Starting identification consumers")
@@ -75,7 +87,7 @@ func startIdentificationConsumer(id int) {
 		}
 
 		localJourneyID := fmt.Sprintf(
-			"%s:%s:%s:%s",
+			"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
 			fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
 			vehicle.MonitoredVehicleJourney.LineRef,
 			fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
@@ -86,7 +98,7 @@ func startIdentificationConsumer(id int) {
 
 		cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
 
-		if cachedJourneyMapping == nil {
+		if cachedJourneyMapping == nil || cachedJourneyMapping == "" {
 			journey, err := ctdf.IdentifyJourney(map[string]string{
 				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,

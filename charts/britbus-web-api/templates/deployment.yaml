@@ -42,6 +42,12 @@ spec:
                   optional: false
             - name: BRITBUS_MONGODB_DATABASE
               value: {{ .Values.database.database }}
+            - name: BRITBUS_BODS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bods.apiKeySecret }}
+                  key: api_key
+                  optional: false
           ports:
             - name: http
               containerPort: 80
