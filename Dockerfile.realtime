@@ -4,8 +4,8 @@ RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificat
 
 WORKDIR /
 
-COPY ./data-importer /data-importer
+COPY ./realtime /realtime
 
-RUN chmod +x /data-importer
+RUN chmod +x /realtime
 
-ENTRYPOINT ["/data-importer"]
+ENTRYPOINT ["/realtime"]
