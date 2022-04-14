@@ -241,8 +241,8 @@ func main() {
 						if err := redis_client.Connect(); err != nil {
 							log.Fatal().Err(err).Msg("Failed to connect to Redis")
 						}
-						realtime.StartConsumers("redis")
-						go siri_vm.StartIdentificationConsumers("redis")
+						realtime.StartConsumers()
+						go siri_vm.StartIdentificationConsumers()
 
 						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL

@@ -23,38 +23,36 @@ import (
 const numConsumers = 10
 
 var vehicleLocationEventQueue chan *ctdf.VehicleLocationEvent = make(chan *ctdf.VehicleLocationEvent, 2000)
-var journeyCache *cache.Cache
+var journeyCache *cache.ChainCache
 
-func StartConsumers(cacheMode string) {
+func StartConsumers() {
 	// Create Cache
 
-	if cacheMode == "local" {
-		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-			NumCounters: 8000,
-			MaxCost:     150000000,
-			BufferItems: 64,
-		})
-		if err != nil {
-			panic(err)
-		}
-		ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-			Expiration: 30 * time.Minute,
-		})
-		journeyCache = cache.New(ristrettoStore)
-	} else if cacheMode == "redis" {
-		redisStore := store.NewRedis(redis_client.Client, &store.Options{
-			Expiration: 30 * time.Minute,
-		})
-
-		journeyCache = cache.New(redisStore)
-	} else {
-		log.Fatal().Str("cacheMode", cacheMode).Msg("Unknown cache mode")
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 8000,
+		MaxCost:     10000000,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
 	}
+	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	redisStore := store.NewRedis(redis_client.Client, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	journeyCache = cache.NewChain(
+		cache.New(ristrettoStore),
+		cache.New(redisStore),
+	)
 
 	// Mongo indexes
 	//TODO: Doesnt really make sense for this package to be managing indexes
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},

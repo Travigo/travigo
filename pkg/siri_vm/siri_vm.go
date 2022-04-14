@@ -18,7 +18,7 @@ import (
 const numConsumers = 5
 
 var identificationQueue chan *SiriVMVehicleIdentificationEvent = make(chan *SiriVMVehicleIdentificationEvent, 2000)
-var identificationCache *cache.Cache
+var identificationCache *cache.ChainCache
 
 type SiriVM struct {
 	ServiceDelivery struct {
@@ -42,32 +42,29 @@ type SiriVMVehicleIdentificationEvent struct {
 	ResponseTime    time.Time
 }
 
-func StartIdentificationConsumers(cacheMode string) {
+func StartIdentificationConsumers() {
 	// Create cache
 
-	if cacheMode == "local" {
-		ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-			NumCounters: 10000,
-			MaxCost:     50000000,
-			BufferItems: 64,
-		})
-		if err != nil {
-			panic(err)
-		}
-		ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-			Expiration: 30 * time.Minute,
-		})
-
-		identificationCache = cache.New(ristrettoStore)
-	} else if cacheMode == "redis" {
-		redisStore := store.NewRedis(redis_client.Client, &store.Options{
-			Expiration: 30 * time.Minute,
-		})
-
-		identificationCache = cache.New(redisStore)
-	} else {
-		log.Fatal().Str("cacheMode", cacheMode).Msg("Unknown cache mode")
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 10000,
+		MaxCost:     50000000,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
 	}
+	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	redisStore := store.NewRedis(redis_client.Client, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	identificationCache = cache.NewChain(
+		cache.New(ristrettoStore),
+		cache.New(redisStore),
+	)
 
 	// Start the background consumers
 	log.Info().Msgf("Starting identification consumers")
