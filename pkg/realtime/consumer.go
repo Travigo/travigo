@@ -82,7 +82,7 @@ func startRealtimeConsumer(id int) {
 }
 
 func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) error {
-	var journey *ctdf.Journey
+	var journey *CacheJourney
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
 	if cachedJourney == nil || cachedJourney == "" {
@@ -95,7 +95,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	} else {
 		switch cachedJourney.(type) {
 		default:
-			journey = cachedJourney.(*ctdf.Journey)
+			journey = cachedJourney.(*CacheJourney)
 		case string:
 			json.Unmarshal([]byte(cachedJourney.(string)), &journey)
 		}
