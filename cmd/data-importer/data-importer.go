@@ -14,11 +14,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/bods"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/naptan"
-	"github.com/britbus/britbus/pkg/realtime"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/britbus/britbus/pkg/transxchange"
@@ -34,6 +34,8 @@ import (
 
 	_ "time/tzdata"
 )
+
+var realtimeQueue rmq.Queue
 
 type DataFile struct {
 	Name   string
@@ -169,7 +171,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 			return err
 		}
 
-		siriVMdoc.SubmitToProcessQueue(&ctdf.DataSource{
+		siriVMdoc.SubmitToProcessQueue(realtimeQueue, &ctdf.DataSource{
 			Provider: "Department of Transport", // This may not always be true
 			Dataset:  dataFile.Name,
 		})
@@ -241,8 +243,12 @@ func main() {
 						if err := redis_client.Connect(); err != nil {
 							log.Fatal().Err(err).Msg("Failed to connect to Redis")
 						}
-						realtime.StartConsumers()
-						go siri_vm.StartIdentificationConsumers()
+
+						var err error
+						realtimeQueue, err = redis_client.QueueConnection.OpenQueue("realtime-queue")
+						if err != nil {
+							log.Fatal().Err(err).Msg("Failed to start siri-vm redis queue")
+						}
 
 						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL

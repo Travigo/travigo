@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/redis_client"
+	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
@@ -20,17 +22,35 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
-const numConsumers = 10
-
-var vehicleLocationEventQueue chan *ctdf.VehicleLocationEvent = make(chan *ctdf.VehicleLocationEvent, 2000)
 var journeyCache *cache.ChainCache
+var identificationCache *cache.ChainCache
 
-func StartConsumers() {
-	// Create Cache
-
+func CreateIdentificationCache() {
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 8000,
-		MaxCost:     10000000,
+		NumCounters: 10000,
+		MaxCost:     50000000,
+		BufferItems: 64,
+	})
+	if err != nil {
+		panic(err)
+	}
+	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	redisStore := store.NewRedis(redis_client.Client, &store.Options{
+		Expiration: 30 * time.Minute,
+	})
+
+	identificationCache = cache.NewChain(
+		cache.New(ristrettoStore),
+		cache.New(redisStore),
+	)
+}
+func CreateJourneyCache() {
+	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 6000,
+		MaxCost:     5000000,
 		BufferItems: 64,
 	})
 	if err != nil {
@@ -48,11 +68,16 @@ func StartConsumers() {
 		cache.New(ristrettoStore),
 		cache.New(redisStore),
 	)
+}
+func StartConsumers() {
+	// Create Cache
+	CreateIdentificationCache()
+	CreateJourneyCache()
 
 	// Mongo indexes
 	//TODO: Doesnt really make sense for this package to be managing indexes
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
@@ -64,20 +89,126 @@ func StartConsumers() {
 	// Start the background consumers
 	log.Info().Msgf("Starting realtime consumers")
 
-	for i := 0; i < numConsumers; i++ {
-		go startRealtimeConsumer(i)
+	// for i := 0; i < numConsumers; i++ {
+	// 	go startRealtimeConsumer(i)
+	// }
+	queue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
+	if err != nil {
+		panic(err)
+	}
+	if err := queue.StartConsuming(50, 100*time.Millisecond); err != nil {
+		panic(err)
+	}
+	if _, err := queue.AddBatchConsumer("realtime-queue", 20, 1*time.Second, NewBatchConsumer()); err != nil {
+		panic(err)
 	}
 }
 
-func AddToQueue(vehicleLocationEvent *ctdf.VehicleLocationEvent) {
-	vehicleLocationEventQueue <- vehicleLocationEvent
+type BatchConsumer struct {
 }
 
-func startRealtimeConsumer(id int) {
-	log.Info().Msgf("Realtime consumer %d started", id)
+func NewBatchConsumer() *BatchConsumer {
+	return &BatchConsumer{}
+}
 
-	for vehicleLocationEvent := range vehicleLocationEventQueue {
-		updateRealtimeJourney(vehicleLocationEvent)
+func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
+	payloads := batch.Payloads()
+
+	for _, payload := range payloads {
+		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
+		if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
+			if errors := batch.Reject(); err != nil {
+				for _, err := range errors {
+					log.Error().Err(err).Msg("Failed to reject realtime event")
+				}
+			}
+		}
+
+		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
+
+		if vehicleLocationEvent != nil {
+			updateRealtimeJourney(vehicleLocationEvent)
+		}
+	}
+
+	if errors := batch.Ack(); len(errors) > 0 {
+		for _, err := range errors {
+			log.Error().Err(err).Msg("Failed to consume realtime event")
+		}
+	}
+}
+
+func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *ctdf.VehicleLocationEvent {
+	vehicle := siriVMVehicleIdentificationEvent.VehicleActivity
+	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
+
+	if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
+		vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
+	}
+
+	localJourneyID := fmt.Sprintf(
+		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
+		fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+		vehicle.MonitoredVehicleJourney.LineRef,
+		fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+		vehicleJourneyRef,
+	)
+
+	var journeyID string
+
+	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
+
+	if cachedJourneyMapping == nil || cachedJourneyMapping == "" {
+		journey, err := ctdf.IdentifyJourney(map[string]string{
+			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+			"VehicleJourneyRef":        vehicleJourneyRef,
+			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+		})
+
+		if err != nil {
+			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+
+			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
+			identificationCache.Set(context.Background(), localJourneyID, "N/A", &store.Options{
+				Expiration: 30 * time.Minute,
+			})
+			return nil
+		}
+		journeyID = journey.PrimaryIdentifier
+
+		identificationCache.Set(context.Background(), localJourneyID, journeyID, nil)
+	} else if cachedJourneyMapping == "N/A" {
+		return nil
+	} else {
+		journeyID = cachedJourneyMapping.(string)
+	}
+
+	timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
+	if timeframe == "" {
+		timeframe = time.Now().Format("2006-01-02")
+	}
+
+	return &ctdf.VehicleLocationEvent{
+		JourneyRef:       journeyID,
+		Timeframe:        timeframe,
+		CreationDateTime: siriVMVehicleIdentificationEvent.ResponseTime,
+
+		DataSource: siriVMVehicleIdentificationEvent.DataSource,
+
+		VehicleLocation: ctdf.Location{
+			Type: "Point",
+			Coordinates: []float64{
+				vehicle.MonitoredVehicleJourney.VehicleLocation.Longitude,
+				vehicle.MonitoredVehicleJourney.VehicleLocation.Latitude,
+			},
+		},
+		VehicleBearing: vehicle.MonitoredVehicleJourney.Bearing,
 	}
 }
 

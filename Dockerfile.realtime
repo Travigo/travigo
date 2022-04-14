@@ -1,0 +1,11 @@
+FROM ubuntu:latest
+
+RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
+
+WORKDIR /
+
+COPY ./data-importer /data-importer
+
+RUN chmod +x /data-importer
+
+ENTRYPOINT ["/data-importer"]

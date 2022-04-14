@@ -1,0 +1,67 @@
+package main
+
+import (
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/realtime"
+	"github.com/britbus/britbus/pkg/redis_client"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/urfave/cli/v2"
+
+	_ "time/tzdata"
+)
+
+func main() {
+	// Overwrite internal timezone location to UK time
+	loc, _ := time.LoadLocation("Europe/London")
+	time.Local = loc
+
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
+	app := &cli.App{
+		Name: "realtime",
+		Commands: []*cli.Command{
+			{
+				Name:  "run",
+				Usage: "run an instance of the realtime engine",
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to database")
+					}
+					if err := redis_client.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to redis")
+					}
+
+					ctdf.LoadSpecialDayCache()
+
+					realtime.StartConsumers()
+
+					signals := make(chan os.Signal, 1)
+					signal.Notify(signals, syscall.SIGINT)
+					defer signal.Stop(signals)
+
+					<-signals // wait for signal
+					go func() {
+						<-signals // hard exit on second signal (in case shutdown gets stuck)
+						os.Exit(1)
+					}()
+
+					<-redis_client.QueueConnection.StopAllConsuming() // wait for all Consume() calls to finish
+
+					return nil
+				},
+			},
+		},
+	}
+
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal().Err(err).Send()
+	}
+}

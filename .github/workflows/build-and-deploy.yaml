@@ -31,6 +31,23 @@ jobs:
         name: data-importer
         path: ./data-importer
 
+  realtime-build:
+    name: Build realtime
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.18
+    - name: Build
+      run: go build -v ./cmd/realtime
+    - name: Upload realtime
+      uses: actions/upload-artifact@v2
+      with:
+        name: realtime
+        path: ./realtime
+
   web-api-build:
     name: Build web-api
     runs-on: ubuntu-latest
@@ -90,6 +107,52 @@ jobs:
         with:
           context: .
           file: Dockerfile.data-importer
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  realtime-docker:
+    name: Package realtime Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    needs:
+      - realtime-build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: realtime
+          path: ./
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/realtime
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short
+            type=sha,format=long
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          file: Dockerfile.realtime
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -178,6 +241,45 @@ jobs:
     - name: Helm upgrade
       run: |-
         helm upgrade -i britbus-data-importer ./charts/britbus-data-importer --set image.tag=sha-${{ github.sha }}
+
+  realtime-deploy-helm:
+    if: github.ref == 'refs/heads/main'
+  
+    name: Deploy realtime to GCP
+    runs-on: ubuntu-latest
+    environment: production
+
+    needs: realtime-docker
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    # Configure Workload Identity Federation and generate an access token.
+    - id: 'auth'
+      name: 'Authenticate to Google Cloud'
+      uses: 'google-github-actions/auth@v0'
+      with:
+        token_format: 'access_token'
+        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
+        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
+
+    - name: Helm tool installer
+      uses: Azure/setup-helm@v2.0
+  
+    - name: Set up GKE credentials
+      uses: google-github-actions/get-gke-credentials@v0
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
+
+    - name: Helm upgrade
+      run: |-
+        helm upgrade -i britbus-realtime ./charts/britbus-realtime--set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
