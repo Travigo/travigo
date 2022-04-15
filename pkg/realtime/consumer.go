@@ -141,7 +141,9 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			// startTime := time.Now()
 
 			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
-			locationEventOperations = append(locationEventOperations, writeModel)
+			if writeModel != nil {
+				locationEventOperations = append(locationEventOperations, writeModel)
+			}
 
 			// executionDuration := time.Since(startTime)
 			// log.Info().Msgf("Update generation took %s", executionDuration.String())
