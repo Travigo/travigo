@@ -8,4 +8,6 @@ COPY ./realtime /realtime
 
 RUN chmod +x /realtime
 
+EXPOSE 3333
+
 ENTRYPOINT ["/realtime"]

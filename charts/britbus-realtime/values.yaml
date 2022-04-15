@@ -17,6 +17,10 @@ image:
   pullPolicy: Always
   tag: main
 
+service:
+  type: ClusterIP
+  port: 3333
+
 ingress:
   enabled: true
   className: ""
