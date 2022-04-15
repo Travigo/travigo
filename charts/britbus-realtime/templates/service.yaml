@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "britbus-realtime.fullname" . }}
+  labels:
+    {{- include "britbus-realtime.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3333
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "britbus-realtime.selectorLabels" . | nindent 4 }}
