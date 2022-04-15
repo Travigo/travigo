@@ -12,7 +12,6 @@ import (
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
-	"github.com/dgraph-io/ristretto"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/rs/zerolog/log"
@@ -22,54 +21,24 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
-var journeyCache *cache.ChainCache
-var identificationCache *cache.ChainCache
+var journeyCache *cache.Cache
+var identificationCache *cache.Cache
 
 const numConsumers = 5
 
 func CreateIdentificationCache() {
-	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 10000,
-		MaxCost:     50000000,
-		BufferItems: 64,
-	})
-	if err != nil {
-		panic(err)
-	}
-	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-		Expiration: 30 * time.Minute,
-	})
-
 	redisStore := store.NewRedis(redis_client.Client, &store.Options{
 		Expiration: 30 * time.Minute,
 	})
 
-	identificationCache = cache.NewChain(
-		cache.New(ristrettoStore),
-		cache.New(redisStore),
-	)
+	identificationCache = cache.New(redisStore)
 }
 func CreateJourneyCache() {
-	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
-		NumCounters: 6000,
-		MaxCost:     5000000,
-		BufferItems: 64,
-	})
-	if err != nil {
-		panic(err)
-	}
-	ristrettoStore := store.NewRistretto(ristrettoCache, &store.Options{
-		Expiration: 30 * time.Minute,
-	})
-
 	redisStore := store.NewRedis(redis_client.Client, &store.Options{
 		Expiration: 30 * time.Minute,
 	})
 
-	journeyCache = cache.NewChain(
-		cache.New(ristrettoStore),
-		cache.New(redisStore),
-	)
+	journeyCache = cache.New(redisStore)
 }
 func StartConsumers() {
 	// Create Cache
