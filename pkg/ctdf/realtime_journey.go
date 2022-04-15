@@ -45,7 +45,16 @@ func (r *RealtimeJourney) GetJourney() {
 }
 
 func (r *RealtimeJourney) IsActive() bool {
-	return (time.Now().Sub(r.ModificationDateTime)).Minutes() < 10
+	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > 10
+
+	// lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
+	// // now := time.Now()
+	// // nearEndTime := lastPathItem.DestinationArrivalTime.Sub(now)
+
+	// pretty.Println(lastPathItem.DestinationStop.Location)
+	// // nearEndStopLocation := r.VehicleLocation.Distance(lastPathItem.DestinationStop.Location)
+
+	return !timedOut
 }
 
 type RealtimeJourneyStops struct {

@@ -73,11 +73,13 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		realtimeJourney.GetReferences()
-		realtimeJourney.Journey.GetService()
-		realtimeJourney.Journey.GetOperator()
+		if realtimeJourney.IsActive() {
+			realtimeJourney.GetReferences()
+			realtimeJourney.Journey.GetService()
+			realtimeJourney.Journey.GetOperator()
 
-		realtimeJourneys = append(realtimeJourneys, newRealtimeJourneyMinimised(realtimeJourney))
+			realtimeJourneys = append(realtimeJourneys, newRealtimeJourneyMinimised(realtimeJourney))
+		}
 	}
 
 	c.JSON(realtimeJourneys)

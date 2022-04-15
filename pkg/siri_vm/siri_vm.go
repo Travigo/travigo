@@ -37,13 +37,15 @@ type SiriVMVehicleIdentificationEvent struct {
 
 func (s *SiriVM) SubmitToProcessQueue(queue rmq.Queue, datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "siri-vm"
-	log.Info().Msgf("Submitting the %d activity records in %s to processing queue", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
+	log.Info().Msgf("Retrieved %d activity records from Siri-VM response %s", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
 
 	currentTime := time.Now()
 
 	// Offset the response to the correct current timezone
 	responseTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeWithFractionalFormat, s.ServiceDelivery.ResponseTimestamp)
 	responseTime := responseTimeNoOffset.In(currentTime.Location())
+
+	submittedRecords := 0
 
 	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
 		recordedAtTime, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
@@ -66,5 +68,9 @@ func (s *SiriVM) SubmitToProcessQueue(queue rmq.Queue, datasource *ctdf.DataSour
 		identificationEventJson, _ := json.Marshal(identificationEvent)
 
 		queue.PublishBytes(identificationEventJson)
+		submittedRecords += 1
 	}
+
+	log.Info().Msgf("Submitted %d activity records from Siri-VM response %s", submittedRecords, s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
+
 }
