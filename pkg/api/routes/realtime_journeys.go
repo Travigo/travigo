@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -15,6 +16,36 @@ func RealtimeJourneysRouter(router fiber.Router) {
 	router.Get("/:identifier", getRealtimeJourney)
 }
 
+type realtimeJourneyMinimised struct {
+	Journey struct {
+		PrimaryIdentifier string
+
+		Service *struct {
+			// PrimaryIdentifier string `groups:"basic"`
+			ServiceName string
+		}
+
+		Operator *struct {
+			// PrimaryIdentifier string `groups:"basic"`
+			PrimaryName string
+		}
+
+		DestinationDisplay string
+	}
+
+	VehicleLocation ctdf.Location
+	VehicleBearing  float64
+}
+
+// TODO this should be using Sherrif instead of this dodgy json marhsall unmarshall
+func newRealtimeJourneyMinimised(realtimeJourney *ctdf.RealtimeJourney) realtimeJourneyMinimised {
+	realtimeJourneyMinimised := realtimeJourneyMinimised{}
+	bytes, _ := json.Marshal(realtimeJourney)
+	json.Unmarshal(bytes, &realtimeJourneyMinimised)
+
+	return realtimeJourneyMinimised
+}
+
 func listRealtimeJourney(c *fiber.Ctx) error {
 	boundsQuery, err := getBoundsQuery(c)
 	if err != nil {
@@ -24,7 +55,7 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 		})
 	}
 
-	realtimeJourneys := []ctdf.RealtimeJourney{}
+	realtimeJourneys := []realtimeJourneyMinimised{}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
@@ -46,7 +77,7 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 		realtimeJourney.Journey.GetService()
 		realtimeJourney.Journey.GetOperator()
 
-		realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
+		realtimeJourneys = append(realtimeJourneys, newRealtimeJourneyMinimised(realtimeJourney))
 	}
 
 	c.JSON(realtimeJourneys)
