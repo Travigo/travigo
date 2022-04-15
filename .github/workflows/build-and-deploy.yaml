@@ -279,7 +279,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i britbus-realtime ./charts/britbus-realtime--set image.tag=sha-${{ github.sha }}
+        helm upgrade -i britbus-realtime ./charts/britbus-realtime --set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'

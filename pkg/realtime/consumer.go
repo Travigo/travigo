@@ -25,6 +25,8 @@ import (
 var journeyCache *cache.ChainCache
 var identificationCache *cache.ChainCache
 
+const numConsumers = 5
+
 func CreateIdentificationCache() {
 	ristrettoCache, err := ristretto.NewCache(&ristretto.Config{
 		NumCounters: 10000,
@@ -87,11 +89,15 @@ func StartConsumers() {
 	}
 
 	// Start the background consumers
-	log.Info().Msgf("Starting realtime consumers")
+	log.Info().Msg("Starting realtime consumers")
 
-	// for i := 0; i < numConsumers; i++ {
-	// 	go startRealtimeConsumer(i)
-	// }
+	for i := 0; i < numConsumers; i++ {
+		go startRealtimeConsumer(i)
+	}
+}
+func startRealtimeConsumer(id int) {
+	log.Info().Msgf("Starting realtime consumer %d", id)
+
 	queue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
 	if err != nil {
 		panic(err)
@@ -99,16 +105,17 @@ func StartConsumers() {
 	if err := queue.StartConsuming(50, 100*time.Millisecond); err != nil {
 		panic(err)
 	}
-	if _, err := queue.AddBatchConsumer("realtime-queue", 20, 1*time.Second, NewBatchConsumer()); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 40, 1*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }
 
 type BatchConsumer struct {
+	id int
 }
 
-func NewBatchConsumer() *BatchConsumer {
-	return &BatchConsumer{}
+func NewBatchConsumer(id int) *BatchConsumer {
+	return &BatchConsumer{id: id}
 }
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
