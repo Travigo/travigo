@@ -71,21 +71,24 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		panic(err)
 	}
 
+	journeyIdentificationIndexName := "JourneyIdentificationIndex"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "otheridentifiers.RealtimeJourneyCode", Value: bsonx.Int32(1)}},
-		},
-		{
 			Keys: bsonx.Doc{{Key: "serviceref", Value: bsonx.Int32(1)}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "path.originstopref", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "path.destinationstopref", Value: bsonx.Int32(1)}},
+			Options: &options.IndexOptions{
+				Name: &journeyIdentificationIndexName,
+			},
+			Keys: bson.D{
+				{Key: "serviceref", Value: 1},
+				{Key: "otheridentifiers.RealtimeJourneyCode", Value: 1},
+				{Key: "path.originstopref", Value: 1},
+				{Key: "path.destinationstopref", Value: 1},
+			},
 		},
 	}, options.CreateIndexes())
 	if err != nil {

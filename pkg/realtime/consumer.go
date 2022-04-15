@@ -102,10 +102,10 @@ func startRealtimeConsumer(id int) {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(50, 100*time.Millisecond); err != nil {
+	if err := queue.StartConsuming(200, 100*time.Millisecond); err != nil {
 		panic(err)
 	}
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 40, 1*time.Second, NewBatchConsumer(id)); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 100, 1*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }
@@ -120,6 +120,7 @@ func NewBatchConsumer(id int) *BatchConsumer {
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
+	locationEventOperations := []mongo.WriteModel{}
 
 	for _, payload := range payloads {
 		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
@@ -131,17 +132,33 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		startTime := time.Now()
+		// startTime := time.Now()
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
-		executionDuration := time.Since(startTime)
-		log.Info().Msgf("Identification took %s", executionDuration.String())
+		// executionDuration := time.Since(startTime)
+		// log.Info().Msgf("Identification took %s", executionDuration.String())
 
 		if vehicleLocationEvent != nil {
-			startTime := time.Now()
-			updateRealtimeJourney(vehicleLocationEvent)
-			executionDuration := time.Since(startTime)
-			log.Info().Msgf("Update took %s", executionDuration.String())
+			// startTime := time.Now()
+
+			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
+			locationEventOperations = append(locationEventOperations, writeModel)
+
+			// executionDuration := time.Since(startTime)
+			// log.Info().Msgf("Update generation took %s", executionDuration.String())
 		}
+	}
+
+	if len(locationEventOperations) > 0 {
+		// startTime := time.Now()
+
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
+		}
+
+		// executionDuration := time.Since(startTime)
+		// log.Info().Msgf("Bulk update took %s", executionDuration.String())
 	}
 
 	if errors := batch.Ack(); len(errors) > 0 {
@@ -225,7 +242,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	}
 }
 
-func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) error {
+func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mongo.WriteModel, error) {
 	var journey *CacheJourney
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
@@ -285,7 +302,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 
 	if closestDistanceJourneyPath == nil {
 		// https://github.com/BritBus/britbus/issues/35
-		return errors.New("Could not identify closet journey path")
+		return nil, errors.New("Could not identify closet journey path")
 	}
 
 	// Get the arrival & departure times with date of the journey
@@ -378,8 +395,11 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) erro
 	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
 	realtimeJourney.Stops = estimatedJourneyStops
 
-	opts := options.Update().SetUpsert(true)
-	realtimeJourneysCollection.UpdateOne(context.Background(), searchQuery, bson.M{"$set": realtimeJourney}, opts)
+	bsonRep, _ := bson.Marshal(realtimeJourney)
+	updateModel := mongo.NewReplaceOneModel()
+	updateModel.SetFilter(searchQuery)
+	updateModel.SetReplacement(bsonRep)
+	updateModel.SetUpsert(true)
 
-	return nil
+	return updateModel, nil
 }
