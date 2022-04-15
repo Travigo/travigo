@@ -131,10 +131,16 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
+		startTime := time.Now()
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
+		executionDuration := time.Since(startTime)
+		log.Info().Msgf("Identification took %s", executionDuration.String())
 
 		if vehicleLocationEvent != nil {
+			startTime := time.Now()
 			updateRealtimeJourney(vehicleLocationEvent)
+			executionDuration := time.Since(startTime)
+			log.Info().Msgf("Update took %s", executionDuration.String())
 		}
 	}
 
