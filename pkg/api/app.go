@@ -2,10 +2,13 @@ package api
 
 import (
 	"github.com/britbus/britbus/pkg/api/routes"
+	"github.com/britbus/britbus/pkg/api/stats"
 	"github.com/gofiber/fiber/v2"
 )
 
 func SetupServer(listen string) {
+	go stats.UpdateRecordsStats()
+
 	webApp := fiber.New()
 
 	webApp.Get("version", routes.APIVersion)
