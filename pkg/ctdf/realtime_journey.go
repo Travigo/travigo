@@ -47,14 +47,36 @@ func (r *RealtimeJourney) GetJourney() {
 func (r *RealtimeJourney) IsActive() bool {
 	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > 10
 
-	// lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
-	// // now := time.Now()
-	// // nearEndTime := lastPathItem.DestinationArrivalTime.Sub(now)
+	if timedOut {
+		return false
+	}
 
-	// pretty.Println(lastPathItem.DestinationStop.Location)
-	// // nearEndStopLocation := r.VehicleLocation.Distance(lastPathItem.DestinationStop.Location)
+	if r.Journey == nil {
+		r.GetJourney()
+	}
 
-	return !timedOut
+	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
+
+	if lastPathItem.DestinationStop == nil {
+		lastPathItem.GetDestinationStop()
+
+		// If we still cant find it then mark as in-active
+		if lastPathItem.DestinationStop == nil {
+			return false
+		}
+	}
+
+	now := time.Now()
+	lastPathItemArrivalDateless := lastPathItem.DestinationArrivalTime
+	lastPathItemArrival := time.Date(
+		now.Year(), now.Month(), now.Day(), lastPathItemArrivalDateless.Hour(), lastPathItemArrivalDateless.Minute(), lastPathItemArrivalDateless.Second(), lastPathItemArrivalDateless.Nanosecond(), now.Location(),
+	)
+	timeFromlastPathItemArrival := lastPathItemArrival.Sub(now).Minutes()
+
+	distanceEndStopLocation := r.VehicleLocation.Distance(lastPathItem.DestinationStop.Location)
+
+	// If we're past the last path item arrival time & vehicle location is less than 150m from it then class journey as in-active
+	return !((timeFromlastPathItemArrival < 0) && (distanceEndStopLocation < 150))
 }
 
 type RealtimeJourneyStops struct {

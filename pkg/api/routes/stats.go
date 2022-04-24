@@ -23,10 +23,20 @@ func Stats(c *fiber.Ctx) error {
 
 	numberRealtimeJourneys, _ := realtimeJourneysCollection.CountDocuments(context.Background(), bson.D{})
 
+	var numberActiveRealtimeJourneys int64
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-	numberActiveRealtimeJourneys, _ := realtimeJourneysCollection.CountDocuments(context.Background(), bson.M{
+	activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
 		"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
 	})
+	for activeRealtimeJourneys.Next(context.TODO()) {
+		var realtimeJourney *ctdf.RealtimeJourney
+		activeRealtimeJourneys.Decode(&realtimeJourney)
+
+		if realtimeJourney.IsActive() {
+			numberActiveRealtimeJourneys += 1
+		}
+	}
+
 	numberHistoricRealtimeJourneys := numberRealtimeJourneys - numberActiveRealtimeJourneys
 
 	return c.JSON(fiber.Map{
