@@ -6,28 +6,11 @@ import (
 
 	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/rs/zerolog/log"
 )
 
 const numConsumers = 5
 
 var identificationQueue chan *SiriVMVehicleIdentificationEvent = make(chan *SiriVMVehicleIdentificationEvent, 2000)
-
-type SiriVM struct {
-	ServiceDelivery struct {
-		ResponseTimestamp string
-		ProducerRef       string
-
-		VehicleMonitoringDelivery struct {
-			ResponseTimestamp     string
-			RequestMessageRef     string
-			ValidUntil            string
-			ShortestPossibleCycle string
-
-			VehicleActivity []*VehicleActivity
-		}
-	}
-}
 
 type SiriVMVehicleIdentificationEvent struct {
 	VehicleActivity *VehicleActivity
@@ -35,42 +18,31 @@ type SiriVMVehicleIdentificationEvent struct {
 	ResponseTime    time.Time
 }
 
-func (s *SiriVM) SubmitToProcessQueue(queue rmq.Queue, datasource *ctdf.DataSource) {
+func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource *ctdf.DataSource) bool {
 	datasource.OriginalFormat = "siri-vm"
-	log.Info().Msgf("Retrieved %d activity records from Siri-VM response %s", len(s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity), s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
 
 	currentTime := time.Now()
 
-	// Offset the response to the correct current timezone
-	responseTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeWithFractionalFormat, s.ServiceDelivery.ResponseTimestamp)
-	responseTime := responseTimeNoOffset.In(currentTime.Location())
+	recordedAtTime, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
 
-	submittedRecords := 0
+	if err == nil {
+		recordedAtDifference := currentTime.Sub(recordedAtTime)
 
-	for _, vehicle := range s.ServiceDelivery.VehicleMonitoringDelivery.VehicleActivity {
-		recordedAtTime, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
-
-		if err == nil {
-			recordedAtDifference := currentTime.Sub(recordedAtTime)
-
-			// Skip any records that haven't been updated in over 20 minutes
-			if recordedAtDifference.Minutes() > 20 {
-				continue
-			}
+		// Skip any records that haven't been updated in over 20 minutes
+		if recordedAtDifference.Minutes() > 20 {
+			return false
 		}
-
-		identificationEvent := &SiriVMVehicleIdentificationEvent{
-			VehicleActivity: vehicle,
-			ResponseTime:    responseTime,
-			DataSource:      datasource,
-		}
-
-		identificationEventJson, _ := json.Marshal(identificationEvent)
-
-		queue.PublishBytes(identificationEventJson)
-		submittedRecords += 1
 	}
 
-	log.Info().Msgf("Submitted %d activity records from Siri-VM response %s", submittedRecords, s.ServiceDelivery.VehicleMonitoringDelivery.RequestMessageRef)
+	identificationEvent := &SiriVMVehicleIdentificationEvent{
+		VehicleActivity: vehicle,
+		ResponseTime:    currentTime,
+		DataSource:      datasource,
+	}
 
+	identificationEventJson, _ := json.Marshal(identificationEvent)
+
+	queue.PublishBytes(identificationEventJson)
+
+	return true
 }

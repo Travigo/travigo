@@ -163,18 +163,15 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 		})
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
-		ctdf.LoadSpecialDayCache()
 
-		siriVMdoc, err := siri_vm.ParseXMLFile(dataFile.Reader)
+		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &ctdf.DataSource{
+			Provider: "Department of Transport", // This may not always be true
+			Dataset:  dataFile.Name,
+		})
 
 		if err != nil {
 			return err
 		}
-
-		siriVMdoc.SubmitToProcessQueue(realtimeQueue, &ctdf.DataSource{
-			Provider: "Department of Transport", // This may not always be true
-			Dataset:  dataFile.Name,
-		})
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
@@ -195,6 +192,8 @@ func main() {
 
 	// Setup the notifications client
 	notify_client.Setup()
+
+	ctdf.LoadSpecialDayCache()
 
 	app := &cli.App{
 		Name:        "data-importer",
