@@ -2,6 +2,8 @@ package routes
 
 import (
 	"context"
+	"sort"
+	"strings"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -73,7 +75,16 @@ func listOperators(c *fiber.Ctx) error {
 				operatorInRegionCheck[region][operator.PrimaryIdentifier] = true
 			}
 		}
+	}
 
+	// Alphabetically sort operators by name
+	// Code is a bit vom
+	for _, operatorRegion := range regionOperators {
+		sort.SliceStable(operatorRegion.Operators, func(i, j int) bool {
+			return strings.Compare(
+				operatorRegion.Operators[i].(map[string]interface{})["PrimaryName"].(string),
+				operatorRegion.Operators[j].(map[string]interface{})["PrimaryName"].(string)) < 0
+		})
 	}
 
 	return c.JSON(regionOperators)
