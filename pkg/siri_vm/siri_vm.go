@@ -94,7 +94,7 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 
 	if inQueue > 2*submittedRecords {
 		log.Info().Int64("queueSize", inQueue).Msgf("Queue size too large, sleeping")
-		time.Sleep(5 * time.Minute)
+		time.Sleep(2 * time.Minute)
 	}
 
 	return nil

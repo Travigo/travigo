@@ -26,6 +26,15 @@ var identificationCache *cache.Cache
 
 const numConsumers = 5
 
+type localJourneyIDMap struct {
+	JourneyID   string
+	LastUpdated string
+}
+
+func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
+	return json.Marshal(j)
+}
+
 func CreateIdentificationCache() {
 	redisStore := store.NewRedis(redis_client.Client, &store.Options{
 		Expiration: 30 * time.Minute,
@@ -183,11 +192,22 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		}
 		journeyID = journey.PrimaryIdentifier
 
-		identificationCache.Set(context.Background(), localJourneyID, journeyID, nil)
+		identificationCache.Set(context.Background(), localJourneyID, localJourneyIDMap{
+			JourneyID:   journeyID,
+			LastUpdated: vehicle.RecordedAtTime,
+		}, nil)
 	} else if cachedJourneyMapping == "N/A" {
 		return nil
 	} else {
-		journeyID = cachedJourneyMapping.(string)
+		var journeyMap localJourneyIDMap
+		json.Unmarshal([]byte(cachedJourneyMapping.(string)), &journeyMap)
+
+		// skip this journey if hasnt changed
+		if journeyMap.LastUpdated == vehicle.RecordedAtTime {
+			return nil
+		}
+
+		journeyID = journeyMap.JourneyID
 	}
 
 	timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
