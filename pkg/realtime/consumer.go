@@ -3,6 +3,7 @@ package realtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -112,11 +113,9 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
 
 		if vehicleLocationEvent != nil {
-			writeModel, err := updateRealtimeJourney(vehicleLocationEvent)
+			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
-			} else {
-				log.Error().Err(err).Msg("failed to generate realtime journey update")
 			}
 		}
 	}
@@ -279,6 +278,11 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 		closestDistance = 999999999999.0
 		for i, journeyPathItem := range journey.Path {
 			journeyPathItem.GetDestinationStop()
+
+			if journeyPathItem.DestinationStop == nil {
+				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
+			}
+
 			distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
 
 			if distance < closestDistance {
@@ -289,10 +293,16 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 		}
 
 		if closestDistanceJourneyPathIndex == 1 {
-			// TODO this seems a bit hacky but I dont think we care much if we're on the find item
+			// TODO this seems a bit hacky but I dont think we care much if we're on the first item
 			closestDistanceJourneyPathPercentComplete = 0.5
 		} else {
 			previousJourneyPath := journey.Path[len(journey.Path)-1]
+			previousJourneyPath.GetDestinationStop()
+
+			if previousJourneyPath.DestinationStop == nil {
+				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
+			}
+
 			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
 
 			closestDistanceJourneyPathPercentComplete = (1 + (float64(previousJourneyPathDistance-closestDistance) / float64(previousJourneyPathDistance+closestDistance))) / 2
