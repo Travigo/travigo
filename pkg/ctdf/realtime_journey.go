@@ -34,7 +34,17 @@ type RealtimeJourney struct {
 	NextStopDeparture time.Time `groups:"basic"`
 
 	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+
+	Reliability RealtimeJourneyReliabilityType `groups:"basic"`
 }
+
+type RealtimeJourneyReliabilityType string
+
+const (
+	RealtimeJourneyReliabilityExternalProvided     RealtimeJourneyReliabilityType = "ExternalProvided"
+	RealtimeJourneyReliabilityLocationWithTrack                                   = "LocationWithTrack"
+	RealtimeJourneyReliabilityLocationWithoutTrack                                = "LocationWithoutTrack"
+)
 
 func (r *RealtimeJourney) GetReferences() {
 	r.GetJourney()

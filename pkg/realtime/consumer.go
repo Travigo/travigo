@@ -3,7 +3,6 @@ package realtime
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -110,35 +109,24 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		// startTime := time.Now()
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
-		// executionDuration := time.Since(startTime)
-		// log.Info().Msgf("Identification took %s", executionDuration.String())
 
 		if vehicleLocationEvent != nil {
-			// startTime := time.Now()
-
-			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
+			writeModel, err := updateRealtimeJourney(vehicleLocationEvent)
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
+			} else {
+				log.Error().Err(err).Msg("failed to generate realtime journey update")
 			}
-
-			// executionDuration := time.Since(startTime)
-			// log.Info().Msgf("Update generation took %s", executionDuration.String())
 		}
 	}
 
 	if len(locationEventOperations) > 0 {
-		// startTime := time.Now()
-
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
-
-		// executionDuration := time.Since(startTime)
-		// log.Info().Msgf("Bulk update took %s", executionDuration.String())
 	}
 
 	if errors := batch.Ack(); len(errors) > 0 {
@@ -235,6 +223,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mongo.WriteModel, error) {
 	var journey *CacheJourney
+	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
 	if cachedJourney == nil || cachedJourney == "" {
@@ -259,6 +248,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 	var closestDistanceJourneyPathIndex int
 	var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
 
+	// Attempt to calculate using closest journey track
 	for i, journeyPathItem := range journey.Path {
 		journeyPathClosestDistance := 99999999999999.0 // TODO do this better
 
@@ -284,16 +274,40 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 		}
 	}
 
+	// If we fail to identify closest journey path item using track use fallback stop location method
+	if closestDistanceJourneyPath == nil {
+		closestDistance = 999999999999.0
+		for i, journeyPathItem := range journey.Path {
+			journeyPathItem.GetDestinationStop()
+			distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
+
+			if distance < closestDistance {
+				closestDistance = distance
+				closestDistanceJourneyPath = journeyPathItem
+				closestDistanceJourneyPathIndex = i
+			}
+		}
+
+		if closestDistanceJourneyPathIndex == 1 {
+			// TODO this seems a bit hacky but I dont think we care much if we're on the find item
+			closestDistanceJourneyPathPercentComplete = 0.5
+		} else {
+			previousJourneyPath := journey.Path[len(journey.Path)-1]
+			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
+
+			closestDistanceJourneyPathPercentComplete = (1 + (float64(previousJourneyPathDistance-closestDistance) / float64(previousJourneyPathDistance+closestDistance))) / 2
+		}
+
+		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
+	} else {
+		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
+	}
+
 	// Calculate new stop arrival times
 	currentTime := time.Now()
 	realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to parse realtime time frame")
-	}
-
-	if closestDistanceJourneyPath == nil {
-		// https://github.com/BritBus/britbus/issues/35
-		return nil, errors.New("Could not identify closet journey path")
 	}
 
 	// Get the arrival & departure times with date of the journey
@@ -376,6 +390,7 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 
 			CreationDateTime: time.Now(),
 			DataSource:       vehicleLocationEvent.DataSource,
+			Reliability:      realtimeJourneyReliability,
 		}
 	}
 
