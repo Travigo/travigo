@@ -38,7 +38,7 @@ type Journey struct {
 
 	Path []*JourneyPathItem `groups:"detailed"`
 
-	RealtimeJourney *RealtimeJourney `groups:"basic"`
+	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
 }
 
 func (j *Journey) GetReferences() {

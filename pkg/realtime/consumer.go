@@ -135,7 +135,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	}
 }
 
-func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *ctdf.VehicleLocationEvent {
+func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *VehicleLocationEvent {
 	vehicle := siriVMVehicleIdentificationEvent.VehicleActivity
 	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
 
@@ -202,7 +202,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		timeframe = time.Now().Format("2006-01-02")
 	}
 
-	return &ctdf.VehicleLocationEvent{
+	vehicleLocationEvent := VehicleLocationEvent{
 		JourneyRef:       journeyID,
 		Timeframe:        timeframe,
 		CreationDateTime: siriVMVehicleIdentificationEvent.ResponseTime,
@@ -218,9 +218,15 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		},
 		VehicleBearing: vehicle.MonitoredVehicleJourney.Bearing,
 	}
+
+	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {
+		vehicleLocationEvent.VehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", vehicle.MonitoredVehicleJourney.OperatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
+	}
+
+	return &vehicleLocationEvent
 }
 
-func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mongo.WriteModel, error) {
+func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
@@ -401,6 +407,8 @@ func updateRealtimeJourney(vehicleLocationEvent *ctdf.VehicleLocationEvent) (mon
 			CreationDateTime: time.Now(),
 			DataSource:       vehicleLocationEvent.DataSource,
 			Reliability:      realtimeJourneyReliability,
+
+			VehicleRef: vehicleLocationEvent.VehicleRef,
 		}
 	}
 

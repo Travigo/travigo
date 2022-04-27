@@ -36,6 +36,8 @@ type RealtimeJourney struct {
 	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 
 	Reliability RealtimeJourneyReliabilityType `groups:"basic"`
+
+	VehicleRef string `groups:"internal"`
 }
 
 type RealtimeJourneyReliabilityType string
