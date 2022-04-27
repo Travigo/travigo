@@ -13,18 +13,29 @@ type RecordsStats struct {
 	Stops                      int64
 	Operators                  int64
 	Services                   int64
-	ActiveRealtimeJourneys     int64
+	ActiveRealtimeJourneys     RecordsStatsActiveRealtimeJourneys
 	HistoricalRealtimeJourneys int64
+}
+type RecordsStatsActiveRealtimeJourneys struct {
+	Current              int64
+	LocationWithTrack    int64
+	LocationWithoutTrack int64
+	ExternalProvided     int64
 }
 
 var CurrentRecordsStats *RecordsStats
 
 func UpdateRecordsStats() {
 	CurrentRecordsStats = &RecordsStats{
-		Stops:                      0,
-		Operators:                  0,
-		Services:                   0,
-		ActiveRealtimeJourneys:     0,
+		Stops:     0,
+		Operators: 0,
+		Services:  0,
+		ActiveRealtimeJourneys: RecordsStatsActiveRealtimeJourneys{
+			Current:              0,
+			LocationWithTrack:    0,
+			LocationWithoutTrack: 0,
+			ExternalProvided:     0,
+		},
 		HistoricalRealtimeJourneys: 0,
 	}
 
@@ -46,6 +57,9 @@ func UpdateRecordsStats() {
 		numberRealtimeJourneys, _ := realtimeJourneysCollection.CountDocuments(context.Background(), bson.D{})
 
 		var numberActiveRealtimeJourneys int64
+		var numberActiveRealtimeJourneysWithTrack int64
+		var numberActiveRealtimeJourneysWithoutTrack int64
+		var numberActiveRealtimeJourneysExternal int64
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
 			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
@@ -56,12 +70,25 @@ func UpdateRecordsStats() {
 
 			if realtimeJourney.IsActive() {
 				numberActiveRealtimeJourneys += 1
+
+				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithTrack {
+					numberActiveRealtimeJourneysWithTrack += 1
+				}
+				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithoutTrack {
+					numberActiveRealtimeJourneysWithoutTrack += 1
+				}
+				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityExternalProvided {
+					numberActiveRealtimeJourneysExternal += 1
+				}
 			}
 		}
 
 		numberHistoricRealtimeJourneys := numberRealtimeJourneys - numberActiveRealtimeJourneys
 
-		CurrentRecordsStats.ActiveRealtimeJourneys = numberActiveRealtimeJourneys
+		CurrentRecordsStats.ActiveRealtimeJourneys.Current = numberActiveRealtimeJourneys
+		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithTrack = numberActiveRealtimeJourneysWithTrack
+		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
+		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.HistoricalRealtimeJourneys = numberHistoricRealtimeJourneys
 
 		time.Sleep(1 * time.Minute)
