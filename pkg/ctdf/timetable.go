@@ -5,18 +5,28 @@ import (
 )
 
 type TimetableRecord struct {
-	Journey            *Journey `groups:"basic"`
-	DestinationDisplay string   `groups:"basic"`
+	Journey            *Journey            `groups:"basic"`
+	DestinationDisplay string              `groups:"basic"`
+	Type               TimetableRecordType `groups:"basic"`
 
 	Time time.Time `groups:"basic"`
 }
 
-func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string) []*TimetableRecord {
+type TimetableRecordType string
+
+const (
+	TimetableRecordTypeScheduled       TimetableRecordType = "Scheduled"
+	TimetableRecordTypeRealtimeTracked                     = "RealtimeTracked"
+	TimetableRecordTypeEstimated                           = "Estimated"
+)
+
+func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*TimetableRecord {
 	timetable := []*TimetableRecord{}
 
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
 		var destinationDisplay string
+		timetableRecordType := TimetableRecordTypeScheduled
 
 		journey.GetRealtimeJourney(realtimeTimeframe)
 
@@ -27,6 +37,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				// Use the realtime estimated stop time based if realtime is available
 				if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
 					refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
+					timetableRecordType = TimetableRecordTypeRealtimeTracked
 				}
 
 				stopDeperatureTime = time.Date(
@@ -51,6 +62,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				Journey:            journey,
 				Time:               stopDeperatureTime,
 				DestinationDisplay: destinationDisplay,
+				Type:               timetableRecordType,
 			})
 		}
 	}
