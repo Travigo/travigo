@@ -46,8 +46,8 @@ The following are in the TODO list
 
 #### Realtime Bus Tracking
 * England
-  * Cambridge (Stagecoach)
-  * York (First Bus)
+  * Currently tracks up to 6000 bus journeys at a time
+  * Large portion of vehicle location events still fail to identify its journey
 
 #### Fares
 * None

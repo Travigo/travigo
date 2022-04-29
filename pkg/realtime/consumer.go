@@ -175,6 +175,24 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			identificationCache.Set(context.Background(), localJourneyID, "N/A", &store.Options{
 				Expiration: 30 * time.Minute,
 			})
+
+			// Temporary https://github.com/BritBus/britbus/issues/43
+			errorCode := "UNKNOWN"
+			switch err.Error() {
+			case "Could not find referenced Operator":
+				errorCode = "NONREF_OPERATOR"
+			case "Could not find related Service":
+				errorCode = "NONREF_SERVICE"
+			case "Could not find related Journeys":
+				errorCode = "NONREF_JOURNEY"
+			case "Could not narrow down to single Journey with departure time. Now zero":
+				errorCode = "JOURNEYNARROW_ZERO"
+			case "Could not narrow down to single Journey by time. Still many remaining":
+				errorCode = "JOURNEYNARROW_MANY"
+			}
+
+			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKTYPE_%s", errorCode))
+			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKOPERATOR_%s", vehicle.MonitoredVehicleJourney.OperatorRef))
 			return nil
 		}
 		journeyID = journey.PrimaryIdentifier
