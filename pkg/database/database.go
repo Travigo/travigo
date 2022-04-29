@@ -14,7 +14,7 @@ type MongoInstance struct {
 	Database *mongo.Database
 }
 
-var mongoDb MongoInstance
+var Instance *MongoInstance
 
 const defaultConnectionString = "mongodb://localhost:27017/"
 const defaultDatabase = "britbus"
@@ -45,14 +45,19 @@ func Connect() error {
 		return err
 	}
 
-	mongoDb = MongoInstance{
+	Instance = &MongoInstance{
 		Client:   client,
 		Database: database,
+	}
+
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
-	return mongoDb.Database.Collection(collectionName)
+	return Instance.Database.Collection(collectionName)
 }
