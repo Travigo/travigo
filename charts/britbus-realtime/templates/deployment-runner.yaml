@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "britbus-realtime.fullname" . }}
+  name: {{ include "britbus-realtime.fullname" . }}-runner
   labels:
     {{- include "britbus-realtime.labels" . | nindent 4 }}
 spec:
@@ -11,6 +11,7 @@ spec:
   selector:
     matchLabels:
       {{- include "britbus-realtime.selectorLabels" . | nindent 6 }}
+      appModule: runner
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -19,6 +20,7 @@ spec:
       {{- end }}
       labels:
         {{- include "britbus-realtime.selectorLabels" . | nindent 8 }}
+        appModule: runner
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

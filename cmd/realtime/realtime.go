@@ -59,6 +59,31 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:  "cleaner",
+				Usage: "run an the queue cleaner for the realtime queue",
+				Action: func(c *cli.Context) error {
+					if err := redis_client.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to redis")
+					}
+
+					realtime.StartCleaner()
+
+					signals := make(chan os.Signal, 1)
+					signal.Notify(signals, syscall.SIGINT)
+					defer signal.Stop(signals)
+
+					<-signals // wait for signal
+					go func() {
+						<-signals // hard exit on second signal (in case shutdown gets stuck)
+						os.Exit(1)
+					}()
+
+					<-redis_client.QueueConnection.StopAllConsuming() // wait for all Consume() calls to finish
+
+					return nil
+				},
+			},
 		},
 	}
 
