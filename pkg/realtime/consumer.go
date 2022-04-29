@@ -189,8 +189,21 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		var journeyMap localJourneyIDMap
 		json.Unmarshal([]byte(cachedJourneyMapping.(string)), &journeyMap)
 
+		cachedLastUpdated, err := time.Parse(ctdf.XSDDateTimeFormat, journeyMap.LastUpdated)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to parse cached journeyMap.LastUpdated time")
+		}
+		vehicleLastUpdated, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to parse vehicle.RecordedAtTime time")
+		}
+
 		// skip this journey if hasnt changed
-		if journeyMap.LastUpdated == vehicle.RecordedAtTime {
+		if vehicleLastUpdated.After(cachedLastUpdated) {
+			// Update the last updated time
+			journeyMap.LastUpdated = vehicle.RecordedAtTime
+			identificationCache.Set(context.Background(), localJourneyID, journeyMap, nil)
+		} else {
 			return nil
 		}
 
