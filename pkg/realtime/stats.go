@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/adjust/rmq/v4"
@@ -65,6 +67,12 @@ func (handler *ErrorStatsServerHandler) ServeHTTP(writer http.ResponseWriter, re
 	fmt.Fprint(writer, "</table>")
 
 	// Get top failed operators
+	type OperatorErrorResult struct {
+		Operator string
+		Errors   int
+	}
+	operatorErrors := []*OperatorErrorResult{}
+	operatorErrorsTotal := 0
 	fmt.Fprint(writer, "<html><body><h2>Failed operators</23>")
 
 	operatorsScan := redis_client.Client.Keys(context.Background(), "ERRORTRACKOPERATOR_*")
@@ -73,9 +81,23 @@ func (handler *ErrorStatsServerHandler) ServeHTTP(writer http.ResponseWriter, re
 	fmt.Fprint(writer, "<table>")
 	for _, operatorKey := range operatorsScanResults {
 		keyVal := redis_client.Client.Get(context.TODO(), operatorKey).Val()
+		errors, _ := strconv.Atoi(keyVal)
 		operator := strings.Split(operatorKey, "_")[1]
-		fmt.Fprintf(writer, "<tr><td>%s</td><td>%s</td></tr>", operator, keyVal)
+
+		operatorErrors = append(operatorErrors, &OperatorErrorResult{
+			Operator: operator,
+			Errors:   errors,
+		})
+		operatorErrorsTotal += errors
 	}
+	sort.SliceStable(operatorErrors, func(i, j int) bool {
+		return operatorErrors[i].Errors > operatorErrors[j].Errors
+	})
+	for _, errorResult := range operatorErrors {
+		percentage := (float64(errorResult.Errors) / float64(operatorErrorsTotal)) * 100
+		fmt.Fprintf(writer, "<tr><td>%s</td><td>%d</td><td>%.2f%%</td></tr>", errorResult.Operator, errorResult.Errors, percentage)
+	}
+	fmt.Fprintf(writer, "<tr><td></td><td>%d</td><td></td></tr>", operatorErrorsTotal)
 	fmt.Fprint(writer, "</table>")
 
 	fmt.Fprint(writer, "</body></html>")
