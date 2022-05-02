@@ -197,16 +197,16 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKTYPE_%s", errorCode))
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKOPERATOR_%s", vehicle.MonitoredVehicleJourney.OperatorRef))
 
-			elasticEvent, _ := json.Marshal(RealtimeElasticEvent{
-				Timestamp:  time.Now(),
-				Success:    false,
+			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
+				Timestamp: time.Now(),
+
 				FailReason: errorCode,
 				Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
 				Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
 			elastic_client.IndexRequest(esapi.IndexRequest{
-				Index:   "realtime-events-1",
+				Index:   "realtime-identify-failure-events-1",
 				Body:    bytes.NewReader(elasticEvent),
 				Refresh: "true",
 			})
@@ -476,20 +476,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	updateModel.SetFilter(searchQuery)
 	updateModel.SetReplacement(bsonRep)
 	updateModel.SetUpsert(true)
-
-	// Create update event in Elasticsearch
-	elasticEvent, _ := json.Marshal(RealtimeElasticEvent{
-		Timestamp: time.Now(),
-		Success:   true,
-		Operator:  vehicleLocationEvent.OperatorRef,
-		Service:   vehicleLocationEvent.ServiceRef,
-	})
-
-	elastic_client.IndexRequest(esapi.IndexRequest{
-		Index:   "realtime-events-1",
-		Body:    bytes.NewReader(elasticEvent),
-		Refresh: "true",
-	})
 
 	return updateModel, nil
 }

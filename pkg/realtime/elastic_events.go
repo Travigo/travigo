@@ -2,10 +2,9 @@ package realtime
 
 import "time"
 
-type RealtimeElasticEvent struct {
+type RealtimeIdentifyFailureElasticEvent struct {
 	Timestamp time.Time
 
-	Success    bool
 	FailReason string
 
 	Operator string
