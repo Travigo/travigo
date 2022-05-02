@@ -62,13 +62,13 @@ spec:
                   optional: false
             - name: BRITBUS_ELASTICSEARCH_ADDRESS
               value: {{ $.Values.elasticsearch.address }}
-            - name: BRITBUS_ELASRICSEARCH_USERNAME
+            - name: BRITBUS_ELASTICSEARCH_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.elasticsearch.accountSecret }}
                   key: username
                   optional: false
-            - name: BRITBUS_ELASRICSEARCH_PASSWORD
+            - name: BRITBUS_ELASTICSEARCH_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.elasticsearch.accountSecret }}

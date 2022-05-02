@@ -7,14 +7,12 @@ import (
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 )
 
 var Client *elasticsearch.Client
 
 func Connect() error {
-	pretty.Println("WTF")
 	env := util.GetEnvironmentVariables()
 
 	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" {
