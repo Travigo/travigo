@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,10 +11,12 @@ import (
 	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -193,6 +196,21 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKTYPE_%s", errorCode))
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKOPERATOR_%s", vehicle.MonitoredVehicleJourney.OperatorRef))
+
+			elasticEvent, _ := json.Marshal(RealtimeElasticEvent{
+				Timestamp:  time.Now(),
+				Success:    false,
+				FailReason: errorCode,
+				Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+				Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
+			})
+
+			elastic_client.IndexRequest(esapi.IndexRequest{
+				Index:   "realtime-events-1",
+				Body:    bytes.NewReader(elasticEvent),
+				Refresh: "true",
+			})
+
 			return nil
 		}
 		journeyID = journey.PrimaryIdentifier
@@ -234,7 +252,10 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	}
 
 	vehicleLocationEvent := VehicleLocationEvent{
-		JourneyRef:       journeyID,
+		JourneyRef:  journeyID,
+		OperatorRef: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+		ServiceRef:  vehicle.MonitoredVehicleJourney.PublishedLineName,
+
 		Timeframe:        timeframe,
 		CreationDateTime: siriVMVehicleIdentificationEvent.ResponseTime,
 
@@ -455,6 +476,20 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	updateModel.SetFilter(searchQuery)
 	updateModel.SetReplacement(bsonRep)
 	updateModel.SetUpsert(true)
+
+	// Create update event in Elasticsearch
+	elasticEvent, _ := json.Marshal(RealtimeElasticEvent{
+		Timestamp: time.Now(),
+		Success:   true,
+		Operator:  vehicleLocationEvent.OperatorRef,
+		Service:   vehicleLocationEvent.ServiceRef,
+	})
+
+	elastic_client.IndexRequest(esapi.IndexRequest{
+		Index:   "realtime-events-1",
+		Body:    bytes.NewReader(elasticEvent),
+		Refresh: "true",
+	})
 
 	return updateModel, nil
 }

@@ -7,7 +7,9 @@ import (
 )
 
 type VehicleLocationEvent struct {
-	JourneyRef string
+	JourneyRef  string
+	ServiceRef  string
+	OperatorRef string
 
 	CreationDateTime time.Time `groups:"detailed"`
 

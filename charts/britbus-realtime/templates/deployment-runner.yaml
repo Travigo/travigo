@@ -60,6 +60,20 @@ spec:
                   name: {{ $.Values.redis.passwordSecret }}
                   key: password
                   optional: false
+            - name: BRITBUS_ELASTICSEARCH_ADDRESS
+              value: {{ $.Values.elasticsearch.address }}
+            - name: BRITBUS_ELASRICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: username
+                  optional: false
+            - name: BRITBUS_ELASRICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: password
+                  optional: false
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

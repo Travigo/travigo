@@ -29,6 +29,8 @@ require (
 	github.com/XiaoMi/pegasus-go-client v0.0.0-20211220102249-0e7f49437ffe // indirect
 	github.com/adjust/rmq/v4 v4.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.1.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.33.0 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect

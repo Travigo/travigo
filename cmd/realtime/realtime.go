@@ -8,6 +8,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/realtime"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/rs/zerolog"
@@ -36,6 +37,9 @@ func main() {
 					}
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to redis")
+					}
+					if err := elastic_client.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 
 					ctdf.LoadSpecialDayCache()
