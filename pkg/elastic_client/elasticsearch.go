@@ -17,7 +17,7 @@ func Connect() error {
 	pretty.Println("WTF")
 	env := util.GetEnvironmentVariables()
 
-	if env["BRITBUS_ELASTICSEARCH_URL"] == "" {
+	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" {
 		log.Info().Msg("Skipping Elasticsearch setup")
 		return nil
 	}
@@ -28,7 +28,7 @@ func Connect() error {
 	tp.TLSClientConfig.InsecureSkipVerify = true
 
 	es, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{env["BRITBUS_ELASTICSEARCH_URL"]},
+		Addresses: []string{env["BRITBUS_ELASTICSEARCH_ADDRESS"]},
 		Username:  env["BRITBUS_ELASTICSEARCH_USERNAME"],
 		Password:  env["BRITBUS_ELASTICSEARCH_PASSWORD"],
 		Transport: tp,
@@ -43,6 +43,8 @@ func Connect() error {
 	}
 
 	Client = es
+
+	log.Info().Msgf("Elasticsearch client setup for %s", env["BRITBUS_ELASTICSEARCH_ADDRESS"])
 
 	return nil
 }

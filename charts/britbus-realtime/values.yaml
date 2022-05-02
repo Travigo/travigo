@@ -12,8 +12,8 @@ redis:
   address: "redis-headless.redis:6379"
   passwordSecret: redis-password
 
-elasticSearch:
-  address: "https://primary-es-primary.elastic:9200"
+elasticsearch:
+  address: "https://primary-es-http.elastic:9200"
   accountSecret: "britbus-elasticsearch-user"
 
 image:
