@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/database"
@@ -16,7 +13,6 @@ import (
 
 func StartStatsServer() {
 	http.Handle("/realtime-stats/queue", NewStatsHandler(redis_client.QueueConnection))
-	http.Handle("/realtime-stats/errors", &ErrorStatsServerHandler{})
 	http.Handle("/health", NewHealthHandler())
 
 	log.Info().Msg("Stats server listening on http://localhost:3333/realtime-stats/queue")
@@ -48,59 +44,6 @@ func (handler *StatsServerHandler) ServeHTTP(writer http.ResponseWriter, request
 	}
 
 	fmt.Fprint(writer, stats.GetHtml(layout, refresh))
-}
-
-type ErrorStatsServerHandler struct{}
-
-func (handler *ErrorStatsServerHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	// get error type stats
-	fmt.Fprint(writer, "<html><body><h2>Error types</23>")
-
-	errorTypesScan := redis_client.Client.Keys(context.Background(), "ERRORTRACKTYPE_*")
-	errorTypesResults, _ := errorTypesScan.Result()
-
-	fmt.Fprint(writer, "<table>")
-	for _, typeKey := range errorTypesResults {
-		keyVal := redis_client.Client.Get(context.TODO(), typeKey).Val()
-		fmt.Fprintf(writer, "<tr><td>%s</td><td>%s</td></tr>", typeKey, keyVal)
-	}
-	fmt.Fprint(writer, "</table>")
-
-	// Get top failed operators
-	type OperatorErrorResult struct {
-		Operator string
-		Errors   int
-	}
-	operatorErrors := []*OperatorErrorResult{}
-	operatorErrorsTotal := 0
-	fmt.Fprint(writer, "<html><body><h2>Failed operators</23>")
-
-	operatorsScan := redis_client.Client.Keys(context.Background(), "ERRORTRACKOPERATOR_*")
-	operatorsScanResults, _ := operatorsScan.Result()
-
-	fmt.Fprint(writer, "<table>")
-	for _, operatorKey := range operatorsScanResults {
-		keyVal := redis_client.Client.Get(context.TODO(), operatorKey).Val()
-		errors, _ := strconv.Atoi(keyVal)
-		operator := strings.Split(operatorKey, "_")[1]
-
-		operatorErrors = append(operatorErrors, &OperatorErrorResult{
-			Operator: operator,
-			Errors:   errors,
-		})
-		operatorErrorsTotal += errors
-	}
-	sort.SliceStable(operatorErrors, func(i, j int) bool {
-		return operatorErrors[i].Errors > operatorErrors[j].Errors
-	})
-	for _, errorResult := range operatorErrors {
-		percentage := (float64(errorResult.Errors) / float64(operatorErrorsTotal)) * 100
-		fmt.Fprintf(writer, "<tr><td>%s</td><td>%d</td><td>%.2f%%</td></tr>", errorResult.Operator, errorResult.Errors, percentage)
-	}
-	fmt.Fprintf(writer, "<tr><td></td><td>%d</td><td></td></tr>", operatorErrorsTotal)
-	fmt.Fprint(writer, "</table>")
-
-	fmt.Fprint(writer, "</body></html>")
 }
 
 type HealthHandler struct {

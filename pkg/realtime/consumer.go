@@ -26,6 +26,7 @@ import (
 
 var journeyCache *cache.Cache
 var identificationCache *cache.Cache
+var cacheExpirationTime = 90 * time.Minute
 
 const numConsumers = 5
 
@@ -40,14 +41,14 @@ func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
 
 func CreateIdentificationCache() {
 	redisStore := store.NewRedis(redis_client.Client, &store.Options{
-		Expiration: 30 * time.Minute,
+		Expiration: cacheExpirationTime,
 	})
 
 	identificationCache = cache.New(redisStore)
 }
 func CreateJourneyCache() {
 	redisStore := store.NewRedis(redis_client.Client, &store.Options{
-		Expiration: 30 * time.Minute,
+		Expiration: cacheExpirationTime,
 	})
 
 	journeyCache = cache.New(redisStore)
@@ -175,9 +176,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			identificationCache.Set(context.Background(), localJourneyID, "N/A", &store.Options{
-				Expiration: 30 * time.Minute,
-			})
+			identificationCache.Set(context.Background(), localJourneyID, "N/A", nil)
 
 			// Temporary https://github.com/BritBus/britbus/issues/43
 			errorCode := "UNKNOWN"
@@ -194,18 +193,15 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				errorCode = "JOURNEYNARROW_MANY"
 			}
 
-			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKTYPE_%s", errorCode))
-			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKOPERATOR_%s", vehicle.MonitoredVehicleJourney.OperatorRef))
-
 			// Record the failed identification event
 			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
 				Timestamp: time.Now(),
 
-				Success: false,
+				Success:    false,
 				FailReason: errorCode,
 
-				Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
-				Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
+				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
 			elastic_client.IndexRequest(esapi.IndexRequest{
@@ -229,8 +225,8 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 			Success: true,
 
-			Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
-			Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
+			Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+			Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 		})
 
 		elastic_client.IndexRequest(esapi.IndexRequest{
@@ -306,9 +302,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
-		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, &store.Options{
-			Expiration: 30 * time.Minute,
-		})
+		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
 	} else {
 		switch cachedJourney.(type) {
 		default:
