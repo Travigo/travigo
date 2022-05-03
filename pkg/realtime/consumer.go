@@ -197,16 +197,19 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKTYPE_%s", errorCode))
 			redis_client.Client.Incr(context.TODO(), fmt.Sprintf("ERRORTRACKOPERATOR_%s", vehicle.MonitoredVehicleJourney.OperatorRef))
 
+			// Record the failed identification event
 			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
 				Timestamp: time.Now(),
 
+				Success: false,
 				FailReason: errorCode,
+
 				Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
 				Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
 			elastic_client.IndexRequest(esapi.IndexRequest{
-				Index:   "realtime-identify-failure-events-1",
+				Index:   "realtime-identify-events-1",
 				Body:    bytes.NewReader(elasticEvent),
 				Refresh: "true",
 			})
@@ -219,6 +222,22 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			JourneyID:   journeyID,
 			LastUpdated: vehicle.RecordedAtTime,
 		}, nil)
+
+		// Record the successful identification event
+		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
+			Timestamp: time.Now(),
+
+			Success: true,
+
+			Operator:   fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+			Service:    vehicle.MonitoredVehicleJourney.PublishedLineName,
+		})
+
+		elastic_client.IndexRequest(esapi.IndexRequest{
+			Index:   "realtime-identify-events-1",
+			Body:    bytes.NewReader(elasticEvent),
+			Refresh: "true",
+		})
 	} else if cachedJourneyMapping == "N/A" {
 		return nil
 	} else {
