@@ -509,5 +509,21 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	updateModel.SetReplacement(bsonRep)
 	updateModel.SetUpsert(true)
 
+	// Submit Bus locations to ES
+	elasticEvent, _ := json.Marshal(BusLocationElasticEvent{
+		Timestamp: time.Now(),
+
+		Location: ElasticGeoPoint{
+			Lat: vehicleLocationEvent.VehicleLocation.Coordinates[1],
+			Lon: vehicleLocationEvent.VehicleLocation.Coordinates[0],
+		},
+	})
+
+	elastic_client.IndexRequest(&esapi.IndexRequest{
+		Index:   fmt.Sprintf("realtime-vehicle-location-%d", time.Now().YearDay()),
+		Body:    bytes.NewReader(elasticEvent),
+		Refresh: "true",
+	})
+
 	return updateModel, nil
 }

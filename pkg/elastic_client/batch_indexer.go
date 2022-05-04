@@ -2,6 +2,8 @@ package elastic_client
 
 import (
 	"context"
+	"io"
+	"os"
 	"time"
 
 	"github.com/MasterOfBinary/gobatch/batch"
@@ -30,6 +32,7 @@ func (i indexProcessor) Process(ctx context.Context, ps *batch.PipelineStage) {
 
 		if res.IsError() {
 			log.Error().Msgf("[%s] Error indexing document", res.Status())
+			io.Copy(os.Stdout, res.Body)
 		}
 	}
 }
