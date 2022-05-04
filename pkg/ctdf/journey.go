@@ -138,10 +138,10 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		"$and": bson.A{
 			bson.M{"serviceref": bson.M{"$in": services}},
 			bson.M{"otheridentifiers.RealtimeJourneyCode": vehicleJourneyRef},
-			bson.M{"$or": bson.A{
-				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
-				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-			}},
+			// bson.M{"$or": bson.A{
+			// 	bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+			// 	bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+			// }},
 		},
 	}
 
