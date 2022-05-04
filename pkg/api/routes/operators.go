@@ -95,7 +95,10 @@ func getOperator(c *fiber.Ctx) error {
 
 	operatorsCollection := database.GetCollection("operators")
 	var operator *ctdf.Operator
-	operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&operator)
+	operatorsCollection.FindOne(context.Background(), bson.M{"$or": bson.A{
+		bson.M{"primaryidentifier": identifier},
+		bson.M{"otheridentifiers": identifier},
+	}}).Decode(&operator)
 
 	if operator == nil {
 		c.SendStatus(404)

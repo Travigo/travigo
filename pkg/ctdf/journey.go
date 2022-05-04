@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -119,7 +119,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		var service *Service
 		err := cursor.Decode(&service)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Str("serviceName", serviceName).Msg("Failed to decode service")
 		}
 
 		services = append(services, service.PrimaryIdentifier)
@@ -151,10 +151,11 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		var journey *Journey
 		err := cursor.Decode(&journey)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("Failed to decode journey")
 		}
 
-		if journey.Availability.MatchDate(framedVehicleJourneyDate) {
+		// if it has no availability then we'll just ignore it
+		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
 			journeys = append(journeys, journey)
 		}
 	}
