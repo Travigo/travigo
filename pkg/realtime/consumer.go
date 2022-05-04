@@ -164,6 +164,9 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	case "UNO":
 		// Uno (GB:NOCID:137967)
 		operatorRef = "UNOE"
+	case "BC", "WA", "WB", "WN", "CV", "PB", "YW", "AG", "PN":
+		// National Express West Midlands (GB:NOCID:138032)
+		operatorRef = "TCVW"
 	}
 
 	localJourneyID := fmt.Sprintf(
