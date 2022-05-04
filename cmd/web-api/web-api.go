@@ -7,6 +7,7 @@ import (
 	"github.com/britbus/britbus/pkg/api"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -37,6 +38,9 @@ func main() {
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
+					}
+					if err := elastic_client.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 
 					ctdf.LoadSpecialDayCache()

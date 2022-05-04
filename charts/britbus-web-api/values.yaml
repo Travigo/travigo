@@ -14,6 +14,10 @@ database:
   connectionStringSecret: britbus-mongodb-admin-britbus
   database: britbus
 
+elasticsearch:
+  address: "https://primary-es-http.elastic:9200"
+  accountSecret: "britbus-elasticsearch-user"
+
 bods:
   apiKeySecret: britbus-bods-api
 
