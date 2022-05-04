@@ -26,6 +26,11 @@ type RecordsStatsActiveRealtimeJourneys struct {
 	LocationWithoutTrack int64
 	ExternalProvided     int64
 }
+type recordStatsElasticEvent struct {
+	Stats *RecordsStats
+
+	Timestamp time.Time
+}
 
 var CurrentRecordsStats *RecordsStats
 
@@ -96,7 +101,10 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.HistoricalRealtimeJourneys = numberHistoricRealtimeJourneys
 
 		// Publish stats to Elasticsearch
-		elasticEvent, _ := json.Marshal(CurrentRecordsStats)
+		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
+			Stats:     CurrentRecordsStats,
+			Timestamp: time.Now(),
+		})
 
 		elastic_client.IndexRequest(&esapi.IndexRequest{
 			Index:   "overall-stats-1",
