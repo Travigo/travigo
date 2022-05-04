@@ -24,25 +24,27 @@ func (i indexProcessor) Process(ctx context.Context, ps *batch.PipelineStage) {
 	for item := range ps.Input {
 		req := item.Get().(*esapi.IndexRequest)
 		// Perform the request with the client.
-		res, err := req.Do(context.Background(), Client)
-		if err != nil {
-			log.Error().Err(err).Msg("Error getting response")
-		}
-		defer res.Body.Close()
+		go func(req *esapi.IndexRequest) {
+			res, err := req.Do(context.Background(), Client)
+			if err != nil {
+				log.Error().Err(err).Msg("Error getting response")
+			}
+			defer res.Body.Close()
 
-		if res.IsError() {
-			log.Error().Msgf("[%s] Error indexing document", res.Status())
-			io.Copy(os.Stdout, res.Body)
-		}
+			if res.IsError() {
+				log.Error().Msgf("[%s] Error indexing document", res.Status())
+				io.Copy(os.Stdout, res.Body)
+			}
+		}(req)
 	}
 }
 
 func setupBatchIndexer() {
 	// Create a batch processor that processes items 5 at a time
 	config := batch.NewConstantConfig(&batch.ConfigValues{
-		MaxItems: 50,
-		MinTime:  1 * time.Second,
-		MaxTime:  1 * time.Second,
+		MaxItems: 100,
+		MinTime:  500 * time.Millisecond,
+		MaxTime:  500 * time.Second,
 	})
 	b := batch.New(config)
 	p := &indexProcessor{}
