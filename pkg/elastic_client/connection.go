@@ -1,18 +1,18 @@
 package elastic_client
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 )
 
 var Client *elasticsearch.Client
 
 func Connect() error {
+	setupBatchIndexer()
+
 	env := util.GetEnvironmentVariables()
 
 	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" {
@@ -45,21 +45,4 @@ func Connect() error {
 	log.Info().Msgf("Elasticsearch client setup for %s", env["BRITBUS_ELASTICSEARCH_ADDRESS"])
 
 	return nil
-}
-
-func IndexRequest(req esapi.IndexRequest) {
-	if Client == nil {
-		return
-	}
-
-	// Perform the request with the client.
-	res, err := req.Do(context.Background(), Client)
-	if err != nil {
-		log.Error().Err(err).Msg("Error getting response")
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		log.Error().Msgf("[%s] Error indexing document", res.Status())
-	}
 }

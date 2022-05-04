@@ -223,7 +223,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
-			elastic_client.IndexRequest(esapi.IndexRequest{
+			elastic_client.IndexRequest(&esapi.IndexRequest{
 				Index:   "realtime-identify-events-1",
 				Body:    bytes.NewReader(elasticEvent),
 				Refresh: "true",
@@ -248,7 +248,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 		})
 
-		elastic_client.IndexRequest(esapi.IndexRequest{
+		elastic_client.IndexRequest(&esapi.IndexRequest{
 			Index:   "realtime-identify-events-1",
 			Body:    bytes.NewReader(elasticEvent),
 			Refresh: "true",

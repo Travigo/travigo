@@ -26,6 +26,7 @@ require (
 )
 
 require (
+	github.com/MasterOfBinary/gobatch v0.1.0 // indirect
 	github.com/XiaoMi/pegasus-go-client v0.0.0-20211220102249-0e7f49437ffe // indirect
 	github.com/adjust/rmq/v4 v4.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
