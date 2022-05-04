@@ -1,11 +1,15 @@
 package stats
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/elastic_client"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -90,6 +94,15 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.HistoricalRealtimeJourneys = numberHistoricRealtimeJourneys
+
+		// Publish stats to Elasticsearch
+		elasticEvent, _ := json.Marshal(CurrentRecordsStats)
+
+		elastic_client.IndexRequest(&esapi.IndexRequest{
+			Index:   "overall-stats-1",
+			Body:    bytes.NewReader(elasticEvent),
+			Refresh: "true",
+		})
 
 		time.Sleep(1 * time.Minute)
 	}
