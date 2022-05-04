@@ -147,9 +147,28 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
 	}
 
+	// Temporary remap of known incorrect values
+	// TODO: A better way fof doing this should be done under https://github.com/BritBus/britbus/issues/46
+	operatorRef := vehicle.MonitoredVehicleJourney.OperatorRef
+
+	switch operatorRef {
+	case "SCSO":
+		// Stagecoach south (GB:NOCID:137728)
+		operatorRef = "SCCO"
+	case "CT4N":
+		// CT4n (GB:NOCID:137286)
+		operatorRef = "NOCT"
+	case "SCEM":
+		// Stagecoach East Midlands (GB:NOCID:136971)
+		operatorRef = "SCGR"
+	case "UNO":
+		// Uno (GB:NOCID:137967)
+		operatorRef = "UNOE"
+	}
+
 	localJourneyID := fmt.Sprintf(
 		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
-		fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+		fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 		vehicle.MonitoredVehicleJourney.LineRef,
 		fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
 		vehicleJourneyRef,
@@ -164,7 +183,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
 			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 			"VehicleJourneyRef":        vehicleJourneyRef,
 			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
 			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
@@ -200,7 +219,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				Success:    false,
 				FailReason: errorCode,
 
-				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
@@ -225,7 +244,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 			Success: true,
 
-			Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+			Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 			Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 		})
 
@@ -268,7 +287,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 	vehicleLocationEvent := VehicleLocationEvent{
 		JourneyRef:  journeyID,
-		OperatorRef: fmt.Sprintf(ctdf.OperatorNOCFormat, vehicle.MonitoredVehicleJourney.OperatorRef),
+		OperatorRef: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 		ServiceRef:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 
 		Timeframe:        timeframe,
@@ -287,7 +306,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	}
 
 	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {
-		vehicleLocationEvent.VehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", vehicle.MonitoredVehicleJourney.OperatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
+		vehicleLocationEvent.VehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", operatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
 	}
 
 	return &vehicleLocationEvent
