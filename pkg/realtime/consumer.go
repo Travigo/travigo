@@ -385,7 +385,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			}
 		}
 
-		if closestDistanceJourneyPathIndex == 1 {
+		if closestDistanceJourneyPathIndex == 0 {
 			// TODO this seems a bit hacky but I dont think we care much if we're on the first item
 			closestDistanceJourneyPathPercentComplete = 0.5
 		} else {
