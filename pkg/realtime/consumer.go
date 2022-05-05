@@ -215,22 +215,22 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				errorCode = "JOURNEYNARROW_MANY"
 			}
 
-			// Record the failed identification event
-			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-				Timestamp: time.Now(),
+			// // Record the failed identification event
+			// elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
+			// 	Timestamp: time.Now(),
 
-				Success:    false,
-				FailReason: errorCode,
+			// 	Success:    false,
+			// 	FailReason: errorCode,
 
-				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
-			})
+			// 	Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+			// 	Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
+			// })
 
-			elastic_client.IndexRequest(&esapi.IndexRequest{
-				Index:   "realtime-identify-events-1",
-				Body:    bytes.NewReader(elasticEvent),
-				Refresh: "true",
-			})
+			// elastic_client.IndexRequest(&esapi.IndexRequest{
+			// 	Index:   "realtime-identify-events-1",
+			// 	Body:    bytes.NewReader(elasticEvent),
+			// 	Refresh: "true",
+			// })
 
 			return nil
 		}
