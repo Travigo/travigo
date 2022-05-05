@@ -215,22 +215,22 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				errorCode = "JOURNEYNARROW_MANY"
 			}
 
-			// // Record the failed identification event
-			// elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-			// 	Timestamp: time.Now(),
+			// Record the failed identification event
+			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
+				Timestamp: time.Now(),
 
-			// 	Success:    false,
-			// 	FailReason: errorCode,
+				Success:    false,
+				FailReason: errorCode,
 
-			// 	Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-			// 	Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
-			// })
+				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
+			})
 
-			// elastic_client.IndexRequest(&esapi.IndexRequest{
-			// 	Index:   "realtime-identify-events-1",
-			// 	Body:    bytes.NewReader(elasticEvent),
-			// 	Refresh: "true",
-			// })
+			elastic_client.IndexRequest(&esapi.IndexRequest{
+				Index:   "realtime-identify-events-1",
+				Body:    bytes.NewReader(elasticEvent),
+				Refresh: "true",
+			})
 
 			return nil
 		}
@@ -512,21 +512,21 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	updateModel.SetReplacement(bsonRep)
 	updateModel.SetUpsert(true)
 
-	// Submit Bus locations to ES
-	elasticEvent, _ := json.Marshal(BusLocationElasticEvent{
-		Timestamp: time.Now(),
+	// // Submit Bus locations to ES
+	// elasticEvent, _ := json.Marshal(BusLocationElasticEvent{
+	// 	Timestamp: time.Now(),
 
-		Location: ElasticGeoPoint{
-			Lat: vehicleLocationEvent.VehicleLocation.Coordinates[1],
-			Lon: vehicleLocationEvent.VehicleLocation.Coordinates[0],
-		},
-	})
+	// 	Location: ElasticGeoPoint{
+	// 		Lat: vehicleLocationEvent.VehicleLocation.Coordinates[1],
+	// 		Lon: vehicleLocationEvent.VehicleLocation.Coordinates[0],
+	// 	},
+	// })
 
-	elastic_client.IndexRequest(&esapi.IndexRequest{
-		Index:   fmt.Sprintf("realtime-vehicle-location-%d", time.Now().YearDay()),
-		Body:    bytes.NewReader(elasticEvent),
-		Refresh: "true",
-	})
+	// elastic_client.IndexRequest(&esapi.IndexRequest{
+	// 	Index:   fmt.Sprintf("realtime-vehicle-location-%d", time.Now().YearDay()),
+	// 	Body:    bytes.NewReader(elasticEvent),
+	// 	Refresh: "true",
+	// })
 
 	return updateModel, nil
 }
