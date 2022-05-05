@@ -413,6 +413,10 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		log.Error().Err(err).Msg("Failed to parse realtime time frame")
 	}
 
+	if closestDistanceJourneyPath == nil {
+		return nil, errors.New("nil closestdistancejourneypath")
+	}
+
 	// Get the arrival & departure times with date of the journey
 	destinationArrivalTimeWithDate := time.Date(
 		realtimeTimeframe.Year(),
