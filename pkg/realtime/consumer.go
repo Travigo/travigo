@@ -316,7 +316,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 }
 
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
-	currentTime := time.Now()
+	currentTime := vehicleLocationEvent.CreationDateTime
 
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
