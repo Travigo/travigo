@@ -40,7 +40,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 
 	identificationEvent := &SiriVMVehicleIdentificationEvent{
 		VehicleActivity: vehicle,
-		ResponseTime:    currentTime,
+		ResponseTime:    recordedAtTime,
 		DataSource:      datasource,
 	}
 

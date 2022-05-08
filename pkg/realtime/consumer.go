@@ -320,16 +320,16 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	currentTime := vehicleLocationEvent.CreationDateTime
 
 	// TODO HACK
-	currentTime = time.Date(
-		currentTime.Year(),
-		currentTime.Month(),
-		currentTime.Day(),
-		currentTime.Hour(),
-		currentTime.Minute(),
-		currentTime.Second(),
-		currentTime.Nanosecond(),
-		loc,
-	)
+	// currentTime = time.Date(
+	// 	currentTime.Year(),
+	// 	currentTime.Month(),
+	// 	currentTime.Day(),
+	// 	currentTime.Hour(),
+	// 	currentTime.Minute(),
+	// 	currentTime.Second(),
+	// 	currentTime.Nanosecond(),
+	// 	loc,
+	// )
 
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
@@ -440,7 +440,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
 		closestDistanceJourneyPath.DestinationArrivalTime.Second(),
 		closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
-		currentTime.Location(),
+		loc,
 	)
 	originDepartureTimeWithDate := time.Date(
 		realtimeTimeframe.Year(),
@@ -450,7 +450,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		closestDistanceJourneyPath.OriginDepartureTime.Minute(),
 		closestDistanceJourneyPath.OriginDepartureTime.Second(),
 		closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
-		currentTime.Location(),
+		loc,
 	)
 
 	// How long it take to travel between origin & destination
@@ -522,8 +522,8 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
 
 			// TODO this should obviously be a different time
-			ArrivalTime:   currentTime,
-			DepartureTime: currentTime,
+			ArrivalTime:   currentTime.In(loc).Add(1 * time.Hour),
+			DepartureTime: currentTime.In(loc).Add(1 * time.Hour),
 		}
 	}
 
