@@ -17,6 +17,7 @@ import (
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -316,7 +317,8 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 }
 
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
-	currentTime := vehicleLocationEvent.CreationDateTime
+	currentTime := vehicleLocationEvent.CreationDateTime.In(time.Now().Location())
+	pretty.Println(currentTime)
 
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
