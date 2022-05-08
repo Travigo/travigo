@@ -17,7 +17,6 @@ import (
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -317,11 +316,20 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 }
 
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
+	loc, _ := time.LoadLocation("Europe/London")
 	currentTime := vehicleLocationEvent.CreationDateTime
 
-	// if currentTime.Location() != time.Local {
-	pretty.Println(currentTime.Hour(), currentTime.Location().String(), time.Local.String())
-	// }
+	// TODO HACK
+	currentTime = time.Date(
+		currentTime.Year(),
+		currentTime.Month(),
+		currentTime.Day(),
+		currentTime.Hour(),
+		currentTime.Minute(),
+		currentTime.Second(),
+		currentTime.Nanosecond(),
+		loc,
+	)
 
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
