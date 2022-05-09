@@ -105,7 +105,11 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 
 	// Get the relevant Services
 	var services []string
-	serviceName := identifyingInformation["ServiceNameRef"]
+	serviceName := identifyingInformation["PublishedLineName"]
+	if serviceName == "" {
+		serviceName = identifyingInformation["ServiceNameRef"]
+	}
+
 	servicesCollection := database.GetCollection("services")
 
 	query = bson.M{
