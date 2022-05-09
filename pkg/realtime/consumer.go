@@ -522,6 +522,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
 
 			// TODO this should obviously be a different time
+			// TODO this add 1 hour is a massive hack and will probably break when clocks change again
 			ArrivalTime:   currentTime.In(loc).Add(1 * time.Hour),
 			DepartureTime: currentTime.In(loc).Add(1 * time.Hour),
 		}

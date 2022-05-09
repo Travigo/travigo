@@ -28,6 +28,9 @@ cronjobs:
   - name: bods-timetable
     schedule: "0 5 * * 6"
     args: ["bods-timetable"]
+  - name: tfl
+    schedule: "0 3 * * 0"
+    args: ["tfl"]
 
 deployments:
   - name: sirivm-all

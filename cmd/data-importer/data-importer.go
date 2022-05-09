@@ -21,6 +21,7 @@ import (
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
+	"github.com/britbus/britbus/pkg/tfl"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/pkg/util"
@@ -351,6 +352,17 @@ func main() {
 					}
 
 					return nil
+				},
+			},
+			{
+				Name:  "tfl",
+				Usage: "Import Transport for London (TfL) datasets from their API into BritBus",
+				Action: func(c *cli.Context) error {
+					log.Info().Msgf("TfL API import")
+
+					err := tfl.ImportTFLData()
+
+					return err
 				},
 			},
 		},
