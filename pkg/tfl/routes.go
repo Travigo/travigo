@@ -44,7 +44,7 @@ type RouteSections struct {
 	ValidFrom       string `json:"validFrom"`
 }
 
-func (r RouteAPI) ParseJSON(reader io.Reader, datasource ctdf.DataSource) error {
+func (r *RouteAPI) ParseJSON(reader io.Reader, datasource ctdf.DataSource) error {
 	datasource.Dataset = "Line/Route"
 
 	bytes, err := io.ReadAll(reader)
@@ -99,7 +99,7 @@ func (r RouteAPI) ParseJSON(reader io.Reader, datasource ctdf.DataSource) error 
 	return nil
 }
 
-func (r RouteAPI) ImportIntoMongoAsCTDF() {
+func (r *RouteAPI) ImportIntoMongoAsCTDF() {
 	log.Info().Msg("Converting & Importing TFL Routes as CTDF Services into Mongo")
 	serviceOperations := []mongo.WriteModel{}
 	var serviceOperationInsert uint64
