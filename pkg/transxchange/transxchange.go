@@ -57,7 +57,7 @@ func (n *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, overrides map[string]string) {
 	datasource.OriginalFormat = "transxchange"
 	datasource.Identifier = doc.ModificationDateTime
 
@@ -76,8 +76,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		panic(err)
 	}
 
-	journeyIdentificationIndexName := "JourneyIdentificationIndex"
-	journeyIdentificationIndexName2 := "JourneyIdentificationIndex2"
+	journeyIdentificationServiceStopsIndexName := "JourneyIdentificationServiceStops"
+	journeyIdentificationServiceJourneycodeIndexName := "JourneyIdentificationServiceJourneycode"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
@@ -93,22 +93,21 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		},
 		{
 			Options: &options.IndexOptions{
-				Name: &journeyIdentificationIndexName,
+				Name: &journeyIdentificationServiceStopsIndexName,
 			},
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
-				{Key: "otheridentifiers.RealtimeJourneyCode", Value: 1},
 				{Key: "path.originstopref", Value: 1},
 				{Key: "path.destinationstopref", Value: 1},
 			},
 		},
 		{
 			Options: &options.IndexOptions{
-				Name: &journeyIdentificationIndexName2,
+				Name: &journeyIdentificationServiceJourneycodeIndexName,
 			},
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
-				{Key: "otheridentifiers.RealtimeJourneyCode", Value: 1},
+				{Key: "otheridentifiers.JourneyCode", Value: 1},
 			},
 		},
 	}, options.CreateIndexes())
@@ -120,6 +119,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	operatorLocalMapping := map[string]string{}
 
 	for _, operator := range doc.Operators {
+		if operator.NationalOperatorCode == "" {
+			continue
+		}
 		operatorLocalMapping[operator.ID] = fmt.Sprintf(ctdf.OperatorNOCFormat, operator.NationalOperatorCode)
 	}
 
@@ -157,6 +159,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		for _, txcLine := range txcService.Lines {
 			// Generate the CTDF Service Record
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
+			if operatorRef == "" {
+				operatorRef = "BRITBUS:INTERNAL:NOREF"
+			}
+
+			// TODO clean this up
+			// This is a temporary way of doing overrides for TfL import until https://github.com/BritBus/britbus/issues/46 is done
+			if overrides["OperatorRef"] != "" {
+				operatorRef = overrides["OperatorRef"]
+			}
 
 			serviceIdentifier := fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID)
 			localServiceIdentifier := fmt.Sprintf("%s:%s", txcService.ServiceCode, txcLine.ID)
@@ -339,6 +350,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 
 				operatorRef := operatorLocalMapping[txcJourneyOperatorRef] // NOT ALWAYS THERE, could be in SERVICE DEFINITION
+				if operatorRef == "" {
+					operatorRef = "BRITBUS:INTERNAL:NOREF"
+				}
+
+				// TODO clean this up
+				// This is a temporary way of doing overrides for TfL import until https://github.com/BritBus/britbus/issues/46 is done
+				if overrides["OperatorRef"] != "" {
+					operatorRef = overrides["OperatorRef"]
+				}
 
 				journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
 				if journeyPattern == nil {
@@ -444,6 +464,11 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 				modificationTime, _ := time.Parse(modificationDateTimeFormat, modificationDateTimeString)
 
+				destinationDisplay := journeyPattern.DestinationDisplay
+				if txcJourney.DestinationDisplay != "" {
+					destinationDisplay = txcJourney.DestinationDisplay
+				}
+
 				// Create CTDF Journey record
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
@@ -461,22 +486,16 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					OperatorRef:        operatorRef,
 					Direction:          txcJourney.Direction,
 					DepartureTime:      departureTime,
-					DestinationDisplay: journeyPattern.DestinationDisplay,
+					DestinationDisplay: destinationDisplay,
 
 					Availability: availability,
 
 					Path: []*ctdf.JourneyPathItem{},
 				}
 
-				// Get the realtime journey reference code
-				var realtimeJourneyCode string
-
+				// Get the vehicle journey reference code
 				if txcJourney.Operational.TicketMachine.JourneyCode != "" {
-					realtimeJourneyCode = txcJourney.Operational.TicketMachine.JourneyCode
-				}
-
-				if realtimeJourneyCode != "" {
-					ctdfJourney.OtherIdentifiers["RealtimeJourneyCode"] = realtimeJourneyCode
+					ctdfJourney.OtherIdentifiers["JourneyCode"] = txcJourney.Operational.TicketMachine.JourneyCode
 				}
 
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
@@ -530,6 +549,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 					// Calculate the destination display at this stop
 					destinationDisplay := journeyPattern.DestinationDisplay
+					if txcJourney.DestinationDisplay != "" {
+						destinationDisplay = txcJourney.DestinationDisplay
+					}
 					if journeyPatternTimingLink.From.DynamicDestinationDisplay != "" {
 						destinationDisplay = journeyPatternTimingLink.From.DynamicDestinationDisplay
 					}

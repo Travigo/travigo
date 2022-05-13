@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/adjust/rmq/v4"
@@ -21,7 +22,6 @@ import (
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
-	"github.com/britbus/britbus/pkg/tfl"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/pkg/util"
@@ -39,39 +39,46 @@ import (
 var realtimeQueue rmq.Queue
 
 type DataFile struct {
-	Name   string
-	Reader io.Reader
+	Name      string
+	Reader    io.Reader
+	Overrides map[string]string
 }
 
-func importFile(dataFormat string, source string, fileFormat string) error {
+func tempDownloadFile(source string) (*os.File, string) {
+	resp, err := http.Get(source)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Download file")
+	}
+	defer resp.Body.Close()
+
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	fileExtension := filepath.Ext(source)
+	if err == nil {
+		fileExtension = filepath.Ext(params["filename"])
+	}
+
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot create temporary file")
+	}
+
+	io.Copy(tmpFile, resp.Body)
+
+	return tmpFile, fileExtension
+}
+
+func importFile(dataFormat string, source string, fileFormat string, overrides map[string]string) error {
 	dataFiles := []DataFile{}
 	fileExtension := filepath.Ext(source)
 
 	// Check if the source is a URL and load the http client stream if it is
 	if isValidUrl(source) {
-		resp, err := http.Get(source)
+		var tempFile *os.File
+		tempFile, fileExtension = tempDownloadFile(source)
 
-		if err != nil {
-			log.Fatal().Err(err).Msg("Download file")
-		}
-		defer resp.Body.Close()
-
-		_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-		if err == nil {
-			fileExtension = filepath.Ext(params["filename"])
-		} else {
-			fileExtension = filepath.Ext(source)
-		}
-
-		tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-")
-		if err != nil {
-			log.Fatal().Err(err).Msg("Cannot create temporary file")
-		}
-		defer os.Remove(tmpFile.Name())
-
-		io.Copy(tmpFile, resp.Body)
-
-		source = tmpFile.Name()
+		source = tempFile.Name()
+		defer os.Remove(tempFile.Name())
 	}
 
 	if fileFormat != "" {
@@ -88,8 +95,9 @@ func importFile(dataFormat string, source string, fileFormat string) error {
 		defer file.Close()
 
 		dataFiles = append(dataFiles, DataFile{
-			Name:   source,
-			Reader: file,
+			Name:      source,
+			Reader:    file,
+			Overrides: overrides,
 		})
 	} else if fileExtension == ".zip" {
 		archive, err := zip.OpenReader(source)
@@ -106,8 +114,9 @@ func importFile(dataFormat string, source string, fileFormat string) error {
 			defer file.Close()
 
 			dataFiles = append(dataFiles, DataFile{
-				Name:   fmt.Sprintf("%s:%s", source, zipFile.Name),
-				Reader: file,
+				Name:      fmt.Sprintf("%s:%s", source, zipFile.Name),
+				Reader:    file,
+				Overrides: overrides,
 			})
 		}
 	} else {
@@ -161,7 +170,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 		transXChangeDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
 			Provider: "Department of Transport", // This may not always be true
 			Dataset:  dataFile.Name,
-		})
+		}, dataFile.Overrides)
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
 
@@ -261,7 +270,7 @@ func main() {
 					for {
 						startTime := time.Now()
 
-						err := importFile(dataFormat, source, fileFormat)
+						err := importFile(dataFormat, source, fileFormat, map[string]string{})
 
 						if err != nil {
 							return err
@@ -297,7 +306,7 @@ func main() {
 				Action: func(c *cli.Context) error {
 					source := c.String("url")
 
-					// Default source of all published busses
+					// Default source of all published buses
 					if source == "" {
 						source = "https://data.bus-data.dft.gov.uk/api/v1/dataset/?limit=25&offset=0&status=published"
 					}
@@ -329,7 +338,7 @@ func main() {
 						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
 
 						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
-							err = importFile("transxchange", dataset.URL, "")
+							err = importFile("transxchange", dataset.URL, "", map[string]string{})
 
 							if err != nil {
 								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
@@ -357,12 +366,63 @@ func main() {
 			{
 				Name:  "tfl",
 				Usage: "Import Transport for London (TfL) datasets from their API into BritBus",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "Overwrite URL for the TfL TransXChange file",
+						Required: false,
+					},
+				},
 				Action: func(c *cli.Context) error {
-					log.Info().Msgf("TfL API import")
+					source := c.String("url")
 
-					err := tfl.ImportTFLData()
+					// Default source of all published buses
+					if source == "" {
+						source = "https://tfl.gov.uk/tfl/syndication/feeds/journey-planner-timetables.zip"
+					}
 
-					return err
+					log.Info().Msgf("TfL TransXChange import from %s", source)
+
+					if isValidUrl(source) {
+						tempFile, _ := tempDownloadFile(source)
+
+						source = tempFile.Name()
+						defer os.Remove(tempFile.Name())
+					}
+
+					archive, err := zip.OpenReader(source)
+					if err != nil {
+						panic(err)
+					}
+					defer archive.Close()
+
+					tflBusesMatchRegex, _ := regexp.Compile("BUSES PART \\w+ \\d+.zip")
+					for _, zipFile := range archive.File {
+						if tflBusesMatchRegex.MatchString(zipFile.Name) {
+							file, err := zipFile.Open()
+							if err != nil {
+								log.Fatal().Err(err)
+							}
+							defer file.Close()
+
+							tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-tfl-innerzip-")
+							if err != nil {
+								log.Fatal().Err(err).Msg("Cannot create temporary file")
+							}
+							defer os.Remove(tmpFile.Name())
+
+							io.Copy(tmpFile, file)
+
+							err = importFile("transxchange", tmpFile.Name(), "zip", map[string]string{
+								"OperatorRef": "GB:NOC:TFLO",
+							})
+							if err != nil {
+								log.Fatal().Err(err).Msg("Cannot import TfL inner zip")
+							}
+						}
+					}
+
+					return nil
 				},
 			},
 		},

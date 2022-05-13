@@ -14,6 +14,7 @@ type VehicleJourney struct {
 	LineRef            string
 	JourneyPatternRef  string
 	DepartureTime      string
+	DestinationDisplay string
 
 	Frequency *struct {
 		EndTime  string
