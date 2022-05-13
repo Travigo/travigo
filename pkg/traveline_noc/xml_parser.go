@@ -6,12 +6,14 @@ import (
 
 	"github.com/britbus/britbus/pkg/util"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/html/charset"
 )
 
 func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 	travelineData := TravelineData{}
 
 	d := xml.NewDecoder(util.NewValidUTF8Reader(reader))
+	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {

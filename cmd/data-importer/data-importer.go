@@ -90,7 +90,7 @@ func importFile(dataFormat string, source string, fileFormat string, overrides m
 	if fileExtension == ".xml" {
 		file, err := os.Open(source)
 		if err != nil {
-			log.Fatal().Err(err)
+			log.Fatal().Err(err).Msg("Failed to open file")
 		}
 		defer file.Close()
 
@@ -109,7 +109,7 @@ func importFile(dataFormat string, source string, fileFormat string, overrides m
 		for _, zipFile := range archive.File {
 			file, err := zipFile.Open()
 			if err != nil {
-				log.Fatal().Err(err)
+				log.Fatal().Err(err).Msg("Failed to open file")
 			}
 			defer file.Close()
 
@@ -401,7 +401,7 @@ func main() {
 						if tflBusesMatchRegex.MatchString(zipFile.Name) {
 							file, err := zipFile.Open()
 							if err != nil {
-								log.Fatal().Err(err)
+								log.Fatal().Err(err).Msg("Failed to open file")
 							}
 							defer file.Close()
 

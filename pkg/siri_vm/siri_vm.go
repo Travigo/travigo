@@ -10,6 +10,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/html/charset"
 )
 
 const numConsumers = 5
@@ -56,6 +57,7 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 	var submittedRecords int64
 
 	d := xml.NewDecoder(reader)
+	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {

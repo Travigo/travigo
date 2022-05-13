@@ -10,6 +10,7 @@ import (
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
@@ -74,6 +75,27 @@ func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }
 
+func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*Journey {
+	journeys := []*Journey{}
+
+	cursor, _ := journeysCollection.Find(context.Background(), query)
+
+	for cursor.Next(context.TODO()) {
+		var journey *Journey
+		err := cursor.Decode(&journey)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode journey")
+		}
+
+		// if it has no availability then we'll just ignore it
+		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
+			journeys = append(journeys, journey)
+		}
+	}
+
+	return journeys
+}
+
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
 //  currently no other kind so is fine for now (TODO)
 func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
@@ -134,34 +156,35 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	}
 
 	// Get the relevant Journeys
-	framedVehicleJourneyDate, _ := time.Parse(YearMonthDayFormat, identifyingInformation["FramedVehicleJourneyDate"])
-	var journeys []*Journey
+	var framedVehicleJourneyDate time.Time
+	if identifyingInformation["FramedVehicleJourneyDate"] == "" {
+		framedVehicleJourneyDate = time.Now()
+	} else {
+		framedVehicleJourneyDate, _ = time.Parse(YearMonthDayFormat, identifyingInformation["FramedVehicleJourneyDate"])
+	}
+
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
 	journeysCollection := database.GetCollection("journeys")
-	query = bson.M{
+
+	// First try getting Journeys by the JourneyCode
+	journeys := GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 		"$and": bson.A{
 			bson.M{"serviceref": bson.M{"$in": services}},
 			bson.M{"otheridentifiers.JourneyCode": vehicleJourneyRef},
-			// bson.M{"$or": bson.A{
-			// 	bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
-			// 	bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-			// }},
 		},
-	}
+	})
 
-	cursor, _ = journeysCollection.Find(context.Background(), query)
-
-	for cursor.Next(context.TODO()) {
-		var journey *Journey
-		err := cursor.Decode(&journey)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode journey")
-		}
-
-		// if it has no availability then we'll just ignore it
-		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
-			journeys = append(journeys, journey)
-		}
+	// If we fail with the JourneyCode then try with the stops
+	if len(journeys) == 0 {
+		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"$or": bson.A{
+					bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+					bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+				}},
+			},
+		})
 	}
 
 	if len(journeys) == 0 {

@@ -112,14 +112,26 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 			return false
 		}
 
-		specialDateTime := SpecialDays[dateTime.Year()][rule.Value]
+		if rule.Value == "GB:BankHoliday:AllBankHolidays" {
+			// If the special case of all bank holidays then loop through every special day in that year and check if any match
+			// Of course if Britbus ever expands to non-UK bank holidays then this doesnt work
+			for _, specialDateTime := range SpecialDays[dateTime.Year()] {
+				if datesMatch(specialDateTime, dateTime) {
+					return true
+				}
+			}
 
-		if specialDateTime.Year() == 1 {
-			log.Error().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
 			return false
-		}
+		} else {
+			specialDateTime := SpecialDays[dateTime.Year()][rule.Value]
 
-		return datesMatch(specialDateTime, dateTime)
+			if specialDateTime.Year() == 1 {
+				log.Error().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
+				return false
+			}
+
+			return datesMatch(specialDateTime, dateTime)
+		}
 	case AvailabilityMatchAll:
 		return true
 	default:
