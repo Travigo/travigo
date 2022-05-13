@@ -49,7 +49,8 @@ func loadGBBankHolidayCache() {
 		return
 	}
 
-	aggregateEvents := append(bankHolidaysRaw.NorthernIreland.Events, bankHolidaysRaw.EnglandAndWales.Events...)
+	aggregateEvents := append(bankHolidaysRaw.NorthernIreland.Events, bankHolidaysRaw.Scotland.Events...)
+	aggregateEvents = append(aggregateEvents, bankHolidaysRaw.EnglandAndWales.Events...)
 
 	for _, event := range aggregateEvents {
 		eventDate, _ := time.Parse(YearMonthDayFormat, event.Date)
