@@ -195,7 +195,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		})
 
 		if err != nil {
-			log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
+			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			identificationCache.Set(context.Background(), localJourneyID, "N/A", nil)
