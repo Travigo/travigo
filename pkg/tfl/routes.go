@@ -9,14 +9,20 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const ServiceIDFormat = "GB:TFL:SERVICE:%s"
+
 type RouteAPI struct {
+	Lines    []*Line
 	Services []*ctdf.Service
+
+	Journeys []*ctdf.Journey
 }
 
 type Line struct {
@@ -27,9 +33,28 @@ type Line struct {
 	Created       string          `json:"created"`
 	Modified      string          `json:"modified"`
 	RouteSections []RouteSections `json:"routeSections"`
+
+	OutboundSequence *Sequence
+	InboundSequence  *Sequence
 	// lineStatuses
 
 	// serviceStatuses
+}
+
+func (l *Line) GetSequence() error {
+	l.OutboundSequence = &Sequence{}
+	err := l.OutboundSequence.Get(l.ID, "outbound")
+	if err != nil {
+		return err
+	}
+
+	l.InboundSequence = &Sequence{}
+	err = l.InboundSequence.Get(l.ID, "inbound")
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type RouteSections struct {
@@ -74,9 +99,16 @@ func (r *RouteAPI) ParseJSON(reader io.Reader, datasource ctdf.DataSource) error
 			})
 		}
 
+		if len(line.RouteSections) > 2 {
+			pretty.Println(line.ID, line.Name, len(line.RouteSections))
+		}
+
+		r.Lines = append(r.Lines, &line)
 		r.Services = append(r.Services, &ctdf.Service{
-			PrimaryIdentifier: fmt.Sprintf("GB:TFL:SERVICE:%s", line.ID),
-			OtherIdentifiers:  map[string]string{},
+			PrimaryIdentifier: fmt.Sprintf(ServiceIDFormat, line.ID),
+			OtherIdentifiers: map[string]string{
+				"LineID": line.ID,
+			},
 
 			CreationDateTime:     creationDateTime,
 			ModificationDateTime: modifiedDateTime,
@@ -138,4 +170,40 @@ func (r *RouteAPI) ImportIntoMongoAsCTDF() {
 			log.Fatal().Err(err).Msg("Failed to bulk write Services")
 		}
 	}
+}
+
+func (line *Line) GenerateCTDFJourneys(datasource ctdf.DataSource) error {
+	datasource.Dataset = "Line/Route/Sequence,Line/Timetable"
+
+	// TODO handle both inbound & outbound
+	sequence := line.OutboundSequence
+
+	for _, stopPointSequence := range sequence.StopPointSequences {
+		baseJourney := ctdf.Journey{
+			PrimaryIdentifier: fmt.Sprintf("%s:%s:%s:%d", "GB:NOC:TFLO", line.ID, sequence.Direction, stopPointSequence.BranchID),
+			OtherIdentifiers: map[string]string{
+				"LineID":   line.ID,
+				"BranchID": fmt.Sprint(stopPointSequence.BranchID),
+			},
+
+			CreationDateTime:     time.Now(),
+			ModificationDateTime: time.Now(),
+
+			DataSource: &datasource,
+
+			ServiceRef:         fmt.Sprintf(ServiceIDFormat, line.ID),
+			OperatorRef:        "GB:NOC:TFLO",
+			Direction:          sequence.Direction,
+			DepartureTime:      time.Date(0, 1, 1, 23, 59, 59, 0, time.UTC),
+			DestinationDisplay: line.Name,
+
+			Availability: nil,
+
+			Path: []*ctdf.JourneyPathItem{},
+		}
+
+		pretty.Println(baseJourney)
+	}
+
+	return nil
 }
