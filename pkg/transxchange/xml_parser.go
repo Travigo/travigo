@@ -5,12 +5,14 @@ import (
 	"io"
 
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/html/charset"
 )
 
 func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 	transXChange := TransXChange{}
 
 	d := xml.NewDecoder(reader)
+	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {

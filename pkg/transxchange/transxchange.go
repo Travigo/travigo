@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -24,6 +25,8 @@ import (
 )
 
 const DateTimeFormat = "2006-01-02T15:04:05"
+const DateTimeFormatWithTimezoneRegex = ".+[+-]\\d{2}:\\d{2}"
+const DateTimeFormatWithTimezone = "2006-01-02T15:04:05-07:00"
 
 type TransXChange struct {
 	CreationDateTime     string `xml:",attr"`
@@ -47,8 +50,8 @@ func (n *TransXChange) Validate() error {
 	if n.ModificationDateTime == "" {
 		return errors.New("ModificationDateTime must be set")
 	}
-	if n.SchemaVersion != "2.4" {
-		return errors.New("SchemaVersion must be 2.4")
+	if !(n.SchemaVersion == "2.1" || n.SchemaVersion == "2.4") {
+		return errors.New("SchemaVersion must be 2.1 or 2.4")
 	}
 
 	return nil
@@ -57,6 +60,8 @@ func (n *TransXChange) Validate() error {
 func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "transxchange"
 	datasource.Identifier = doc.ModificationDateTime
+
+	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
 
 	servicesCollection := database.GetCollection("services")
 	journeysCollection := database.GetCollection("journeys")
@@ -72,6 +77,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	}
 
 	journeyIdentificationIndexName := "JourneyIdentificationIndex"
+	journeyIdentificationIndexName2 := "JourneyIdentificationIndex2"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
@@ -94,6 +100,15 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				{Key: "otheridentifiers.RealtimeJourneyCode", Value: 1},
 				{Key: "path.originstopref", Value: 1},
 				{Key: "path.destinationstopref", Value: 1},
+			},
+		},
+		{
+			Options: &options.IndexOptions{
+				Name: &journeyIdentificationIndexName2,
+			},
+			Keys: bson.D{
+				{Key: "serviceref", Value: 1},
+				{Key: "otheridentifiers.RealtimeJourneyCode", Value: 1},
 			},
 		},
 	}, options.CreateIndexes())
@@ -148,8 +163,27 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 			servicesReferences[localServiceIdentifier] = txcService
 
-			creationTime, _ := time.Parse(DateTimeFormat, txcService.CreationDateTime)
-			modificationTime, _ := time.Parse(DateTimeFormat, txcService.ModificationDateTime)
+			// Get Creation & Modification date times from either the individual record or the whole document if that doesnt exist
+			// Some regex checks to see if it has a timezone
+			creationDateTimeString := txcService.CreationDateTime
+			if creationDateTimeString == "" && doc.CreationDateTime != "" {
+				creationDateTimeString = doc.CreationDateTime
+			}
+			creationDateTimeFormat := DateTimeFormat
+			if dateTimeFormatWithTimezoneRegex.MatchString(creationDateTimeString) {
+				creationDateTimeFormat = DateTimeFormatWithTimezone
+			}
+			creationTime, _ := time.Parse(creationDateTimeFormat, creationDateTimeString)
+
+			modificationDateTimeString := txcService.ModificationDateTime
+			if modificationDateTimeString == "" && doc.ModificationDateTime != "" {
+				modificationDateTimeString = doc.ModificationDateTime
+			}
+			modificationDateTimeFormat := DateTimeFormat
+			if dateTimeFormatWithTimezoneRegex.MatchString(modificationDateTimeString) {
+				modificationDateTimeFormat = DateTimeFormatWithTimezone
+			}
+			modificationTime, _ := time.Parse(modificationDateTimeFormat, modificationDateTimeString)
 
 			ctdfService := ctdf.Service{
 				PrimaryIdentifier: serviceIdentifier,
@@ -388,10 +422,29 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					log.Error().Msgf("Vehicle journey %s has a nil availability", txcJourney.VehicleJourneyCode)
 				}
 
-				// Create CTDF Journey record
-				creationTime, _ := time.Parse(DateTimeFormat, txcJourney.CreationDateTime)
-				modificationTime, _ := time.Parse(DateTimeFormat, txcJourney.ModificationDateTime)
+				// Get Creation & Modification date times from either the individual record or the whole document if that doesnt exist
+				// Some regex checks to see if it has a timezone
+				creationDateTimeString := txcJourney.CreationDateTime
+				if creationDateTimeString == "" && doc.CreationDateTime != "" {
+					creationDateTimeString = doc.CreationDateTime
+				}
+				creationDateTimeFormat := DateTimeFormat
+				if dateTimeFormatWithTimezoneRegex.MatchString(creationDateTimeString) {
+					creationDateTimeFormat = DateTimeFormatWithTimezone
+				}
+				creationTime, _ := time.Parse(creationDateTimeFormat, creationDateTimeString)
 
+				modificationDateTimeString := txcJourney.ModificationDateTime
+				if modificationDateTimeString == "" && doc.ModificationDateTime != "" {
+					modificationDateTimeString = doc.ModificationDateTime
+				}
+				modificationDateTimeFormat := DateTimeFormat
+				if dateTimeFormatWithTimezoneRegex.MatchString(modificationDateTimeString) {
+					modificationDateTimeFormat = DateTimeFormatWithTimezone
+				}
+				modificationTime, _ := time.Parse(modificationDateTimeFormat, modificationDateTimeString)
+
+				// Create CTDF Journey record
 				ctdfJourney := ctdf.Journey{
 					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
 					OtherIdentifiers: map[string]string{
