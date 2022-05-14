@@ -34,7 +34,7 @@ cronjobs:
 
 deployments:
   - name: sirivm-all
-    args: ["file", "--repeat-every", "10s", "--file-format", "xml", "siri-vm", "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"]
+    args: ["file", "--repeat-every", "45s", "--file-format", "xml", "siri-vm", "https://data.bus-data.dft.gov.uk/api/v1/datafeed/"]
 
 resources: {}
 podAnnotations: {}

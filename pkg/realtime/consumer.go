@@ -319,25 +319,18 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	loc, _ := time.LoadLocation("Europe/London")
 	currentTime := vehicleLocationEvent.CreationDateTime
 
-	// TODO HACK
-	// currentTime = time.Date(
-	// 	currentTime.Year(),
-	// 	currentTime.Month(),
-	// 	currentTime.Day(),
-	// 	currentTime.Hour(),
-	// 	currentTime.Minute(),
-	// 	currentTime.Second(),
-	// 	currentTime.Nanosecond(),
-	// 	loc,
-	// )
-
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
+	wasCacheHit := false
 
 	if cachedJourney == nil || cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+
+		for _, pathItem := range journey.Path {
+			pathItem.GetDestinationStop()
+		}
 
 		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
 	} else {
@@ -348,6 +341,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			json.Unmarshal([]byte(cachedJourney.(string)), &journey)
 		}
 
+		wasCacheHit = true
 	}
 
 	closestDistance := 999999999999.0
@@ -385,8 +379,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	if closestDistanceJourneyPath == nil {
 		closestDistance = 999999999999.0
 		for i, journeyPathItem := range journey.Path {
-			journeyPathItem.GetDestinationStop()
-
 			if journeyPathItem.DestinationStop == nil {
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
 			}
@@ -405,7 +397,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			closestDistanceJourneyPathPercentComplete = 0.5
 		} else {
 			previousJourneyPath := journey.Path[len(journey.Path)-1]
-			previousJourneyPath.GetDestinationStop()
 
 			if previousJourneyPath.DestinationStop == nil {
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
@@ -496,13 +487,16 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	// Update database
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
-
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
 	var realtimeJourney *ctdf.RealtimeJourney
+	if wasCacheHit {
+		realtimeJourney = &ctdf.RealtimeJourney{}
+	} else {
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+	}
 
 	if realtimeJourney == nil {
 		realtimeJourney = &ctdf.RealtimeJourney{
@@ -539,9 +533,9 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	}
 
 	bsonRep, _ := bson.Marshal(realtimeJourney)
-	updateModel := mongo.NewReplaceOneModel()
+	updateModel := mongo.NewUpdateOneModel()
 	updateModel.SetFilter(searchQuery)
-	updateModel.SetReplacement(bsonRep)
+	updateModel.SetUpdate(bson.M{"$set": bsonRep})
 	updateModel.SetUpsert(true)
 
 	return updateModel, nil
