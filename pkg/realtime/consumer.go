@@ -532,10 +532,10 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		realtimeJourney.Stops[key] = stopUpdate
 	}
 
-	bsonRep, _ := bson.Marshal(realtimeJourney)
+	bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
 	updateModel := mongo.NewUpdateOneModel()
 	updateModel.SetFilter(searchQuery)
-	updateModel.SetUpdate(bson.M{"$set": bsonRep})
+	updateModel.SetUpdate(bsonRep)
 	updateModel.SetUpsert(true)
 
 	return updateModel, nil
