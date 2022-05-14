@@ -35,7 +35,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 
 		// Skip any records that haven't been updated in over 20 minutes
 		if recordedAtDifference.Minutes() > 20 {
-			return false
+			// return false
 		}
 	}
 
@@ -102,7 +102,7 @@ func checkQueueSize(submittedRecords int64) {
 
 	if inQueue > 2*submittedRecords {
 		log.Info().Int64("queueSize", inQueue).Msgf("Queue size too large, sleeping")
-		time.Sleep(2 * time.Minute)
+		time.Sleep(5 * time.Minute)
 
 		checkQueueSize(submittedRecords)
 	}
