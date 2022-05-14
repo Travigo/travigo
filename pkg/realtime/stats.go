@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/database"
