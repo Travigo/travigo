@@ -179,12 +179,16 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{
 				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"$or": bson.A{
-					bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
-					// bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-				}},
+				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
 			},
 		})
+
+		journeys = append(journeys, GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+			},
+		})...)
 	}
 
 	if len(journeys) == 0 {

@@ -76,7 +76,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 		panic(err)
 	}
 
-	journeyIdentificationServiceStopsIndexName := "JourneyIdentificationServiceStops"
+	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
+	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
 	journeyIdentificationServiceJourneycodeIndexName := "JourneyIdentificationServiceJourneycode"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
@@ -93,11 +94,19 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 		},
 		{
 			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceStopsIndexName,
+				Name: &journeyIdentificationServiceOriginStopsIndexName,
 			},
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
 				{Key: "path.originstopref", Value: 1},
+			},
+		},
+		{
+			Options: &options.IndexOptions{
+				Name: &journeyIdentificationServiceDestinationStopsIndexName,
+			},
+			Keys: bson.D{
+				{Key: "serviceref", Value: 1},
 				{Key: "path.destinationstopref", Value: 1},
 			},
 		},
