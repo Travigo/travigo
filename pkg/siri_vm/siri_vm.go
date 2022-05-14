@@ -100,7 +100,7 @@ func checkQueueSize(submittedRecords int64) {
 	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
 	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue > 2*submittedRecords {
+	if inQueue > int64(1.5*float64(submittedRecords)) {
 		log.Info().Int64("queueSize", inQueue).Msgf("Queue size too large, sleeping")
 		time.Sleep(5 * time.Minute)
 
