@@ -322,7 +322,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	var journey *CacheJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
-	wasCacheHit := false
 
 	if cachedJourney == nil || cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
@@ -340,8 +339,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		case string:
 			json.Unmarshal([]byte(cachedJourney.(string)), &journey)
 		}
-
-		wasCacheHit = true
 	}
 
 	closestDistance := 999999999999.0
@@ -490,13 +487,9 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
 	var realtimeJourney *ctdf.RealtimeJourney
-	if wasCacheHit {
-		realtimeJourney = &ctdf.RealtimeJourney{}
-	} else {
-		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-	}
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
 	if realtimeJourney == nil {
 		realtimeJourney = &ctdf.RealtimeJourney{
