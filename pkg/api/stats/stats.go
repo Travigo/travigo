@@ -112,6 +112,6 @@ func UpdateRecordsStats() {
 			Refresh: "true",
 		})
 
-		time.Sleep(1 * time.Minute)
+		time.Sleep(10 * time.Minute)
 	}
 }
