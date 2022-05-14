@@ -84,10 +84,10 @@ func startRealtimeConsumer(id int) {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(200, 100*time.Millisecond); err != nil {
+	if err := queue.StartConsuming(200, 1*time.Second); err != nil {
 		panic(err)
 	}
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 100, 1*time.Second, NewBatchConsumer(id)); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 200, 2*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }
