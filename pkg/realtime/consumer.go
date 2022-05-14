@@ -73,20 +73,21 @@ func StartConsumers() {
 	// Start the background consumers
 	log.Info().Msg("Starting realtime consumers")
 
-	for i := 0; i < numConsumers; i++ {
-		go startRealtimeConsumer(i)
-	}
-}
-func startRealtimeConsumer(id int) {
-	log.Info().Msgf("Starting realtime consumer %d", id)
-
 	queue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(200, 1*time.Second); err != nil {
+	if err := queue.StartConsuming(numConsumers*200, 1*time.Second); err != nil {
 		panic(err)
 	}
+
+	for i := 0; i < numConsumers; i++ {
+		go startRealtimeConsumer(queue, i)
+	}
+}
+func startRealtimeConsumer(queue rmq.Queue, id int) {
+	log.Info().Msgf("Starting realtime consumer %d", id)
+
 	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 200, 2*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
