@@ -173,26 +173,39 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 			bson.M{"otheridentifiers.JourneyCode": vehicleJourneyRef},
 		},
 	})
-
-	// If we fail with the JourneyCode then try with the stops
-	if len(journeys) == 0 {
-		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
-			},
-		})
+	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+	if err == nil {
+		return identifiedJourney, nil
 	}
 
-	if len(journeys) == 0 {
-		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-			},
-		})
+	// If we fail with the JourneyCode then try with the origin stops
+	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+		"$and": bson.A{
+			bson.M{"serviceref": bson.M{"$in": services}},
+			bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+		},
+	})
+	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
+	if err == nil {
+		return identifiedJourney, nil
 	}
 
+	// If fail with that we then try destination stop
+	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+		"$and": bson.A{
+			bson.M{"serviceref": bson.M{"$in": services}},
+			bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+		},
+	})
+	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
+	if err == nil {
+		return identifiedJourney, nil
+	} else {
+		return nil, err
+	}
+}
+
+func narrowJourneys(identifyingInformation map[string]string, currentTime time.Time, journeys []*Journey) (*Journey, error) {
 	if len(journeys) == 0 {
 		return nil, errors.New("Could not find related Journeys")
 	} else if len(journeys) == 1 {
