@@ -456,6 +456,11 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	// Offset is how far behind or ahead the vehicle is from its positions expected time
 	offset := currentTime.Sub(currentPathPositionExpectedTime)
 
+	// If the offset is too small then just turn it to zero so we can mark buses as on time
+	if offset.Seconds() <= 45 {
+		offset = time.Duration(0)
+	}
+
 	// Calculate all the estimated stop arrival & departure times
 	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
 	for i := closestDistanceJourneyPathIndex; i < len(journey.Path); i++ {
