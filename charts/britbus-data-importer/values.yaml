@@ -10,6 +10,10 @@ redis:
   address: "redis-headless.redis:6379"
   passwordSecret: redis-password
 
+elasticsearch:
+  address: "https://primary-es-http.elastic:9200"
+  accountSecret: "britbus-elasticsearch-user"
+
 bods:
   apiKeySecret: britbus-bods-api
 
