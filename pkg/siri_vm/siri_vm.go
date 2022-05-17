@@ -123,7 +123,7 @@ func checkQueueSize() {
 	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
 	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue == 0 {
+	if inQueue != 0 {
 		time.Sleep(1 * time.Second)
 
 		checkQueueSize()
