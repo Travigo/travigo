@@ -155,7 +155,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	if len(services) == 0 {
 		serviceNameMatch := serviceNameRegex.FindStringSubmatch(serviceName)
 
-		if len(serviceNameMatch) != 2 {
+		if len(serviceNameMatch) == 2 {
 			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
 					bson.M{"operatorref": bson.M{"$in": operators}},
