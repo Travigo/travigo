@@ -223,6 +223,12 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
+		{
+			Keys: bsonx.Doc{{Key: "otheridentifiers", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "operatorgroupref", Value: bsonx.Int32(1)}},
+		},
 	}
 
 	opts := options.CreateIndexes()

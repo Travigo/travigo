@@ -67,9 +67,19 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 	journeysCollection := database.GetCollection("journeys")
 
 	//TODO: Doesnt really make sense for the TransXChange package to be managing CTDF tables and indexes
+	serviceNameOperatorRefIndexName := "ServiceNameOperatorRef"
 	_, err := servicesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+		},
+		{
+			Options: &options.IndexOptions{
+				Name: &serviceNameOperatorRefIndexName,
+			},
+			Keys: bson.D{
+				{Key: "servicename", Value: 1},
+				{Key: "operatorref", Value: 1},
+			},
 		},
 	}, options.CreateIndexes())
 	if err != nil {

@@ -77,7 +77,7 @@ func StartConsumers() {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(numConsumers*200, 1*time.Second); err != nil {
+	if err := queue.StartConsuming(numConsumers*100, 1*time.Second); err != nil {
 		panic(err)
 	}
 
@@ -88,7 +88,7 @@ func StartConsumers() {
 func startRealtimeConsumer(queue rmq.Queue, id int) {
 	log.Info().Msgf("Starting realtime consumer %d", id)
 
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 200, 2*time.Second, NewBatchConsumer(id)); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 100, 1*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }
