@@ -125,11 +125,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		}
 	}
 
-	executionDuration := time.Since(currentTime)
-	log.Info().Msgf("OPERATORS %s", executionDuration.String())
-
-	timer := time.Now()
-
 	// Get the relevant Services
 	var services []string
 	serviceName := identifyingInformation["PublishedLineName"]
@@ -156,9 +151,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		services = append(services, service.PrimaryIdentifier)
 	}
 
-	executionDuration = time.Since(timer)
-	log.Info().Msgf("SERVICES %s", executionDuration.String())
-
 	if len(services) == 0 {
 		return nil, errors.New("Could not find related Service")
 	}
@@ -174,8 +166,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
 	journeysCollection := database.GetCollection("journeys")
 
-	timer = time.Now()
-
 	// First try getting Journeys by the JourneyCode
 	journeys := GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 		"$and": bson.A{
@@ -187,11 +177,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	if err == nil {
 		return identifiedJourney, nil
 	}
-
-	executionDuration = time.Since(timer)
-	log.Info().Msgf("JOURNEYS-A %s", executionDuration.String())
-
-	timer = time.Now()
 
 	// If we fail with the JourneyCode then try with the origin & destination stops
 	journeyQuery := []bson.M{}
@@ -215,9 +200,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
 	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
-
-	executionDuration = time.Since(timer)
-	log.Info().Msgf("JOURNEYS-B %s", executionDuration.String())
 
 	if err == nil {
 		return identifiedJourney, nil

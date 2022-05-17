@@ -28,7 +28,7 @@ var journeyCache *cache.Cache
 var identificationCache *cache.Cache
 var cacheExpirationTime = 90 * time.Minute
 
-const numConsumers = 1
+const numConsumers = 5
 
 type localJourneyIDMap struct {
 	JourneyID   string
@@ -116,17 +116,11 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		startTime := time.Now()
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
-		executionDuration := time.Since(startTime)
-		log.Info().Msgf("Identify took %s", executionDuration.String())
 
 		if vehicleLocationEvent != nil {
-			log.Info().Msgf("way", vehicleLocationEvent.JourneyRef)
-			startTime := time.Now()
 			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
-			executionDuration := time.Since(startTime)
-			log.Info().Msgf("Update took %s", executionDuration.String())
+
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
 			}
@@ -136,10 +130,8 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	if len(locationEventOperations) > 0 {
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
-		startTime := time.Now()
 		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
-		executionDuration := time.Since(startTime)
-		log.Info().Msgf("Bulk write took %s", executionDuration.String())
+
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
