@@ -90,20 +90,22 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 
 	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
 
-	// Prevent queue from growing too large
-	checkQueueSize(submittedRecords)
+	// Wait for queue to empty
+	startTime := time.Now()
+	checkQueueSize()
+	executionDuration := time.Since(startTime)
+	log.Info().Msgf("Queue took %s to empty", executionDuration.String())
 
 	return nil
 }
 
-func checkQueueSize(submittedRecords int64) {
+func checkQueueSize() {
 	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
 	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue > int64(1.5*float64(submittedRecords)) {
-		log.Info().Int64("queueSize", inQueue).Msgf("Queue size too large, sleeping")
-		time.Sleep(5 * time.Minute)
+	if inQueue > 100 {
+		time.Sleep(1 * time.Second)
 
-		checkQueueSize(submittedRecords)
+		checkQueueSize()
 	}
 }
