@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -125,6 +126,11 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		}
 	}
 
+	executionDuration := time.Since(currentTime)
+	log.Info().Msgf("OPERATORS %s", executionDuration.String())
+
+	timer := time.Now()
+
 	// Get the relevant Services
 	var services []string
 	serviceName := identifyingInformation["PublishedLineName"]
@@ -151,6 +157,9 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		services = append(services, service.PrimaryIdentifier)
 	}
 
+	executionDuration = time.Since(timer)
+	log.Info().Msgf("SERVICES %s", executionDuration.String())
+
 	if len(services) == 0 {
 		return nil, errors.New("Could not find related Service")
 	}
@@ -166,6 +175,8 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
 	journeysCollection := database.GetCollection("journeys")
 
+	timer = time.Now()
+
 	// First try getting Journeys by the JourneyCode
 	journeys := GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 		"$and": bson.A{
@@ -178,22 +189,37 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		return identifiedJourney, nil
 	}
 
+	executionDuration = time.Since(timer)
+	log.Info().Msgf("JOURNEYS-A %s", executionDuration.String())
+
+	timer = time.Now()
+
 	// If we fail with the JourneyCode then try with the origin & destination stops
-	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": bson.A{
-		bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+	journeyQuery := []bson.M{}
+	for _, service := range services {
+		journeyQuery = append(journeyQuery, bson.M{"$or": bson.A{
+			bson.M{
+				"$and": bson.A{
+					bson.M{"serviceref": service},
+					bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+				},
 			},
-		},
-		bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+			bson.M{
+				"$and": bson.A{
+					bson.M{"serviceref": service},
+					bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+				},
 			},
-		},
-	}})
+		}})
+	}
+
+	pretty.Println(bson.M{"$or": journeyQuery})
+	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
+
 	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
+
+	executionDuration = time.Since(timer)
+	log.Info().Msgf("JOURNEYS-B %s", executionDuration.String())
 
 	if err == nil {
 		return identifiedJourney, nil
