@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
-	"sync"
 	"time"
 
 	"github.com/adjust/rmq/v4"
@@ -106,58 +104,35 @@ func NewBatchConsumer(id int) *BatchConsumer {
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
-	maxBatchSize := 10
-	numBatches := int(math.Ceil(float64(len(payloads)) / float64(maxBatchSize)))
+	locationEventOperations := []mongo.WriteModel{}
 
-	processingGroup := sync.WaitGroup{}
-	processingGroup.Add(numBatches)
-
-	for i := 0; i < numBatches; i++ {
-		lower := maxBatchSize * i
-		upper := maxBatchSize * (i + 1)
-
-		if upper > len(payloads) {
-			upper = len(payloads)
+	for _, payload := range payloads {
+		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
+		if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
+			if errors := batch.Reject(); err != nil {
+				for _, err := range errors {
+					log.Error().Err(err).Msg("Failed to reject realtime event")
+				}
+			}
 		}
 
-		batchSlice := payloads[lower:upper]
+		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
 
-		go func(payloads []string) {
-			locationEventOperations := []mongo.WriteModel{}
-
-			for _, payload := range payloads {
-				var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
-				if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
-					if errors := batch.Reject(); err != nil {
-						for _, err := range errors {
-							log.Error().Err(err).Msg("Failed to reject realtime event")
-						}
-					}
-				}
-
-				vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
-
-				if vehicleLocationEvent != nil {
-					writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
-					if writeModel != nil {
-						locationEventOperations = append(locationEventOperations, writeModel)
-					}
-				}
+		if vehicleLocationEvent != nil {
+			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
+			if writeModel != nil {
+				locationEventOperations = append(locationEventOperations, writeModel)
 			}
-
-			if len(locationEventOperations) > 0 {
-				realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-				_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
-				if err != nil {
-					log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
-				}
-			}
-
-			processingGroup.Done()
-		}(batchSlice)
+		}
 	}
 
-	processingGroup.Wait()
+	if len(locationEventOperations) > 0 {
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
+		}
+	}
 
 	if errors := batch.Ack(); len(errors) > 0 {
 		for _, err := range errors {
