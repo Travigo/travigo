@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
@@ -134,12 +135,11 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 
 	servicesCollection := database.GetCollection("services")
 
-	query = bson.M{
+	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
 			bson.M{"operatorref": bson.M{"$in": operators}},
 		},
-	}
-	cursor, _ := servicesCollection.Find(context.Background(), query)
+	})
 
 	for cursor.Next(context.TODO()) {
 		var service *Service
@@ -149,6 +149,29 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		}
 
 		services = append(services, service.PrimaryIdentifier)
+	}
+
+	serviceNameRegex, _ := regexp.Compile("^\\D+(\\d+)$")
+	if len(services) == 0 {
+		serviceNameMatch := serviceNameRegex.FindStringSubmatch(serviceName)
+
+		if len(serviceNameMatch) != 2 {
+			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
+				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
+					bson.M{"operatorref": bson.M{"$in": operators}},
+				},
+			})
+
+			for cursor.Next(context.TODO()) {
+				var service *Service
+				err := cursor.Decode(&service)
+				if err != nil {
+					log.Error().Err(err).Str("serviceName", serviceName).Msg("Failed to decode service")
+				}
+
+				services = append(services, service.PrimaryIdentifier)
+			}
+		}
 	}
 
 	if len(services) == 0 {
