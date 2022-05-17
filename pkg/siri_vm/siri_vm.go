@@ -11,7 +11,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
-	"github.com/elastic/go-elasticsearch/esapi"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 )
