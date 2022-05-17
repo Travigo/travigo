@@ -19,6 +19,7 @@ import (
 	"github.com/britbus/britbus/pkg/bods"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
@@ -198,6 +199,9 @@ func main() {
 
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
+	}
+	if err := elastic_client.Connect(); err != nil {
+		log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 	}
 
 	// Setup the notifications client

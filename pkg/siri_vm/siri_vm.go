@@ -1,6 +1,7 @@
 package siri_vm
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"io"
@@ -8,7 +9,9 @@ import (
 
 	"github.com/adjust/rmq/v4"
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
+	"github.com/elastic/go-elasticsearch/esapi"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 )
@@ -21,6 +24,11 @@ type SiriVMVehicleIdentificationEvent struct {
 	VehicleActivity *VehicleActivity
 	DataSource      *ctdf.DataSource
 	ResponseTime    time.Time
+}
+
+type queueEmptyElasticEvent struct {
+	Timestamp time.Time
+	Duration  int
 }
 
 func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource *ctdf.DataSource) bool {
@@ -95,6 +103,18 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 	checkQueueSize()
 	executionDuration := time.Since(startTime)
 	log.Info().Msgf("Queue took %s to empty", executionDuration.String())
+
+	// Publish stats to Elasticsearch
+	elasticEvent, _ := json.Marshal(&queueEmptyElasticEvent{
+		Duration:  int(executionDuration.Seconds()),
+		Timestamp: time.Now(),
+	})
+
+	elastic_client.IndexRequest(&esapi.IndexRequest{
+		Index:   "sirivm-queue-empty-1",
+		Body:    bytes.NewReader(elasticEvent),
+		Refresh: "true",
+	})
 
 	return nil
 }
