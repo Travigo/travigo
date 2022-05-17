@@ -152,8 +152,12 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 					log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 				}
 			}
+
+			processingGroup.Done()
 		}(batchSlice)
 	}
+
+	processingGroup.Wait()
 
 	if errors := batch.Ack(); len(errors) > 0 {
 		for _, err := range errors {
