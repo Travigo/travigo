@@ -178,26 +178,23 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		return identifiedJourney, nil
 	}
 
-	// If we fail with the JourneyCode then try with the origin stops
-	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
-		"$and": bson.A{
-			bson.M{"serviceref": bson.M{"$in": services}},
-			bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+	// If we fail with the JourneyCode then try with the origin & destination stops
+	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": bson.A{
+		bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+			},
 		},
-	})
+		bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+			},
+		},
+	}})
 	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
-	if err == nil {
-		return identifiedJourney, nil
-	}
 
-	// If fail with that we then try destination stop
-	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
-		"$and": bson.A{
-			bson.M{"serviceref": bson.M{"$in": services}},
-			bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
-		},
-	})
-	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
 	if err == nil {
 		return identifiedJourney, nil
 	} else {
