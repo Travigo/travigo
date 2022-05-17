@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -213,7 +212,6 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		}})
 	}
 
-	pretty.Println(bson.M{"$or": journeyQuery})
 	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
 	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
