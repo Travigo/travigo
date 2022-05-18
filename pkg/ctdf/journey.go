@@ -189,11 +189,11 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
 	journeysCollection := database.GetCollection("journeys")
 
-	// First try getting Journeys by the JourneyCode
+	// First try getting Journeys by the TicketMachineJourneyCode
 	journeys := GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 		"$and": bson.A{
 			bson.M{"serviceref": bson.M{"$in": services}},
-			bson.M{"otheridentifiers.JourneyCode": vehicleJourneyRef},
+			bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
 		},
 	})
 	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)

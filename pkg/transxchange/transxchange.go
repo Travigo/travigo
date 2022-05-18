@@ -490,7 +490,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 
 				// Create CTDF Journey record
 				ctdfJourney := ctdf.Journey{
-					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode),
+					PrimaryIdentifier: fmt.Sprintf("%s:%s:%s:%s:%s", operatorRef, serviceRef, txcJourney.VehicleJourneyCode, txcJourney.JourneyPatternRef, txcJourney.Operational.TicketMachine.JourneyCode),
 					OtherIdentifiers: map[string]string{
 						"PrivateCode": txcJourney.PrivateCode,
 						"JourneyCode": txcJourney.VehicleJourneyCode,
@@ -514,7 +514,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 
 				// Get the vehicle journey reference code
 				if txcJourney.Operational.TicketMachine.JourneyCode != "" {
-					ctdfJourney.OtherIdentifiers["JourneyCode"] = txcJourney.Operational.TicketMachine.JourneyCode
+					ctdfJourney.OtherIdentifiers["TicketMachineJourneyCode"] = txcJourney.Operational.TicketMachine.JourneyCode
 				}
 
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
