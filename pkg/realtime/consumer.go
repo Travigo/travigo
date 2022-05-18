@@ -17,6 +17,7 @@ import (
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -169,6 +170,9 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	case "UNO":
 		// Uno (GB:NOCID:137967)
 		operatorRef = "UNOE"
+	case "SBS":
+		// Select Bus Services (GB:NOCID:135680)
+		operatorRef = "SLBS"
 	case "BC", "WA", "WB", "WN", "CV", "PB", "YW", "AG", "PN":
 		// National Express West Midlands (GB:NOCID:138032)
 		operatorRef = "TCVW"
@@ -219,6 +223,8 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			case "Could not narrow down to single Journey by time. Still many remaining":
 				errorCode = "JOURNEYNARROW_MANY"
 			}
+
+			pretty.Println(err.Error(), vehicle.MonitoredVehicleJourney)
 
 			// Record the failed identification event
 			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
