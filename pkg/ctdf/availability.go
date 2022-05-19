@@ -108,7 +108,8 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 		specialDayDateYear := SpecialDays[dateTime.Year()]
 
 		if specialDayDateYear == nil {
-			log.Error().Msgf("Looks like year %d doesnt exist in SpecialDays", dateTime.Year())
+			// TODO FIX THIS????????!!!! has availability completely broken!
+			// log.Error().Msgf("Looks like year %d doesnt exist in SpecialDays", dateTime.Year())
 			return false
 		}
 
