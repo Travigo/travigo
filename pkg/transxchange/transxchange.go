@@ -524,6 +524,10 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 				if txcJourney.Operational.TicketMachine.JourneyCode != "" {
 					ctdfJourney.OtherIdentifiers["TicketMachineJourneyCode"] = txcJourney.Operational.TicketMachine.JourneyCode
 				}
+				// Get the vehicle block number code
+				if txcJourney.Operational.Block.BlockNumber != "" {
+					ctdfJourney.OtherIdentifiers["BlockNumber"] = txcJourney.Operational.Block.BlockNumber
+				}
 
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 

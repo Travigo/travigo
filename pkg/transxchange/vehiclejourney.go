@@ -28,6 +28,9 @@ type VehicleJourney struct {
 		TicketMachine struct {
 			JourneyCode string
 		}
+		Block struct {
+			BlockNumber string
+		}
 	}
 
 	VehicleJourneyTimingLinks []VehicleJourneyTimingLink `xml:"VehicleJourneyTimingLink"`
