@@ -88,7 +88,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 
 	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
 	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
-	journeyIdentificationServiceJourneycodeIndexName := "JourneyIdentificationServiceJourneycode"
+	journeyIdentificationServiceTicketMachineJourneycodeIndexName := "JourneyIdentificationServiceTicketMachineJourneyCode"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
@@ -122,11 +122,11 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 		},
 		{
 			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceJourneycodeIndexName,
+				Name: &journeyIdentificationServiceTicketMachineJourneycodeIndexName,
 			},
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
-				{Key: "otheridentifiers.JourneyCode", Value: 1},
+				{Key: "otheridentifiers.TicketMachineJourneyCode", Value: 1},
 			},
 		},
 	}, options.CreateIndexes())
@@ -180,6 +180,14 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
 			if operatorRef == "" {
 				operatorRef = "BRITBUS:INTERNAL:NOREF"
+
+				// if we cant find the reference and theres only 1 in the operators map then just use that
+				// some documents dont use the correct reference in the services
+				if len(operatorLocalMapping) == 1 {
+					for _, ref := range operatorLocalMapping {
+						operatorRef = ref
+					}
+				}
 			}
 
 			// TODO clean this up
