@@ -17,7 +17,6 @@ import (
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -224,7 +223,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				errorCode = "JOURNEYNARROW_MANY"
 			}
 
-			pretty.Println(err.Error(), vehicle.MonitoredVehicleJourney)
+			// pretty.Println(err.Error(), vehicle.MonitoredVehicleJourney)
 
 			// Record the failed identification event
 			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
