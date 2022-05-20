@@ -273,6 +273,27 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 		}
 
 		if len(timeFilteredJourneys) == 0 {
+			// Check for identical(ish) Journeys
+			if len(journeys) == 2 && len(journeys[0].Path) == len(journeys[1].Path) && journeys[0].DepartureTime == journeys[1].DepartureTime {
+				identical := true
+
+				for i := 0; i < len(journeys[0].Path); i++ {
+					a := journeys[0].Path[i]
+					b := journeys[1].Path[i]
+
+					if a.OriginStopRef != b.OriginStopRef || a.OriginArrivalTime != b.OriginArrivalTime || a.OriginDepartureTime != b.OriginDepartureTime {
+						identical = false
+					}
+					if a.DestinationStopRef != b.DestinationStopRef || a.DestinationArrivalTime != b.DestinationArrivalTime {
+						identical = false
+					}
+				}
+
+				if identical {
+					return journeys[0], nil
+				}
+			}
+
 			return nil, errors.New("Could not narrow down to single Journey with departure time. Now zero")
 		} else if len(timeFilteredJourneys) == 1 {
 			return timeFilteredJourneys[0], nil
