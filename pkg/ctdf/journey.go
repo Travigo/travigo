@@ -248,6 +248,14 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 
 	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
 
+	// if err != nil {
+	// 	for _, v := range journeys {
+	// 		if (v.Path[0].OriginStopRef == identifyingInformation["OriginRef"]) || (v.Path[len(v.Path)-1].DestinationStopRef == identifyingInformation["DestinationRef"]) {
+	// 			pretty.Println(v.DepartureTime, identifyingInformation["OriginAimedDepartureTime"])
+	// 		}
+	// 	}
+	// }
+
 	if err == nil {
 		return identifiedJourney, nil
 	} else {
@@ -263,12 +271,35 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 	} else {
 		timeFilteredJourneys := []*Journey{}
 
+		// Filter based on exact time
 		for _, journey := range journeys {
 			originAimedDepartureTimeNoOffset, _ := time.Parse(XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
 			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
 
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)
+			}
+		}
+
+		// If fail exact time then give a few minute on each side a try if at least one of the start/end stops match
+		allowedMinuteOffset := 5
+		if len(timeFilteredJourneys) == 0 {
+			for _, journey := range journeys {
+				// Skip check if none of the start/end stops match
+				if !(journey.Path[0].OriginStopRef == identifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == identifyingInformation["DestinationRef"]) {
+					continue
+				}
+
+				originAimedDepartureTimeNoOffset, _ := time.Parse(XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
+				originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
+
+				originAimedDepartureTimeDayMinutes := (originAimedDepartureTime.Hour() * 60) + originAimedDepartureTime.Minute()
+				journeyDepartureTimeDayMinutes := (journey.DepartureTime.Hour() * 60) + journey.DepartureTime.Minute()
+				dayMinuteDiff := originAimedDepartureTimeDayMinutes - journeyDepartureTimeDayMinutes
+
+				if dayMinuteDiff <= allowedMinuteOffset && dayMinuteDiff >= (allowedMinuteOffset*-1) {
+					timeFilteredJourneys = append(timeFilteredJourneys, journey)
+				}
 			}
 		}
 
