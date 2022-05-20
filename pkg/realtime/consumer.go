@@ -196,6 +196,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
 			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 			"VehicleJourneyRef":        vehicleJourneyRef,
+			"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
 			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
 			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
 			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,

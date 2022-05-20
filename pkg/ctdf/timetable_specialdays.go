@@ -65,6 +65,7 @@ func loadGBBankHolidayCache() {
 			"Spring bank holiday":    "GB:BankHoliday:SpringBank",
 			"Summer bank holiday":    "GB:BankHoliday:LateSummerBankHolidayNotScotland",
 			"St Andrew's Day":        "GB:BankHoliday:StAndrewsDayHoliday",
+			"St Andrew’s Day":        "GB:BankHoliday:StAndrewsDayHoliday",
 			"2nd January":            "GB:BankHoliday:Jan2ndScotlandHoliday",
 		}
 

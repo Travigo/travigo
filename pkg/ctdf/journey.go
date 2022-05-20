@@ -184,24 +184,48 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		framedVehicleJourneyDate = time.Now()
 	} else {
 		framedVehicleJourneyDate, _ = time.Parse(YearMonthDayFormat, identifyingInformation["FramedVehicleJourneyDate"])
+
+		// Fallback for dodgy formatted frames
+		if framedVehicleJourneyDate.Year() < 2022 {
+			framedVehicleJourneyDate = time.Now()
+		}
 	}
 
+	journeys := []*Journey{}
+
 	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
+	blockRef := identifyingInformation["BlockRef"]
 	journeysCollection := database.GetCollection("journeys")
 
 	// First try getting Journeys by the TicketMachineJourneyCode
-	journeys := GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
-		"$and": bson.A{
-			bson.M{"serviceref": bson.M{"$in": services}},
-			bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
-		},
-	})
-	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
-	if err == nil {
-		return identifiedJourney, nil
+	if vehicleJourneyRef != "" {
+		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
+			},
+		})
+		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+		if err == nil {
+			return identifiedJourney, nil
+		}
 	}
 
-	// If we fail with the JourneyCode then try with the origin & destination stops
+	// Fallback to Block Ref
+	if blockRef != "" {
+		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+			"$and": bson.A{
+				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"otheridentifiers.BlockNumber": blockRef},
+			},
+		})
+		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+		if err == nil {
+			return identifiedJourney, nil
+		}
+	}
+
+	// If we fail with the ID codes then try with the origin & destination stops
 	journeyQuery := []bson.M{}
 	for _, service := range services {
 		journeyQuery = append(journeyQuery, bson.M{"$or": bson.A{
@@ -222,7 +246,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 
 	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
-	identifiedJourney, err = narrowJourneys(identifyingInformation, currentTime, journeys)
+	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
 
 	if err == nil {
 		return identifiedJourney, nil

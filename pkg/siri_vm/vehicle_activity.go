@@ -35,5 +35,6 @@ type MonitoredVehicleJourney struct {
 	}
 	Bearing float64
 
+	BlockRef   string
 	VehicleRef string
 }
