@@ -389,6 +389,14 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 				operatorRef := operatorLocalMapping[txcJourneyOperatorRef] // NOT ALWAYS THERE, could be in SERVICE DEFINITION
 				if operatorRef == "" {
 					operatorRef = "BRITBUS:INTERNAL:NOREF"
+
+					// if we cant find the reference and theres only 1 in the operators map then just use that
+					// some documents dont use the correct reference in the services
+					if len(operatorLocalMapping) == 1 {
+						for _, ref := range operatorLocalMapping {
+							operatorRef = ref
+						}
+					}
 				}
 
 				// TODO clean this up
