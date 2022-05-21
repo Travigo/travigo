@@ -286,6 +286,10 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 		if len(timeFilteredJourneys) == 0 {
 			for _, journey := range journeys {
 				// Skip check if none of the start/end stops match
+				if len(journey.Path) == 0 {
+					continue
+				}
+
 				if !(journey.Path[0].OriginStopRef == identifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == identifyingInformation["DestinationRef"]) {
 					continue
 				}
