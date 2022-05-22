@@ -131,10 +131,18 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 	realtimeTimeframe := startDateTime.Format("2006-01-02")
 
-	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, startDateTime, realtimeTimeframe, true)
-	journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, dayAfterDateTime, realtimeTimeframe, false)
+	var journeysTimetable []*ctdf.TimetableRecord
 
-	journeysTimetable := append(journeysTimetableToday, journeysTimetableTomorrow...)
+	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, startDateTime, realtimeTimeframe, true)
+
+	// If not enough journeys in todays timetable then look into tomorrows
+	if len(journeysTimetableToday) < count {
+		journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, dayAfterDateTime, realtimeTimeframe, false)
+
+		journeysTimetable = append(journeysTimetableToday, journeysTimetableTomorrow...)
+	} else {
+		journeysTimetable = journeysTimetableToday
+	}
 
 	// Sort timetable by TimetableRecord time
 	sort.Slice(journeysTimetable, func(i, j int) bool {

@@ -62,11 +62,16 @@ func (j *Journey) GetDeepReferences() {
 	}
 }
 func (j *Journey) GetRealtimeJourney(timeframe string) {
+	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
+
 	realtimeJourneyIdentifier := fmt.Sprintf(RealtimeJourneyIDFormat, timeframe, j.PrimaryIdentifier)
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 	var realtimeJourney *RealtimeJourney
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": realtimeJourneyIdentifier}).Decode(&realtimeJourney)
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
+		"primaryidentifier":    realtimeJourneyIdentifier,
+		"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+	}).Decode(&realtimeJourney)
 
 	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
