@@ -536,6 +536,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	realtimeJourney.VehicleBearing = vehicleLocationEvent.VehicleBearing
 	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
 	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+	realtimeJourney.Offset = offset
 
 	for key, stopUpdate := range journeyStopUpdates {
 		realtimeJourney.Stops[key] = stopUpdate

@@ -211,7 +211,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		}
 	}
 
-	// Fallback to Block Ref
+	// Fallback to Block Ref (incorrect usage of block ref but it kinda works)
 	if blockRef != "" {
 		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{

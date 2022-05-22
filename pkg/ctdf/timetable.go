@@ -1,7 +1,13 @@
 package ctdf
 
 import (
+	"context"
 	"time"
+
+	"github.com/britbus/britbus/pkg/database"
+	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type TimetableRecord struct {
@@ -22,8 +28,9 @@ const (
 
 func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*TimetableRecord {
 	timetable := []*TimetableRecord{}
-	// journeysCollection := database.GetCollection("journeys")
-	// stopsCollection := database.GetCollection("stops")
+	journeysCollection := database.GetCollection("journeys")
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
@@ -59,57 +66,46 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 		if availability.MatchDate(dateTime) {
 			journey.GetReferences()
-			// This idea might not actually work :(
-			/*
-				// If the departure is within 90 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
-				// We estimate the current vehicle realtime journey based on when the bus may turn around and switch journeys
-				stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
-				if doEstimates && timetableRecordType == TimetableRecordTypeScheduled && stopDeperatureTimeFromNow <= 90 && stopDeperatureTimeFromNow >= 0 {
-					lastPathItem := journey.Path[len(journey.Path)-1]
-					numPotentials := 0
 
-					lastPathItem.GetDestinationStop()
-					associatedStopRef := lastPathItem.DestinationStopRef
+			// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
+			// We estimate the current vehicle realtime journey based on the Block Number
+			stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
+			if doEstimates &&
+				timetableRecordType == TimetableRecordTypeScheduled &&
+				stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
+				journey.OtherIdentifiers["BlockNumber"] != "" {
 
-					if len(lastPathItem.DestinationStop.Associations) == 1 && lastPathItem.DestinationStop.Associations[0].Type == "stop_group" {
-						var associatedStop *Stop
-						stopsCollection.FindOne(context.Background(),
-							bson.M{"$and": bson.A{
-								bson.M{"associations.associatedidentifier": lastPathItem.DestinationStop.Associations[0].AssociatedIdentifier},
-								bson.M{"primaryidentifier": bson.M{"$ne": lastPathItem.DestinationStopRef}},
-							}},
-						).Decode(&associatedStop)
+				blockJourneys := []string{}
+				cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]})
 
-						if associatedStop != nil {
-							associatedStopRef = associatedStop.PrimaryIdentifier
-						}
+				for cursor.Next(context.TODO()) {
+					var blockJourney Journey
+					err := cursor.Decode(&blockJourney)
+					if err != nil {
+						log.Error().Err(err).Msg("Failed to decode Journey")
 					}
 
-					cursor, _ := journeysCollection.Find(context.Background(), bson.M{"$and": bson.A{
-						// bson.M{"serviceref": journey.ServiceRef},
-						bson.M{"path.originstopref": associatedStopRef},
-					}})
+					blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
+				}
 
-					for cursor.Next(context.TODO()) {
-						var journey Journey
-						err := cursor.Decode(&journey)
-						if err != nil {
-							log.Error().Err(err).Msg("Failed to decode Stop")
-							continue
-						}
+				var blockRealtimeJourney *RealtimeJourney
+				realtimeJourneysCollection.FindOne(context.Background(),
+					bson.M{
+						"journeyref": bson.M{
+							"$in": blockJourneys,
+						},
+						"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+					}, &options.FindOneOptions{}).Decode(&blockRealtimeJourney)
 
-						// Its more effecient for the db to do the query on all journeys containing this stop and then checking if its the first in code
-						// The index isnt used for array index based searches
-						if journey.Path[0].OriginStopRef == associatedStopRef {
-							numPotentials += 1
-						}
+				if blockRealtimeJourney != nil {
+					// Ignore negative offsets as we assume bus will right itself when turning over
+					if blockRealtimeJourney.Offset.Minutes() > 0 {
+						stopDeperatureTime = stopDeperatureTime.Add(blockRealtimeJourney.Offset)
 					}
-
-					pretty.Println(lastPathItem.DestinationStopRef, lastPathItem.DestinationArrivalTime, numPotentials, associatedStopRef)
-
 					timetableRecordType = TimetableRecordTypeEstimated
 				}
-			*/
+			}
+
 			timetable = append(timetable, &TimetableRecord{
 				Journey:            journey,
 				Time:               stopDeperatureTime,

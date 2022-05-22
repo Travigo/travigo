@@ -33,7 +33,8 @@ type RealtimeJourney struct {
 	NextStopArrival   time.Time `groups:"basic"`
 	NextStopDeparture time.Time `groups:"basic"`
 
-	Stops map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+	Stops  map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+	Offset time.Duration
 
 	Reliability RealtimeJourneyReliabilityType `groups:"basic"`
 
