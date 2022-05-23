@@ -11,6 +11,7 @@ import (
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/realtime"
 	"github.com/britbus/britbus/pkg/redis_client"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -24,6 +25,8 @@ func main() {
 	time.Local = loc
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
+	transforms.SetupClient()
 
 	app := &cli.App{
 		Name: "realtime",

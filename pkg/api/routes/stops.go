@@ -8,6 +8,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
@@ -66,6 +67,9 @@ func getStop(c *fiber.Ctx) error {
 		})
 	} else {
 		stop.GetServices()
+
+		transforms.Transform(stop)
+
 		return c.JSON(stop)
 	}
 }
@@ -153,6 +157,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 	if len(journeysTimetable) > count {
 		journeysTimetable = journeysTimetable[:count]
 	}
+
+	transforms.Transform(journeysTimetable)
 
 	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},

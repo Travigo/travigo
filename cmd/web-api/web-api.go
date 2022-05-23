@@ -8,6 +8,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -21,6 +22,8 @@ func main() {
 	time.Local = loc
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
+	transforms.SetupClient()
 
 	app := &cli.App{
 		Name: "web-api",
@@ -42,6 +45,17 @@ func main() {
 					if err := elastic_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
+
+					// servicesCollection := database.GetCollection("stops")
+					// var service *ctdf.Stop
+					// servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": "GB:ATCO:0500CCITY346"}).Decode(&service)
+					// service.GetServices()
+
+					// transforms.Transform([]*ctdf.Stop{service})
+
+					// pretty.Println(service)
+
+					// return nil
 
 					ctdf.LoadSpecialDayCache()
 

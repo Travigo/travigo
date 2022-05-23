@@ -23,6 +23,7 @@ import (
 	"github.com/britbus/britbus/pkg/naptan"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/pkg/util"
@@ -196,6 +197,8 @@ func main() {
 	time.Local = loc
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
+	transforms.SetupClient()
 
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
