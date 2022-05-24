@@ -108,28 +108,28 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	currentTime := time.Now()
 
 	// Get the directly referenced Operator
-	// var referencedOperator *Operator
+	var referencedOperator *Operator
 	operatorRef := identifyingInformation["OperatorRef"]
-	// operatorsCollection := database.GetCollection("operators")
-	// query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": operatorRef}, bson.M{"otheridentifiers": operatorRef}}}
-	// operatorsCollection.FindOne(context.Background(), query).Decode(&referencedOperator)
+	operatorsCollection := database.GetCollection("operators")
+	query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": operatorRef}, bson.M{"otheridentifiers": operatorRef}}}
+	operatorsCollection.FindOne(context.Background(), query).Decode(&referencedOperator)
 
-	// if referencedOperator == nil {
-	// 	return nil, errors.New("Could not find referenced Operator")
-	// }
-	// referencedOperator.GetOperatorGroup()
+	if referencedOperator == nil {
+		return nil, errors.New("Could not find referenced Operator")
+	}
+	referencedOperator.GetOperatorGroup()
 
-	// // Get all potential Operators that belong in the Operator group
-	// // This is because *some* operator groups have incorrect operator IDs for a service
-	// var operators []string
-	// if referencedOperator.OperatorGroup == nil {
-	// 	operators = append(operators, referencedOperator.OtherIdentifiers...)
-	// } else {
-	// 	referencedOperator.OperatorGroup.GetOperators()
-	// 	for _, operator := range referencedOperator.OperatorGroup.Operators {
-	// 		operators = append(operators, operator.OtherIdentifiers...)
-	// 	}
-	// }
+	// Get all potential Operators that belong in the Operator group
+	// This is because *some* operator groups have incorrect operator IDs for a service
+	var operators []string
+	if referencedOperator.OperatorGroup == nil {
+		operators = append(operators, referencedOperator.OtherIdentifiers...)
+	} else {
+		referencedOperator.OperatorGroup.GetOperators()
+		for _, operator := range referencedOperator.OperatorGroup.Operators {
+			operators = append(operators, operator.OtherIdentifiers...)
+		}
+	}
 
 	// Get the relevant Services
 	var services []string
@@ -142,7 +142,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 
 	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
-			bson.M{"operatorref": operatorRef},
+			bson.M{"operatorref": bson.M{"$in": operators}},
 		},
 	})
 
@@ -163,7 +163,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		if len(serviceNameMatch) == 2 {
 			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
-					bson.M{"operatorref": operatorRef},
+					bson.M{"operatorref": bson.M{"$in": operators}},
 				},
 			})
 
