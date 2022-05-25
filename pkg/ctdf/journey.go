@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -79,6 +80,24 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 }
 func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
+}
+func (journey *Journey) GenerateFunctionalHash() string {
+	hash := sha256.New()
+
+	hash.Write([]byte(journey.ServiceRef))
+	hash.Write([]byte(journey.DestinationDisplay))
+	hash.Write([]byte(journey.Direction))
+	hash.Write([]byte(journey.DepartureTime.String()))
+
+	for _, pathItem := range journey.Path {
+		hash.Write([]byte(pathItem.OriginStopRef))
+		hash.Write([]byte(pathItem.OriginArrivalTime.GoString()))
+		hash.Write([]byte(pathItem.OriginDepartureTime.GoString()))
+		hash.Write([]byte(pathItem.DestinationStopRef))
+		hash.Write([]byte(pathItem.DestinationArrivalTime.GoString()))
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
 func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*Journey {
@@ -269,6 +288,8 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 }
 
 func narrowJourneys(identifyingInformation map[string]string, currentTime time.Time, journeys []*Journey) (*Journey, error) {
+	journeys = FilterIdenticalJourneys(journeys)
+
 	if len(journeys) == 0 {
 		return nil, errors.New("Could not find related Journeys")
 	} else if len(journeys) == 1 {
@@ -313,27 +334,6 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 		}
 
 		if len(timeFilteredJourneys) == 0 {
-			// Check for identical(ish) Journeys
-			if len(journeys) == 2 && len(journeys[0].Path) == len(journeys[1].Path) && journeys[0].DepartureTime == journeys[1].DepartureTime {
-				identical := true
-
-				for i := 0; i < len(journeys[0].Path); i++ {
-					a := journeys[0].Path[i]
-					b := journeys[1].Path[i]
-
-					if a.OriginStopRef != b.OriginStopRef || a.OriginArrivalTime != b.OriginArrivalTime || a.OriginDepartureTime != b.OriginDepartureTime {
-						identical = false
-					}
-					if a.DestinationStopRef != b.DestinationStopRef || a.DestinationArrivalTime != b.DestinationArrivalTime {
-						identical = false
-					}
-				}
-
-				if identical {
-					return journeys[0], nil
-				}
-			}
-
 			return nil, errors.New("Could not narrow down to single Journey with departure time. Now zero")
 		} else if len(timeFilteredJourneys) == 1 {
 			return timeFilteredJourneys[0], nil
@@ -341,6 +341,22 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 			return nil, errors.New("Could not narrow down to single Journey by time. Still many remaining")
 		}
 	}
+}
+
+func FilterIdenticalJourneys(journeys []*Journey) []*Journey {
+	filtered := []*Journey{}
+
+	matches := map[string]bool{}
+	for _, journey := range journeys {
+		hash := journey.GenerateFunctionalHash()
+
+		if !matches[hash] {
+			filtered = append(filtered, journey)
+			matches[hash] = true
+		}
+	}
+
+	return filtered
 }
 
 type JourneyPathItem struct {

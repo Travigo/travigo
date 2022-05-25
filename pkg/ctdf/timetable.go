@@ -32,6 +32,8 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
+	journeys = FilterIdenticalJourneys(journeys)
+
 	for _, journey := range journeys {
 		var stopDeperatureTime time.Time
 		var destinationDisplay string
