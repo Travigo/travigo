@@ -403,7 +403,7 @@ func main() {
 					}
 					defer archive.Close()
 
-					tflBusesMatchRegex, _ := regexp.Compile("BUSES PART \\w+ \\d+.zip")
+					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART \\w+ \\d+.zip")
 					for _, zipFile := range archive.File {
 						if tflBusesMatchRegex.MatchString(zipFile.Name) {
 							file, err := zipFile.Open()
