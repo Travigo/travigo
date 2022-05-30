@@ -99,6 +99,33 @@ func (journey *Journey) GenerateFunctionalHash() string {
 
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
+func (j Journey) FlattenStops() ([]string, map[string]time.Time, map[string]time.Time) {
+	stops := []string{}
+	arrivalTimes := map[string]time.Time{}
+	departureTimes := map[string]time.Time{}
+	alreadySeen := map[string]bool{}
+
+	for _, pathItem := range j.Path {
+		if !alreadySeen[pathItem.OriginStopRef] {
+			stops = append(stops, pathItem.OriginStopRef)
+
+			arrivalTimes[pathItem.OriginStopRef] = pathItem.OriginArrivalTime
+			departureTimes[pathItem.OriginStopRef] = pathItem.OriginDepartureTime
+
+			alreadySeen[pathItem.OriginStopRef] = true
+		}
+	}
+
+	lastPathItem := j.Path[len(j.Path)-1]
+	if !alreadySeen[lastPathItem.OriginStopRef] {
+		stops = append(stops, lastPathItem.OriginStopRef)
+
+		arrivalTimes[lastPathItem.OriginStopRef] = lastPathItem.OriginArrivalTime
+		departureTimes[lastPathItem.OriginStopRef] = lastPathItem.OriginDepartureTime
+	}
+
+	return stops, arrivalTimes, departureTimes
+}
 
 func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*Journey {
 	journeys := []*Journey{}
