@@ -16,6 +16,9 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "britbus-elasticsearch-user"
 
+archiver:
+  schedule: "0 3 * * 1"
+
 image:
   repository: ghcr.io/britbus/britbus/realtime
   pullPolicy: Always

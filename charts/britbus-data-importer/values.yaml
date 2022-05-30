@@ -30,7 +30,7 @@ cronjobs:
     schedule: "0 3 * * 6"
     args: ["file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]
   - name: bods-timetable
-    schedule: "0 5 * * 6"
+    schedule: "0 5 * * *"
     args: ["bods-timetable"]
   - name: tfl
     schedule: "0 3 * * 0"

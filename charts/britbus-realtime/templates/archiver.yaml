@@ -1,0 +1,41 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "britbus-realtime.fullname" . }}-archiver
+  labels:
+    {{- include "britbus-realtime.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.archiver.schedule }}
+  jobTemplate:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "britbus-realtime.selectorLabels" . | nindent 8 }}
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ include "britbus-realtime.serviceAccountName" $ }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ .Chart.Name }}-archiver
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["archive", "--output-directory", "/tmp"]
+              env:
+                {{- with .env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+                - name: BRITBUS_MONGODB_CONNECTION
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.connectionStringSecret }}
+                      key: connectionString.standard
+                      optional: false
+                - name: BRITBUS_MONGODB_DATABASE
+                  value: {{ .Values.database.database }}
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}

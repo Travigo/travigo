@@ -139,11 +139,16 @@ func (a *Archiver) uploadToStorage(filename string) {
 	defer reader.Close()
 
 	writer := object.NewWriter(context.Background())
-	defer writer.Close()
 
 	io.Copy(writer, reader)
 
-	log.Info().Msgf("Written file %s to bucket %s", object.ObjectName(), object.BucketName())
+	err = writer.Close()
+
+	if err == nil {
+		log.Info().Msgf("Written file %s to bucket %s", object.ObjectName(), object.BucketName())
+	} else {
+		log.Fatal().Err(err).Msg("Failed to write file to GCP")
+	}
 }
 
 func (a *Archiver) convertRealtimeToArchiveJourney(realtimeJourney *ctdf.RealtimeJourney) *ctdf.ArchivedJourney {
