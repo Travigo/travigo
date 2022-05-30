@@ -28,7 +28,7 @@ type Archiver struct {
 }
 
 func (a *Archiver) Perform() {
-	log.Info().Str("outputDirectory", a.OutputDirectory).Bool("individualFile", a.WriteIndividualFile).Bool("bundle", a.WriteBundle).Msg("Running Archive process")
+	log.Info().Interface("archiver", a).Msg("Running Archive process")
 
 	currentTime := time.Now()
 	cutOffTime := currentTime.Add(-24 * time.Hour)
