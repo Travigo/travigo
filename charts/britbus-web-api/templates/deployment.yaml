@@ -68,11 +68,11 @@ spec:
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /version
+              path: /core/version
               port: http
           readinessProbe:
             httpGet:
-              path: /version
+              path: /core/version
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
