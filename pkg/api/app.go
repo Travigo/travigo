@@ -11,21 +11,23 @@ func SetupServer(listen string) {
 
 	webApp := fiber.New()
 
-	webApp.Get("version", routes.APIVersion)
+	group := webApp.Group("/core")
 
-	routes.StopsRouter(webApp.Group("/stops"))
-	routes.StopGroupsRouter(webApp.Group("/stop_groups"))
+	group.Get("version", routes.APIVersion)
 
-	routes.OperatorsRouter(webApp.Group("/operators"))
-	routes.OperatorGroupsRouter(webApp.Group("/operator_groups"))
+	routes.StopsRouter(group.Group("/stops"))
+	routes.StopGroupsRouter(group.Group("/stop_groups"))
 
-	routes.ServicesRouter(webApp.Group("/services"))
+	routes.OperatorsRouter(group.Group("/operators"))
+	routes.OperatorGroupsRouter(group.Group("/operator_groups"))
 
-	routes.JourneysRouter(webApp.Group("/journeys"))
+	routes.ServicesRouter(group.Group("/services"))
 
-	routes.RealtimeJourneysRouter(webApp.Group("/realtime_journeys"))
+	routes.JourneysRouter(group.Group("/journeys"))
 
-	webApp.Get("stats", routes.Stats)
+	routes.RealtimeJourneysRouter(group.Group("/realtime_journeys"))
+
+	group.Get("stats", routes.Stats)
 
 	webApp.Listen(listen)
 }

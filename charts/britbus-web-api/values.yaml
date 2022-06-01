@@ -61,7 +61,7 @@ ingress:
   hosts:
     - host: api.britbus.app
       paths:
-        - path: /
+        - path: /core
           pathType: ImplementationSpecific
 
 
