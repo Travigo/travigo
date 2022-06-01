@@ -18,7 +18,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: {{ include "britbus-realtime.serviceAccountName" $ }}
+          serviceAccountName: {{ .Values.archiver.serviceAccountName }}
           restartPolicy: OnFailure
           containers:
             - name: {{ .Chart.Name }}-archiver
