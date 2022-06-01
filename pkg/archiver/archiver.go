@@ -2,7 +2,6 @@ package archiver
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,6 +15,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/rs/zerolog/log"
+	"github.com/ulikunitz/xz"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -39,17 +39,20 @@ func (a *Archiver) Perform() {
 
 	recordCount := 0
 
-	bundleFilename := fmt.Sprintf("%s.tar.gz", currentTime.Format(time.RFC3339))
+	bundleFilename := fmt.Sprintf("%s.tar.xz", currentTime.Format(time.RFC3339))
+
 	var tarWriter *tar.Writer
+	var xzWriter *xz.Writer
+
 	if a.WriteBundle {
 		bundleFile, err := os.Create(path.Join(a.OutputDirectory, bundleFilename))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to open file")
 		}
 
-		gzipWriter := gzip.NewWriter(bundleFile)
-		defer gzipWriter.Close()
-		tarWriter = tar.NewWriter(gzipWriter)
+		xzWriter, _ = xz.NewWriter(bundleFile)
+		defer xzWriter.Close()
+		tarWriter = tar.NewWriter(xzWriter)
 		defer tarWriter.Close()
 	}
 
@@ -112,6 +115,11 @@ func (a *Archiver) Perform() {
 		}
 
 		recordCount += 1
+	}
+
+	if a.WriteBundle {
+		tarWriter.Close()
+		xzWriter.Close()
 	}
 
 	log.Info().Int("recordCount", recordCount).Msg("Archive document generation complete")
