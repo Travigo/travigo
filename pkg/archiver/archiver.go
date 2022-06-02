@@ -35,7 +35,8 @@ func (a *Archiver) Perform() {
 	log.Info().Msgf("Archiving realtime journeys older than %s", cutOffTime)
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{"modificationdatetime": bson.M{"$lt": cutOffTime}})
+	searchFilter := bson.M{"modificationdatetime": bson.M{"$lt": cutOffTime}}
+	cursor, _ := realtimeJourneysCollection.Find(context.Background(), searchFilter)
 
 	recordCount := 0
 
@@ -127,6 +128,8 @@ func (a *Archiver) Perform() {
 	if a.CloudUpload {
 		a.uploadToStorage(bundleFilename)
 	}
+
+	realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
 }
 
 func (a *Archiver) uploadToStorage(filename string) {
