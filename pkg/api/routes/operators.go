@@ -7,8 +7,10 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -20,6 +22,7 @@ type operatorRegions struct {
 func OperatorsRouter(router fiber.Router) {
 	router.Get("/", listOperators)
 	router.Get("/:identifier", getOperator)
+	router.Get("/:identifier/services", getOperatorServices)
 }
 
 func listOperators(c *fiber.Ctx) error {
@@ -93,12 +96,7 @@ func listOperators(c *fiber.Ctx) error {
 func getOperator(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	operatorsCollection := database.GetCollection("operators")
-	var operator *ctdf.Operator
-	operatorsCollection.FindOne(context.Background(), bson.M{"$or": bson.A{
-		bson.M{"primaryidentifier": identifier},
-		bson.M{"otheridentifiers": identifier},
-	}}).Decode(&operator)
+	operator := getOperatorById(identifier)
 
 	if operator == nil {
 		c.SendStatus(404)
@@ -109,4 +107,47 @@ func getOperator(c *fiber.Ctx) error {
 		operator.GetReferences()
 		return c.JSON(operator)
 	}
+}
+
+func getOperatorServices(c *fiber.Ctx) error {
+	identifier := c.Params("identifier")
+
+	operator := getOperatorById(identifier)
+
+	if operator == nil {
+		c.SendStatus(404)
+		return c.JSON(fiber.Map{
+			"error": "Could not find Operator matching Operator Identifier",
+		})
+	} else {
+		services := []*ctdf.Service{}
+
+		servicesCollection := database.GetCollection("services")
+		cursor, _ := servicesCollection.Find(context.Background(), bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}})
+
+		for cursor.Next(context.TODO()) {
+			var service ctdf.Service
+			err := cursor.Decode(&service)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to decode Service")
+			}
+
+			services = append(services, &service)
+		}
+
+		transforms.Transform(services)
+
+		return c.JSON(services)
+	}
+}
+
+func getOperatorById(identifier string) *ctdf.Operator {
+	operatorsCollection := database.GetCollection("operators")
+	var operator *ctdf.Operator
+	operatorsCollection.FindOne(context.Background(), bson.M{"$or": bson.A{
+		bson.M{"primaryidentifier": identifier},
+		bson.M{"otheridentifiers": identifier},
+	}}).Decode(&operator)
+
+	return operator
 }
