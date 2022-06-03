@@ -6,7 +6,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/britbus/britbus/pkg/archiver"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
@@ -42,7 +41,7 @@ func main() {
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to redis")
 					}
-					if err := elastic_client.Connect(); err != nil {
+					if err := elastic_client.Connect(false); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 
@@ -107,7 +106,7 @@ func main() {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
 					}
 
-					archiver := archiver.Archiver{
+					archiver := realtime.Archiver{
 						OutputDirectory:     c.String("output-directory"),
 						WriteIndividualFile: false,
 						WriteBundle:         true,

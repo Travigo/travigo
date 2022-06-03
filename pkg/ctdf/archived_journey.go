@@ -36,4 +36,6 @@ type ArchivedJourneyStops struct {
 
 	ActualArrivalTime   time.Time `groups:"basic"`
 	ActualDepartureTime time.Time `groups:"basic"`
+
+	Offset int `groups:"basic"`
 }

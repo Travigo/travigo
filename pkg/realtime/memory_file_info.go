@@ -1,4 +1,4 @@
-package archiver
+package realtime
 
 import (
 	"io/fs"

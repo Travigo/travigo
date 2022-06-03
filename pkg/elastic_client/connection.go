@@ -10,14 +10,16 @@ import (
 
 var Client *elasticsearch.Client
 
-func Connect() error {
+func Connect(required bool) error {
 	setupBatchIndexer()
 
 	env := util.GetEnvironmentVariables()
 
-	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" {
+	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" && !required {
 		log.Info().Msg("Skipping Elasticsearch setup")
 		return nil
+	} else if required {
+		log.Fatal().Msg("Elasticsearch configuration not set")
 	}
 
 	// Naughty disable TLS verify on ES endpoint

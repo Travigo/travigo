@@ -42,7 +42,7 @@ func main() {
 					if err := database.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
 					}
-					if err := elastic_client.Connect(); err != nil {
+					if err := elastic_client.Connect(false); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 

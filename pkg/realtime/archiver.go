@@ -1,4 +1,4 @@
-package archiver
+package realtime
 
 import (
 	"archive/tar"
@@ -177,12 +177,15 @@ func (a *Archiver) convertRealtimeToArchiveJourney(realtimeJourney *ctdf.Realtim
 			ExpectedDepartureTime: departureTimes[stopRef],
 
 			HasActualData: false,
+			Offset:        0,
 		}
 
 		if realtimeJourneyStop != nil {
 			archivedJourneyStop.HasActualData = true
 			archivedJourneyStop.ActualArrivalTime = realtimeJourneyStop.ArrivalTime
 			archivedJourneyStop.ActualDepartureTime = realtimeJourneyStop.DepartureTime
+
+			archivedJourneyStop.Offset = int(archivedJourneyStop.ActualArrivalTime.Sub(realtimeJourneyStop.ArrivalTime).Seconds())
 		}
 
 		archivedStops = append(archivedStops, &archivedJourneyStop)
