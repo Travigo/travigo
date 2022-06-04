@@ -385,7 +385,7 @@ jobs:
       run: |-
         helm upgrade -i britbus-web-api ./charts/britbus-web-api --set image.tag=sha-${{ github.sha }}
 
-   stats-deploy-helm:
+  stats-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy stats to GCP
