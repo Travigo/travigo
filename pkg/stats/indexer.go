@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -150,8 +149,6 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 			Body:    bytes.NewReader(archivedJourneyBytes),
 			Refresh: "true",
 		})
-
-		time.Sleep(10 * time.Millisecond)
 	}
 
 	log.Info().Msgf("Bundle file %s indexing complete", bundleName)
