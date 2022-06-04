@@ -5,12 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
@@ -19,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/ulikunitz/xz"
 	"go.mongodb.org/mongo-driver/bson"
+	"google.golang.org/api/iterator"
 )
 
 type Indexer struct {
@@ -32,14 +32,82 @@ func (i *Indexer) Perform() {
 	i.operatorsCache = map[string]*ctdf.Operator{}
 	i.servicesCache = map[string]*ctdf.Service{}
 
-	bundleName := "./test/output/2022-06-02T22:37:19+01:00.tar.xz"
-	file, _ := os.Open(bundleName)
-	defer file.Close()
+	client, err := storage.NewClient(context.Background())
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not create GCP storage client")
+	}
 
-	i.indexJourneysBundle(bundleName, file)
+	bucket := client.Bucket(i.CloudBucketName)
+
+	objects := bucket.Objects(context.TODO(), nil)
+
+	for {
+		objectAttr, err := objects.Next()
+
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to iterate over bucket")
+		}
+
+		log.Info().Msgf("Found bundle file %s", objectAttr.Name)
+
+		bundleAlreadyIndexed := i.bundleIndexed(objectAttr.Name)
+
+		if bundleAlreadyIndexed {
+			log.Info().Msgf("Bundle file %s already indexed", objectAttr.Name)
+		} else {
+			object := bucket.Object(objectAttr.Name)
+			storageReader, err := object.NewReader(context.Background())
+			if err != nil {
+				log.Error().Err(err).Msgf("Failed to get object %s", objectAttr.Name)
+			}
+
+			i.indexJourneysBundle(objectAttr.Name, storageReader)
+		}
+	}
+}
+
+func (i *Indexer) bundleIndexed(bundleName string) bool {
+	var queryBytes bytes.Buffer
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"BundleSourceFile.keyword": bundleName,
+			},
+		},
+	}
+	json.NewEncoder(&queryBytes).Encode(query)
+	res, err := elastic_client.Client.Count(
+		elastic_client.Client.Count.WithContext(context.Background()),
+		elastic_client.Client.Count.WithIndex("journey-history-*"),
+		elastic_client.Client.Count.WithBody(&queryBytes),
+		elastic_client.Client.Count.WithPretty(),
+	)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to query index")
+	}
+
+	responseBytes, _ := io.ReadAll(res.Body)
+	var responseMap map[string]interface{}
+	json.Unmarshal(responseBytes, &responseMap)
+
+	if responseMap["status"] != nil {
+		log.Fatal().Str("response", string(responseBytes)).Msg("Failed to query index")
+	}
+
+	if int(responseMap["count"].(float64)) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
+	log.Info().Msgf("Indexing bundle file %s", bundleName)
+
 	xzReader, err := xz.NewReader(file)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to decompress xz file")
@@ -48,12 +116,10 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 	tarReader := tar.NewReader(xzReader)
 
 	for {
-		header, err := tarReader.Next()
+		_, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
-
-		log.Info().Msg(header.Name)
 
 		fileBytes, _ := ioutil.ReadAll(tarReader)
 
@@ -69,7 +135,7 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 		// Convert to the extended stats Archived Journey form
 		archivedJourney := ArchivedJourney{
 			ArchivedJourney:  *ctdfArchivedJourney,
-			BundleSourceFile: fmt.Sprintf("%s/%s", bundleName, header.Name),
+			BundleSourceFile: bundleName,
 
 			PrimaryOperatorRef: operator.PrimaryIdentifier,
 			OperatorGroupRef:   operator.OperatorGroupRef,
@@ -85,8 +151,10 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 			Refresh: "true",
 		})
 
-		time.Sleep(25 * time.Millisecond)
+		time.Sleep(35 * time.Millisecond)
 	}
+
+	log.Info().Msgf("Bundle file %s indexing complete", bundleName)
 }
 
 func (i *Indexer) getOperator(identifier string) *ctdf.Operator {
