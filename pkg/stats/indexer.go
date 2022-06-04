@@ -151,7 +151,7 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 			Refresh: "true",
 		})
 
-		time.Sleep(35 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	log.Info().Msgf("Bundle file %s indexing complete", bundleName)

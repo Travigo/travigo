@@ -1,0 +1,55 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "britbus-stats.fullname" . }}-indexer
+  labels:
+    {{- include "britbus-stats.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.indexer.schedule }}
+  jobTemplate:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "britbus-stats.selectorLabels" . | nindent 8 }}
+    spec:
+      template:
+        spec:
+          serviceAccountName: {{ .Values.indexer.serviceAccountName }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ .Chart.Name }}-indexer
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: ["index"]
+              env:
+                {{- with .env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+                - name: BRITBUS_MONGODB_CONNECTION
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.database.connectionStringSecret }}
+                      key: connectionString.standard
+                      optional: false
+                - name: BRITBUS_MONGODB_DATABASE
+                  value: {{ .Values.database.database }}
+                - name: BRITBUS_ELASTICSEARCH_ADDRESS
+                  value: {{ $.Values.elasticsearch.address }}
+                - name: BRITBUS_ELASTICSEARCH_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.elasticsearch.accountSecret }}
+                      key: username
+                      optional: false
+                - name: BRITBUS_ELASTICSEARCH_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.elasticsearch.accountSecret }}
+                      key: password
+                      optional: false
+              resources:
+                {{- toYaml .Values.resources | nindent 16 }}
