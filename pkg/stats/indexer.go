@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -107,6 +109,9 @@ func (i *Indexer) bundleIndexed(bundleName string) bool {
 func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 	log.Info().Msgf("Indexing bundle file %s", bundleName)
 
+	currentTime := time.Now()
+	indexName := fmt.Sprintf("journey-history-%d%d%d", currentTime.Year(), currentTime.Month(), currentTime.Day())
+
 	xzReader, err := xz.NewReader(file)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to decompress xz file")
@@ -145,7 +150,7 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 		archivedJourneyBytes, _ := json.Marshal(archivedJourney)
 
 		elastic_client.IndexRequest(&esapi.IndexRequest{
-			Index:   "journey-history-1",
+			Index:   indexName,
 			Body:    bytes.NewReader(archivedJourneyBytes),
 			Refresh: "true",
 		})
