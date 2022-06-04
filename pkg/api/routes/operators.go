@@ -149,5 +149,7 @@ func getOperatorById(identifier string) *ctdf.Operator {
 		bson.M{"otheridentifiers": identifier},
 	}}).Decode(&operator)
 
+	transforms.Transform(operator)
+
 	return operator
 }

@@ -7,7 +7,7 @@ import (
 type TransformDefinition struct {
 	Type  string
 	Match map[string]string
-	Data  map[string]string
+	Data  map[string]interface{}
 }
 
 func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue reflect.Value) {
@@ -33,7 +33,8 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		for key, value := range t.Data {
 			field := inputValue.FieldByName(key)
 			if field.IsValid() {
-				field.SetString(value)
+				field.Set(reflect.ValueOf(value))
+				// field.SetString(value)
 			}
 		}
 
