@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/stats"
 	"github.com/britbus/britbus/pkg/transforms"
@@ -32,10 +31,7 @@ func main() {
 				Name:  "index",
 				Usage: "index the latest data into Elasticsearch",
 				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to database")
-					}
-					if err := elastic_client.Connect(false); err != nil {
+					if err := elastic_client.Connect(true); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 

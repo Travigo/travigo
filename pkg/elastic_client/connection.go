@@ -18,7 +18,7 @@ func Connect(required bool) error {
 	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" && !required {
 		log.Info().Msg("Skipping Elasticsearch setup")
 		return nil
-	} else if required {
+	} else if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" && required {
 		log.Fatal().Msg("Elasticsearch configuration not set")
 	}
 

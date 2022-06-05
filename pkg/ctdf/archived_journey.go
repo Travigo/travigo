@@ -7,8 +7,7 @@ type ArchivedJourney struct {
 
 	JourneyRef string `groups:"internal"`
 
-	ServiceRef  string `groups:"internal"`
-	ServiceName string `groups:"internal"`
+	ServiceRef string `groups:"internal"`
 
 	OperatorRef string `groups:"internal"`
 	// Journey    *Journey `groups:"basic" bson:"-"`

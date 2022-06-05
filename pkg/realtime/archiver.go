@@ -37,14 +37,7 @@ func (a *Archiver) Perform() {
 	currentTime := time.Now()
 	a.currentTime = currentTime
 
-	cutOffTime := currentTime.Add(-6 * time.Hour)
-	log.Info().Msgf("Archiving realtime journeys older than %s", cutOffTime)
-
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	searchFilter := bson.M{"modificationdatetime": bson.M{"$lt": cutOffTime}}
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(), searchFilter)
-
-	recordCount := 0
+	cutOffTime := currentTime.Add(-2 * time.Hour)
 
 	bundleFilename := fmt.Sprintf("%s.tar.xz", currentTime.Format(time.RFC3339))
 
@@ -58,32 +51,6 @@ func (a *Archiver) Perform() {
 
 		xzWriter, _ = xz.NewWriter(bundleFile)
 		a.tarWriter = tar.NewWriter(xzWriter)
-	}
-
-	log.Info().Int("recordCount", recordCount).Msg("Journeys archive document generation complete")
-
-	// Write all the journeys
-	for cursor.Next(context.TODO()) {
-		var realtimeJourney ctdf.RealtimeJourney
-		err := cursor.Decode(&realtimeJourney)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode RealtimeJourney")
-		}
-
-		realtimeJourney.GetJourney()
-		realtimeJourney.Journey.GetService()
-
-		archivedJourney := a.convertRealtimeToArchiveJourney(&realtimeJourney)
-		archivedJourneyJSON, err := json.Marshal(archivedJourney)
-		if err != nil {
-			log.Error().Err(err).Msg("Error converting archive to json")
-		}
-
-		filename := strings.ReplaceAll(fmt.Sprintf("%s.json", archivedJourney.PrimaryIdentifier), "/", "_")
-
-		a.writeFile(filename, archivedJourneyJSON)
-
-		recordCount += 1
 	}
 
 	// Keep a record of all the stops at this point in time
@@ -108,6 +75,29 @@ func (a *Archiver) Perform() {
 		log.Error().Err(err).Msg("Error converting stops to json")
 	}
 	a.writeFile("stops.json", stopsJSON)
+
+	// Keep a record of all the services at this point in time
+	log.Info().Msg("Writing services")
+	servicesCollection := database.GetCollection("services")
+	cursor, _ = servicesCollection.Find(context.Background(), bson.M{})
+	services := []*ctdf.Service{}
+
+	for cursor.Next(context.TODO()) {
+		var service ctdf.Service
+		err := cursor.Decode(&service)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Service")
+		}
+
+		transforms.Transform(&service)
+
+		services = append(services, &service)
+	}
+	servicesJSON, err := json.Marshal(services)
+	if err != nil {
+		log.Error().Err(err).Msg("Error converting services to json")
+	}
+	a.writeFile("services.json", servicesJSON)
 
 	// Keep a record of all the operators at this point in time
 	log.Info().Msg("Writing operators")
@@ -155,6 +145,40 @@ func (a *Archiver) Perform() {
 	}
 	a.writeFile("operator_groups.json", operatorGroupsJSON)
 
+	// Write all the journeys
+	log.Info().Msgf("Archiving realtime journeys older than %s", cutOffTime)
+
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	searchFilter := bson.M{"modificationdatetime": bson.M{"$lt": cutOffTime}}
+	cursor, _ = realtimeJourneysCollection.Find(context.Background(), searchFilter)
+
+	recordCount := 0
+
+	for cursor.Next(context.TODO()) {
+		var realtimeJourney ctdf.RealtimeJourney
+		err := cursor.Decode(&realtimeJourney)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode RealtimeJourney")
+		}
+
+		realtimeJourney.GetJourney()
+		realtimeJourney.Journey.GetService()
+
+		archivedJourney := a.convertRealtimeToArchiveJourney(&realtimeJourney)
+		archivedJourneyJSON, err := json.Marshal(archivedJourney)
+		if err != nil {
+			log.Error().Err(err).Msg("Error converting archive to json")
+		}
+
+		filename := strings.ReplaceAll(fmt.Sprintf("%s.json", archivedJourney.PrimaryIdentifier), "/", "_")
+
+		a.writeFile(filename, archivedJourneyJSON)
+
+		recordCount += 1
+	}
+
+	log.Info().Int("recordCount", recordCount).Msg("Journeys archive document generation complete")
+
 	if a.WriteBundle {
 		a.tarWriter.Close()
 		xzWriter.Close()
@@ -164,7 +188,7 @@ func (a *Archiver) Perform() {
 		a.uploadToStorage(bundleFilename)
 	}
 
-	realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
+	// realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
 }
 
 func (a *Archiver) writeFile(filename string, contents []byte) {
@@ -273,8 +297,7 @@ func (a *Archiver) convertRealtimeToArchiveJourney(realtimeJourney *ctdf.Realtim
 
 		JourneyRef: realtimeJourney.JourneyRef,
 
-		ServiceRef:  realtimeJourney.Journey.ServiceRef,
-		ServiceName: realtimeJourney.Journey.Service.ServiceName,
+		ServiceRef: realtimeJourney.Journey.ServiceRef,
 
 		OperatorRef: realtimeJourney.Journey.OperatorRef,
 

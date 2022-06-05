@@ -145,6 +145,10 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 }
 
 func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *VehicleLocationEvent {
+	currentTime := time.Now()
+	yearNumber, weekNumber := currentTime.ISOWeek()
+	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
+
 	vehicle := siriVMVehicleIdentificationEvent.VehicleActivity
 	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
 
@@ -238,7 +242,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			})
 
 			elastic_client.IndexRequest(&esapi.IndexRequest{
-				Index:   "realtime-identify-events-1",
+				Index:   identifyEventsIndexName,
 				Body:    bytes.NewReader(elasticEvent),
 				Refresh: "true",
 			})
@@ -254,7 +258,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 		// Record the successful identification event
 		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-			Timestamp: time.Now(),
+			Timestamp: currentTime,
 
 			Success: true,
 
@@ -263,7 +267,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		})
 
 		elastic_client.IndexRequest(&esapi.IndexRequest{
-			Index:   "realtime-identify-events-1",
+			Index:   identifyEventsIndexName,
 			Body:    bytes.NewReader(elasticEvent),
 			Refresh: "true",
 		})
@@ -296,7 +300,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 	timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
 	if timeframe == "" {
-		timeframe = time.Now().Format("2006-01-02")
+		timeframe = currentTime.Format("2006-01-02")
 	}
 
 	vehicleLocationEvent := VehicleLocationEvent{
