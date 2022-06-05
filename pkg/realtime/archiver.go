@@ -14,6 +14,7 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
+	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/rs/zerolog/log"
 	"github.com/ulikunitz/xz"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,13 +26,18 @@ type Archiver struct {
 	WriteBundle         bool
 	CloudUpload         bool
 	CloudBucketName     string
+
+	currentTime time.Time
+	tarWriter   *tar.Writer
 }
 
 func (a *Archiver) Perform() {
 	log.Info().Interface("archiver", a).Msg("Running Archive process")
 
 	currentTime := time.Now()
-	cutOffTime := currentTime.Add(-24 * time.Hour)
+	a.currentTime = currentTime
+
+	cutOffTime := currentTime.Add(-6 * time.Hour)
 	log.Info().Msgf("Archiving realtime journeys older than %s", cutOffTime)
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -42,7 +48,6 @@ func (a *Archiver) Perform() {
 
 	bundleFilename := fmt.Sprintf("%s.tar.xz", currentTime.Format(time.RFC3339))
 
-	var tarWriter *tar.Writer
 	var xzWriter *xz.Writer
 
 	if a.WriteBundle {
@@ -52,11 +57,12 @@ func (a *Archiver) Perform() {
 		}
 
 		xzWriter, _ = xz.NewWriter(bundleFile)
-		defer xzWriter.Close()
-		tarWriter = tar.NewWriter(xzWriter)
-		defer tarWriter.Close()
+		a.tarWriter = tar.NewWriter(xzWriter)
 	}
 
+	log.Info().Int("recordCount", recordCount).Msg("Journeys archive document generation complete")
+
+	// Write all the journeys
 	for cursor.Next(context.TODO()) {
 		var realtimeJourney ctdf.RealtimeJourney
 		err := cursor.Decode(&realtimeJourney)
@@ -75,61 +81,132 @@ func (a *Archiver) Perform() {
 
 		filename := strings.ReplaceAll(fmt.Sprintf("%s.json", archivedJourney.PrimaryIdentifier), "/", "_")
 
-		if a.WriteIndividualFile {
-			file, err := os.Create(path.Join(a.OutputDirectory, filename))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to open file")
-			}
-
-			_, err = file.Write(archivedJourneyJSON)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to write to file")
-			}
-
-			file.Close()
-		}
-
-		if a.WriteBundle {
-			memoryFileInfo := MemoryFileInfo{
-				MFI_Name:    filename,
-				MFI_Size:    int64(len(archivedJourneyJSON)),
-				MFI_Mode:    777,
-				MFI_ModTime: currentTime,
-				MFI_IsDir:   false,
-			}
-
-			header, err := tar.FileInfoHeader(memoryFileInfo, filename)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to generate tar header")
-			}
-
-			// Write file header to the tar archive
-			err = tarWriter.WriteHeader(header)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to write tar header")
-			}
-
-			_, err = tarWriter.Write(archivedJourneyJSON)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to write to file")
-			}
-		}
+		a.writeFile(filename, archivedJourneyJSON)
 
 		recordCount += 1
 	}
 
+	// Keep a record of all the stops at this point in time
+	log.Info().Msg("Writing stops")
+	stopsCollection := database.GetCollection("stops")
+	cursor, err := stopsCollection.Find(context.Background(), bson.M{})
+	stops := []*ctdf.Stop{}
+
+	for cursor.Next(context.TODO()) {
+		var stop ctdf.Stop
+		err := cursor.Decode(&stop)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Stop")
+		}
+
+		transforms.Transform(&stop)
+
+		stops = append(stops, &stop)
+	}
+	stopsJSON, err := json.Marshal(stops)
+	if err != nil {
+		log.Error().Err(err).Msg("Error converting stops to json")
+	}
+	a.writeFile("stops.json", stopsJSON)
+
+	// Keep a record of all the operators at this point in time
+	log.Info().Msg("Writing operators")
+	operatorsCollection := database.GetCollection("operators")
+	cursor, _ = operatorsCollection.Find(context.Background(), bson.M{})
+	operators := []*ctdf.Operator{}
+
+	for cursor.Next(context.TODO()) {
+		var operator ctdf.Operator
+		err := cursor.Decode(&operator)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Operator")
+		}
+
+		transforms.Transform(&operator)
+
+		operators = append(operators, &operator)
+	}
+	operatorsJSON, err := json.Marshal(operators)
+	if err != nil {
+		log.Error().Err(err).Msg("Error converting operators to json")
+	}
+	a.writeFile("operators.json", operatorsJSON)
+
+	// Keep a record of all the operator groups at this point in time
+	log.Info().Msg("Writing operator groups")
+	operatorGroupsCollection := database.GetCollection("operator_groups")
+	cursor, _ = operatorGroupsCollection.Find(context.Background(), bson.M{})
+	operatorGroups := []*ctdf.OperatorGroup{}
+
+	for cursor.Next(context.TODO()) {
+		var operatorGroup ctdf.OperatorGroup
+		err := cursor.Decode(&operatorGroup)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode OperatorGroup")
+		}
+
+		transforms.Transform(&operatorGroup)
+
+		operatorGroups = append(operatorGroups, &operatorGroup)
+	}
+	operatorGroupsJSON, err := json.Marshal(operatorGroups)
+	if err != nil {
+		log.Error().Err(err).Msg("Error converting operator groups to json")
+	}
+	a.writeFile("operator_groups.json", operatorGroupsJSON)
+
 	if a.WriteBundle {
-		tarWriter.Close()
+		a.tarWriter.Close()
 		xzWriter.Close()
 	}
-
-	log.Info().Int("recordCount", recordCount).Msg("Archive document generation complete")
 
 	if a.CloudUpload {
 		a.uploadToStorage(bundleFilename)
 	}
 
 	realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
+}
+
+func (a *Archiver) writeFile(filename string, contents []byte) {
+	if a.WriteIndividualFile {
+		file, err := os.Create(path.Join(a.OutputDirectory, filename))
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to open file")
+		}
+
+		_, err = file.Write(contents)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to write to file")
+		}
+
+		file.Close()
+	}
+
+	if a.WriteBundle {
+		memoryFileInfo := MemoryFileInfo{
+			MFI_Name:    filename,
+			MFI_Size:    int64(len(contents)),
+			MFI_Mode:    777,
+			MFI_ModTime: a.currentTime,
+			MFI_IsDir:   false,
+		}
+
+		header, err := tar.FileInfoHeader(memoryFileInfo, filename)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to generate tar header")
+		}
+
+		// Write file header to the tar archive
+		err = a.tarWriter.WriteHeader(header)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to write tar header")
+		}
+
+		_, err = a.tarWriter.Write(contents)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to write to file")
+		}
+	}
 }
 
 func (a *Archiver) uploadToStorage(filename string) {
