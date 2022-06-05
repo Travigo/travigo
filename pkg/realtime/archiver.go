@@ -188,7 +188,7 @@ func (a *Archiver) Perform() {
 		a.uploadToStorage(bundleFilename)
 	}
 
-	// realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
+	realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
 }
 
 func (a *Archiver) writeFile(filename string, contents []byte) {
