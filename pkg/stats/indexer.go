@@ -227,5 +227,5 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 		Refresh: "true",
 	})
 
-	time.Sleep(80 * time.Millisecond) // TODO temporary sleep until bulk indexing added
+	// time.Sleep(10 * time.Millisecond) // TODO temporary sleep until bulk indexing added
 }

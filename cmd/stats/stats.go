@@ -42,6 +42,8 @@ func main() {
 					}
 					indexer.Perform()
 
+					elastic_client.WaitUntilQueueEmpty()
+
 					return nil
 				},
 			},
