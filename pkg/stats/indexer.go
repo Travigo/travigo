@@ -292,7 +292,7 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 			Body:    bytes.NewReader(journeyStopActivityBytes),
 			Refresh: "true",
 		})
-	}
 
-	time.Sleep(10 * time.Millisecond) // TODO temporary sleep until bulk indexing added
+		time.Sleep(5 * time.Millisecond) // TODO temporary sleep until bulk indexing added
+	}
 }
