@@ -30,12 +30,13 @@ func (i indexProcessor) Process(ctx context.Context, ps *batch.PipelineStage) {
 		if err != nil {
 			log.Error().Err(err).Msg("Error getting response")
 		}
-		defer res.Body.Close()
 
 		if res.IsError() {
 			log.Error().Msgf("[%s] Error indexing document", res.Status())
 			io.Copy(os.Stdout, res.Body)
 		}
+
+		res.Body.Close()
 
 		processingGroup.Done()
 	}
