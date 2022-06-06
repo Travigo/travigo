@@ -237,6 +237,10 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 	for index, archivedJourneyStop := range archivedJourney.Stops {
 		stop := i.stops[archivedJourneyStop.StopRef]
 
+		if stop == nil {
+			continue
+		}
+
 		var stopTimestamp time.Time
 
 		if index > 0 {
