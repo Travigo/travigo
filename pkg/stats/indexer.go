@@ -27,13 +27,15 @@ type Indexer struct {
 	stops          map[string]*ctdf.Stop
 	services       map[string]*ctdf.Service
 
-	journeyHistoryIndexName string
+	journeyHistoryIndexName      string
+	journeyStopActivityIndexName string
 }
 
 func (i *Indexer) Perform() {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	i.journeyHistoryIndexName = fmt.Sprintf("journey-history-%d-%d", yearNumber, weekNumber)
+	i.journeyStopActivityIndexName = fmt.Sprintf("journey-stop-activity-%d-%d", yearNumber, weekNumber)
 
 	client, err := storage.NewClient(context.Background())
 	if err != nil {
@@ -226,6 +228,67 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 		Body:    bytes.NewReader(archivedJourneyBytes),
 		Refresh: "true",
 	})
+
+	// Go ahead and create a journey stop activity index event
+	// Contains stop arrival time, co-ordinates, service
+	stopTimestampDate := archivedJourney.CreationDateTime
+	dateRolledOver := false
+
+	for index, archivedJourneyStop := range archivedJourney.Stops {
+		stop := i.stops[archivedJourneyStop.StopRef]
+
+		var stopTimestamp time.Time
+
+		if index > 0 {
+			lastArchivedJourneyStop := archivedJourney.Stops[index-1]
+
+			if !dateRolledOver && lastArchivedJourneyStop.ExpectedArrivalTime.Sub(archivedJourneyStop.ExpectedArrivalTime).Seconds() > 0 {
+				dateRolledOver = true
+				stopTimestampDate = stopTimestampDate.Add(24 * time.Hour)
+			}
+		}
+
+		if archivedJourneyStop.HasActualData {
+			stopTimestamp = time.Date(
+				stopTimestampDate.Year(),
+				stopTimestampDate.Month(),
+				stopTimestampDate.Day(),
+				archivedJourneyStop.ActualArrivalTime.Hour(),
+				archivedJourneyStop.ActualArrivalTime.Minute(),
+				archivedJourneyStop.ActualArrivalTime.Second(),
+				archivedJourneyStop.ActualArrivalTime.Nanosecond(),
+				archivedJourneyStop.ActualArrivalTime.Location(),
+			)
+		} else {
+			stopTimestamp = time.Date(
+				stopTimestampDate.Year(),
+				stopTimestampDate.Month(),
+				stopTimestampDate.Day(),
+				archivedJourneyStop.ExpectedArrivalTime.Hour(),
+				archivedJourneyStop.ExpectedArrivalTime.Minute(),
+				archivedJourneyStop.ExpectedArrivalTime.Second(),
+				archivedJourneyStop.ExpectedArrivalTime.Nanosecond(),
+				archivedJourneyStop.ExpectedArrivalTime.Location(),
+			)
+		}
+
+		journeyStopActivity := ctdf.ArchivedJourneyStopActivity{
+			Timestamp: stopTimestamp,
+
+			Location: ctdf.ElasticGeoPoint{
+				Lat: stop.Location.Coordinates[1],
+				Lon: stop.Location.Coordinates[0],
+			},
+		}
+
+		journeyStopActivityBytes, _ := json.Marshal(journeyStopActivity)
+
+		elastic_client.IndexRequest(&esapi.IndexRequest{
+			Index:   i.journeyStopActivityIndexName,
+			Body:    bytes.NewReader(journeyStopActivityBytes),
+			Refresh: "true",
+		})
+	}
 
 	time.Sleep(10 * time.Millisecond) // TODO temporary sleep until bulk indexing added
 }

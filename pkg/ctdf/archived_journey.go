@@ -38,3 +38,14 @@ type ArchivedJourneyStops struct {
 
 	Offset int `groups:"basic"`
 }
+
+type ElasticGeoPoint struct {
+	Lat float64 `json:"lat"`
+	Lon float64 `json:"lon"`
+}
+
+type ArchivedJourneyStopActivity struct {
+	Timestamp time.Time
+
+	Location ElasticGeoPoint
+}
