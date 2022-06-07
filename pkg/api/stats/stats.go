@@ -9,7 +9,6 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -106,11 +105,7 @@ func UpdateRecordsStats() {
 			Timestamp: time.Now(),
 		})
 
-		elastic_client.IndexRequest(&esapi.IndexRequest{
-			Index:   "overall-stats-1",
-			Body:    bytes.NewReader(elasticEvent),
-			Refresh: "true",
-		})
+		elastic_client.IndexRequest("overall-stats-1", bytes.NewReader(elasticEvent))
 
 		time.Sleep(10 * time.Minute)
 	}

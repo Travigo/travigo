@@ -16,7 +16,6 @@ import (
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/eko/gocache/v2/cache"
 	"github.com/eko/gocache/v2/store"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -241,11 +240,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 			})
 
-			elastic_client.IndexRequest(&esapi.IndexRequest{
-				Index:   identifyEventsIndexName,
-				Body:    bytes.NewReader(elasticEvent),
-				Refresh: "true",
-			})
+			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 
 			return nil
 		}
@@ -266,11 +261,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
 		})
 
-		elastic_client.IndexRequest(&esapi.IndexRequest{
-			Index:   identifyEventsIndexName,
-			Body:    bytes.NewReader(elasticEvent),
-			Refresh: "true",
-		})
+		elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 	} else if cachedJourneyMapping == "N/A" {
 		return nil
 	} else {

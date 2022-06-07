@@ -11,7 +11,6 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 )
@@ -110,11 +109,7 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 		Timestamp: time.Now(),
 	})
 
-	elastic_client.IndexRequest(&esapi.IndexRequest{
-		Index:   "sirivm-queue-empty-1",
-		Body:    bytes.NewReader(elasticEvent),
-		Refresh: "true",
-	})
+	elastic_client.IndexRequest("sirivm-queue-empty-1", bytes.NewReader(elasticEvent))
 
 	return nil
 }

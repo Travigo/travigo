@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/elastic_client"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/rs/zerolog/log"
 	"github.com/ulikunitz/xz"
 	"google.golang.org/api/iterator"
@@ -36,6 +35,12 @@ func (i *Indexer) Perform() {
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	i.journeyHistoryIndexName = fmt.Sprintf("journey-history-%d-%d", yearNumber, weekNumber)
 	i.journeyStopActivityIndexName = fmt.Sprintf("journey-stop-activity-%d-%d", yearNumber, weekNumber)
+
+	// file, _ := os.Open("/Users/aaronclaydon/Downloads/test_data.tar.xz")
+	// i.indexJourneysBundle("2022-06-06T04 00 02+01 00.tar.xz", file)
+	// file.Close()
+
+	// return
 
 	client, err := storage.NewClient(context.Background())
 	if err != nil {
@@ -223,11 +228,7 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 
 	archivedJourneyBytes, _ := json.Marshal(archivedJourney)
 
-	elastic_client.IndexRequest(&esapi.IndexRequest{
-		Index:   i.journeyHistoryIndexName,
-		Body:    bytes.NewReader(archivedJourneyBytes),
-		Refresh: "true",
-	})
+	elastic_client.IndexRequest(i.journeyHistoryIndexName, bytes.NewReader(archivedJourneyBytes))
 
 	// Go ahead and create a journey stop activity index event
 	// Contains stop arrival time, co-ordinates, service
@@ -287,12 +288,6 @@ func (i *Indexer) parseArchivedJourneyFile(bundleName string, contents []byte) {
 
 		journeyStopActivityBytes, _ := json.Marshal(journeyStopActivity)
 
-		elastic_client.IndexRequest(&esapi.IndexRequest{
-			Index:   i.journeyStopActivityIndexName,
-			Body:    bytes.NewReader(journeyStopActivityBytes),
-			Refresh: "true",
-		})
-
-		time.Sleep(10 * time.Millisecond) // TODO temporary sleep until bulk indexing added
+		elastic_client.IndexRequest(i.journeyStopActivityIndexName, bytes.NewReader(journeyStopActivityBytes))
 	}
 }
