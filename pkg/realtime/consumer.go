@@ -115,6 +115,19 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
+		if !(vehicleIdentificationEvent.VehicleActivity.MonitoredVehicleJourney.VehicleLocation.Latitude == 0 && vehicleIdentificationEvent.VehicleActivity.MonitoredVehicleJourney.VehicleLocation.Longitude == 0) {
+			vehicleLocationBytes, _ := json.Marshal(BusLocationElasticEvent{
+				Timestamp: vehicleIdentificationEvent.ResponseTime,
+
+				Location: ctdf.ElasticGeoPoint{
+					Lat: vehicleIdentificationEvent.VehicleActivity.MonitoredVehicleJourney.VehicleLocation.Latitude,
+					Lon: vehicleIdentificationEvent.VehicleActivity.MonitoredVehicleJourney.VehicleLocation.Longitude,
+				},
+			})
+
+			yearNumber, weekNumber := vehicleIdentificationEvent.ResponseTime.ISOWeek()
+			elastic_client.IndexRequest(fmt.Sprintf("vehicle-locations-%d-%d", yearNumber, weekNumber), bytes.NewReader(vehicleLocationBytes))
+		}
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
 
 		if vehicleLocationEvent != nil {
