@@ -16,6 +16,12 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "britbus-elasticsearch-user"
 
+runner:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 150Mi
+
 archiver:
   schedule: "0 3 * * 1"
   serviceAccountName: "realtime-archiver-service-account"
