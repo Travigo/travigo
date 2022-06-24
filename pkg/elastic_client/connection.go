@@ -74,6 +74,10 @@ func Connect(required bool) error {
 }
 
 func IndexRequest(indexName string, document io.ReadSeeker) {
+	if Client == nil {
+		return
+	}
+
 	bulkIndexer.Add(
 		context.Background(),
 		esutil.BulkIndexerItem{
