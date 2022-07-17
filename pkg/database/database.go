@@ -55,6 +55,8 @@ func Connect() error {
 		return err
 	}
 
+	createIndexes()
+
 	return nil
 }
 

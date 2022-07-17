@@ -18,7 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 type TravelineData struct {
@@ -218,40 +217,8 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	// Operators table
 	operatorsCollection := database.GetCollection("operators")
 
-	// TODO: Doesnt really make sense for the traveline package to be managing CTDF tables and indexes
-	operatorIndex := []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "otheridentifiers", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "operatorgroupref", Value: bsonx.Int32(1)}},
-		},
-	}
-
-	opts := options.CreateIndexes()
-	_, err := operatorsCollection.Indexes().CreateMany(context.Background(), operatorIndex, opts)
-	if err != nil {
-		panic(err)
-	}
-
 	// OperatorGroups table
 	operatorGroupsCollection := database.GetCollection("operator_groups")
-
-	// TODO: Doesnt really make sense for the traveline package to be managing CTDF tables and indexes
-	operatorGroupsIndex := []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "identifier", Value: bsonx.Int32(1)}},
-		},
-	}
-
-	opts = options.CreateIndexes()
-	_, err = operatorGroupsCollection.Indexes().CreateMany(context.Background(), operatorGroupsIndex, opts)
-	if err != nil {
-		panic(err)
-	}
 
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
@@ -315,7 +282,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
-				_, err = operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
+				_, err := operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Operators")
 				}
@@ -393,7 +360,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&operatorGroupOperationUpdate, localOperationUpdate)
 
 			if len(operatorGroupOperations) > 0 {
-				_, err = operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
+				_, err := operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write OperatorGroups")
 				}

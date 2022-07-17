@@ -16,7 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 const DateTimeFormat string = "2006-01-02T15:04:05"
@@ -51,34 +50,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	stopsCollection := database.GetCollection("stops")
 	stopGroupsCollection := database.GetCollection("stop_groups")
-
-	// TODO: Doesnt really make sense for the NaPTAN package to be managing CTDF tables and indexes
-	stopsIndex := []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "location", Value: bsonx.String("2dsphere")}},
-		},
-	}
-
-	opts := options.CreateIndexes()
-	_, err := stopsCollection.Indexes().CreateMany(context.Background(), stopsIndex, opts)
-	if err != nil {
-		panic(err)
-	}
-
-	stopGroupsIndex := []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "identifier", Value: bsonx.Int32(1)}},
-		},
-	}
-
-	opts = options.CreateIndexes()
-	_, err = stopGroupsCollection.Indexes().CreateMany(context.Background(), stopGroupsIndex, opts)
-	if err != nil {
-		panic(err)
-	}
 
 	// StopPoints
 	log.Info().Msg("Converting & Importing CTDF Stops into Mongo")
@@ -134,7 +105,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
-				_, err = stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
+				_, err := stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Stops")
 				}
@@ -208,7 +179,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&stopGroupsOperationUpdate, localOperationUpdate)
 
 			if len(stopGroupOperations) > 0 {
-				_, err = stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
+				_, err := stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write StopGroups")
 				}

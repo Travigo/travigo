@@ -20,7 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 var journeyCache *cache.Cache
@@ -56,18 +55,6 @@ func StartConsumers() {
 	// Create Cache
 	CreateIdentificationCache()
 	CreateJourneyCache()
-
-	// Mongo indexes
-	//TODO: Doesnt really make sense for this package to be managing indexes
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
-		},
-	}, options.CreateIndexes())
-	if err != nil {
-		log.Error().Err(err)
-	}
 
 	// Start the background consumers
 	log.Info().Msg("Starting realtime consumers")

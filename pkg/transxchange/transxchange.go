@@ -19,7 +19,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 
 	iso8601 "github.com/senseyeio/duration"
 )
@@ -65,84 +64,6 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 
 	servicesCollection := database.GetCollection("services")
 	journeysCollection := database.GetCollection("journeys")
-
-	//TODO: Doesnt really make sense for the TransXChange package to be managing CTDF tables and indexes
-	serviceNameOperatorRefIndexName := "ServiceNameOperatorRef"
-	_, err := servicesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &serviceNameOperatorRefIndexName,
-			},
-			Keys: bson.D{
-				{Key: "servicename", Value: 1},
-				{Key: "operatorref", Value: 1},
-			},
-		},
-	}, options.CreateIndexes())
-	if err != nil {
-		panic(err)
-	}
-
-	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
-	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
-	journeyIdentificationServiceTicketMachineJourneycodeIndexName := "JourneyIdentificationServiceTicketMachineJourneyCode"
-	journeyIdentificationServiceBlockNumberIndexName := "JourneyIdentificationServiceBlockNumberJourneyCode"
-	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "serviceref", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "path.originstopref", Value: bsonx.Int32(1)}},
-		},
-		{
-			Keys: bsonx.Doc{{Key: "path.destinationstopref", Value: bsonx.Int32(1)}},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceOriginStopsIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "path.originstopref", Value: 1},
-			},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceDestinationStopsIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "path.destinationstopref", Value: 1},
-			},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceTicketMachineJourneycodeIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "otheridentifiers.TicketMachineJourneyCode", Value: 1},
-			},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceBlockNumberIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "otheridentifiers.BlockNumber", Value: 1},
-			},
-		},
-	}, options.CreateIndexes())
-	if err != nil {
-		panic(err)
-	}
 
 	// Map the local operator references to globally unique operator codes based on NOC
 	operatorLocalMapping := map[string]string{}
@@ -301,7 +222,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 	}
 
 	if len(serviceOperations) > 0 {
-		_, err = servicesCollection.BulkWrite(context.TODO(), serviceOperations, &options.BulkWriteOptions{})
+		_, err := servicesCollection.BulkWrite(context.TODO(), serviceOperations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Services")
 		}
@@ -740,7 +661,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 			atomic.AddUint64(&journeyOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
-				_, err = journeysCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
+				_, err := journeysCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 				}
