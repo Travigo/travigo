@@ -6,6 +6,24 @@ type VehicleActivity struct {
 	ValidUntilTime string
 
 	MonitoredVehicleJourney *MonitoredVehicleJourney
+
+	Extensions struct {
+		VehicleJourney struct {
+			Operational struct {
+				TicketMachine struct {
+					TicketMachineServiceCode string
+					JourneyCode              string
+				}
+			}
+
+			VehicleUniqueId     string
+			SeatedOccupancy     int
+			SeatedCapacity      int
+			WheelchairOccupancy int
+			WheelchairCapacity  int
+			OccupancyThresholds string
+		}
+	}
 }
 
 type MonitoredVehicleJourney struct {
@@ -33,7 +51,8 @@ type MonitoredVehicleJourney struct {
 		Longitude float64
 		Latitude  float64
 	}
-	Bearing float64
+	Bearing   float64
+	Occupancy string
 
 	BlockRef   string
 	VehicleRef string
