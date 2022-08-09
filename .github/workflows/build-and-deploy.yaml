@@ -22,7 +22,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18
+        go-version: 1.19
     - name: Build
       run: go build -v ./cmd/data-importer
     - name: Upload data-importer
@@ -39,7 +39,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18
+        go-version: 1.19
     - name: Build
       run: go build -v ./cmd/realtime
     - name: Upload realtime
@@ -56,7 +56,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18
+        go-version: 1.19
     - name: Build
       run: go build -v ./cmd/web-api
     - name: Upload webapi
@@ -73,7 +73,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18
+        go-version: 1.19
     - name: Build
       run: go build -v ./cmd/stats
     - name: Upload stats

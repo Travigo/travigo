@@ -11,7 +11,6 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 )
@@ -57,7 +56,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 
 	queue.PublishBytes(identificationEventJson)
 
-	pretty.Println(identificationEvent.VehicleActivity.ItemIdentifier)
+	// pretty.Println(identificationEvent.VehicleActivity.ItemIdentifier)
 
 	return true
 }
