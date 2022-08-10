@@ -106,7 +106,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 		if err != nil {
 			c.SendStatus(fiber.StatusBadRequest)
 			return c.JSON(fiber.Map{
-				"error": "Parameter datetime should be an RFS3339/ISO8601 datetime",
+				"error":    "Parameter datetime should be an RFS3339/ISO8601 datetime",
+				"detailed": err,
 			})
 		}
 	}
