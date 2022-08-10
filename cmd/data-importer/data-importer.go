@@ -70,7 +70,7 @@ func tempDownloadFile(source string) (*os.File, string) {
 	return tmpFile, fileExtension
 }
 
-func importFile(dataFormat string, source string, fileFormat string, overrides map[string]string) error {
+func importFile(dataFormat string, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
 	dataFiles := []DataFile{}
 	fileExtension := filepath.Ext(source)
 
@@ -126,7 +126,7 @@ func importFile(dataFormat string, source string, fileFormat string, overrides m
 	}
 
 	for _, dataFile := range dataFiles {
-		err := parseDataFile(dataFormat, &dataFile)
+		err := parseDataFile(dataFormat, &dataFile, sourceDatasource)
 
 		if err != nil {
 			return err
@@ -136,7 +136,9 @@ func importFile(dataFormat string, source string, fileFormat string, overrides m
 	return nil
 }
 
-func parseDataFile(dataFormat string, dataFile *DataFile) error {
+func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf.DataSource) error {
+	var datasource ctdf.DataSource
+
 	switch dataFormat {
 	case "naptan":
 		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
@@ -146,10 +148,16 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 			return err
 		}
 
-		naptanDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
-			Provider: "Department of Transport",
-			Dataset:  dataFile.Name,
-		})
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport",
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		naptanDoc.ImportIntoMongoAsCTDF(&datasource)
 	case "traveline-noc":
 		log.Info().Msgf("Traveline NOC file import from %s", dataFile.Name)
 		travelineData, err := travelinenoc.ParseXMLFile(dataFile.Reader)
@@ -158,9 +166,15 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 			return err
 		}
 
-		travelineData.ImportIntoMongoAsCTDF(&ctdf.DataSource{
-			Dataset: dataFile.Name,
-		})
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Dataset: dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		travelineData.ImportIntoMongoAsCTDF(&datasource)
 	case "transxchange":
 		log.Info().Msgf("TransXChange file import from %s ", dataFile.Name)
 		transXChangeDoc, err := transxchange.ParseXMLFile(dataFile.Reader)
@@ -169,17 +183,29 @@ func parseDataFile(dataFormat string, dataFile *DataFile) error {
 			return err
 		}
 
-		transXChangeDoc.ImportIntoMongoAsCTDF(&ctdf.DataSource{
-			Provider: "Department of Transport", // This may not always be true
-			Dataset:  dataFile.Name,
-		}, dataFile.Overrides)
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.Overrides)
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
 
-		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &ctdf.DataSource{
-			Provider: "Department of Transport", // This may not always be true
-			Dataset:  dataFile.Name,
-		})
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &datasource)
 
 		if err != nil {
 			return err
@@ -277,7 +303,7 @@ func main() {
 					for {
 						startTime := time.Now()
 
-						err := importFile(dataFormat, source, fileFormat, map[string]string{})
+						err := importFile(dataFormat, source, fileFormat, nil, map[string]string{})
 
 						if err != nil {
 							return err
@@ -345,7 +371,12 @@ func main() {
 						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
 
 						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
-							err = importFile("transxchange", dataset.URL, "", map[string]string{})
+							err = importFile("transxchange", dataset.URL, "", &ctdf.DataSource{
+								OriginalFormat: "transxchange",
+								Provider:       "DfT-BODS",
+								Dataset:        fmt.Sprint(dataset.ID),
+								Identifier:     dataset.Modified,
+							}, map[string]string{})
 
 							if err != nil {
 								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
@@ -388,6 +419,8 @@ func main() {
 						source = "https://tfl.gov.uk/tfl/syndication/feeds/journey-planner-timetables.zip"
 					}
 
+					currentTime := time.Now().Format(time.RFC3339)
+
 					log.Info().Msgf("TfL TransXChange import from %s", source)
 
 					if isValidUrl(source) {
@@ -420,7 +453,12 @@ func main() {
 
 							io.Copy(tmpFile, file)
 
-							err = importFile("transxchange", tmpFile.Name(), "zip", map[string]string{
+							err = importFile("transxchange", tmpFile.Name(), "zip", &ctdf.DataSource{
+								OriginalFormat: "transxchange",
+								Provider:       "TfL-TRANSXCHANGE",
+								Dataset:        "ALL",
+								Identifier:     currentTime,
+							}, map[string]string{
 								"OperatorRef": "GB:NOC:TFLO",
 							})
 							if err != nil {
