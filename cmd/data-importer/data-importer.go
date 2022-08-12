@@ -303,7 +303,30 @@ func main() {
 					for {
 						startTime := time.Now()
 
-						err := importFile(dataFormat, source, fileFormat, nil, map[string]string{})
+						var datasource *ctdf.DataSource
+
+						switch dataFormat {
+						case "naptan":
+							datasource = &ctdf.DataSource{
+								OriginalFormat: "naptan",
+								Dataset:        source,
+								Identifier:     time.Now().Format(time.RFC3339),
+							}
+
+							cleanupOldRecords("stops", datasource)
+							cleanupOldRecords("stop_groups", datasource)
+						case "traveline-noc":
+							datasource = &ctdf.DataSource{
+								OriginalFormat: "traveline-noc",
+								Dataset:        source,
+								Identifier:     time.Now().Format(time.RFC3339),
+							}
+
+							cleanupOldRecords("operators", datasource)
+							cleanupOldRecords("operator_groups", datasource)
+						}
+
+						err := importFile(dataFormat, source, fileFormat, datasource, map[string]string{})
 
 						if err != nil {
 							return err
