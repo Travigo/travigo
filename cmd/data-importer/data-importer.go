@@ -371,12 +371,18 @@ func main() {
 						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
 
 						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
-							err = importFile("transxchange", dataset.URL, "", &ctdf.DataSource{
+							datasource := &ctdf.DataSource{
 								OriginalFormat: "transxchange",
 								Provider:       "DfT-BODS",
 								Dataset:        fmt.Sprint(dataset.ID),
 								Identifier:     dataset.Modified,
-							}, map[string]string{})
+							}
+
+							// Cleanup per file if it changes
+							cleanupOldRecords("services", datasource)
+							cleanupOldRecords("journeys", datasource)
+
+							err = importFile("transxchange", dataset.URL, "", datasource, map[string]string{})
 
 							if err != nil {
 								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
@@ -437,6 +443,17 @@ func main() {
 					defer archive.Close()
 
 					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART \\w+ \\d+.zip")
+
+					// Cleanup right at the begining once, as we do it as 1 big import
+					datasource := &ctdf.DataSource{
+						OriginalFormat: "transxchange",
+						Provider:       "TfL-TRANSXCHANGE",
+						Dataset:        "ALL",
+						Identifier:     currentTime,
+					}
+					cleanupOldRecords("services", datasource)
+					cleanupOldRecords("journeys", datasource)
+
 					for _, zipFile := range archive.File {
 						if tflBusesMatchRegex.MatchString(zipFile.Name) {
 							file, err := zipFile.Open()
@@ -453,12 +470,7 @@ func main() {
 
 							io.Copy(tmpFile, file)
 
-							err = importFile("transxchange", tmpFile.Name(), "zip", &ctdf.DataSource{
-								OriginalFormat: "transxchange",
-								Provider:       "TfL-TRANSXCHANGE",
-								Dataset:        "ALL",
-								Identifier:     currentTime,
-							}, map[string]string{
+							err = importFile("transxchange", tmpFile.Name(), "zip", datasource, map[string]string{
 								"OperatorRef": "GB:NOC:TFLO",
 							})
 							if err != nil {
@@ -480,6 +492,23 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Send()
 	}
+}
+
+func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
+	collection := database.GetCollection(collectionName)
+
+	query := bson.M{
+		"$and": bson.A{
+			bson.M{"datasource.originalformat": datasource.OriginalFormat},
+			bson.M{"datasource.provider": datasource.Provider},
+			bson.M{"datasource.dataset": datasource.Dataset},
+			bson.M{"datasource.identifier": bson.M{
+				"$ne": datasource.Identifier,
+			}},
+		},
+	}
+
+	collection.DeleteMany(context.Background(), query)
 }
 
 func isValidUrl(toTest string) bool {

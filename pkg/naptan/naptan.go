@@ -46,7 +46,6 @@ func (n *NaPTAN) Validate() error {
 
 func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	datasource.OriginalFormat = "naptan"
-	datasource.Identifier = naptanDoc.ModificationDateTime
 
 	stopsCollection := database.GetCollection("stops")
 	stopGroupsCollection := database.GetCollection("stop_groups")
