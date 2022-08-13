@@ -360,12 +360,20 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					bodsDatasetIdentifier := "GB-DfT-BODS"
+
 					source := c.String("url")
 
 					// Default source of all published buses
 					if source == "" {
 						source = "https://data.bus-data.dft.gov.uk/api/v1/dataset/?limit=25&offset=0&status=published"
 					}
+
+					// First get the unique set of datasets that we have previously imported
+					// This will be used later to see if any are no longer active in the dataset, and should be removed
+					datasetVersionsCollection := database.GetCollection("dataset_versions")
+					datasetVersionsIdentifiers, _ := datasetVersionsCollection.Distinct(context.Background(), "identifier", bson.M{"dataset": bodsDatasetIdentifier})
+					datasetIdentifiersSeen := map[string]bool{}
 
 					log.Info().Msgf("Bus Open Data Service Timetable API import from %s ", source)
 
@@ -382,13 +390,13 @@ func main() {
 						return err
 					}
 
-					datasetVersionsCollection := database.GetCollection("dataset_versions")
-
 					for _, dataset := range timeTableDataset {
+						datasetIdentifiersSeen[fmt.Sprint(dataset.ID)] = true
+
 						var datasetVersion *ctdf.DatasetVersion
 
 						query := bson.M{"$and": bson.A{
-							bson.M{"dataset": "GB-BODS"},
+							bson.M{"dataset": bodsDatasetIdentifier},
 							bson.M{"identifier": fmt.Sprintf("%d", dataset.ID)},
 						}}
 						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
@@ -396,7 +404,7 @@ func main() {
 						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
 							datasource := &ctdf.DataSource{
 								OriginalFormat: "transxchange",
-								Provider:       "DfT-BODS",
+								Provider:       bodsDatasetIdentifier,
 								Dataset:        fmt.Sprint(dataset.ID),
 								Identifier:     dataset.Modified,
 							}
@@ -414,7 +422,7 @@ func main() {
 
 							if datasetVersion == nil {
 								datasetVersion = &ctdf.DatasetVersion{
-									Dataset:    "GB-BODS",
+									Dataset:    bodsDatasetIdentifier,
 									Identifier: fmt.Sprintf("%d", dataset.ID),
 								}
 							}
@@ -424,6 +432,32 @@ func main() {
 							datasetVersionsCollection.UpdateOne(context.Background(), query, bson.M{"$set": datasetVersion}, opts)
 						} else {
 							log.Info().Int("id", dataset.ID).Msg("Dataset not changed")
+						}
+					}
+
+					// Now check if this new results has any datasets removed
+					for _, datasetIdentifier := range datasetVersionsIdentifiers {
+						if !datasetIdentifiersSeen[datasetIdentifier.(string)] {
+							log.Info().Str("id", datasetIdentifier.(string)).Msg("Deleted removed dataset")
+
+							datasetVersionsCollection.DeleteMany(context.Background(), bson.M{"$and": bson.A{
+								bson.M{"dataset": bodsDatasetIdentifier},
+								bson.M{"identifier": datasetIdentifier.(string)},
+							}})
+
+							journeysCollection := database.GetCollection("journeys")
+							servicesCollection := database.GetCollection("services")
+
+							query := bson.M{
+								"$and": bson.A{
+									bson.M{"datasource.originalformat": "transxchange"},
+									bson.M{"datasource.provider": bodsDatasetIdentifier},
+									bson.M{"datasource.dataset": datasetIdentifier.(string)},
+								},
+							}
+
+							journeysCollection.DeleteMany(context.Background(), query)
+							servicesCollection.DeleteMany(context.Background(), query)
 						}
 					}
 
