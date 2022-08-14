@@ -504,7 +504,7 @@ func main() {
 					// Cleanup right at the begining once, as we do it as 1 big import
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "transxchange",
-						Provider:       "TfL-TRANSXCHANGE",
+						Provider:       "GB-TfL-Transxchange",
 						Dataset:        "ALL",
 						Identifier:     currentTime,
 					}
