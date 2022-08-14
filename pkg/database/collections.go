@@ -95,6 +95,9 @@ func createJourneysIndexes() {
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
+			Keys: bsonx.Doc{{Key: "datasource.dataset", Value: bsonx.Int32(1)}},
+		},
+		{
 			Options: &options.IndexOptions{
 				Name: &serviceNameOperatorRefIndexName,
 			},
@@ -127,6 +130,9 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bsonx.Doc{{Key: "path.destinationstopref", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "datasource.dataset", Value: bsonx.Int32(1)}},
 		},
 		{
 			Options: &options.IndexOptions{
