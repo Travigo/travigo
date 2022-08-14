@@ -44,7 +44,6 @@ func UpdateRecordsStats() {
 			LocationWithoutTrack: 0,
 			ExternalProvided:     0,
 		},
-		HistoricalRealtimeJourneys: 0,
 	}
 
 	for {
@@ -61,8 +60,6 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.Services = numberServices
 
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-		numberRealtimeJourneys, _ := realtimeJourneysCollection.CountDocuments(context.Background(), bson.D{})
 
 		var numberActiveRealtimeJourneys int64
 		var numberActiveRealtimeJourneysWithTrack int64
@@ -91,13 +88,10 @@ func UpdateRecordsStats() {
 			}
 		}
 
-		numberHistoricRealtimeJourneys := numberRealtimeJourneys - numberActiveRealtimeJourneys
-
 		CurrentRecordsStats.ActiveRealtimeJourneys.Current = numberActiveRealtimeJourneys
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithTrack = numberActiveRealtimeJourneysWithTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
-		CurrentRecordsStats.HistoricalRealtimeJourneys = numberHistoricRealtimeJourneys
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
