@@ -1,5 +1,7 @@
 # BritBus
 
+[![Build, Test, and Deploy](https://github.com/BritBus/britbus/actions/workflows/build-and-deploy.yaml/badge.svg)](https://github.com/BritBus/britbus/actions/workflows/build-and-deploy.yaml)
+
 BritBus is a collection of applications that provide realtime & up to date information on bus transport within Great Britain.
 
 Takes advantage of numerous open datasets and combines them into one helpful up to date API & website.
@@ -11,7 +13,6 @@ BritBus is currently a heavy WIP and only has the following features implemented
 
 * Import bus stops & bus stop groups
 * Import bus operators & operator groups
-* Very basic web API providing imported data
 * Import bus lines
 * Import bus timetables
 * Endpoint for providing timetable for a given stop on each day
@@ -43,7 +44,7 @@ The following are in the TODO list
 
 #### Realtime Bus Tracking
 * England
-  * Currently tracks up to 16000 bus journeys at a time
+  * Currently tracks up to 19000 bus journeys at a time
 
 #### Fares
 * None
