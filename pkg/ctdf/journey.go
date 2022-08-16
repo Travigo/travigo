@@ -89,6 +89,16 @@ func (journey *Journey) GenerateFunctionalHash() string {
 	hash.Write([]byte(journey.Direction))
 	hash.Write([]byte(journey.DepartureTime.String()))
 
+	rules := append(journey.Availability.Condition, journey.Availability.Match...)
+	rules = append(rules, journey.Availability.MatchSecondary...)
+	rules = append(rules, journey.Availability.Exclude...)
+
+	for _, availabilityMatchRule := range rules {
+		hash.Write([]byte(availabilityMatchRule.Type))
+		hash.Write([]byte(availabilityMatchRule.Value))
+		hash.Write([]byte(availabilityMatchRule.Description))
+	}
+
 	for _, pathItem := range journey.Path {
 		hash.Write([]byte(pathItem.OriginStopRef))
 		hash.Write([]byte(pathItem.OriginArrivalTime.GoString()))
@@ -149,7 +159,8 @@ func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 }
 
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
-//  currently no other kind so is fine for now (TODO)
+//
+//	currently no other kind so is fine for now (TODO)
 func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
 	currentTime := time.Now()
 
