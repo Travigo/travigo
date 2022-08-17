@@ -125,6 +125,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 	journeysCollection := database.GetCollection("journeys")
 	currentTime := time.Now()
 
+	// This projection excludes values we dont care about - the main ones being path.*
+	// Reduces memory usage and execution time
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "otheridentifiers", Value: 0},

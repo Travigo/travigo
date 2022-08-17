@@ -78,7 +78,10 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				journey.OtherIdentifiers["BlockNumber"] != "" {
 
 				blockJourneys := []string{}
-				cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]})
+				opts := options.Find().SetProjection(bson.D{
+					bson.E{Key: "primaryidentifier", Value: 1},
+				})
+				cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]}, opts)
 
 				for cursor.Next(context.TODO()) {
 					var blockJourney Journey
