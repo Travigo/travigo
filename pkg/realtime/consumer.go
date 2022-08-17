@@ -246,7 +246,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 			return nil
 		}
-		journeyID = journey.PrimaryIdentifier
+		journeyID = journey
 
 		identificationCache.Set(context.Background(), localJourneyID, localJourneyIDMap{
 			JourneyID:   journeyID,

@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
@@ -140,7 +141,18 @@ func (j Journey) FlattenStops() ([]string, map[string]time.Time, map[string]time
 func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*Journey {
 	journeys := []*Journey{}
 
-	cursor, _ := journeysCollection.Find(context.Background(), query)
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "otheridentifiers", Value: 0},
+		bson.E{Key: "datasource", Value: 0},
+		bson.E{Key: "creationdatetime", Value: 0},
+		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "destinationdisplay", Value: 0},
+		bson.E{Key: "path.track", Value: 0},
+		bson.E{Key: "path.originactivity", Value: 0},
+		bson.E{Key: "path.destinationactivity", Value: 0},
+	})
+	cursor, _ := journeysCollection.Find(context.Background(), query, opts)
 
 	for cursor.Next(context.TODO()) {
 		var journey *Journey
@@ -161,7 +173,7 @@ func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
 //
 //	currently no other kind so is fine for now (TODO)
-func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error) {
+func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 	currentTime := time.Now()
 
 	// Get the directly referenced Operator
@@ -172,7 +184,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	operatorsCollection.FindOne(context.Background(), query).Decode(&referencedOperator)
 
 	if referencedOperator == nil {
-		return nil, errors.New("Could not find referenced Operator")
+		return "", errors.New("Could not find referenced Operator")
 	}
 	referencedOperator.GetOperatorGroup()
 
@@ -237,7 +249,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	}
 
 	if len(services) == 0 {
-		return nil, errors.New("Could not find related Service")
+		return "", errors.New("Could not find related Service")
 	}
 
 	// Get the relevant Journeys
@@ -269,7 +281,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		})
 		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
 		if err == nil {
-			return identifiedJourney, nil
+			return identifiedJourney.PrimaryIdentifier, nil
 		}
 	}
 
@@ -283,7 +295,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 		})
 		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
 		if err == nil {
-			return identifiedJourney, nil
+			return identifiedJourney.PrimaryIdentifier, nil
 		}
 	}
 
@@ -319,9 +331,9 @@ func IdentifyJourney(identifyingInformation map[string]string) (*Journey, error)
 	// }
 
 	if err == nil {
-		return identifiedJourney, nil
+		return identifiedJourney.PrimaryIdentifier, nil
 	} else {
-		return nil, err
+		return "", err
 	}
 }
 
