@@ -104,13 +104,13 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 		}
 	}
 
-	log.Info().Msgf("Successfully parsed document")
-	log.Info().Msgf(" - Last modified %s", transXChange.ModificationDateTime)
-	log.Info().Msgf(" - Contains %d operators", len(transXChange.Operators))
-	log.Info().Msgf(" - Contains %d services", len(transXChange.Services))
-	log.Info().Msgf(" - Contains %d routes", len(transXChange.Routes))
-	log.Info().Msgf(" - Contains %d route sections", len(transXChange.RouteSections))
-	log.Info().Msgf(" - Contains %d vehicle journeys", len(transXChange.VehicleJourneys))
+	log.Debug().Msgf("Successfully parsed document")
+	log.Debug().Msgf(" - Last modified %s", transXChange.ModificationDateTime)
+	log.Debug().Msgf(" - Contains %d operators", len(transXChange.Operators))
+	log.Debug().Msgf(" - Contains %d services", len(transXChange.Services))
+	log.Debug().Msgf(" - Contains %d routes", len(transXChange.Routes))
+	log.Debug().Msgf(" - Contains %d route sections", len(transXChange.RouteSections))
+	log.Debug().Msgf(" - Contains %d vehicle journeys", len(transXChange.VehicleJourneys))
 
 	return &transXChange, nil
 }

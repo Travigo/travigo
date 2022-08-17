@@ -222,7 +222,7 @@ func main() {
 	loc, _ := time.LoadLocation("Europe/London")
 	time.Local = loc
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).Level(zerolog.InfoLevel)
 
 	transforms.SetupClient()
 
@@ -237,6 +237,10 @@ func main() {
 	notify_client.Setup()
 
 	ctdf.LoadSpecialDayCache()
+
+	if os.Getenv("BRITBUS_DEBUG") == "YES" {
+		log.Logger = log.Logger.Level(zerolog.DebugLevel)
+	}
 
 	app := &cli.App{
 		Name:        "data-importer",

@@ -126,7 +126,7 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 			specialDateTime := SpecialDays[dateTime.Year()][rule.Value]
 
 			if specialDateTime.Year() == 1 {
-				log.Error().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
+				log.Debug().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
 				return false
 			}
 

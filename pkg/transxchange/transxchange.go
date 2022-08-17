@@ -93,7 +93,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 	}
 
 	// Get CTDF services from TransXChange Services & Lines
-	log.Info().Msg("Converting & Importing CTDF Services into Mongo")
+	log.Debug().Msg("Converting & Importing CTDF Services into Mongo")
 	serviceOperations := []mongo.WriteModel{}
 	var serviceOperationInsert uint64
 	var serviceOperationUpdate uint64
@@ -227,12 +227,12 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 		}
 	}
 
-	log.Info().Msg(" - Written to MongoDB")
-	log.Info().Msgf(" - %d inserts", serviceOperationInsert)
-	log.Info().Msgf(" - %d updates", serviceOperationUpdate)
+	log.Debug().Msg(" - Written to MongoDB")
+	log.Debug().Msgf(" - %d inserts", serviceOperationInsert)
+	log.Debug().Msgf(" - %d updates", serviceOperationUpdate)
 
 	// Get CTDF Journeys from TransXChange VehicleJourneys
-	log.Info().Msg("Converting & Importing CTDF Journeys into Mongo")
+	log.Debug().Msg("Converting & Importing CTDF Journeys into Mongo")
 
 	// A little cheat for handling frequent services by just duplicating the VehicleJourney record for each frequent run
 	for _, txcJourney := range doc.VehicleJourneys {
@@ -672,9 +672,9 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 
 	processingGroup.Wait()
 
-	log.Info().Msg(" - Written to MongoDB")
-	log.Info().Msgf(" - %d inserts", journeyOperationInsert)
-	log.Info().Msgf(" - %d updates", journeyOperationUpdate)
+	log.Debug().Msg(" - Written to MongoDB")
+	log.Debug().Msgf(" - %d inserts", journeyOperationInsert)
+	log.Debug().Msgf(" - %d updates", journeyOperationUpdate)
 
-	log.Info().Msgf("Successfully imported into MongoDB")
+	log.Debug().Msgf("Successfully imported into MongoDB")
 }
