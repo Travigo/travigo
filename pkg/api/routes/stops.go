@@ -13,6 +13,7 @@ import (
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	iso8601 "github.com/senseyeio/duration"
 )
@@ -122,27 +123,40 @@ func getStopDepartures(c *fiber.Ctx) error {
 	journeys := []*ctdf.Journey{}
 
 	journeysCollection := database.GetCollection("journeys")
-	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": stopIdentifier})
+	currentTime := time.Now()
 
-	for cursor.Next(context.TODO()) {
-		var journey ctdf.Journey
-		err := cursor.Decode(&journey)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode Stop")
-		}
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "otheridentifiers", Value: 0},
+		bson.E{Key: "datasource", Value: 0},
+		bson.E{Key: "creationdatetime", Value: 0},
+		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "destinationdisplay", Value: 0},
+		bson.E{Key: "path.track", Value: 0},
+		bson.E{Key: "path.originactivity", Value: 0},
+		bson.E{Key: "path.destinationactivity", Value: 0},
+	})
+	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": stopIdentifier}, opts)
 
-		journeys = append(journeys, &journey)
+	if err = cursor.All(context.Background(), &journeys); err != nil {
+		log.Error().Err(err).Msg("Failed to decode Stop")
 	}
+
+	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Database lookup")
 
 	realtimeTimeframe := startDateTime.Format("2006-01-02")
 
 	var journeysTimetable []*ctdf.TimetableRecord
 
+	currentTime = time.Now()
 	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, startDateTime, realtimeTimeframe, true)
+	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation today")
 
 	// If not enough journeys in todays timetable then look into tomorrows
 	if len(journeysTimetableToday) < count {
+		currentTime = time.Now()
 		journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, dayAfterDateTime, realtimeTimeframe, false)
+		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation tomorrow")
 
 		journeysTimetable = append(journeysTimetableToday, journeysTimetableTomorrow...)
 	} else {
@@ -159,7 +173,9 @@ func getStopDepartures(c *fiber.Ctx) error {
 		journeysTimetable = journeysTimetable[:count]
 	}
 
+	currentTime = time.Now()
 	transforms.Transform(journeysTimetable)
+	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Transform")
 
 	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},
