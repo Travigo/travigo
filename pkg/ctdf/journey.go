@@ -186,19 +186,20 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 	if referencedOperator == nil {
 		return "", errors.New("Could not find referenced Operator")
 	}
-	referencedOperator.GetOperatorGroup()
+	// referencedOperator.GetOperatorGroup()
 
+	// TODO this is temporarily disabled as we're misidentifying journeys a lot
 	// Get all potential Operators that belong in the Operator group
 	// This is because *some* operator groups have incorrect operator IDs for a service
 	var operators []string
-	if referencedOperator.OperatorGroup == nil {
-		operators = append(operators, referencedOperator.OtherIdentifiers...)
-	} else {
-		referencedOperator.OperatorGroup.GetOperators()
-		for _, operator := range referencedOperator.OperatorGroup.Operators {
-			operators = append(operators, operator.OtherIdentifiers...)
-		}
-	}
+	// if referencedOperator.OperatorGroup == nil {
+	operators = append(operators, referencedOperator.OtherIdentifiers...)
+	// } else {
+	// 	referencedOperator.OperatorGroup.GetOperators()
+	// 	for _, operator := range referencedOperator.OperatorGroup.Operators {
+	// 		operators = append(operators, operator.OtherIdentifiers...)
+	// 	}
+	// }
 
 	// Get the relevant Services
 	var services []string
