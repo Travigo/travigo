@@ -189,6 +189,8 @@ func (a *Archiver) Perform() {
 	}
 
 	realtimeJourneysCollection.DeleteMany(context.Background(), searchFilter)
+
+	database.Instance.Database.RunCommand(context.Background(), bson.M{"compact": "realtime_journeys"})
 }
 
 func (a *Archiver) writeFile(filename string, contents []byte) {
