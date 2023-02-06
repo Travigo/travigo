@@ -10,8 +10,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  GKE_CLUSTER: britbus-gke
-  GCP_ZONE: europe-central2-a
 
 jobs:
   data-importer-build:
@@ -267,7 +265,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   data-importer-deploy-helm:
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
   
     name: Deploy data-importer to BritBus Kubernetes
     runs-on: ubuntu-latest
@@ -300,7 +298,7 @@ jobs:
         helm upgrade -i britbus-data-importer ./charts/britbus-data-importer --set image.tag=sha-${{ github.sha }}
 
   realtime-deploy-helm:
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
   
     name: Deploy realtime to BritBus Kubernetes
     runs-on: ubuntu-latest
@@ -333,7 +331,7 @@ jobs:
         helm upgrade -i britbus-realtime ./charts/britbus-realtime --set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
   
     name: Deploy web-api to BritBus Kubernetes
     runs-on: ubuntu-latest
@@ -370,37 +368,37 @@ jobs:
       run: |-
         helm upgrade -i britbus-web-api ./charts/britbus-web-api --set image.tag=sha-${{ github.sha }}
 
-  stats-deploy-helm:
-    # if: github.ref == 'refs/heads/main'
+  # stats-deploy-helm:
+  #   if: github.ref == 'refs/heads/main'
   
-    name: Deploy stats to BritBus Kubernetes
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-      url: https://api.britbus.app/stats
+  #   name: Deploy stats to BritBus Kubernetes
+  #   runs-on: ubuntu-latest
+  #   environment: 
+  #     name: production
+  #     url: https://api.britbus.app/stats
 
-    needs: stats-docker
+  #   needs: stats-docker
 
-    permissions:
-      contents: 'read'
-      id-token: 'write'
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
 
-    steps:
-    - name: Helm tool installer
-      uses: Azure/setup-helm@v3
+  #   steps:
+  #   - name: Helm tool installer
+  #     uses: Azure/setup-helm@v3
 
-    - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+  #   - name: Kubectl tool installer
+  #     uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+  #   - name: Setup kubeconfig
+  #     run: |
+  #         mkdir ~/.kube/
+  #         echo "$KUBECONFIG" >> ~/.kube/config
+  #         chmod 600 ~/.kube/config
+  #     shell: bash
+  #     env:
+  #       KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
-    - name: Helm upgrade
-      run: |-
-        helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
+  #   - name: Helm upgrade
+  #     run: |-
+  #       helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
