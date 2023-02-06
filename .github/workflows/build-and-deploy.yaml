@@ -278,6 +278,8 @@ jobs:
       id-token: 'write'
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
 
@@ -311,6 +313,8 @@ jobs:
       id-token: 'write'
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@v2
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
 
@@ -384,6 +388,8 @@ jobs:
   #     id-token: 'write'
 
   #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v2
   #   - name: Helm tool installer
   #     uses: Azure/setup-helm@v3
 
