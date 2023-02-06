@@ -373,6 +373,7 @@ jobs:
       run: |
           mkdir ~/.kube/
           echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
       shell: bash
       env:
         KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
