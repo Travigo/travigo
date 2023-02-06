@@ -269,7 +269,7 @@ jobs:
   data-importer-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy data-importer to GCP
+    name: Deploy data-importer to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -308,7 +308,7 @@ jobs:
   realtime-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy realtime to GCP
+    name: Deploy realtime to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -347,7 +347,7 @@ jobs:
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy web-api to GCP
+    name: Deploy web-api to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -388,7 +388,7 @@ jobs:
   stats-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy stats to GCP
+    name: Deploy stats to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
