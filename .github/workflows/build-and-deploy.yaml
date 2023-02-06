@@ -10,8 +10,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  GKE_CLUSTER: britbus-gke
-  GCP_ZONE: europe-central2-a
 
 jobs:
   data-importer-build:
@@ -269,7 +267,7 @@ jobs:
   data-importer-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy data-importer to GCP
+    name: Deploy data-importer to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -282,24 +280,20 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    # Configure Workload Identity Federation and generate an access token.
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0'
-      with:
-        token_format: 'access_token'
-        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
-        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
-
     - name: Helm tool installer
-      uses: Azure/setup-helm@v2.0
-  
-    - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GCP_ZONE }}
+      uses: Azure/setup-helm@v3
+
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
+
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
     - name: Helm upgrade
       run: |-
@@ -308,7 +302,7 @@ jobs:
   realtime-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy realtime to GCP
+    name: Deploy realtime to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -321,24 +315,20 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-
-    # Configure Workload Identity Federation and generate an access token.
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0'
-      with:
-        token_format: 'access_token'
-        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
-        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
-
     - name: Helm tool installer
-      uses: Azure/setup-helm@v2.0
-  
-    - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GCP_ZONE }}
+      uses: Azure/setup-helm@v3
+
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
+
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
     - name: Helm upgrade
       run: |-
@@ -347,7 +337,7 @@ jobs:
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy web-api to GCP
+    name: Deploy web-api to BritBus Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -363,65 +353,58 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
 
-    # Configure Workload Identity Federation and generate an access token.
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0'
-      with:
-        token_format: 'access_token'
-        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
-        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
-
     - name: Helm tool installer
-      uses: Azure/setup-helm@v2.0
-  
-    - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GCP_ZONE }}
+      uses: Azure/setup-helm@v3
+
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
+
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
     - name: Helm upgrade
       run: |-
         helm upgrade -i britbus-web-api ./charts/britbus-web-api --set image.tag=sha-${{ github.sha }}
 
-  stats-deploy-helm:
-    if: github.ref == 'refs/heads/main'
+  # stats-deploy-helm:
+  #   if: github.ref == 'refs/heads/main'
   
-    name: Deploy stats to GCP
-    runs-on: ubuntu-latest
-    environment: 
-      name: production
-      url: https://api.britbus.app/stats
+  #   name: Deploy stats to BritBus Kubernetes
+  #   runs-on: ubuntu-latest
+  #   environment: 
+  #     name: production
+  #     url: https://api.britbus.app/stats
 
-    needs: stats-docker
+  #   needs: stats-docker
 
-    permissions:
-      contents: 'read'
-      id-token: 'write'
+  #   permissions:
+  #     contents: 'read'
+  #     id-token: 'write'
 
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v2
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v2
+  #   - name: Helm tool installer
+  #     uses: Azure/setup-helm@v3
 
-    # Configure Workload Identity Federation and generate an access token.
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v0'
-      with:
-        token_format: 'access_token'
-        workload_identity_provider: 'projects/635806391814/locations/global/workloadIdentityPools/github/providers/github-actions'
-        service_account: 'github-actions@britbus.iam.gserviceaccount.com'
+  #   - name: Kubectl tool installer
+  #     uses: Azure/setup-kubectl@v3
 
-    - name: Helm tool installer
-      uses: Azure/setup-helm@v2.0
-  
-    - name: Set up GKE credentials
-      uses: google-github-actions/get-gke-credentials@v0
-      with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GCP_ZONE }}
+  #   - name: Setup kubeconfig
+  #     run: |
+  #         mkdir ~/.kube/
+  #         echo "$KUBECONFIG" >> ~/.kube/config
+  #         chmod 600 ~/.kube/config
+  #     shell: bash
+  #     env:
+  #       KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
-    - name: Helm upgrade
-      run: |-
-        helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
+  #   - name: Helm upgrade
+  #     run: |-
+  #       helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
