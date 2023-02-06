@@ -2,6 +2,7 @@ package transforms
 
 import (
 	"reflect"
+	"strings"
 )
 
 type TransformDefinition struct {
@@ -17,48 +18,33 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		return
 	}
 
-	for key, value := range t.Match {
-		field := inputValue.FieldByName(key)
-		if field.IsValid() {
-			if value != field.String() {
-				isMatch = false
-			}
-		} else {
-			isMatch = false
-		}
-	}
+	// Only check values and try and replace them if the types match the transform def
+	inputTypeName := strings.Replace(inputTypeOf.String(), "*", "", 1)
 
-	// If we match then go over and update the values
-	if isMatch {
-		for key, value := range t.Data {
+	if inputTypeName == t.Type {
+		for key, value := range t.Match {
 			field := inputValue.FieldByName(key)
 			if field.IsValid() {
-				field.Set(reflect.ValueOf(value))
-				// field.SetString(value)
+				if value != field.String() {
+					isMatch = false
+				}
+			} else {
+				isMatch = false
 			}
 		}
 
-		// for i := 0; i < inputValue.NumField(); i++ {
-		// 	valueField := inputValue.Field(i)
-		// 	typeField := inputValue.Type().Field(i)
-
-		// 	if t.Data[typeField.Name] != "" {
-		// 		valueField.SetString(t.Data[typeField.Name])
-		// 	}
-
-		// 	valueType := typeField.Type.Kind()
-		// 	if valueType == reflect.Pointer {
-		// 		valueType = reflect.Indirect(valueField).Type().Kind()
-		// 	}
-
-		// 	pretty.Println(typeField.Name, valueType == reflect.Slice, valueType == reflect.Struct)
-
-		// 	if valueType == reflect.Slice || valueType == reflect.Struct {
-		// 		Transform(valueField.Interface())
-		// 	}
-		// }
+		// If we match then go over and update the values
+		if isMatch {
+			for key, value := range t.Data {
+				field := inputValue.FieldByName(key)
+				if field.IsValid() {
+					field.Set(reflect.ValueOf(value))
+				}
+			}
+		}
 	}
 
+	// Go through all the fields and try and run transform against anymore structs/slices
 	for i := 0; i < inputValue.NumField(); i++ {
 		valueField := inputValue.Field(i)
 		typeField := inputValue.Type().Field(i)
@@ -67,7 +53,7 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		if valueTypeKind == reflect.Pointer {
 			valueType := reflect.Indirect(valueField)
 			if !valueType.IsValid() {
-				return
+				continue
 			}
 			valueTypeKind = valueType.Type().Kind()
 		}
@@ -93,18 +79,12 @@ func Transform(input interface{}) {
 }
 
 func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value) {
-	// inputTypeName := strings.Replace(inputTypeOf.String(), "*", "", 1)
-
 	var inputValue reflect.Value
 	if inputTypeOf.Kind() == reflect.Pointer {
 		inputValue = inputValueOf.Elem()
 	}
 
 	for _, transformDef := range transforms {
-		// if inputTypeName != transformDef.Type {
-		// 	continue
-		// }
-
 		transformDef.Transform(inputTypeOf, inputValue)
 	}
 }
