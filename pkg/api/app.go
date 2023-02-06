@@ -4,12 +4,14 @@ import (
 	"github.com/britbus/britbus/pkg/api/routes"
 	"github.com/britbus/britbus/pkg/api/stats"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func SetupServer(listen string) {
 	go stats.UpdateRecordsStats()
 
 	webApp := fiber.New()
+	webApp.Use(logger.New())
 
 	group := webApp.Group("/core")
 
