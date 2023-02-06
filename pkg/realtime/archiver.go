@@ -66,7 +66,7 @@ func (a *Archiver) Perform() {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		transforms.Transform(&stop)
+		transforms.Transform(&stop, 2)
 
 		stops = append(stops, &stop)
 	}
@@ -89,7 +89,7 @@ func (a *Archiver) Perform() {
 			log.Error().Err(err).Msg("Failed to decode Service")
 		}
 
-		transforms.Transform(&service)
+		transforms.Transform(&service, 2)
 
 		services = append(services, &service)
 	}
@@ -112,7 +112,7 @@ func (a *Archiver) Perform() {
 			log.Error().Err(err).Msg("Failed to decode Operator")
 		}
 
-		transforms.Transform(&operator)
+		transforms.Transform(&operator, 2)
 
 		operators = append(operators, &operator)
 	}
@@ -135,7 +135,7 @@ func (a *Archiver) Perform() {
 			log.Error().Err(err).Msg("Failed to decode OperatorGroup")
 		}
 
-		transforms.Transform(&operatorGroup)
+		transforms.Transform(&operatorGroup, 2)
 
 		operatorGroups = append(operatorGroups, &operatorGroup)
 	}

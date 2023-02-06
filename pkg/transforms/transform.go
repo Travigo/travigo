@@ -11,10 +11,14 @@ type TransformDefinition struct {
 	Data  map[string]interface{}
 }
 
-func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue reflect.Value) {
+func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue reflect.Value, depth int) {
 	isMatch := true
 
 	if !inputValue.IsValid() {
+		return
+	}
+
+	if depth < 0 {
 		return
 	}
 
@@ -59,32 +63,32 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		}
 
 		if valueTypeKind == reflect.Slice || valueTypeKind == reflect.Struct {
-			Transform(valueField.Interface())
+			Transform(valueField.Interface(), depth-1)
 		}
 	}
 }
 
-func Transform(input interface{}) {
+func Transform(input interface{}, depth int) {
 	inputTypeOf := reflect.TypeOf(input)
 	inputValueOf := reflect.ValueOf(input)
 
 	if inputTypeOf.Kind() == reflect.Slice {
 		for i := 0; i < inputValueOf.Len(); i++ {
 			indexInput := inputValueOf.Index(i).Interface()
-			transformValue(reflect.TypeOf(indexInput), reflect.ValueOf(indexInput))
+			transformValue(reflect.TypeOf(indexInput), reflect.ValueOf(indexInput), depth)
 		}
 	} else {
-		transformValue(inputTypeOf, inputValueOf)
+		transformValue(inputTypeOf, inputValueOf, depth)
 	}
 }
 
-func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value) {
+func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value, depth int) {
 	var inputValue reflect.Value
 	if inputTypeOf.Kind() == reflect.Pointer {
 		inputValue = inputValueOf.Elem()
 	}
 
 	for _, transformDef := range transforms {
-		transformDef.Transform(inputTypeOf, inputValue)
+		transformDef.Transform(inputTypeOf, inputValue, depth)
 	}
 }

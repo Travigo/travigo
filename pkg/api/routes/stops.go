@@ -69,7 +69,7 @@ func getStop(c *fiber.Ctx) error {
 	} else {
 		stop.GetServices()
 
-		transforms.Transform(stop)
+		transforms.Transform(stop, 3)
 
 		return c.JSON(stop)
 	}
@@ -176,7 +176,12 @@ func getStopDepartures(c *fiber.Ctx) error {
 	}
 
 	currentTime = time.Now()
-	transforms.Transform(journeysTimetable)
+	// Transforming the whole document is incredibly ineffecient
+	// Instead just transform the Operator & Service as those are the key values
+	for _, item := range journeysTimetable {
+		transforms.Transform(item.Journey.Operator, 1)
+		transforms.Transform(item.Journey.Service, 1)
+	}
 	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Transform")
 
 	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{

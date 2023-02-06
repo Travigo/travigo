@@ -135,7 +135,7 @@ func getOperatorServices(c *fiber.Ctx) error {
 			services = append(services, &service)
 		}
 
-		transforms.Transform(services)
+		transforms.Transform(services, 3)
 
 		return c.JSON(services)
 	}
@@ -149,7 +149,7 @@ func getOperatorById(identifier string) *ctdf.Operator {
 		bson.M{"otheridentifiers": identifier},
 	}}).Decode(&operator)
 
-	transforms.Transform(operator)
+	transforms.Transform(operator, 2)
 
 	return operator
 }
