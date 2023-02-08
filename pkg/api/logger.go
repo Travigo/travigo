@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,6 +26,8 @@ func NewLogger() fiber.Handler {
 		if cloudflareConnectingIP := c.Get("CF-Connecting-IP", ""); cloudflareConnectingIP != "" {
 			ipAddress = cloudflareConnectingIP
 		}
+
+		pretty.Println(c.Request().Header.String())
 
 		requestLogger := log.With().
 			Int("status", code).
