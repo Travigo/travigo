@@ -15,6 +15,7 @@ import (
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/store"
 	redis_store "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -38,18 +39,12 @@ func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
 }
 
 func CreateIdentificationCache() {
-	redisStore := redis_store.NewRedis(redis_client.Client)
-	// &store.Options{
-	// 	Expiration: cacheExpirationTime,
-	// }
+	redisStore := redis_store.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
 
 	identificationCache = cache.New[string](redisStore)
 }
 func CreateJourneyCache() {
-	redisStore := redis_store.NewRedis(redis_client.Client)
-	// &store.Options{
-	// 	Expiration: cacheExpirationTime,
-	// }
+	redisStore := redis_store.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
 
 	journeyCache = cache.New[string](redisStore)
 }
