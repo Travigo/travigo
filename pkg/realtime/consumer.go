@@ -14,16 +14,16 @@ import (
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
-	"github.com/eko/gocache/v2/cache"
-	"github.com/eko/gocache/v2/store"
+	"github.com/eko/gocache/lib/v4/cache"
+	redis_store "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var journeyCache *cache.Cache
-var identificationCache *cache.Cache
+var journeyCache *cache.Cache[string]
+var identificationCache *cache.Cache[string]
 var cacheExpirationTime = 90 * time.Minute
 
 const numConsumers = 5
@@ -38,18 +38,20 @@ func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
 }
 
 func CreateIdentificationCache() {
-	redisStore := store.NewRedis(redis_client.Client, &store.Options{
-		Expiration: cacheExpirationTime,
-	})
+	redisStore := redis_store.NewRedis(redis_client.Client)
+	// &store.Options{
+	// 	Expiration: cacheExpirationTime,
+	// }
 
-	identificationCache = cache.New(redisStore)
+	identificationCache = cache.New[string](redisStore)
 }
 func CreateJourneyCache() {
-	redisStore := store.NewRedis(redis_client.Client, &store.Options{
-		Expiration: cacheExpirationTime,
-	})
+	redisStore := redis_store.NewRedis(redis_client.Client)
+	// &store.Options{
+	// 	Expiration: cacheExpirationTime,
+	// }
 
-	journeyCache = cache.New(redisStore)
+	journeyCache = cache.New[string](redisStore)
 }
 func StartConsumers() {
 	// Create Cache
@@ -194,7 +196,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
 
-	if cachedJourneyMapping == nil || cachedJourneyMapping == "" {
+	if cachedJourneyMapping == "" {
 		journey, err := ctdf.IdentifyJourney(map[string]string{
 			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
@@ -212,7 +214,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
 
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			identificationCache.Set(context.Background(), localJourneyID, "N/A", nil)
+			identificationCache.Set(context.Background(), localJourneyID, "N/A")
 
 			// Temporary https://github.com/BritBus/britbus/issues/43
 			errorCode := "UNKNOWN"
@@ -248,10 +250,12 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		}
 		journeyID = journey
 
-		identificationCache.Set(context.Background(), localJourneyID, localJourneyIDMap{
+		journeyMapJson, _ := json.Marshal(localJourneyIDMap{
 			JourneyID:   journeyID,
 			LastUpdated: vehicle.RecordedAtTime,
-		}, nil)
+		})
+
+		identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
 
 		// Record the successful identification event
 		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
@@ -268,7 +272,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		return nil
 	} else {
 		var journeyMap localJourneyIDMap
-		json.Unmarshal([]byte(cachedJourneyMapping.(string)), &journeyMap)
+		json.Unmarshal([]byte(cachedJourneyMapping), &journeyMap)
 
 		cachedLastUpdated, err := time.Parse(ctdf.XSDDateTimeFormat, journeyMap.LastUpdated)
 		if err != nil {
@@ -283,7 +287,10 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		if vehicleLastUpdated.After(cachedLastUpdated) {
 			// Update the last updated time
 			journeyMap.LastUpdated = vehicle.RecordedAtTime
-			identificationCache.Set(context.Background(), localJourneyID, journeyMap, nil)
+
+			journeyMapJson, _ := json.Marshal(journeyMap)
+
+			identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
 		} else {
 			return nil
 		}
@@ -331,7 +338,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
-	if cachedJourney == nil || cachedJourney == "" {
+	if cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
 		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
@@ -339,14 +346,11 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			pathItem.GetDestinationStop()
 		}
 
-		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, journey, nil)
+		journeyJson, _ := json.Marshal(journey)
+
+		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, string(journeyJson))
 	} else {
-		switch cachedJourney.(type) {
-		default:
-			journey = cachedJourney.(*CacheJourney)
-		case string:
-			json.Unmarshal([]byte(cachedJourney.(string)), &journey)
-		}
+		json.Unmarshal([]byte(cachedJourney), &journey)
 	}
 
 	closestDistance := 999999999999.0
