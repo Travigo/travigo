@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/britbus/britbus/pkg/database"
@@ -34,91 +35,104 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 	journeys = FilterIdenticalJourneys(journeys)
 
+	wg := &sync.WaitGroup{}
+	timetableMutex := sync.Mutex{}
+
 	for _, journey := range journeys {
-		var stopDeperatureTime time.Time
-		var destinationDisplay string
-		timetableRecordType := TimetableRecordTypeScheduled
+		wg.Add(1)
+		go func(journey *Journey) {
+			defer wg.Done()
 
-		journey.GetRealtimeJourney(realtimeTimeframe)
+			var stopDeperatureTime time.Time
+			var destinationDisplay string
+			timetableRecordType := TimetableRecordTypeScheduled
 
-		for _, path := range journey.Path {
-			if path.OriginStopRef == stopRef {
-				refTime := path.OriginDepartureTime
+			journey.GetRealtimeJourney(realtimeTimeframe)
 
-				// Use the realtime estimated stop time based if realtime is available
-				if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
-					refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
-					timetableRecordType = TimetableRecordTypeRealtimeTracked
+			for _, path := range journey.Path {
+				if path.OriginStopRef == stopRef {
+					refTime := path.OriginDepartureTime
+
+					// Use the realtime estimated stop time based if realtime is available
+					if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+						refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
+						timetableRecordType = TimetableRecordTypeRealtimeTracked
+					}
+
+					stopDeperatureTime = time.Date(
+						dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
+					)
+
+					destinationDisplay = path.DestinationDisplay
+					break
+				}
+			}
+
+			if stopDeperatureTime.Before(dateTime) {
+				return
+			}
+
+			availability := journey.Availability
+
+			if availability.MatchDate(dateTime) {
+				journey.GetReferences()
+
+				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
+				// We estimate the current vehicle realtime journey based on the Block Number
+				stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
+				if doEstimates &&
+					timetableRecordType == TimetableRecordTypeScheduled &&
+					stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
+					journey.OtherIdentifiers["BlockNumber"] != "" {
+
+					blockJourneys := []string{}
+					opts := options.Find().SetProjection(bson.D{
+						bson.E{Key: "primaryidentifier", Value: 1},
+					})
+					cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]}, opts)
+
+					for cursor.Next(context.TODO()) {
+						var blockJourney Journey
+						err := cursor.Decode(&blockJourney)
+						if err != nil {
+							log.Error().Err(err).Msg("Failed to decode Journey")
+						}
+
+						blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
+					}
+
+					var blockRealtimeJourney *RealtimeJourney
+					realtimeJourneysCollection.FindOne(context.Background(),
+						bson.M{
+							"journeyref": bson.M{
+								"$in": blockJourneys,
+							},
+							"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+						}, &options.FindOneOptions{}).Decode(&blockRealtimeJourney)
+
+					if blockRealtimeJourney != nil {
+						// Ignore negative offsets as we assume bus will right itself when turning over
+						if blockRealtimeJourney.Offset.Minutes() > 0 {
+							stopDeperatureTime = stopDeperatureTime.Add(blockRealtimeJourney.Offset)
+						}
+						timetableRecordType = TimetableRecordTypeEstimated
+					}
 				}
 
-				stopDeperatureTime = time.Date(
-					dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
-				)
-
-				destinationDisplay = path.DestinationDisplay
-				break
-			}
-		}
-
-		if stopDeperatureTime.Before(dateTime) {
-			continue
-		}
-
-		availability := journey.Availability
-
-		if availability.MatchDate(dateTime) {
-			journey.GetReferences()
-
-			// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
-			// We estimate the current vehicle realtime journey based on the Block Number
-			stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
-			if doEstimates &&
-				timetableRecordType == TimetableRecordTypeScheduled &&
-				stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
-				journey.OtherIdentifiers["BlockNumber"] != "" {
-
-				blockJourneys := []string{}
-				opts := options.Find().SetProjection(bson.D{
-					bson.E{Key: "primaryidentifier", Value: 1},
+				timetableMutex.Lock()
+				timetable = append(timetable, &TimetableRecord{
+					Journey:            journey,
+					Time:               stopDeperatureTime,
+					DestinationDisplay: destinationDisplay,
+					Type:               timetableRecordType,
 				})
-				cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]}, opts)
-
-				for cursor.Next(context.TODO()) {
-					var blockJourney Journey
-					err := cursor.Decode(&blockJourney)
-					if err != nil {
-						log.Error().Err(err).Msg("Failed to decode Journey")
-					}
-
-					blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
-				}
-
-				var blockRealtimeJourney *RealtimeJourney
-				realtimeJourneysCollection.FindOne(context.Background(),
-					bson.M{
-						"journeyref": bson.M{
-							"$in": blockJourneys,
-						},
-						"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-					}, &options.FindOneOptions{}).Decode(&blockRealtimeJourney)
-
-				if blockRealtimeJourney != nil {
-					// Ignore negative offsets as we assume bus will right itself when turning over
-					if blockRealtimeJourney.Offset.Minutes() > 0 {
-						stopDeperatureTime = stopDeperatureTime.Add(blockRealtimeJourney.Offset)
-					}
-					timetableRecordType = TimetableRecordTypeEstimated
-				}
+				timetableMutex.Unlock()
 			}
+		}(journey)
 
-			timetable = append(timetable, &TimetableRecord{
-				Journey:            journey,
-				Time:               stopDeperatureTime,
-				DestinationDisplay: destinationDisplay,
-				Type:               timetableRecordType,
-			})
-		}
 	}
+
+	wg.Wait()
 
 	return timetable
 }
