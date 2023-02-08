@@ -9,6 +9,7 @@ import (
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/transforms"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -17,6 +18,7 @@ import (
 )
 
 func main() {
+	pretty.Println("what")
 	// Overwrite internal timezone location to UK time
 	loc, _ := time.LoadLocation("Europe/London")
 	time.Local = loc
