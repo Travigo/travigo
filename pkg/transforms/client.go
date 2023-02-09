@@ -12,6 +12,15 @@ func SetupClient() {
 			"BrandColour": "#F2A83B",
 		},
 	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"OperatorRef": "GB:NOC:WHIP",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#368BFF",
+		},
+	})
 
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
