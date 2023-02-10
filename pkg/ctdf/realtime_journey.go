@@ -68,6 +68,11 @@ func (r *RealtimeJourney) IsActive() bool {
 		r.GetJourney()
 	}
 
+	// If tis still nil then give up
+	if r.Journey == nil {
+		return false
+	}
+
 	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
 
 	if lastPathItem.DestinationStop == nil {
