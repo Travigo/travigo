@@ -33,7 +33,7 @@ cronjobs:
     schedule: "0 5 * * *"
     args: ["bods-timetable"]
   - name: tfl
-    schedule: "0 3 * * 0"
+    schedule: "0 3 * * *"
     args: ["tfl"]
 
 deployments:

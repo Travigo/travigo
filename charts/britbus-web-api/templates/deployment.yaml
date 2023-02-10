@@ -34,6 +34,8 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
+            - name: BRITBUS_LOG_FORMAT
+              value: JSON
             - name: BRITBUS_DEBUG
               value: "YES"
             - name: BRITBUS_MONGODB_CONNECTION

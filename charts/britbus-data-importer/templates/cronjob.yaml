@@ -17,6 +17,7 @@ spec:
       labels:
         {{- include "britbus-data-importer.selectorLabels" $ | nindent 8 }}
     spec:
+      ttlSecondsAfterFinished: 3600
       template:
         spec:
           serviceAccountName: {{ include "britbus-data-importer.serviceAccountName" $ }}
@@ -31,6 +32,8 @@ spec:
                 {{- with .env }}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
+                - name: BRITBUS_LOG_FORMAT
+                  value: JSON
                 - name: BRITBUS_BODS_API_KEY
                   valueFrom:
                     secretKeyRef:

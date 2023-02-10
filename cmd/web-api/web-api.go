@@ -21,10 +21,14 @@ func main() {
 	loc, _ := time.LoadLocation("Europe/London")
 	time.Local = loc
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).Level(zerolog.InfoLevel)
+	if os.Getenv("BRITBUS_LOG_FORMAT") != "JSON" {
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	}
 
 	if os.Getenv("BRITBUS_DEBUG") == "YES" {
 		log.Logger = log.Logger.Level(zerolog.DebugLevel)
+	} else {
+		log.Logger = log.Logger.Level(zerolog.InfoLevel)
 	}
 
 	transforms.SetupClient()

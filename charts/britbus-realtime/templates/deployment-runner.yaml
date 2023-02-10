@@ -44,6 +44,8 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            - name: BRITBUS_LOG_FORMAT
+              value: JSON
             - name: BRITBUS_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:

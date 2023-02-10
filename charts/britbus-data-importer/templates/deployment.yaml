@@ -27,6 +27,8 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            - name: BRITBUS_LOG_FORMAT
+              value: JSON
             - name: BRITBUS_BODS_API_KEY
               valueFrom:
                 secretKeyRef:
