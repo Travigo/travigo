@@ -109,8 +109,9 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 				},
 			})
 
-			yearNumber, weekNumber := vehicleIdentificationEvent.ResponseTime.ISOWeek()
-			elastic_client.IndexRequest(fmt.Sprintf("vehicle-locations-%d-%d", yearNumber, weekNumber), bytes.NewReader(vehicleLocationBytes))
+			yearNumber := vehicleIdentificationEvent.ResponseTime.Year()
+			yearDay := vehicleIdentificationEvent.ResponseTime.YearDay()
+			elastic_client.IndexRequest(fmt.Sprintf("vehicle-locations-%d-%d", yearNumber, yearDay), bytes.NewReader(vehicleLocationBytes))
 		}
 
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
