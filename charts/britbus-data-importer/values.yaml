@@ -35,6 +35,18 @@ cronjobs:
   - name: tfl
     schedule: "0 3 * * *"
     args: ["tfl"]
+  - name: stagecoach-scfi
+    schedule: "0 2 * * 6"
+    args: ["file", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-scfi-route-schedule-data-transxchange.zip"]
+  - name: stagecoach-schi
+    schedule: "5 2 * * 6"
+    args: ["file", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-schi-route-schedule-data-transxchange.zip"]
+  - name: stagecoach-stws
+    schedule: "10 2 * * 6"
+    args: ["file", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-stws-route-schedule-data-transxchange.zip"]
+  - name: stagecoach-sblb
+    schedule: "15 2 * * 6"
+    args: ["file", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-sblb-route-schedule-data-transxchange.zip"]
 
 deployments:
   - name: sirivm-all
