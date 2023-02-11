@@ -43,7 +43,7 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 				if validate != nil {
 					return nil, validate
 				}
-			} else if ty.Name.Local == "Operator" {
+			} else if ty.Name.Local == "Operator" || ty.Name.Local == "LicensedOperator" {
 				var operator Operator
 
 				if err = d.DecodeElement(&operator, &ty); err != nil {
