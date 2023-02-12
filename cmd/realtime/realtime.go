@@ -55,6 +55,12 @@ func main() {
 
 					ctdf.LoadSpecialDayCache()
 
+					// journey, erro := ctdf.IdentifyJourney(map[string]string{"BlockRef": "208461", "DestinationRef": "GB:ATCO:0100BRA10811", "DirectionRef": "inbound", "FramedVehicleJourneyDate": "2023-02-11", "OperatorRef": "GB:NOC:FBRI", "OriginAimedDepartureTime": "2023-02-11T23:20:00+00:00", "OriginRef": "GB:ATCO:0170SGB20205", "PublishedLineName": "42", "ServiceNameRef": "42", "VehicleJourneyRef": "2320"})
+					// pretty.Println(journey)
+					// pretty.Println(erro)
+
+					// return nil
+
 					realtime.StartConsumers()
 
 					realtime.StartStatsServer()

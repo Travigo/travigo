@@ -33,7 +33,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
-	journeys = FilterIdenticalJourneys(journeys)
+	journeys = FilterIdenticalJourneys(journeys, true)
 
 	wg := &sync.WaitGroup{}
 	timetableMutex := sync.Mutex{}

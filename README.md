@@ -45,6 +45,8 @@ The following are in the TODO list
 #### Realtime Bus Tracking
 * England
   * Currently tracks up to 19000 bus journeys at a time
+* Scotland
+  * Stagecoach Services
 
 #### Fares
 * None

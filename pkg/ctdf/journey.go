@@ -81,7 +81,7 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }
-func (journey *Journey) GenerateFunctionalHash() string {
+func (journey *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) string {
 	hash := sha256.New()
 
 	hash.Write([]byte(journey.ServiceRef))
@@ -89,9 +89,11 @@ func (journey *Journey) GenerateFunctionalHash() string {
 	hash.Write([]byte(journey.Direction))
 	hash.Write([]byte(journey.DepartureTime.String()))
 
-	rules := append(journey.Availability.Condition, journey.Availability.Match...)
-	rules = append(rules, journey.Availability.MatchSecondary...)
+	rules := append(journey.Availability.Match, journey.Availability.MatchSecondary...)
 	rules = append(rules, journey.Availability.Exclude...)
+	if includeAvailabilityCondition {
+		rules = append(rules, journey.Availability.Condition...)
+	}
 
 	for _, availabilityMatchRule := range rules {
 		hash.Write([]byte(availabilityMatchRule.Type))
@@ -279,7 +281,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 				bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
 			},
 		})
-		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -293,7 +295,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 				bson.M{"otheridentifiers.BlockNumber": blockRef},
 			},
 		})
-		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -320,7 +322,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
-	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys)
+	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
 
 	// if err != nil {
 	// 	for _, v := range journeys {
@@ -333,12 +335,20 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 	if err == nil {
 		return identifiedJourney.PrimaryIdentifier, nil
 	} else {
+		// log.Debug().Err(err).Int("length", len(journeys)).Msgf("wtf")
+
+		// pretty.Println(identifyingInformation)
+		// for _, journey := range journeys {
+		// 	log.Debug().Msg(journey.PrimaryIdentifier)
+		// }
+		// log.Fatal().Err(err).Msgf("OKAY")
+
 		return "", err
 	}
 }
 
-func narrowJourneys(identifyingInformation map[string]string, currentTime time.Time, journeys []*Journey) (*Journey, error) {
-	journeys = FilterIdenticalJourneys(journeys)
+func narrowJourneys(identifyingInformation map[string]string, currentTime time.Time, journeys []*Journey, includeAvailabilityCondition bool) (*Journey, error) {
+	journeys = FilterIdenticalJourneys(journeys, includeAvailabilityCondition)
 
 	if len(journeys) == 0 {
 		return nil, errors.New("Could not find related Journeys")
@@ -388,17 +398,24 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 		} else if len(timeFilteredJourneys) == 1 {
 			return timeFilteredJourneys[0], nil
 		} else {
-			return nil, errors.New("Could not narrow down to single Journey by time. Still many remaining")
+			if includeAvailabilityCondition {
+				// Try again but ignore availability conidition in hash
+				journey, err := narrowJourneys(identifyingInformation, currentTime, journeys, false)
+
+				return journey, err
+			} else {
+				return nil, errors.New("Could not narrow down to single Journey by time. Still many remaining")
+			}
 		}
 	}
 }
 
-func FilterIdenticalJourneys(journeys []*Journey) []*Journey {
+func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition bool) []*Journey {
 	filtered := []*Journey{}
 
 	matches := map[string]bool{}
 	for _, journey := range journeys {
-		hash := journey.GenerateFunctionalHash()
+		hash := journey.GenerateFunctionalHash(includeAvailabilityCondition)
 
 		if !matches[hash] {
 			filtered = append(filtered, journey)
