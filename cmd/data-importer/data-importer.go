@@ -246,10 +246,6 @@ func main() {
 
 	ctdf.LoadSpecialDayCache()
 
-	if os.Getenv("BRITBUS_DEBUG") == "YES" {
-		log.Logger = log.Logger.Level(zerolog.DebugLevel)
-	}
-
 	app := &cli.App{
 		Name:        "data-importer",
 		Description: "Manages ingesting and verifying data in BritBus",

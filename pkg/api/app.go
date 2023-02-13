@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/britbus/britbus/pkg/api/routes"
 	"github.com/britbus/britbus/pkg/api/stats"
+	"github.com/britbus/britbus/pkg/http_server"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -10,7 +11,7 @@ func SetupServer(listen string) {
 	go stats.UpdateRecordsStats()
 
 	webApp := fiber.New()
-	webApp.Use(NewLogger())
+	webApp.Use(http_server.NewLogger())
 
 	group := webApp.Group("/core")
 
