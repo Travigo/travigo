@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/stats"
+	"github.com/britbus/britbus/pkg/stats/web_api"
 	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -51,6 +53,29 @@ func main() {
 					indexer.Perform()
 
 					elastic_client.WaitUntilQueueEmpty()
+
+					return nil
+				},
+			},
+			{
+				Name:  "run",
+				Usage: "run stats server",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "listen",
+						Value: ":8081",
+						Usage: "listen target for the web server",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to database")
+					}
+					if err := elastic_client.Connect(true); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
+					}
+
+					web_api.SetupServer(c.String("listen"))
 
 					return nil
 				},
