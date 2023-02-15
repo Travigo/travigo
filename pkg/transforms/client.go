@@ -3,6 +3,7 @@ package transforms
 var transforms []*TransformDefinition
 
 func SetupClient() {
+	// Stagecoach East
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
@@ -12,6 +13,34 @@ func SetupClient() {
 			"BrandColour": "#F2A83B",
 		},
 	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"OperatorRef": "GB:NOC:SCHU",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#F2A83B",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"OperatorRef": "GB:NOC:SCBD",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#F2A83B",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"OperatorRef": "GB:NOC:SCPB",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#F2A83B",
+		},
+	})
+	// Whippet
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
