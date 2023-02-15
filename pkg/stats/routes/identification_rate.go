@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"strings"
+
 	"github.com/britbus/britbus/pkg/stats"
 	"github.com/gofiber/fiber/v2"
 )
@@ -10,7 +12,14 @@ func IdentificationRateRouter(router fiber.Router) {
 }
 
 func getIdentificationRate(c *fiber.Ctx) error {
-	rateStats := stats.GetIdentificationRateStats()
+	operatorsListString := c.Query("operators", "")
+
+	var operatorsList []string
+	if operatorsListString != "" {
+		operatorsList = strings.Split(operatorsListString, ",")
+	}
+
+	rateStats := stats.GetIdentificationRateStats(operatorsList)
 
 	return c.JSON(rateStats)
 }

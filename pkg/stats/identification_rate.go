@@ -24,6 +24,8 @@ type IdentificationRateStatsOperator struct {
 	Rating string
 }
 type identificationRateESResponse struct {
+	Error map[string]interface{}
+
 	Aggregations struct {
 		Operators struct {
 			Buckets []struct {
@@ -41,14 +43,45 @@ type identificationRateESResponse struct {
 	}
 }
 
-func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}) *identificationRateESResponse {
-	var queryBytes bytes.Buffer
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"range": map[string]interface{}{
-				"Timestamp": timestampRange,
+func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}, operatorsList []string) *identificationRateESResponse {
+	queryFilter := map[string]interface{}{
+		"bool": map[string]interface{}{
+			"must": []map[string]interface{}{
+				{
+					"range": map[string]interface{}{
+						"Timestamp": timestampRange,
+					},
+				},
 			},
 		},
+	}
+
+	if len(operatorsList) != 0 {
+		var operatorQuerys []map[string]interface{}
+
+		for _, operator := range operatorsList {
+			operatorQuerys = append(operatorQuerys, map[string]interface{}{
+				"match": map[string]interface{}{
+					"Operator.keyword": operator,
+				},
+			})
+		}
+
+		operatorQueryFilterFull := map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": operatorQuerys,
+			},
+		}
+
+		queryFilter["bool"].(map[string]interface{})["must"] = append(
+			queryFilter["bool"].(map[string]interface{})["must"].([]map[string]interface{}),
+			operatorQueryFilterFull,
+		)
+	}
+
+	var queryBytes bytes.Buffer
+	query := map[string]interface{}{
+		"query": queryFilter,
 		"aggs": map[string]interface{}{
 			"operators": map[string]interface{}{
 				"terms": map[string]interface{}{
@@ -65,6 +98,7 @@ func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}) *i
 			},
 		},
 	}
+
 	json.NewEncoder(&queryBytes).Encode(query)
 	res, err := elastic_client.Client.Search(
 		elastic_client.Client.Search.WithContext(context.Background()),
@@ -85,7 +119,7 @@ func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}) *i
 	return &responseStruct
 }
 
-func GetIdentificationRateStats() IdentificationRateStats {
+func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats {
 	rateStats := IdentificationRateStats{
 		Operators: map[string]*IdentificationRateStatsOperator{},
 	}
@@ -95,7 +129,7 @@ func GetIdentificationRateStats() IdentificationRateStats {
 	lastDayQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
 		"gte": "now-1d/d",
 		"lt":  "now/d",
-	})
+	}, operatorsList)
 
 	for _, operator := range lastDayQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
@@ -117,7 +151,7 @@ func GetIdentificationRateStats() IdentificationRateStats {
 	sevenDayQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
 		"gte": "now-7d/d",
 		"lt":  "now/d",
-	})
+	}, operatorsList)
 
 	for _, operator := range sevenDayQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
@@ -139,7 +173,7 @@ func GetIdentificationRateStats() IdentificationRateStats {
 	lastMonthQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
 		"gte": "now-31d/d",
 		"lt":  "now/d",
-	})
+	}, operatorsList)
 
 	for _, operator := range lastMonthQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
@@ -159,15 +193,15 @@ func GetIdentificationRateStats() IdentificationRateStats {
 
 	for _, operator := range rateStats.Operators {
 		if operator.LastDayRate >= 0.95 {
-			operator.Rating = "EXCELLENT"
+			operator.Rating = "PERFECT"
 		} else if operator.LastDayRate >= 0.75 {
-			operator.Rating = "GOOD"
+			operator.Rating = "EXCELLENT"
 		} else if operator.LastDayRate <= 0.5 && operator.LastWeekRate >= 0.75 {
 			operator.Rating = "TEMPORARY-ISSUES"
-		} else if operator.LastDayRate < 0.5 {
-			operator.Rating = "POOR"
+		} else if operator.LastDayRate >= 0.6 {
+			operator.Rating = "GOOD"
 		} else {
-			operator.Rating = "UNKNOWN" // Should never get here...
+			operator.Rating = "POOR"
 		}
 	}
 
