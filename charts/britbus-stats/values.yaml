@@ -14,6 +14,26 @@ indexer:
   schedule: "0 5 * * 1"
   serviceAccountName: "stats-indexer-service-account"
 
+web_api:
+  args: ["run", "--listen", ":80"]
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  ingress:
+    enabled: true
+    className: ""
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "https://britbus.app,https://www.britbus.app"
+    hosts:
+      - host: api.britbus.app
+        paths:
+          - path: /stats
+            pathType: ImplementationSpecific
+
 image:
   repository: ghcr.io/britbus/britbus/stats
   pullPolicy: Always

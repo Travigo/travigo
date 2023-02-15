@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "britbus-stats.fullname" . }}-webapi
+  labels:
+    {{- include "britbus-stats.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "britbus-stats.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "britbus-stats.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "britbus-stats.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-webapi
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.web_api.args | nindent 10 }}
+          env:
+            - name: BRITBUS_LOG_FORMAT
+              value: JSON
+            - name: BRITBUS_DEBUG
+              value: "YES"
+            - name: BRITBUS_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: BRITBUS_MONGODB_DATABASE
+              value: {{ .Values.database.database }}
+            - name: BRITBUS_ELASTICSEARCH_ADDRESS
+              value: {{ $.Values.elasticsearch.address }}
+            - name: BRITBUS_ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: username
+                  optional: false
+            - name: BRITBUS_ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: password
+                  optional: false
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /stats/version
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /stats/version
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
