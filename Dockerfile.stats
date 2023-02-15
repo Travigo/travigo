@@ -1,9 +1,9 @@
 FROM ubuntu:latest
 
+RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
+
 RUN useradd britbus
 USER britbus
-
-RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
 
 WORKDIR /
 
