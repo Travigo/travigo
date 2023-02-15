@@ -10,19 +10,33 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type IdentificationRateStats struct {
-	TotalIdentifications int
-	TotalRate            float64
+type IdentificationRateStatsResponse struct {
+	TotalRate *IdentificationRateStats
 
-	Operators map[string]*IdentificationRateStatsOperator
+	Operators map[string]*IdentificationRateStats
 }
-type IdentificationRateStatsOperator struct {
+type IdentificationRateStats struct {
 	LastDayRate   float64
 	LastWeekRate  float64
 	LastMonthRate float64
 
 	Rating string
 }
+
+func (i *IdentificationRateStats) CalculateRating() {
+	if i.LastDayRate >= 0.95 {
+		i.Rating = "PERFECT"
+	} else if i.LastDayRate >= 0.75 {
+		i.Rating = "EXCELLENT"
+	} else if i.LastDayRate <= 0.5 && i.LastWeekRate >= 0.75 {
+		i.Rating = "TEMPORARY-ISSUES"
+	} else if i.LastDayRate >= 0.6 {
+		i.Rating = "GOOD"
+	} else {
+		i.Rating = "POOR"
+	}
+}
+
 type identificationRateESResponse struct {
 	Error map[string]interface{}
 
@@ -119,9 +133,10 @@ func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}, op
 	return &responseStruct
 }
 
-func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats {
-	rateStats := IdentificationRateStats{
-		Operators: map[string]*IdentificationRateStatsOperator{},
+func GetIdentificationRateStats(operatorsList []string) IdentificationRateStatsResponse {
+	rateStats := IdentificationRateStatsResponse{
+		TotalRate: &IdentificationRateStats{},
+		Operators: map[string]*IdentificationRateStats{},
 	}
 
 	// TODO reduce the duplication here
@@ -131,9 +146,12 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		"lt":  "now/d",
 	}, operatorsList)
 
+	totalIdentifies := 0
+	totalIdentifySuccess := 0
+
 	for _, operator := range lastDayQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
-			rateStats.Operators[operator.Key] = &IdentificationRateStatsOperator{}
+			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
 		successCount := 0
@@ -145,7 +163,11 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		}
 
 		rateStats.Operators[operator.Key].LastDayRate = float64(successCount) / float64(operator.DocCount)
+
+		totalIdentifies += operator.DocCount
+		totalIdentifySuccess += successCount
 	}
+	rateStats.TotalRate.LastDayRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
 
 	// Populate for 7 day stats
 	sevenDayQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
@@ -153,9 +175,12 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		"lt":  "now/d",
 	}, operatorsList)
 
+	totalIdentifies = 0
+	totalIdentifySuccess = 0
+
 	for _, operator := range sevenDayQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
-			rateStats.Operators[operator.Key] = &IdentificationRateStatsOperator{}
+			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
 		successCount := 0
@@ -167,7 +192,11 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		}
 
 		rateStats.Operators[operator.Key].LastWeekRate = float64(successCount) / float64(operator.DocCount)
+
+		totalIdentifies += operator.DocCount
+		totalIdentifySuccess += successCount
 	}
+	rateStats.TotalRate.LastWeekRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
 
 	// Populate for 31 day stats
 	lastMonthQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
@@ -175,9 +204,12 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		"lt":  "now/d",
 	}, operatorsList)
 
+	totalIdentifies = 0
+	totalIdentifySuccess = 0
+
 	for _, operator := range lastMonthQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
-			rateStats.Operators[operator.Key] = &IdentificationRateStatsOperator{}
+			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
 		successCount := 0
@@ -189,21 +221,16 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStats 
 		}
 
 		rateStats.Operators[operator.Key].LastMonthRate = float64(successCount) / float64(operator.DocCount)
+
+		totalIdentifies += operator.DocCount
+		totalIdentifySuccess += successCount
 	}
+	rateStats.TotalRate.LastMonthRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
 
 	for _, operator := range rateStats.Operators {
-		if operator.LastDayRate >= 0.95 {
-			operator.Rating = "PERFECT"
-		} else if operator.LastDayRate >= 0.75 {
-			operator.Rating = "EXCELLENT"
-		} else if operator.LastDayRate <= 0.5 && operator.LastWeekRate >= 0.75 {
-			operator.Rating = "TEMPORARY-ISSUES"
-		} else if operator.LastDayRate >= 0.6 {
-			operator.Rating = "GOOD"
-		} else {
-			operator.Rating = "POOR"
-		}
+		operator.CalculateRating()
 	}
+	rateStats.TotalRate.CalculateRating()
 
 	return rateStats
 }
