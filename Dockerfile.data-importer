@@ -1,6 +1,6 @@
 FROM ubuntu:latest
 
-RUN addgroup -S britbus && adduser --system britbus -G britbus
+RUN useradd britbus
 USER britbus
 
 RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
