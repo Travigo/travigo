@@ -2,13 +2,13 @@ FROM ubuntu:latest
 
 RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
 
-RUN useradd britbus
-USER britbus
-
 WORKDIR /
 
 COPY ./stats /stats
 
 RUN chmod +x /stats
+
+RUN useradd britbus
+USER britbus
 
 ENTRYPOINT ["/stats"]

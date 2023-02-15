@@ -2,14 +2,14 @@ FROM ubuntu:latest
 
 RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
 
-RUN useradd britbus
-USER britbus
-
 WORKDIR /
 
 COPY ./web-api /web-api
 
 RUN chmod +x /web-api
+
+RUN useradd britbus
+USER britbus
 
 EXPOSE 80
 

@@ -2,9 +2,6 @@ FROM ubuntu:latest
 
 RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificates
 
-RUN useradd britbus
-USER britbus
-
 WORKDIR /
 
 COPY ./realtime /realtime
@@ -12,5 +9,8 @@ COPY ./realtime /realtime
 RUN chmod +x /realtime
 
 EXPOSE 3333
+
+RUN useradd britbus
+USER britbus
 
 ENTRYPOINT ["/realtime"]
