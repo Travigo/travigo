@@ -372,39 +372,39 @@ jobs:
       run: |-
         helm upgrade -i britbus-web-api ./charts/britbus-web-api --set image.tag=sha-${{ github.sha }}
 
-  # stats-deploy-helm:
-  #   if: github.ref == 'refs/heads/main'
+  stats-deploy-helm:
+    if: github.ref == 'refs/heads/main'
   
-  #   name: Deploy stats to BritBus Kubernetes
-  #   runs-on: ubuntu-latest
-  #   environment: 
-  #     name: production
-  #     url: https://api.britbus.app/stats
+    name: Deploy stats to BritBus Kubernetes
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+      url: https://api.britbus.app/stats
 
-  #   needs: stats-docker
+    needs: stats-docker
 
-  #   permissions:
-  #     contents: 'read'
-  #     id-token: 'write'
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
-  #   steps:
-  #   - name: Checkout
-  #     uses: actions/checkout@v2
-  #   - name: Helm tool installer
-  #     uses: Azure/setup-helm@v3
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Helm tool installer
+      uses: Azure/setup-helm@v3
 
-  #   - name: Kubectl tool installer
-  #     uses: Azure/setup-kubectl@v3
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
 
-  #   - name: Setup kubeconfig
-  #     run: |
-  #         mkdir ~/.kube/
-  #         echo "$KUBECONFIG" >> ~/.kube/config
-  #         chmod 600 ~/.kube/config
-  #     shell: bash
-  #     env:
-  #       KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
-  #   - name: Helm upgrade
-  #     run: |-
-  #       helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
+    - name: Helm upgrade
+      run: |-
+        helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
