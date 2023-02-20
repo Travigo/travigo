@@ -311,7 +311,6 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 }
 
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
-	loc, _ := time.LoadLocation("Europe/London")
 	currentTime := vehicleLocationEvent.CreationDateTime
 
 	var journey *CacheJourney
@@ -420,7 +419,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
 		closestDistanceJourneyPath.DestinationArrivalTime.Second(),
 		closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
-		loc,
+		time.Local,
 	)
 	originDepartureTimeWithDate := time.Date(
 		realtimeTimeframe.Year(),
@@ -430,7 +429,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		closestDistanceJourneyPath.OriginDepartureTime.Minute(),
 		closestDistanceJourneyPath.OriginDepartureTime.Second(),
 		closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
-		loc,
+		time.Local,
 	)
 
 	// How long it take to travel between origin & destination
@@ -507,8 +506,8 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 			// TODO this should obviously be a different time
 			// TODO this add 1 hour is a massive hack and will probably break when clocks change again
-			ArrivalTime:   currentTime.In(loc).Add(1 * time.Hour),
-			DepartureTime: currentTime.In(loc).Add(1 * time.Hour),
+			ArrivalTime:   currentTime,
+			DepartureTime: currentTime,
 		}
 	}
 

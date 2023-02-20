@@ -18,10 +18,6 @@ import (
 )
 
 func main() {
-	// Overwrite internal timezone location to UK time
-	loc, _ := time.LoadLocation("Europe/London")
-	time.Local = loc
-
 	if os.Getenv("BRITBUS_LOG_FORMAT") != "JSON" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	}
