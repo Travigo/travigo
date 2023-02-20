@@ -14,39 +14,19 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// The CTDF abstraction fails here are we only use siri-vm identifyinginformation
-//
-//	currently no other kind so is fine for now (TODO)
-func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
-	currentTime := time.Now()
-
-	// Get the directly referenced Operator
-	var referencedOperator *ctdf.Operator
+func getOperator(identifyingInformation map[string]string) *ctdf.Operator {
+	var operator *ctdf.Operator
 	operatorRef := identifyingInformation["OperatorRef"]
 	operatorsCollection := database.GetCollection("operators")
 	query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": operatorRef}, bson.M{"otheridentifiers": operatorRef}}}
-	operatorsCollection.FindOne(context.Background(), query).Decode(&referencedOperator)
+	operatorsCollection.FindOne(context.Background(), query).Decode(&operator)
 
-	if referencedOperator == nil {
-		return "", errors.New("Could not find referenced Operator")
-	}
-	// referencedOperator.GetOperatorGroup()
+	return operator
+}
 
-	// TODO this is temporarily disabled as we're misidentifying journeys a lot
-	// Get all potential Operators that belong in the Operator group
-	// This is because *some* operator groups have incorrect operator IDs for a service
-	var operators []string
-	// if referencedOperator.OperatorGroup == nil {
-	operators = append(operators, referencedOperator.OtherIdentifiers...)
-	// } else {
-	// 	referencedOperator.OperatorGroup.GetOperators()
-	// 	for _, operator := range referencedOperator.OperatorGroup.Operators {
-	// 		operators = append(operators, operator.OtherIdentifiers...)
-	// 	}
-	// }
-
-	// Get the relevant Services
+func getServices(identifyingInformation map[string]string, operator *ctdf.Operator) []string {
 	var services []string
+
 	serviceName := identifyingInformation["PublishedLineName"]
 	if serviceName == "" {
 		serviceName = identifyingInformation["ServiceNameRef"]
@@ -56,7 +36,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
-			bson.M{"operatorref": bson.M{"$in": operators}},
+			bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}},
 		},
 	})
 
@@ -77,7 +57,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 		if len(serviceNameMatch) == 2 {
 			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
-					bson.M{"operatorref": bson.M{"$in": operators}},
+					bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}},
 				},
 			})
 
@@ -92,6 +72,25 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 			}
 		}
 	}
+
+	return services
+}
+
+// The CTDF abstraction fails here are we only use siri-vm identifyinginformation
+//
+//	currently no other kind so is fine for now (TODO)
+func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
+	currentTime := time.Now()
+
+	// Get the directly referenced Operator
+	operator := getOperator(identifyingInformation)
+
+	if operator == nil {
+		return "", errors.New("Could not find referenced Operator")
+	}
+
+	// Get the relevant Services
+	services := getServices(identifyingInformation, operator)
 
 	if len(services) == 0 {
 		return "", errors.New("Could not find related Service")
@@ -118,7 +117,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	// First try getting Journeys by the TicketMachineJourneyCode
 	if vehicleJourneyRef != "" {
-		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+		journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{
 				bson.M{"serviceref": bson.M{"$in": services}},
 				bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
@@ -132,7 +131,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	// Fallback to Block Ref (incorrect usage of block ref but it kinda works)
 	if blockRef != "" {
-		journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+		journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{
 				bson.M{"serviceref": bson.M{"$in": services}},
 				bson.M{"otheridentifiers.BlockNumber": blockRef},
@@ -163,17 +162,9 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 		}})
 	}
 
-	journeys = GetAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
+	journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
 	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
-
-	// if err != nil {
-	// 	for _, v := range journeys {
-	// 		if (v.Path[0].OriginStopRef == identifyingInformation["OriginRef"]) || (v.Path[len(v.Path)-1].DestinationStopRef == identifyingInformation["DestinationRef"]) {
-	// 			pretty.Println(v.DepartureTime, identifyingInformation["OriginAimedDepartureTime"])
-	// 		}
-	// 	}
-	// }
 
 	if err == nil {
 		return identifiedJourney.PrimaryIdentifier, nil
@@ -190,7 +181,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 	}
 }
 
-func GetAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
+func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
 	journeys := []*ctdf.Journey{}
 
 	opts := options.Find().SetProjection(bson.D{
