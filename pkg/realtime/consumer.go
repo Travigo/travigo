@@ -178,18 +178,22 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
 
 	if cachedJourneyMapping == "" {
-		journey, err := journeyidentifier.IdentifyJourney(map[string]string{
-			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
-			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
-			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-			"VehicleJourneyRef":        vehicleJourneyRef,
-			"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
-			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
-			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
-			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
-		})
+		journeyIdentifier := journeyidentifier.Identifier{
+			IdentifyingInformation: map[string]string{
+				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+				"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+				"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+				"VehicleJourneyRef":        vehicleJourneyRef,
+				"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
+				"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+				"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+				"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+				"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+			},
+		}
+
+		journey, err := journeyIdentifier.IdentifyJourney()
 
 		if err != nil {
 			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")

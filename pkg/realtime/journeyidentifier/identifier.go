@@ -14,9 +14,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func getOperator(identifyingInformation map[string]string) *ctdf.Operator {
+type Identifier struct {
+	IdentifyingInformation map[string]string
+	Operator               *ctdf.Operator
+	PotentialServices      []string
+	CurrentTime            time.Time
+}
+
+func (i *Identifier) getOperator() *ctdf.Operator {
 	var operator *ctdf.Operator
-	operatorRef := identifyingInformation["OperatorRef"]
+	operatorRef := i.IdentifyingInformation["OperatorRef"]
 	operatorsCollection := database.GetCollection("operators")
 	query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": operatorRef}, bson.M{"otheridentifiers": operatorRef}}}
 	operatorsCollection.FindOne(context.Background(), query).Decode(&operator)
@@ -24,19 +31,19 @@ func getOperator(identifyingInformation map[string]string) *ctdf.Operator {
 	return operator
 }
 
-func getServices(identifyingInformation map[string]string, operator *ctdf.Operator) []string {
+func (i *Identifier) getServices() []string {
 	var services []string
 
-	serviceName := identifyingInformation["PublishedLineName"]
+	serviceName := i.IdentifyingInformation["PublishedLineName"]
 	if serviceName == "" {
-		serviceName = identifyingInformation["ServiceNameRef"]
+		serviceName = i.IdentifyingInformation["ServiceNameRef"]
 	}
 
 	servicesCollection := database.GetCollection("services")
 
 	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
-			bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}},
+			bson.M{"operatorref": bson.M{"$in": i.Operator.OtherIdentifiers}},
 		},
 	})
 
@@ -57,7 +64,7 @@ func getServices(identifyingInformation map[string]string, operator *ctdf.Operat
 		if len(serviceNameMatch) == 2 {
 			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
 				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
-					bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}},
+					bson.M{"operatorref": bson.M{"$in": i.Operator.OtherIdentifiers}},
 				},
 			})
 
@@ -79,18 +86,18 @@ func getServices(identifyingInformation map[string]string, operator *ctdf.Operat
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
 //
 //	currently no other kind so is fine for now (TODO)
-func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
-	currentTime := time.Now()
+func (i *Identifier) IdentifyJourney() (string, error) {
+	i.CurrentTime = time.Now()
 
 	// Get the directly referenced Operator
-	operator := getOperator(identifyingInformation)
+	operator := i.getOperator()
 
 	if operator == nil {
 		return "", errors.New("Could not find referenced Operator")
 	}
 
 	// Get the relevant Services
-	services := getServices(identifyingInformation, operator)
+	services := i.getServices()
 
 	if len(services) == 0 {
 		return "", errors.New("Could not find related Service")
@@ -98,10 +105,10 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	// Get the relevant Journeys
 	var framedVehicleJourneyDate time.Time
-	if identifyingInformation["FramedVehicleJourneyDate"] == "" {
+	if i.IdentifyingInformation["FramedVehicleJourneyDate"] == "" {
 		framedVehicleJourneyDate = time.Now()
 	} else {
-		framedVehicleJourneyDate, _ = time.Parse(ctdf.YearMonthDayFormat, identifyingInformation["FramedVehicleJourneyDate"])
+		framedVehicleJourneyDate, _ = time.Parse(ctdf.YearMonthDayFormat, i.IdentifyingInformation["FramedVehicleJourneyDate"])
 
 		// Fallback for dodgy formatted frames
 		if framedVehicleJourneyDate.Year() < 2022 {
@@ -111,8 +118,8 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	journeys := []*ctdf.Journey{}
 
-	vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]
-	blockRef := identifyingInformation["BlockRef"]
+	vehicleJourneyRef := i.IdentifyingInformation["VehicleJourneyRef"]
+	blockRef := i.IdentifyingInformation["BlockRef"]
 	journeysCollection := database.GetCollection("journeys")
 
 	// First try getting Journeys by the TicketMachineJourneyCode
@@ -123,7 +130,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 				bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
 			},
 		})
-		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
+		identifiedJourney, err := i.narrowJourneys(journeys, true)
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -137,7 +144,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 				bson.M{"otheridentifiers.BlockNumber": blockRef},
 			},
 		})
-		identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
+		identifiedJourney, err := i.narrowJourneys(journeys, true)
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -150,13 +157,13 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 			bson.M{
 				"$and": bson.A{
 					bson.M{"serviceref": service},
-					bson.M{"path.originstopref": identifyingInformation["OriginRef"]},
+					bson.M{"path.originstopref": i.IdentifyingInformation["OriginRef"]},
 				},
 			},
 			bson.M{
 				"$and": bson.A{
 					bson.M{"serviceref": service},
-					bson.M{"path.destinationstopref": identifyingInformation["DestinationRef"]},
+					bson.M{"path.destinationstopref": i.IdentifyingInformation["DestinationRef"]},
 				},
 			},
 		}})
@@ -164,7 +171,7 @@ func IdentifyJourney(identifyingInformation map[string]string) (string, error) {
 
 	journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
 
-	identifiedJourney, err := narrowJourneys(identifyingInformation, currentTime, journeys, true)
+	identifiedJourney, err := i.narrowJourneys(journeys, true)
 
 	if err == nil {
 		return identifiedJourney.PrimaryIdentifier, nil
@@ -213,7 +220,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 	return journeys
 }
 
-func narrowJourneys(identifyingInformation map[string]string, currentTime time.Time, journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
+func (i *Identifier) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
 	journeys = ctdf.FilterIdenticalJourneys(journeys, includeAvailabilityCondition)
 
 	if len(journeys) == 0 {
@@ -225,8 +232,8 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 
 		// Filter based on exact time
 		for _, journey := range journeys {
-			originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
-			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
+			originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
+			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(i.CurrentTime.Location())
 
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)
@@ -242,12 +249,12 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 					continue
 				}
 
-				if !(journey.Path[0].OriginStopRef == identifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == identifyingInformation["DestinationRef"]) {
+				if !(journey.Path[0].OriginStopRef == i.IdentifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == i.IdentifyingInformation["DestinationRef"]) {
 					continue
 				}
 
-				originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, identifyingInformation["OriginAimedDepartureTime"])
-				originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(currentTime.Location())
+				originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
+				originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(i.CurrentTime.Location())
 
 				originAimedDepartureTimeDayMinutes := (originAimedDepartureTime.Hour() * 60) + originAimedDepartureTime.Minute()
 				journeyDepartureTimeDayMinutes := (journey.DepartureTime.Hour() * 60) + journey.DepartureTime.Minute()
@@ -266,7 +273,7 @@ func narrowJourneys(identifyingInformation map[string]string, currentTime time.T
 		} else {
 			if includeAvailabilityCondition {
 				// Try again but ignore availability conidition in hash
-				journey, err := narrowJourneys(identifyingInformation, currentTime, journeys, false)
+				journey, err := i.narrowJourneys(journeys, false)
 
 				return journey, err
 			} else {
