@@ -90,16 +90,16 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 	i.CurrentTime = time.Now()
 
 	// Get the directly referenced Operator
-	operator := i.getOperator()
+	i.Operator = i.getOperator()
 
-	if operator == nil {
+	if i.Operator == nil {
 		return "", errors.New("Could not find referenced Operator")
 	}
 
 	// Get the relevant Services
-	services := i.getServices()
+	i.PotentialServices = i.getServices()
 
-	if len(services) == 0 {
+	if len(i.PotentialServices) == 0 {
 		return "", errors.New("Could not find related Service")
 	}
 
@@ -126,7 +126,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 	if vehicleJourneyRef != "" {
 		journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"serviceref": bson.M{"$in": i.PotentialServices}},
 				bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
 			},
 		})
@@ -140,7 +140,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 	if blockRef != "" {
 		journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
 			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
+				bson.M{"serviceref": bson.M{"$in": i.PotentialServices}},
 				bson.M{"otheridentifiers.BlockNumber": blockRef},
 			},
 		})
@@ -152,7 +152,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 
 	// If we fail with the ID codes then try with the origin & destination stops
 	journeyQuery := []bson.M{}
-	for _, service := range services {
+	for _, service := range i.PotentialServices {
 		journeyQuery = append(journeyQuery, bson.M{"$or": bson.A{
 			bson.M{
 				"$and": bson.A{
