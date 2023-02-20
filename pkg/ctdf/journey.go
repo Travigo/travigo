@@ -84,16 +84,17 @@ func (journey *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool
 	hash.Write([]byte(journey.Direction))
 	hash.Write([]byte(journey.DepartureTime.String()))
 
-	rules := append(journey.Availability.Match, journey.Availability.MatchSecondary...)
-	rules = append(rules, journey.Availability.Exclude...)
 	if includeAvailabilityCondition {
-		rules = append(rules, journey.Availability.Condition...)
-	}
+		rules := append(journey.Availability.Match, journey.Availability.MatchSecondary...)
+		rules = append(rules, journey.Availability.Exclude...)
 
-	for _, availabilityMatchRule := range rules {
-		hash.Write([]byte(availabilityMatchRule.Type))
-		hash.Write([]byte(availabilityMatchRule.Value))
-		hash.Write([]byte(availabilityMatchRule.Description))
+		rules = append(rules, journey.Availability.Condition...)
+
+		for _, availabilityMatchRule := range rules {
+			hash.Write([]byte(availabilityMatchRule.Type))
+			hash.Write([]byte(availabilityMatchRule.Value))
+			hash.Write([]byte(availabilityMatchRule.Description))
+		}
 	}
 
 	for _, pathItem := range journey.Path {
