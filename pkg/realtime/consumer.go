@@ -12,6 +12,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
+	"github.com/britbus/britbus/pkg/realtime/journeyidentifier"
 	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -177,7 +178,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
 
 	if cachedJourneyMapping == "" {
-		journey, err := ctdf.IdentifyJourney(map[string]string{
+		journey, err := journeyidentifier.IdentifyJourney(map[string]string{
 			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
 			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
