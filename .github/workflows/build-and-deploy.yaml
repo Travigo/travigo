@@ -16,15 +16,15 @@ jobs:
     name: Build data-importer
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.20
     - name: Build
       run: go build -v ./cmd/data-importer
     - name: Upload data-importer
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: data-importer
         path: ./data-importer
@@ -33,15 +33,15 @@ jobs:
     name: Build realtime
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.20
     - name: Build
       run: go build -v ./cmd/realtime
     - name: Upload realtime
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: realtime
         path: ./realtime
@@ -50,15 +50,15 @@ jobs:
     name: Build web-api
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.20
     - name: Build
       run: go build -v ./cmd/web-api
     - name: Upload webapi
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: web-api
         path: ./web-api
@@ -67,15 +67,15 @@ jobs:
     name: Build stats
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.20
     - name: Build
       run: go build -v ./cmd/stats
     - name: Upload stats
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: stats
         path: ./stats
@@ -91,10 +91,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: data-importer
           path: ./
@@ -137,10 +137,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: realtime
           path: ./
@@ -183,10 +183,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: web-api
           path: ./
@@ -229,10 +229,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: stats
           path: ./
@@ -279,7 +279,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
 
@@ -314,7 +314,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
 
@@ -351,7 +351,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
@@ -389,7 +389,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Helm tool installer
       uses: Azure/setup-helm@v3
 
