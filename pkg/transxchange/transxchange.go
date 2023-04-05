@@ -56,7 +56,7 @@ func (n *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, overrides map[string]string) {
+func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, transportType ctdf.TransportType, overrides map[string]string) {
 	datasource.OriginalFormat = "transxchange"
 
 	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
@@ -167,6 +167,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, over
 				ModificationDateTime: modificationTime,
 
 				OperatorRef: operatorRef,
+
+				TransportType: transportType,
 
 				InboundDescription: &ctdf.ServiceDescription{
 					Origin:      txcLine.InboundOrigin,

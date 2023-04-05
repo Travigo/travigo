@@ -43,6 +43,8 @@ type DataFile struct {
 	Name      string
 	Reader    io.Reader
 	Overrides map[string]string
+
+	TransportType ctdf.TransportType
 }
 
 func tempDownloadFile(source string) (*os.File, string) {
@@ -69,7 +71,7 @@ func tempDownloadFile(source string) (*os.File, string) {
 	return tmpFile, fileExtension
 }
 
-func importFile(dataFormat string, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
+func importFile(dataFormat string, transportType ctdf.TransportType, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
 	dataFiles := []DataFile{}
 	fileExtension := filepath.Ext(source)
 
@@ -96,9 +98,10 @@ func importFile(dataFormat string, source string, fileFormat string, sourceDatas
 		defer file.Close()
 
 		dataFiles = append(dataFiles, DataFile{
-			Name:      source,
-			Reader:    file,
-			Overrides: overrides,
+			Name:          source,
+			Reader:        file,
+			Overrides:     overrides,
+			TransportType: transportType,
 		})
 	} else if fileExtension == ".zip" {
 		archive, err := zip.OpenReader(source)
@@ -115,9 +118,10 @@ func importFile(dataFormat string, source string, fileFormat string, sourceDatas
 			defer file.Close()
 
 			dataFiles = append(dataFiles, DataFile{
-				Name:      fmt.Sprintf("%s:%s", source, zipFile.Name),
-				Reader:    file,
-				Overrides: overrides,
+				Name:          fmt.Sprintf("%s:%s", source, zipFile.Name),
+				Reader:        file,
+				Overrides:     overrides,
+				TransportType: transportType,
 			})
 		}
 	} else {
@@ -191,7 +195,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 			datasource = *sourceDatasource
 		}
 
-		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.Overrides)
+		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.TransportType, dataFile.Overrides)
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
 
@@ -326,7 +330,7 @@ func main() {
 							cleanupOldRecords("operator_groups", datasource)
 						}
 
-						err := importFile(dataFormat, source, fileFormat, datasource, map[string]string{})
+						err := importFile(dataFormat, "", source, fileFormat, datasource, map[string]string{})
 
 						if err != nil {
 							return err
@@ -413,7 +417,7 @@ func main() {
 							cleanupOldRecords("services", datasource)
 							cleanupOldRecords("journeys", datasource)
 
-							err = importFile("transxchange", dataset.URL, "", datasource, map[string]string{})
+							err = importFile("transxchange", ctdf.TransportTypeBus, dataset.URL, "", datasource, map[string]string{})
 
 							if err != nil {
 								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
@@ -527,7 +531,7 @@ func main() {
 
 							io.Copy(tmpFile, file)
 
-							err = importFile("transxchange", tmpFile.Name(), "zip", datasource, map[string]string{
+							err = importFile("transxchange", ctdf.TransportTypeBus, tmpFile.Name(), "zip", datasource, map[string]string{
 								"OperatorRef": "GB:NOC:TFLO",
 							})
 							if err != nil {
