@@ -84,6 +84,9 @@ func (journey *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool
 	hash.Write([]byte(journey.Direction))
 	hash.Write([]byte(journey.DepartureTime.String()))
 
+	// TODO: REVERT THE CHAGES TO THIS LINE
+	// BUT THINK ABOUT IT - WE SHOULD ALWAYS IGNORE AVAILABILITY CONDITIONS WHEN FINDING IDENTICAL JOURNEYS
+	// IF WE FILTER OUT BASED ON BEING AVAILABLE TODAY THEN WE SHOULDNT CARE ABOUT THE SPECIFICS OF THE CONDITIONS???
 	if includeAvailabilityCondition {
 		rules := append(journey.Availability.Match, journey.Availability.MatchSecondary...)
 		rules = append(rules, journey.Availability.Exclude...)

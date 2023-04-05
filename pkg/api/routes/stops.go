@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -37,7 +38,20 @@ func listStops(c *fiber.Ctx) error {
 
 	stopsCollection := database.GetCollection("stops")
 
-	query := bson.M{"$and": bson.A{bson.M{"status": "active"}, bson.M{"location": boundsQuery}}}
+	query := bson.M{"location": boundsQuery}
+
+	transportTypeFilter := c.Query("transport_type")
+	if transportTypeFilter != "" {
+		transportType := strings.Split(transportTypeFilter, ",")
+
+		query = bson.M{
+			"$and": bson.A{
+				bson.M{"transporttypes": bson.M{"$in": transportType}},
+				bson.M{"location": boundsQuery},
+			},
+		}
+	}
+
 	cursor, _ := stopsCollection.Find(context.Background(), query)
 
 	for cursor.Next(context.TODO()) {

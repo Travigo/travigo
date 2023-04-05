@@ -19,10 +19,9 @@ type Stop struct {
 
 	DataSource *DataSource `groups:"internal"`
 
-	PrimaryName string            `groups:"basic"`
-	OtherNames  map[string]string `groups:"basic"`
-	Type        string            `groups:"detailed"` // or an enum
-	Status      string            `groups:"detailed"`
+	PrimaryName    string            `groups:"basic"`
+	OtherNames     map[string]string `groups:"basic"`
+	TransportTypes []TransportType   `groups:"detailed"`
 
 	Location *Location `groups:"detailed"`
 

@@ -39,10 +39,16 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 		ctdfStopGroup.Type = "pair"
 	case "GCLS":
 		ctdfStopGroup.Type = "cluster"
+	case "GCCH":
+		ctdfStopGroup.Type = "cluster"
 	case "GBCS":
 		ctdfStopGroup.Type = "bus_station"
 	case "GMLT":
 		ctdfStopGroup.Type = "multimode_interchange"
+	case "GTMU":
+		ctdfStopGroup.Type = "dock"
+	case "GRLS":
+		ctdfStopGroup.Type = "station"
 	default:
 		ctdfStopGroup.Type = "unknown"
 	}

@@ -11,7 +11,6 @@ import (
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -45,6 +44,9 @@ func (n *NaPTAN) Validate() error {
 }
 
 func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+	// pretty.Println(naptanDoc.StopPoints[1])
+
+	// return
 	datasource.OriginalFormat = "naptan"
 
 	stopsCollection := database.GetCollection("stops")
@@ -55,7 +57,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var stopOperationInsert uint64
 	var stopOperationUpdate uint64
 
-	maxBatchSize := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(runtime.NumCPU())))
+	maxBatchSize := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(runtime.NumCPU()*10)))
 	numBatches := int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(maxBatchSize)))
 
 	processingGroup := sync.WaitGroup{}
@@ -195,16 +197,4 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", stopGroupsOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
-
-	// Send a notification reporting the latest changes
-	notify_client.SendEvent("britbus/naptan/import", bson.M{
-		"Stops": bson.M{
-			"Inserts": stopOperationInsert,
-			"Updates": stopOperationUpdate,
-		},
-		"Stop_Groups": bson.M{
-			"Inserts": stopGroupsOperationInsert,
-			"Updates": stopGroupsOperationUpdate,
-		},
-	})
 }

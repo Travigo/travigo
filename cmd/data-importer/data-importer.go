@@ -27,7 +27,6 @@ import (
 	"github.com/britbus/britbus/pkg/transxchange"
 	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
 	"github.com/britbus/britbus/pkg/util"
-	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -142,7 +141,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 	switch dataFormat {
 	case "naptan":
 		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
-		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader, naptan.BusFilter)
+		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader, naptan.BasicFilter)
 
 		if err != nil {
 			return err
@@ -236,9 +235,6 @@ func main() {
 	if err := elastic_client.Connect(false); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 	}
-
-	// Setup the notifications client
-	notify_client.Setup()
 
 	ctdf.LoadSpecialDayCache()
 
@@ -547,8 +543,6 @@ func main() {
 	}
 
 	err := app.Run(os.Args)
-
-	notify_client.Await()
 
 	if err != nil {
 		log.Fatal().Err(err).Send()

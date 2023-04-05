@@ -13,7 +13,6 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/util"
-	"github.com/britbus/notify/pkg/notify_client"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -375,16 +374,4 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
-
-	// Send a notification reporting the latest changes
-	notify_client.SendEvent("britbus/traveline/import", bson.M{
-		"Operators": bson.M{
-			"Inserts": operatorOperationInsert,
-			"Updates": operatorOperationUpdate,
-		},
-		"Operator_Groups": bson.M{
-			"Inserts": operatorGroupOperationInsert,
-			"Updates": operatorGroupOperationUpdate,
-		},
-	})
 }

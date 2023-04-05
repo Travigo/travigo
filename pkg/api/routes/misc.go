@@ -13,7 +13,7 @@ func getBoundsQuery(c *fiber.Ctx) (bson.M, error) {
 	bounds := c.Query("bounds")
 
 	if bounds == "" {
-		return nil, errors.New("A filter must be applied to the request")
+		return nil, errors.New("A bounds filter must be applied to the request")
 	}
 
 	boundsSplit := strings.Split(bounds, ",")

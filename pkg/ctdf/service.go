@@ -22,6 +22,8 @@ type Service struct {
 	InboundDescription  *ServiceDescription `groups:"basic"`
 
 	BrandColour string `groups:"basic"`
+
+	TransportType TransportType `groups:"basic"`
 }
 
 type Route struct {
