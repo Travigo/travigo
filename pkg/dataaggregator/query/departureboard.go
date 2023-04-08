@@ -6,7 +6,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 )
 
-type TimetableRecords struct {
+type DepartureBoard struct {
 	Stop          *ctdf.Stop
 	Count         int
 	StartDateTime time.Time

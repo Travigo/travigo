@@ -17,25 +17,25 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 )
 
-type LocalTimetableSource struct {
+type LocalDepartureBoardSource struct {
 }
 
-func (l LocalTimetableSource) GetName() string {
-	return "Local Timetable Generator"
+func (l LocalDepartureBoardSource) GetName() string {
+	return "Local Departure Board Generator"
 }
 
-func (l LocalTimetableSource) Supports() []reflect.Type {
+func (l LocalDepartureBoardSource) Supports() []reflect.Type {
 	return []reflect.Type{
-		reflect.TypeOf([]*ctdf.TimetableRecord{}),
+		reflect.TypeOf([]*ctdf.DepartureBoard{}),
 	}
 }
 
-func (l LocalTimetableSource) Lookup(q any) (interface{}, error) {
+func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
-	case query.TimetableRecords:
-		query := q.(query.TimetableRecords)
+	case query.DepartureBoard:
+		query := q.(query.DepartureBoard)
 
-		var journeysTimetable []*ctdf.TimetableRecord
+		var departureBoard []*ctdf.DepartureBoard
 
 		// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
 		nextDayDuration, _ := iso8601.ParseISO8601("P1D")
@@ -73,40 +73,40 @@ func (l LocalTimetableSource) Lookup(q any) (interface{}, error) {
 		realtimeTimeframe := query.StartDateTime.Format("2006-01-02")
 
 		currentTime = time.Now()
-		journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, query.Stop.PrimaryIdentifier, query.StartDateTime, realtimeTimeframe, true)
+		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, query.StartDateTime, realtimeTimeframe, true)
 		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation today")
 
-		// If not enough journeys in todays timetable then look into tomorrows
-		if len(journeysTimetableToday) < query.Count {
+		// If not enough journeys in todays departure board then look into tomorrows
+		if len(departureBoardToday) < query.Count {
 			currentTime = time.Now()
-			journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, query.Stop.PrimaryIdentifier, dayAfterDateTime, realtimeTimeframe, false)
+			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, dayAfterDateTime, realtimeTimeframe, false)
 			log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation tomorrow")
 
-			journeysTimetable = append(journeysTimetableToday, journeysTimetableTomorrow...)
+			departureBoard = append(departureBoardToday, departureBoardTomorrow...)
 		} else {
-			journeysTimetable = journeysTimetableToday
+			departureBoard = departureBoardToday
 		}
 
 		// Sort timetable by TimetableRecord time
-		sort.Slice(journeysTimetable, func(i, j int) bool {
-			return journeysTimetable[i].Time.Before(journeysTimetable[j].Time)
+		sort.Slice(departureBoard, func(i, j int) bool {
+			return departureBoard[i].Time.Before(departureBoard[j].Time)
 		})
 
 		// Once sorted cut off any records higher than our max count
-		if len(journeysTimetable) > query.Count {
-			journeysTimetable = journeysTimetable[:query.Count]
+		if len(departureBoard) > query.Count {
+			departureBoard = departureBoard[:query.Count]
 		}
 
 		currentTime = time.Now()
 		// Transforming the whole document is incredibly ineffecient
 		// Instead just transform the Operator & Service as those are the key values
-		for _, item := range journeysTimetable {
+		for _, item := range departureBoard {
 			transforms.Transform(item.Journey.Operator, 1)
 			transforms.Transform(item.Journey.Service, 1)
 		}
 		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Transform")
 
-		return journeysTimetable, nil
+		return departureBoard, nil
 	default:
 		return nil, UnsupportedSourceError
 	}

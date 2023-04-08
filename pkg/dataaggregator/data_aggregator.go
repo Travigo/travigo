@@ -21,7 +21,7 @@ func GlobalSetup() {
 	databaseLookupSource := source.DatabaseLookupSource{}
 	globalAggregator.RegisterSource(databaseLookupSource)
 
-	localTimetableSource := source.LocalTimetableSource{}
+	localTimetableSource := source.LocalDepartureBoardSource{}
 	globalAggregator.RegisterSource(localTimetableSource)
 }
 

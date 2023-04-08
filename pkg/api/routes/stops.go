@@ -127,24 +127,24 @@ func getStopDepartures(c *fiber.Ctx) error {
 		}
 	}
 
-	var journeysTimetable []*ctdf.TimetableRecord
+	var departureBoard []*ctdf.DepartureBoard
 
-	journeysTimetable, err = dataaggregator.Lookup[[]*ctdf.TimetableRecord](query.TimetableRecords{
+	departureBoard, err = dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
 		Stop:          stop,
 		Count:         count,
 		StartDateTime: startDateTime,
 	})
 
-	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{
+	departureBoardReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},
-	}, journeysTimetable)
+	}, departureBoard)
 
 	if err != nil {
 		c.SendStatus(fiber.StatusInternalServerError)
 		return c.JSON(fiber.Map{
-			"error": "Sherrif could not reduce journeysTimetable",
+			"error": "Sherrif could not reduce departureBoard",
 		})
 	}
 
-	return c.JSON(journeysTimetableReduced)
+	return c.JSON(departureBoardReduced)
 }

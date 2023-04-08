@@ -11,24 +11,24 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type TimetableRecord struct {
-	Journey            *Journey            `groups:"basic"`
-	DestinationDisplay string              `groups:"basic"`
-	Type               TimetableRecordType `groups:"basic"`
+type DepartureBoard struct {
+	Journey            *Journey                 `groups:"basic"`
+	DestinationDisplay string                   `groups:"basic"`
+	Type               DepartureBoardRecordType `groups:"basic"`
 
 	Time time.Time `groups:"basic"`
 }
 
-type TimetableRecordType string
+type DepartureBoardRecordType string
 
 const (
-	TimetableRecordTypeScheduled       TimetableRecordType = "Scheduled"
-	TimetableRecordTypeRealtimeTracked                     = "RealtimeTracked"
-	TimetableRecordTypeEstimated                           = "Estimated"
+	DepartureBoardRecordTypeScheduled       DepartureBoardRecordType = "Scheduled"
+	DepartureBoardRecordTypeRealtimeTracked                          = "RealtimeTracked"
+	DepartureBoardRecordTypeEstimated                                = "Estimated"
 )
 
-func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*TimetableRecord {
-	timetable := []*TimetableRecord{}
+func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*DepartureBoard {
+	departureBoard := []*DepartureBoard{}
 	journeysCollection := database.GetCollection("journeys")
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
@@ -45,7 +45,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 			var stopDeperatureTime time.Time
 			var destinationDisplay string
-			timetableRecordType := TimetableRecordTypeScheduled
+			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
 			journey.GetRealtimeJourney(realtimeTimeframe)
 
@@ -56,7 +56,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 					// Use the realtime estimated stop time based if realtime is available
 					if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
 						refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
-						timetableRecordType = TimetableRecordTypeRealtimeTracked
+						departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
 					}
 
 					stopDeperatureTime = time.Date(
@@ -81,7 +81,7 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 				// We estimate the current vehicle realtime journey based on the Block Number
 				stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
 				if doEstimates &&
-					timetableRecordType == TimetableRecordTypeScheduled &&
+					departureBoardRecordType == DepartureBoardRecordTypeScheduled &&
 					stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
 					journey.OtherIdentifiers["BlockNumber"] != "" {
 
@@ -115,16 +115,16 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 						if blockRealtimeJourney.Offset.Minutes() > 0 {
 							stopDeperatureTime = stopDeperatureTime.Add(blockRealtimeJourney.Offset)
 						}
-						timetableRecordType = TimetableRecordTypeEstimated
+						departureBoardRecordType = DepartureBoardRecordTypeEstimated
 					}
 				}
 
 				timetableMutex.Lock()
-				timetable = append(timetable, &TimetableRecord{
+				departureBoard = append(departureBoard, &DepartureBoard{
 					Journey:            journey,
 					Time:               stopDeperatureTime,
 					DestinationDisplay: destinationDisplay,
-					Type:               timetableRecordType,
+					Type:               departureBoardRecordType,
 				})
 				timetableMutex.Unlock()
 			}
@@ -134,5 +134,5 @@ func GenerateTimetableFromJourneys(journeys []*Journey, stopRef string, dateTime
 
 	wg.Wait()
 
-	return timetable
+	return departureBoard
 }
