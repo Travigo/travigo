@@ -1,6 +1,8 @@
 package dataaggregator
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type DataSource interface {
 	GetName() string

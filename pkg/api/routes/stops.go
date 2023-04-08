@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +15,6 @@ import (
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
-
-	iso8601 "github.com/senseyeio/duration"
 )
 
 func StopsRouter(router fiber.Router) {
@@ -104,7 +100,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 		})
 	}
 
-	_, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+	var stop *ctdf.Stop
+	stop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
 		PrimaryIdentifier: stopIdentifier,
 	})
 
@@ -130,76 +127,13 @@ func getStopDepartures(c *fiber.Ctx) error {
 		}
 	}
 
-	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
-	nextDayDuration, _ := iso8601.ParseISO8601("P1D")
-	dayAfterDateTime := nextDayDuration.Shift(startDateTime)
-	dayAfterDateTime = time.Date(
-		dayAfterDateTime.Year(), dayAfterDateTime.Month(), dayAfterDateTime.Day(), 0, 0, 0, 0, dayAfterDateTime.Location(),
-	)
-
-	journeys := []*ctdf.Journey{}
-
-	journeysCollection := database.GetCollection("journeys")
-	currentTime := time.Now()
-
-	// This projection excludes values we dont care about - the main ones being path.*
-	// Reduces memory usage and execution time
-	opts := options.Find().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
-		bson.E{Key: "datasource", Value: 0},
-		bson.E{Key: "creationdatetime", Value: 0},
-		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "destinationdisplay", Value: 0},
-		bson.E{Key: "path.track", Value: 0},
-		bson.E{Key: "path.originactivity", Value: 0},
-		bson.E{Key: "path.destinationactivity", Value: 0},
-	})
-	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": stopIdentifier}, opts)
-
-	if err = cursor.All(context.Background(), &journeys); err != nil {
-		log.Error().Err(err).Msg("Failed to decode Stop")
-	}
-
-	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Database lookup")
-
-	realtimeTimeframe := startDateTime.Format("2006-01-02")
-
 	var journeysTimetable []*ctdf.TimetableRecord
 
-	currentTime = time.Now()
-	journeysTimetableToday := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, startDateTime, realtimeTimeframe, true)
-	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation today")
-
-	// If not enough journeys in todays timetable then look into tomorrows
-	if len(journeysTimetableToday) < count {
-		currentTime = time.Now()
-		journeysTimetableTomorrow := ctdf.GenerateTimetableFromJourneys(journeys, stopIdentifier, dayAfterDateTime, realtimeTimeframe, false)
-		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation tomorrow")
-
-		journeysTimetable = append(journeysTimetableToday, journeysTimetableTomorrow...)
-	} else {
-		journeysTimetable = journeysTimetableToday
-	}
-
-	// Sort timetable by TimetableRecord time
-	sort.Slice(journeysTimetable, func(i, j int) bool {
-		return journeysTimetable[i].Time.Before(journeysTimetable[j].Time)
+	journeysTimetable, err = dataaggregator.Lookup[[]*ctdf.TimetableRecord](query.TimetableRecords{
+		Stop:          stop,
+		Count:         count,
+		StartDateTime: startDateTime,
 	})
-
-	// Once sorted cut off any records higher than our max count
-	if len(journeysTimetable) > count {
-		journeysTimetable = journeysTimetable[:count]
-	}
-
-	currentTime = time.Now()
-	// Transforming the whole document is incredibly ineffecient
-	// Instead just transform the Operator & Service as those are the key values
-	for _, item := range journeysTimetable {
-		transforms.Transform(item.Journey.Operator, 1)
-		transforms.Transform(item.Journey.Service, 1)
-	}
-	log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Transform")
 
 	journeysTimetableReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},

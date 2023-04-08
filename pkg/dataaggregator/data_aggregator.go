@@ -20,6 +20,9 @@ func GlobalSetup() {
 
 	databaseLookupSource := source.DatabaseLookupSource{}
 	globalAggregator.RegisterSource(databaseLookupSource)
+
+	localTimetableSource := source.LocalTimetableSource{}
+	globalAggregator.RegisterSource(localTimetableSource)
 }
 
 func (a *Aggregator) RegisterSource(source DataSource) {
@@ -37,25 +40,22 @@ func Lookup[T any](query any) (T, error) {
 	}
 
 	for _, source := range globalAggregator.Sources {
-		matches := false
-
 		for _, supportedType := range source.Supports() {
 			if lookupType == supportedType {
-				matches = true
-				break
-			}
-		}
+				var returnValue any
+				var returnError error
 
-		if matches {
-			var returnValue any
-			var returnError error
+				returnValue, returnError = source.Lookup(query)
 
-			returnValue, returnError = source.Lookup(query)
+				if returnError != nil && returnError.Error() == "Unsupported Source for this query" {
+					continue
+				}
 
-			if returnValue == nil {
-				return empty, returnError
-			} else {
-				return returnValue.(T), returnError
+				if returnValue == nil {
+					return empty, returnError
+				} else {
+					return returnValue.(T), returnError
+				}
 			}
 		}
 	}
