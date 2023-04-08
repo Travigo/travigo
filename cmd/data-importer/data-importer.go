@@ -48,7 +48,11 @@ type DataFile struct {
 }
 
 func tempDownloadFile(source string) (*os.File, string) {
-	resp, err := http.Get(source)
+	req, _ := http.NewRequest("GET", source, nil)
+	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Download file")
@@ -499,7 +503,7 @@ func main() {
 
 					archive, err := zip.OpenReader(source)
 					if err != nil {
-						panic(err)
+						log.Fatal().Str("source", source).Err(err).Msg("Could not open zip file")
 					}
 					defer archive.Close()
 
