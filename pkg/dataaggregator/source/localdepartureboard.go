@@ -74,20 +74,20 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 
 		currentTime = time.Now()
 		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, query.StartDateTime, realtimeTimeframe, true)
-		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation today")
+		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation today")
 
 		// If not enough journeys in todays departure board then look into tomorrows
 		if len(departureBoardToday) < query.Count {
 			currentTime = time.Now()
 			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, dayAfterDateTime, realtimeTimeframe, false)
-			log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Timetable generation tomorrow")
+			log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation tomorrow")
 
 			departureBoard = append(departureBoardToday, departureBoardTomorrow...)
 		} else {
 			departureBoard = departureBoardToday
 		}
 
-		// Sort timetable by TimetableRecord time
+		// Sort departures by DepartureBoard time
 		sort.Slice(departureBoard, func(i, j int) bool {
 			return departureBoard[i].Time.Before(departureBoard[j].Time)
 		})

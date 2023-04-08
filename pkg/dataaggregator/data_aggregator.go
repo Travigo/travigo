@@ -18,11 +18,8 @@ var globalAggregator Aggregator
 func GlobalSetup() {
 	globalAggregator = Aggregator{}
 
-	databaseLookupSource := source.DatabaseLookupSource{}
-	globalAggregator.RegisterSource(databaseLookupSource)
-
-	localTimetableSource := source.LocalDepartureBoardSource{}
-	globalAggregator.RegisterSource(localTimetableSource)
+	globalAggregator.RegisterSource(source.DatabaseLookupSource{})
+	globalAggregator.RegisterSource(source.LocalDepartureBoardSource{})
 }
 
 func (a *Aggregator) RegisterSource(source DataSource) {

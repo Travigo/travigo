@@ -36,7 +36,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dat
 	journeys = FilterIdenticalJourneys(journeys, true)
 
 	wg := &sync.WaitGroup{}
-	timetableMutex := sync.Mutex{}
+	departureBoardGenerationMutex := sync.Mutex{}
 
 	for _, journey := range journeys {
 		wg.Add(1)
@@ -119,14 +119,14 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dat
 					}
 				}
 
-				timetableMutex.Lock()
+				departureBoardGenerationMutex.Lock()
 				departureBoard = append(departureBoard, &DepartureBoard{
 					Journey:            journey,
 					Time:               stopDeperatureTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
 				})
-				timetableMutex.Unlock()
+				departureBoardGenerationMutex.Unlock()
 			}
 		}(journey)
 
