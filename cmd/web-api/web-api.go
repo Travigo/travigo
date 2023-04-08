@@ -6,6 +6,7 @@ import (
 
 	"github.com/britbus/britbus/pkg/api"
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/dataaggregator"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/britbus/britbus/pkg/transforms"
@@ -49,6 +50,8 @@ func main() {
 					if err := elastic_client.Connect(false); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
+
+					dataaggregator.GlobalSetup()
 
 					ctdf.LoadSpecialDayCache()
 

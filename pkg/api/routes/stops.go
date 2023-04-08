@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/dataaggregator"
+	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/gofiber/fiber/v2"
@@ -71,14 +73,15 @@ func listStops(c *fiber.Ctx) error {
 func getStop(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	stopsCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
-	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&stop)
+	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+		PrimaryIdentifier: identifier,
+	})
 
-	if stop == nil {
+	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Stop matching Stop Identifier",
+			"error": err.Error(),
 		})
 	} else {
 		stop.GetServices()
