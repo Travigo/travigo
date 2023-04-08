@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/dataaggregator"
+	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -89,14 +91,15 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 func getRealtimeJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	realtimeJourneyCollection := database.GetCollection("realtime_journeys")
 	var realtimeJourney *ctdf.RealtimeJourney
-	realtimeJourneyCollection.FindOne(context.Background(), bson.M{"primaryidentifier": identifier}).Decode(&realtimeJourney)
+	realtimeJourney, err := dataaggregator.Lookup[*ctdf.RealtimeJourney](query.RealtimeJourney{
+		PrimaryIdentifier: identifier,
+	})
 
-	if realtimeJourney == nil {
+	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Realtime Journey matching Identifier",
+			"error": err.Error(),
 		})
 	} else {
 		return c.JSON(realtimeJourney)

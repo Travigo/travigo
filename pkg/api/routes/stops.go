@@ -104,14 +104,14 @@ func getStopDepartures(c *fiber.Ctx) error {
 		})
 	}
 
-	stopsCollection := database.GetCollection("stops")
-	var stop *ctdf.Stop
-	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": stopIdentifier}).Decode(&stop)
+	_, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+		PrimaryIdentifier: stopIdentifier,
+	})
 
-	if stop == nil {
+	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Stop matching Stop Identifier",
+			"error": err.Error(),
 		})
 	}
 

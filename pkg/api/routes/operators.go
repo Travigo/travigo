@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/britbus/britbus/pkg/dataaggregator"
+	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/britbus/britbus/pkg/database"
 	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/gofiber/fiber/v2"
@@ -96,12 +98,12 @@ func listOperators(c *fiber.Ctx) error {
 func getOperator(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	operator := getOperatorById(identifier)
+	operator, err := getOperatorById(identifier)
 
-	if operator == nil {
+	if err != nil {
 		c.SendStatus(404)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Operator matching Operator Identifier",
+			"error": err.Error(),
 		})
 	} else {
 		operator.GetReferences()
@@ -112,12 +114,12 @@ func getOperator(c *fiber.Ctx) error {
 func getOperatorServices(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	operator := getOperatorById(identifier)
+	operator, err := getOperatorById(identifier)
 
-	if operator == nil {
+	if err != nil {
 		c.SendStatus(404)
 		return c.JSON(fiber.Map{
-			"error": "Could not find Operator matching Operator Identifier",
+			"error": err.Error(),
 		})
 	} else {
 		services := []*ctdf.Service{}
@@ -141,15 +143,13 @@ func getOperatorServices(c *fiber.Ctx) error {
 	}
 }
 
-func getOperatorById(identifier string) *ctdf.Operator {
-	operatorsCollection := database.GetCollection("operators")
+func getOperatorById(identifier string) (*ctdf.Operator, error) {
 	var operator *ctdf.Operator
-	operatorsCollection.FindOne(context.Background(), bson.M{"$or": bson.A{
-		bson.M{"primaryidentifier": identifier},
-		bson.M{"otheridentifiers": identifier},
-	}}).Decode(&operator)
+	operator, err := dataaggregator.Lookup[*ctdf.Operator](query.Operator{
+		AnyIdentifier: identifier,
+	})
 
 	transforms.Transform(operator, 2)
 
-	return operator
+	return operator, err
 }

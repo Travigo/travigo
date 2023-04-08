@@ -2,6 +2,7 @@ package dataaggregator
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/britbus/britbus/pkg/dataaggregator/source"
@@ -30,13 +31,13 @@ func (a *Aggregator) RegisterSource(source DataSource) {
 func Lookup[T any](query any) (T, error) {
 	var empty T
 
+	lookupType := reflect.TypeOf(*new(T))
+	if lookupType.Kind() == reflect.Pointer {
+		lookupType = lookupType.Elem()
+	}
+
 	for _, source := range globalAggregator.Sources {
 		matches := false
-
-		lookupType := reflect.TypeOf(*new(T))
-		if lookupType.Kind() == reflect.Pointer {
-			lookupType = lookupType.Elem()
-		}
 
 		for _, supportedType := range source.Supports() {
 			if lookupType == supportedType {
@@ -59,5 +60,5 @@ func Lookup[T any](query any) (T, error) {
 		}
 	}
 
-	return empty, errors.New("Failed to find a matching Data Source for type")
+	return empty, errors.New(fmt.Sprintf("Failed to find a matching Data Source for %s", lookupType.String()))
 }
