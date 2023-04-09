@@ -164,6 +164,8 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			Type:        "Point",
 			Coordinates: []float64{orig.Location.Longitude, orig.Location.Latitude},
 		},
+
+		Active: orig.Status == "active",
 	}
 
 	if orig.AtcoCode != "" {

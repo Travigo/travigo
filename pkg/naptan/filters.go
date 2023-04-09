@@ -5,10 +5,6 @@ func BasicFilter(object interface{}) bool {
 	case *StopPoint:
 		stopPoint := object.(*StopPoint)
 
-		if stopPoint.Status != "active" {
-			return false
-		}
-
 		if stopPoint.StopType == "RSE" { // ignore rail entrances
 			return false
 		}

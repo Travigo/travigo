@@ -27,6 +27,8 @@ type Stop struct {
 
 	Services []*Service `bson:"-" groups:"detailed"`
 
+	Active bool `groups:"basic"`
+
 	Associations []*StopAssociation `groups:"detailed"`
 }
 
