@@ -20,6 +20,7 @@ func GlobalSetup() {
 
 	globalAggregator.RegisterSource(source.DatabaseLookupSource{})
 	globalAggregator.RegisterSource(source.LocalDepartureBoardSource{})
+	globalAggregator.RegisterSource(source.NationalRailSource{})
 }
 
 func (a *Aggregator) RegisterSource(source DataSource) {

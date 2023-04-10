@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/exp/slices"
 
 	iso8601 "github.com/senseyeio/duration"
 )
@@ -34,6 +35,11 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
 	case query.DepartureBoard:
 		query := q.(query.DepartureBoard)
+
+		// Only support buses for local timetable so far
+		if !slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeBus) {
+			return nil, UnsupportedSourceError
+		}
 
 		var departureBoard []*ctdf.DepartureBoard
 
