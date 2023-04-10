@@ -67,7 +67,7 @@ spec:
                   key: password
                   optional: false
             - name: BRITBUS_LDBWS_GATEWAY_ENDPOINT
-              value: "http://ldbws-gateway.default.svc.cluster.local:80"
+              value: "http://ldbws-gatewway-ldbws-gateway.default.svc.cluster.local:80"
           ports:
             - name: http
               containerPort: 80
