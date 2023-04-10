@@ -75,7 +75,7 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 					ServiceRef: serviceRef,
 					Service: &ctdf.Service{
 						PrimaryIdentifier: serviceRef,
-						ServiceName:       "RAIL",
+						ServiceName:       "",
 					},
 
 					OperatorRef: operaterRef,

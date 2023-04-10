@@ -150,11 +150,10 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		OtherIdentifiers:  map[string]string{},
 		PrimaryName:       orig.Descriptor.CommonName,
 		OtherNames: map[string]string{
-			"ShortCommonName":     orig.Descriptor.ShortCommonName,
-			"Street":              orig.Descriptor.Street,
-			"Indicator":           orig.Descriptor.Indicator,
-			"Landmark":            orig.Descriptor.Landmark,
-			"DEBUGNAPTANSTOPTYPE": orig.StopType,
+			"ShortCommonName": orig.Descriptor.ShortCommonName,
+			"Street":          orig.Descriptor.Street,
+			"Indicator":       orig.Descriptor.Indicator,
+			"Landmark":        orig.Descriptor.Landmark,
 		},
 
 		CreationDateTime:     creationTime,
