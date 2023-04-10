@@ -17,6 +17,9 @@ elasticsearch:
 bods:
   apiKeySecret: britbus-bods-api
 
+nationalRail:
+  credentialsSecret: britbus-nationalrail-credentials
+
 image:
   repository: ghcr.io/britbus/britbus/data-importer
   pullPolicy: Always
@@ -26,6 +29,9 @@ cronjobs:
   - name: travelinenoc
     schedule: "0 2 * * 0"
     args: ["file", "traveline-noc", "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"]
+  - name: nationarail-toc
+    schedule: "10 2 * * 0"
+    args: ["nationalrail-toc"]
   - name: naptan
     schedule: "0 3 * * 6"
     args: ["file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]

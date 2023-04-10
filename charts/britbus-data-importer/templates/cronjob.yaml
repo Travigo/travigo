@@ -40,6 +40,18 @@ spec:
                       name: {{ $.Values.bods.apiKeySecret }}
                       key: api_key
                       optional: false
+                - name: BRITBUS_NATIONALRAIL_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.credentialsSecret }}
+                      key: username
+                      optional: true
+                - name: BRITBUS_NATIONALRAIL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.credentialsSecret }}
+                      key: password
+                      optional: true
                 - name: BRITBUS_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:

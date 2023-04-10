@@ -12,6 +12,7 @@ import (
 
 const OperatorNOCFormat = "GB:NOC:%s"
 const OperatorNOCIDFormat = "GB:NOCID:%s"
+const OperatorTOCFormat = "GB:TOC:%s"
 
 type Operator struct {
 	PrimaryIdentifier string   `groups:"basic"`

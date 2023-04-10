@@ -61,7 +61,7 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 				now.Year(), now.Month(), now.Day(), scheduledTimeOnly.Hour(), scheduledTimeOnly.Minute(), 0, 0, now.Location(),
 			)
 
-			operaterRef := fmt.Sprintf("GB:TOC:%s", departure.OperatorCode)
+			operaterRef := fmt.Sprintf(ctdf.OperatorTOCFormat, departure.OperatorCode)
 			serviceRef := fmt.Sprintf("GB:RAILSERVICE:%s", departure.ServiceID)
 
 			departureBoard = append(departureBoard, &ctdf.DepartureBoard{

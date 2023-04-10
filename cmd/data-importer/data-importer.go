@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,9 +14,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/adjust/rmq/v4"
+	"github.com/britbus/britbus/nationalrailtoc"
 	"github.com/britbus/britbus/pkg/bods"
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/database"
@@ -47,9 +50,13 @@ type DataFile struct {
 	TransportType ctdf.TransportType
 }
 
-func tempDownloadFile(source string) (*os.File, string) {
+func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 	req, _ := http.NewRequest("GET", source, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
+
+	for _, header := range headers {
+		req.Header[header[0]] = []string{header[1]}
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -217,6 +224,24 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		if err != nil {
 			return err
 		}
+	case "nationalrail-toc":
+		log.Info().Msgf("National Rail TOC file import from %s ", dataFile.Name)
+		nationalRailTOCDoc, err := nationalrailtoc.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "National Rail", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
@@ -542,6 +567,92 @@ func main() {
 								log.Fatal().Err(err).Msg("Cannot import TfL inner zip")
 							}
 						}
+					}
+
+					return nil
+				},
+			},
+			{
+				Name:  "nationalrail-toc",
+				Usage: "Import Train Operating Companies from the National Rail Open Data API",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "Overwrite URL",
+						Required: false,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					source := c.String("url")
+
+					// Default source of all published buses
+					if source == "" {
+						source = "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs"
+					}
+
+					currentTime := time.Now().Format(time.RFC3339)
+
+					log.Info().Msgf("National Rail TOC import from %s", source)
+
+					// Cleanup right at the begining once, as we do it as 1 big import
+					datasource := &ctdf.DataSource{
+						OriginalFormat: "nationalrail-toc",
+						Provider:       "GB-NationalRail-TOC",
+						Dataset:        "ALL",
+						Identifier:     currentTime,
+					}
+					cleanupOldRecords("operators", datasource)
+					cleanupOldRecords("operator_groups", datasource)
+
+					env := util.GetEnvironmentVariables()
+					if env["BRITBUS_NATIONALRAIL_USERNAME"] == "" {
+						log.Fatal().Msg("BRITBUS_NATIONALRAIL_USERNAME must be set")
+					}
+					if env["BRITBUS_NATIONALRAIL_PASSWORD"] == "" {
+						log.Fatal().Msg("BRITBUS_NATIONALRAIL_PASSWORD must be set")
+					}
+
+					formData := url.Values{
+						"username": {env["BRITBUS_NATIONALRAIL_USERNAME"]},
+						"password": {env["BRITBUS_NATIONALRAIL_PASSWORD"]},
+					}
+
+					client := &http.Client{}
+					req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
+					}
+
+					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+					resp, err := client.Do(req)
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
+					}
+					defer resp.Body.Close()
+
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
+					}
+
+					var loginResponse struct {
+						Token string `json:"token"`
+					}
+					json.Unmarshal(body, &loginResponse)
+
+					if isValidUrl(source) {
+						tempFile, _ := tempDownloadFile(source, []string{
+							"X-Auth-Token", loginResponse.Token,
+						})
+
+						source = tempFile.Name()
+						defer os.Remove(tempFile.Name())
+					}
+
+					err = importFile("nationalrail-toc", ctdf.TransportTypeTrain, source, "xml", datasource, map[string]string{})
+					if err != nil {
+						log.Fatal().Err(err).Msg("Cannot import National Rail TOC document")
 					}
 
 					return nil
