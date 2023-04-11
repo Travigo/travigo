@@ -81,6 +81,7 @@ func getStop(c *fiber.Ctx) error {
 		})
 	} else {
 		stop.GetServices()
+		stop.RecalculateTransportTypes()
 
 		transforms.Transform(stop, 3)
 
