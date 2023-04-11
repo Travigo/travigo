@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -136,6 +137,16 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Count:         count,
 		StartDateTime: startDateTime,
 	})
+
+	// Sort departures by DepartureBoard time
+	sort.Slice(departureBoard, func(i, j int) bool {
+		return departureBoard[i].Time.Before(departureBoard[j].Time)
+	})
+
+	// Once sorted cut off any records higher than our max count
+	if len(departureBoard) > count {
+		departureBoard = departureBoard[:count]
+	}
 
 	departureBoardReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},

@@ -3,7 +3,6 @@ package source
 import (
 	"context"
 	"reflect"
-	"sort"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
@@ -91,16 +90,6 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 			departureBoard = append(departureBoardToday, departureBoardTomorrow...)
 		} else {
 			departureBoard = departureBoardToday
-		}
-
-		// Sort departures by DepartureBoard time
-		sort.Slice(departureBoard, func(i, j int) bool {
-			return departureBoard[i].Time.Before(departureBoard[j].Time)
-		})
-
-		// Once sorted cut off any records higher than our max count
-		if len(departureBoard) > query.Count {
-			departureBoard = departureBoard[:query.Count]
 		}
 
 		currentTime = time.Now()
