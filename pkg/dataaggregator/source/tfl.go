@@ -7,12 +7,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"regexp"
 	"time"
 
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/britbus/britbus/pkg/database"
-	"github.com/kr/pretty"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
@@ -82,15 +82,29 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		var departureBoard []*ctdf.DepartureBoard
 		now := time.Now()
 
-		operatorRef := "GB:NOC:TFLO"
+		operatorRef := "GB:NOC:LULD"
+
+		nameRegex := regexp.MustCompile("(.+) Underground Station")
 
 		for _, prediction := range arrivalPredictions {
 			serviceRef := fmt.Sprintf("GB:TFLSERVICE:%s", prediction.LineID)
-			scheduledTime, err := time.Parse(time.RFC3339, prediction.ExpectedArrival)
-			pretty.Println(err)
+			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
+
+			destinationName := prediction.DestinationName
+			nameMatches := nameRegex.FindStringSubmatch(prediction.DestinationName)
+
+			if len(nameMatches) == 2 {
+				destinationName = nameMatches[1]
+			}
+
+			// TODO: THIS IS JUST FOR TESTING ATM
+			lineName := prediction.LineName
+			if lineName == "Hammersmith & City" {
+				lineName = "H&C"
+			}
 
 			departureBoard = append(departureBoard, &ctdf.DepartureBoard{
-				DestinationDisplay: prediction.DestinationName,
+				DestinationDisplay: destinationName,
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 				Time:               scheduledTime.In(now.Location()),
 
@@ -100,13 +114,13 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 					ServiceRef: serviceRef,
 					Service: &ctdf.Service{
 						PrimaryIdentifier: serviceRef,
-						ServiceName:       prediction.LineName,
+						ServiceName:       lineName,
 					},
 
 					OperatorRef: operatorRef,
 					Operator: &ctdf.Operator{
 						PrimaryIdentifier: operatorRef,
-						PrimaryName:       "Transport for London",
+						PrimaryName:       "London Underground (TfL)",
 					},
 				},
 			})
