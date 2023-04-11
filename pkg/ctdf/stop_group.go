@@ -12,7 +12,8 @@ import (
 const StopGroupIDFormat = "GB:STOPGRP:%s"
 
 type StopGroup struct {
-	Identifier string `groups:"basic"`
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
@@ -28,7 +29,7 @@ type StopGroup struct {
 
 func (stopGroup *StopGroup) GetStops() {
 	stopsCollection := database.GetCollection("stops")
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.Identifier})
+	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier})
 
 	for cursor.Next(context.TODO()) {
 		//Create a value into which the single document can be decoded

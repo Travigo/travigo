@@ -35,7 +35,7 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 		crs := query.Stop.OtherIdentifiers["Crs"]
 
 		// If the stop has no CrsRef then give up
-		if slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeTrain) && crs == "" {
+		if !slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeTrain) || crs == "" {
 			return nil, UnsupportedSourceError
 		}
 
@@ -61,7 +61,7 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 				now.Year(), now.Month(), now.Day(), scheduledTimeOnly.Hour(), scheduledTimeOnly.Minute(), 0, 0, now.Location(),
 			)
 
-			operaterRef := fmt.Sprintf(ctdf.OperatorTOCFormat, departure.OperatorCode)
+			operatorRef := fmt.Sprintf(ctdf.OperatorTOCFormat, departure.OperatorCode)
 			serviceRef := fmt.Sprintf("GB:RAILSERVICE:%s", departure.ServiceID)
 
 			departureBoard = append(departureBoard, &ctdf.DepartureBoard{
@@ -78,9 +78,9 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 						ServiceName:       "",
 					},
 
-					OperatorRef: operaterRef,
+					OperatorRef: operatorRef,
 					Operator: &ctdf.Operator{
-						PrimaryIdentifier: operaterRef,
+						PrimaryIdentifier: operatorRef,
 						PrimaryName:       departure.Operator,
 					},
 				},

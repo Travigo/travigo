@@ -8,6 +8,9 @@ func BasicFilter(object interface{}) bool {
 		if stopPoint.StopType == "RSE" { // ignore rail entrances
 			return false
 		}
+		if stopPoint.StopType == "TMU" { // ignore tramMetroOrUndergroundEntrance
+			return false
+		}
 		// case *StopArea:
 		// 	stopArea := object.(*StopArea)
 	}

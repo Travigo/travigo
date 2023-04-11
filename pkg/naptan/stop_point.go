@@ -110,11 +110,11 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			ctdf.TransportTypeTrain,
 			ctdf.TransportTypeMetro,
 		}
-	case "TMU": // tramMetroOrUndergroundEntrance
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
-			ctdf.TransportTypeMetro,
-		}
+	// case "TMU": // tramMetroOrUndergroundEntrance
+	// 	TransportTypes = []ctdf.TransportType{
+	// 		ctdf.TransportTypeTrain,
+	// 		ctdf.TransportTypeMetro,
+	// 	}
 	case "FER": // ferryOrPortAccess
 		TransportTypes = []ctdf.TransportType{
 			ctdf.TransportTypeBoat,

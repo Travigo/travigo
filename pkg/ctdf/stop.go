@@ -51,6 +51,8 @@ func (s *Stop) GetServices() {
 
 		s.Services = append(s.Services, service)
 	}
+
+	s.RecalculateTransportTypes()
 }
 
 func (s *Stop) RecalculateTransportTypes() {

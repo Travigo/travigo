@@ -59,6 +59,8 @@ func listStops(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
+		stop.GetServices()
+
 		stops = append(stops, *stop)
 	}
 
@@ -81,7 +83,6 @@ func getStop(c *fiber.Ctx) error {
 		})
 	} else {
 		stop.GetServices()
-		stop.RecalculateTransportTypes()
 
 		transforms.Transform(stop, 3)
 

@@ -16,7 +16,7 @@ func getStopGroup(c *fiber.Ctx) error {
 
 	var stopGroup *ctdf.StopGroup
 	stopGroup, err := dataaggregator.Lookup[*ctdf.StopGroup](query.StopGroup{
-		Identifier: identifier,
+		PrimaryIdentifier: identifier,
 	})
 
 	if err != nil {
