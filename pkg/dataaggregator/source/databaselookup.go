@@ -8,6 +8,7 @@ import (
 	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/britbus/britbus/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type DatabaseLookupSource struct {
@@ -26,6 +27,7 @@ func (d DatabaseLookupSource) Supports() []reflect.Type {
 		reflect.TypeOf(ctdf.Operator{}),
 		reflect.TypeOf(ctdf.OperatorGroup{}),
 		reflect.TypeOf(ctdf.Service{}),
+		reflect.TypeOf([]*ctdf.Service{}),
 	}
 }
 
@@ -103,6 +105,34 @@ func (d DatabaseLookupSource) Lookup(q any) (interface{}, error) {
 		} else {
 			return service, nil
 		}
+	case query.ServicesByStop:
+		query := q.(query.ServicesByStop)
+
+		servicesCollection := database.GetCollection("services")
+		journeysCollection := database.GetCollection("journeys")
+
+		filter := bson.M{"$or": bson.A{
+			bson.M{"path.originstopref": query.Stop.PrimaryIdentifier},
+			bson.M{"path.destinationstopref": query.Stop.PrimaryIdentifier},
+		},
+		}
+
+		results, _ := journeysCollection.Distinct(context.Background(), "serviceref", filter)
+		var services []*ctdf.Service
+
+		// TODO: Can probably do this without the for loop
+		for _, serviceID := range results {
+			var service *ctdf.Service
+			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceID}).Decode(&service)
+
+			services = append(services, service)
+		}
+
+		if len(services) == 0 {
+			return nil, UnsupportedSourceError
+		}
+
+		return services, nil
 	case query.RealtimeJourney:
 		query := q.(query.RealtimeJourney)
 

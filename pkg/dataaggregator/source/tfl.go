@@ -27,7 +27,38 @@ func (t TflSource) GetName() string {
 func (t TflSource) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf([]*ctdf.DepartureBoard{}),
+		reflect.TypeOf([]*ctdf.Service{}),
 	}
+}
+
+func getTflStopID(stop *ctdf.Stop) (string, error) {
+	// If the stop has no CrsRef then give up
+	if !slices.Contains(stop.TransportTypes, ctdf.TransportTypeMetro) {
+		return "", UnsupportedSourceError
+	}
+
+	tflStopID := ""
+
+	for _, association := range stop.Associations {
+		if association.Type == "stop_group" {
+			// TODO: USE DATA AGGREGATOR FOR THIS
+			collection := database.GetCollection("stop_groups")
+			var stopGroup *ctdf.StopGroup
+			collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
+
+			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "dock" {
+				tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
+
+				break
+			}
+		}
+	}
+
+	if tflStopID == "" {
+		return tflStopID, UnsupportedSourceError
+	}
+
+	return tflStopID, nil
 }
 
 func (t TflSource) Lookup(q any) (interface{}, error) {
@@ -35,30 +66,10 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 	case query.DepartureBoard:
 		query := q.(query.DepartureBoard)
 
-		// If the stop has no CrsRef then give up
-		if !slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeMetro) {
-			return nil, UnsupportedSourceError
-		}
+		tflStopID, err := getTflStopID(query.Stop)
 
-		tflStopID := ""
-
-		for _, association := range query.Stop.Associations {
-			if association.Type == "stop_group" {
-				// TODO: USE DATA AGGREGATOR FOR THIS
-				collection := database.GetCollection("stop_groups")
-				var stopGroup *ctdf.StopGroup
-				collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
-
-				if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "dock" {
-					tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
-
-					break
-				}
-			}
-		}
-
-		if tflStopID == "" {
-			return nil, UnsupportedSourceError
+		if err != nil {
+			return nil, err
 		}
 
 		source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals", tflStopID)
@@ -76,8 +87,6 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 
 		var arrivalPredictions []tflArrivalPrediction
 		json.Unmarshal(byteValue, &arrivalPredictions)
-
-		// pretty.Println(arrivalPredictions)
 
 		var departureBoard []*ctdf.DepartureBoard
 		now := time.Now()
@@ -127,6 +136,45 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		}
 
 		return departureBoard, nil
+
+	case query.ServicesByStop:
+		query := q.(query.ServicesByStop)
+		tflStopID, err := getTflStopID(query.Stop)
+
+		if err != nil {
+			return nil, err
+		}
+
+		source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/ServiceTypes?id=%s", tflStopID)
+		req, _ := http.NewRequest("GET", source, nil)
+		req.Header["user-agent"] = []string{"curl/7.54.1"}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+
+		if err != nil {
+			return nil, err
+		}
+
+		byteValue, _ := ioutil.ReadAll(resp.Body)
+
+		var stopServices []tflStopService
+		json.Unmarshal(byteValue, &stopServices)
+
+		var services []*ctdf.Service
+
+		for _, stopService := range stopServices {
+			serviceRef := fmt.Sprintf("GB:TFLSERVICE:%s", stopService.LineName)
+
+			services = append(services, &ctdf.Service{
+				PrimaryIdentifier: serviceRef,
+				ServiceName:       stopService.LineName,
+
+				TransportType: ctdf.TransportTypeMetro, // TODO: not always correct
+			})
+		}
+
+		return services, nil
 	}
 
 	return nil, nil
@@ -149,4 +197,8 @@ type tflArrivalPrediction struct {
 	ExpectedArrival string `json:"expectedArrival"`
 
 	ModeName string `json:"modeName"`
+}
+
+type tflStopService struct {
+	LineName string `json:"lineName"`
 }
