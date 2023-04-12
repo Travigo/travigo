@@ -171,6 +171,8 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 				ServiceName:       stopService.LineName,
 
 				TransportType: ctdf.TransportTypeMetro, // TODO: not always correct
+
+				OperatorRef: "GB:NOC:LULD", // TODO: not always correct
 			})
 		}
 
