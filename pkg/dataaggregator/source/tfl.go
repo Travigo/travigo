@@ -13,6 +13,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
@@ -112,7 +113,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 				lineName = "H&C"
 			}
 
-			departureBoard = append(departureBoard, &ctdf.DepartureBoard{
+			departure := &ctdf.DepartureBoard{
 				DestinationDisplay: destinationName,
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 				Time:               scheduledTime.In(now.Location()),
@@ -132,7 +133,9 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 						PrimaryName:       "London Underground (TfL)",
 					},
 				},
-			})
+			}
+			transforms.Transform(departure, 2)
+			departureBoard = append(departureBoard, departure)
 		}
 
 		return departureBoard, nil

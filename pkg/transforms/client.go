@@ -131,4 +131,116 @@ func SetupClient() {
 			"Regions": []string{"UK:REGION:LONDON"},
 		},
 	})
+
+	// TFL
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:bakerloo",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#994f14",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:central",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#d42e12",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:circle",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#f7d117",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:district",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#007336",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:hammersmith-city",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#eb9ca8",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:jubilee",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#8c8f91",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:metropolitan",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#8a004f",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:northern",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#332b24",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:piccadilly",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#2905a1",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:victoria",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#00a3e0",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
+	transforms = append(transforms, &TransformDefinition{
+		Type: "ctdf.Service",
+		Match: map[string]string{
+			"PrimaryIdentifier": "GB:TFLSERVICE:waterloo-city",
+		},
+		Data: map[string]interface{}{
+			"BrandColour": "#7dd1b8",
+			"BrandIcon":   "/icons/tfl-roundel-underground.svg",
+		},
+	})
 }
