@@ -8,9 +8,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/dataaggregator/query"
-	"github.com/britbus/britbus/pkg/util"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/util"
 	"golang.org/x/exp/slices"
 )
 

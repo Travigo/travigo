@@ -5,9 +5,9 @@ import (
 	"errors"
 	"reflect"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/dataaggregator/query"
-	"github.com/britbus/britbus/pkg/database"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

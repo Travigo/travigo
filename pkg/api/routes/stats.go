@@ -1,8 +1,8 @@
 package routes
 
 import (
-	"github.com/britbus/britbus/pkg/api/stats"
 	"github.com/gofiber/fiber/v2"
+	"github.com/travigo/travigo/pkg/api/stats"
 )
 
 func Stats(c *fiber.Ctx) error {

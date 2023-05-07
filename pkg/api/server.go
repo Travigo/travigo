@@ -1,10 +1,10 @@
 package api
 
 import (
-	"github.com/britbus/britbus/pkg/api/routes"
-	"github.com/britbus/britbus/pkg/api/stats"
-	"github.com/britbus/britbus/pkg/http_server"
 	"github.com/gofiber/fiber/v2"
+	"github.com/travigo/travigo/pkg/api/routes"
+	"github.com/travigo/travigo/pkg/api/stats"
+	"github.com/travigo/travigo/pkg/http_server"
 )
 
 func SetupServer(listen string) {

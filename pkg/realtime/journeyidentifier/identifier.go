@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

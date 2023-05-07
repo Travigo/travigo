@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/ulikunitz/xz"
 	"go.mongodb.org/mongo-driver/bson"
 )

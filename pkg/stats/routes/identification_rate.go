@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/stats"
 	"github.com/gofiber/fiber/v2"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/stats"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

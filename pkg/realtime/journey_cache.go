@@ -3,7 +3,7 @@ package realtime
 import (
 	"encoding/json"
 
-	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type CacheJourney struct {

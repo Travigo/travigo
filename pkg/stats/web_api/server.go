@@ -1,9 +1,9 @@
 package web_api
 
 import (
-	"github.com/britbus/britbus/pkg/http_server"
-	"github.com/britbus/britbus/pkg/stats/routes"
 	"github.com/gofiber/fiber/v2"
+	"github.com/travigo/travigo/pkg/http_server"
+	"github.com/travigo/travigo/pkg/stats/routes"
 )
 
 func SetupServer(listen string) {

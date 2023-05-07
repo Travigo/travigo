@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/britbus/britbus/pkg/util"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 var Client *elasticsearch.Client

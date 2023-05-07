@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/britbus/britbus/pkg/database"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

@@ -7,8 +7,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/britbus/britbus/pkg/ctdf"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type OperatingProfile struct {

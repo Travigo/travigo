@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/elastic_client"
 )
 
 type IdentificationRateStatsResponse struct {

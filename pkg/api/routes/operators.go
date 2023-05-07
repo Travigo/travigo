@@ -5,14 +5,14 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/dataaggregator"
-	"github.com/britbus/britbus/pkg/dataaggregator/query"
-	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/transforms"
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

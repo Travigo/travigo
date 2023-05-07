@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/redis_client"
 )
 
 func StartCleaner() {

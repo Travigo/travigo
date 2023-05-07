@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type StopPoint struct {

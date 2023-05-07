@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/elastic_client"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/ulikunitz/xz"
 	"google.golang.org/api/iterator"
 )

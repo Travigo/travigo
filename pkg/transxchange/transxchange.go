@@ -11,11 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
 	"github.com/jinzhu/copier"
 	"github.com/paulcager/osgridref"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -109,7 +109,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 			// Generate the CTDF Service Record
 			operatorRef := operatorLocalMapping[txcService.RegisteredOperatorRef]
 			if operatorRef == "" {
-				operatorRef = "BRITBUS:INTERNAL:NOREF"
+				operatorRef = "TRAVIGO:INTERNAL:NOREF"
 
 				// if we cant find the reference and theres only 1 in the operators map then just use that
 				// some documents dont use the correct reference in the services
@@ -121,7 +121,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 			}
 
 			// TODO clean this up
-			// This is a temporary way of doing overrides for TfL import until https://github.com/BritBus/britbus/issues/46 is done
+			// This is a temporary way of doing overrides for TfL import until https://github.com/travigo/travigo/issues/46 is done
 			if overrides["OperatorRef"] != "" {
 				operatorRef = overrides["OperatorRef"]
 			}
@@ -310,7 +310,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 
 				operatorRef := operatorLocalMapping[txcJourneyOperatorRef] // NOT ALWAYS THERE, could be in SERVICE DEFINITION
 				if operatorRef == "" {
-					operatorRef = "BRITBUS:INTERNAL:NOREF"
+					operatorRef = "TRAVIGO:INTERNAL:NOREF"
 
 					// if we cant find the reference and theres only 1 in the operators map then just use that
 					// some documents dont use the correct reference in the services
@@ -322,7 +322,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				}
 
 				// TODO clean this up
-				// This is a temporary way of doing overrides for TfL import until https://github.com/BritBus/britbus/issues/46 is done
+				// This is a temporary way of doing overrides for TfL import until https://github.com/travigo/travigo/issues/46 is done
 				if overrides["OperatorRef"] != "" {
 					operatorRef = overrides["OperatorRef"]
 				}

@@ -4,8 +4,8 @@ import (
 	"encoding/xml"
 	"io"
 
-	"github.com/britbus/britbus/pkg/util"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/util"
 	"golang.org/x/net/html/charset"
 )
 

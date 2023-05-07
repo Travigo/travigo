@@ -18,18 +18,18 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/britbus/britbus/nationalrailtoc"
-	"github.com/britbus/britbus/pkg/bods"
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/elastic_client"
-	"github.com/britbus/britbus/pkg/naptan"
-	"github.com/britbus/britbus/pkg/redis_client"
-	"github.com/britbus/britbus/pkg/siri_vm"
-	"github.com/britbus/britbus/pkg/transforms"
-	"github.com/britbus/britbus/pkg/transxchange"
-	travelinenoc "github.com/britbus/britbus/pkg/traveline_noc"
-	"github.com/britbus/britbus/pkg/util"
+	"github.com/travigo/travigo/nationalrailtoc"
+	"github.com/travigo/travigo/pkg/bods"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/naptan"
+	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/siri_vm"
+	"github.com/travigo/travigo/pkg/transforms"
+	"github.com/travigo/travigo/pkg/transxchange"
+	travelinenoc "github.com/travigo/travigo/pkg/traveline_noc"
+	"github.com/travigo/travigo/pkg/util"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -72,7 +72,7 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 		fileExtension = filepath.Ext(params["filename"])
 	}
 
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-")
+	tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create temporary file")
 	}
@@ -273,11 +273,11 @@ func main() {
 
 	app := &cli.App{
 		Name:        "data-importer",
-		Description: "Manages ingesting and verifying data in BritBus",
+		Description: "Manages ingesting and verifying data in Travigo",
 		Commands: []*cli.Command{
 			{
 				Name:  "file",
-				Usage: "Import a dataset into BritBus",
+				Usage: "Import a dataset into Travigo",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "repeat-every",
@@ -384,7 +384,7 @@ func main() {
 			},
 			{
 				Name:  "bods-timetable",
-				Usage: "Import TransXChange Timetable datasets from BODS into BritBus",
+				Usage: "Import TransXChange Timetable datasets from BODS into Travigo",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "url",
@@ -499,7 +499,7 @@ func main() {
 			},
 			{
 				Name:  "tfl",
-				Usage: "Import Transport for London (TfL) datasets from their API into BritBus",
+				Usage: "Import Transport for London (TfL) datasets from their API into Travigo",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     "url",
@@ -552,7 +552,7 @@ func main() {
 							}
 							defer file.Close()
 
-							tmpFile, err := ioutil.TempFile(os.TempDir(), "britbus-data-importer-tfl-innerzip-")
+							tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
 							if err != nil {
 								log.Fatal().Err(err).Msg("Cannot create temporary file")
 							}

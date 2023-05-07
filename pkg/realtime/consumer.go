@@ -9,16 +9,16 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/database"
-	"github.com/britbus/britbus/pkg/elastic_client"
-	"github.com/britbus/britbus/pkg/realtime/journeyidentifier"
-	"github.com/britbus/britbus/pkg/redis_client"
-	"github.com/britbus/britbus/pkg/siri_vm"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redis_store "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime/journeyidentifier"
+	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/siri_vm"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -141,7 +141,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	}
 
 	// Temporary remap of known incorrect values
-	// TODO: A better way fof doing this should be done under https://github.com/BritBus/britbus/issues/46
+	// TODO: A better way fof doing this should be done under https://github.com/travigo/travigo/issues/46
 	operatorRef := vehicle.MonitoredVehicleJourney.OperatorRef
 
 	switch operatorRef {
@@ -201,7 +201,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			identificationCache.Set(context.Background(), localJourneyID, "N/A")
 
-			// Temporary https://github.com/BritBus/britbus/issues/43
+			// Temporary https://github.com/travigo/travigo/issues/43
 			errorCode := "UNKNOWN"
 			switch err.Error() {
 			case "Could not find referenced Operator":

@@ -1,6 +1,6 @@
 package stats
 
-import "github.com/britbus/britbus/pkg/ctdf"
+import "github.com/travigo/travigo/pkg/ctdf"
 
 type ArchivedJourney struct {
 	ctdf.ArchivedJourney

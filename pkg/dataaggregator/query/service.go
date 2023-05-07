@@ -1,7 +1,7 @@
 package query
 
 import (
-	"github.com/britbus/britbus/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/ctdf"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

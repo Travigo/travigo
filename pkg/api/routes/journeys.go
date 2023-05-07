@@ -3,11 +3,11 @@ package routes
 import (
 	"time"
 
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/dataaggregator"
-	"github.com/britbus/britbus/pkg/dataaggregator/query"
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 )
 
 func JourneysRouter(router fiber.Router) {

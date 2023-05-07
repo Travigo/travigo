@@ -1,4 +1,4 @@
-module github.com/britbus/britbus
+module github.com/travigo/travigo
 
 go 1.20
 

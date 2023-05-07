@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/britbus/britbus/pkg/dataaggregator/source"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/dataaggregator/source"
 )
 
 type Aggregator struct {

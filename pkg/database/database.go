@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/britbus/britbus/pkg/util"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

@@ -114,7 +114,7 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 
 		if rule.Value == "GB:BankHoliday:AllBankHolidays" {
 			// If the special case of all bank holidays then loop through every special day in that year and check if any match
-			// Of course if Britbus ever expands to non-UK bank holidays then this doesnt work
+			// Of course if Travigo ever expands to non-UK bank holidays then this doesnt work
 			for _, specialDateTime := range SpecialDays[dateTime.Year()] {
 				if datesMatch(specialDateTime, dateTime) {
 					return true

@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/britbus/britbus/pkg/database"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

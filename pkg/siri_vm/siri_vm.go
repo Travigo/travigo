@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/britbus/britbus/pkg/ctdf"
-	"github.com/britbus/britbus/pkg/elastic_client"
-	"github.com/britbus/britbus/pkg/redis_client"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
 

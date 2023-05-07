@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/britbus/britbus/pkg/util"
 	"github.com/go-redis/redis/v8"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 var Client *redis.Client
