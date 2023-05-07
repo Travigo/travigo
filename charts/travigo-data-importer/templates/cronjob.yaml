@@ -1,0 +1,79 @@
+{{- range .Values.cronjobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "travigo-data-importer.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "travigo-data-importer.labels" $ | nindent 4 }}
+spec:
+  schedule: {{ .schedule }}
+  jobTemplate:
+    metadata:
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "travigo-data-importer.selectorLabels" $ | nindent 8 }}
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" $ }}
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ $.Chart.Name }}-{{ .name }}
+              image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
+              imagePullPolicy: {{ $.Values.image.pullPolicy }}
+              args: 
+                {{- toYaml .args | nindent 16 }}
+              env:
+                {{- with .env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+                - name: travigo_LOG_FORMAT
+                  value: JSON
+                - name: travigo_BODS_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.bods.apiKeySecret }}
+                      key: api_key
+                      optional: false
+                - name: travigo_NATIONALRAIL_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.credentialsSecret }}
+                      key: username
+                      optional: true
+                - name: travigo_NATIONALRAIL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.credentialsSecret }}
+                      key: password
+                      optional: true
+                - name: travigo_MONGODB_CONNECTION
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.database.connectionStringSecret }}
+                      key: connectionString.standard
+                      optional: false
+                - name: travigo_MONGODB_DATABASE
+                  value: {{ $.Values.database.database }}
+                - name: travigo_ELASTICSEARCH_ADDRESS
+                  value: {{ $.Values.elasticsearch.address }}
+                - name: travigo_ELASTICSEARCH_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.elasticsearch.accountSecret }}
+                      key: username
+                      optional: false
+                - name: travigo_ELASTICSEARCH_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.elasticsearch.accountSecret }}
+                      key: password
+                      optional: false
+              resources:
+                {{- toYaml $.Values.resources | nindent 16 }}
+{{- end }}

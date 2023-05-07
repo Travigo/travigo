@@ -267,7 +267,7 @@ jobs:
   data-importer-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy data-importer to BritBus Kubernetes
+    name: Deploy data-importer to Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -297,12 +297,12 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i britbus-data-importer ./charts/britbus-data-importer --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-data-importer ./charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
 
   realtime-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy realtime to BritBus Kubernetes
+    name: Deploy realtime to Kubernetes
     runs-on: ubuntu-latest
     environment: production
 
@@ -328,16 +328,16 @@ jobs:
           chmod 600 ~/.kube/config
       shell: bash
       env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+        KUBECONFIG: ${{secrets.travigo_KUBECONFIG}}
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i britbus-realtime ./charts/britbus-realtime --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-realtime ./charts/travigo-realtime --set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy web-api to BritBus Kubernetes
+    name: Deploy web-api to Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -370,12 +370,12 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i britbus-web-api ./charts/britbus-web-api --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-web-api ./charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
 
   stats-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
-    name: Deploy stats to BritBus Kubernetes
+    name: Deploy stats to Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -407,4 +407,4 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i britbus-stats ./charts/britbus-stats --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-stats ./charts/travigo-stats --set image.tag=sha-${{ github.sha }}

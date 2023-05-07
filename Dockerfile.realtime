@@ -10,7 +10,7 @@ RUN chmod +x /realtime
 
 EXPOSE 3333
 
-RUN useradd britbus
-USER britbus
+RUN useradd travigo
+USER travigo
 
 ENTRYPOINT ["/realtime"]

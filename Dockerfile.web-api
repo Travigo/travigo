@@ -8,8 +8,8 @@ COPY ./web-api /web-api
 
 RUN chmod +x /web-api
 
-RUN useradd britbus
-USER britbus
+RUN useradd travigo
+USER travigo
 
 EXPOSE 80
 

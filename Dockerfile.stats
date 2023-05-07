@@ -8,7 +8,7 @@ COPY ./stats /stats
 
 RUN chmod +x /stats
 
-RUN useradd britbus
-USER britbus
+RUN useradd travigo
+USER travigo
 
 ENTRYPOINT ["/stats"]

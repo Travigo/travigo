@@ -8,7 +8,7 @@ COPY ./data-importer /data-importer
 
 RUN chmod +x /data-importer
 
-RUN useradd britbus
-USER britbus
+RUN useradd travigo
+USER travigo
 
 ENTRYPOINT ["/data-importer"]

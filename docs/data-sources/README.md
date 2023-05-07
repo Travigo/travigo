@@ -1,6 +1,6 @@
 # Data Sources
 
-BritBus takes advantage of numerous different data sources to provide its functionality.
+Travigo takes advantage of numerous different data sources to provide its functionality.
 
 The currently supported data sources are:
 
