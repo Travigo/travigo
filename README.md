@@ -1,15 +1,15 @@
-# BritBus
+# Travigo
 
-[![Build, Test, and Deploy](https://github.com/BritBus/britbus/actions/workflows/build-and-deploy.yaml/badge.svg)](https://github.com/BritBus/britbus/actions/workflows/build-and-deploy.yaml)
+[![Build, Test, and Deploy](https://github.com/travigo/travigo/actions/workflows/build-and-deploy.yaml/badge.svg)](https://github.com/travigo/travigo/actions/workflows/build-and-deploy.yaml)
 
-BritBus is a collection of applications that provide realtime & up to date information on bus transport within Great Britain.
+Travigo is a collection of applications that provide realtime & up to date information on public transport within Great Britain.
 
 Takes advantage of numerous open datasets and combines them into one helpful up to date API & website.
 
-This is the core repository and contains all the Go code for the services that make up BritBus - data importer, web api, historical analyser
+This is the core repository and contains all the Go code for the services that make up Travigo - data importer, web api, historical analyser
 
 ## Current Status
-BritBus is currently a heavy WIP and only has the following features implemented
+Travigo is currently a heavy WIP and only has the following features implemented
 
 * Import bus stops & bus stop groups
 * Import bus operators & operator groups
