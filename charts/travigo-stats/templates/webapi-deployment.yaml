@@ -36,27 +36,27 @@ spec:
           args:
             {{- toYaml .Values.web_api.args | nindent 10 }}
           env:
-            - name: BRITBUS_LOG_FORMAT
+            - name: TRAVIGO_LOG_FORMAT
               value: JSON
-            - name: BRITBUS_DEBUG
+            - name: TRAVIGO_DEBUG
               value: "YES"
-            - name: BRITBUS_MONGODB_CONNECTION
+            - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.database.connectionStringSecret }}
                   key: connectionString.standard
                   optional: false
-            - name: BRITBUS_MONGODB_DATABASE
+            - name: TRAVIGO_MONGODB_DATABASE
               value: {{ .Values.database.database }}
-            - name: BRITBUS_ELASTICSEARCH_ADDRESS
+            - name: TRAVIGO_ELASTICSEARCH_ADDRESS
               value: {{ $.Values.elasticsearch.address }}
-            - name: BRITBUS_ELASTICSEARCH_USERNAME
+            - name: TRAVIGO_ELASTICSEARCH_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.elasticsearch.accountSecret }}
                   key: username
                   optional: false
-            - name: BRITBUS_ELASTICSEARCH_PASSWORD
+            - name: TRAVIGO_ELASTICSEARCH_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.elasticsearch.accountSecret }}

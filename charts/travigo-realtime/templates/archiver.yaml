@@ -29,15 +29,15 @@ spec:
                 {{- with .env }}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
-                - name: BRITBUS_LOG_FORMAT
+                - name: TRAVIGO_LOG_FORMAT
                   value: JSON
-                - name: BRITBUS_MONGODB_CONNECTION
+                - name: TRAVIGO_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Values.database.connectionStringSecret }}
                       key: connectionString.standard
                       optional: false
-                - name: BRITBUS_MONGODB_DATABASE
+                - name: TRAVIGO_MONGODB_DATABASE
                   value: {{ .Values.database.database }}
               resources:
                 {{- toYaml .Values.resources | nindent 16 }}

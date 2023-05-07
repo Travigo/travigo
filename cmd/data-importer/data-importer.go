@@ -250,11 +250,11 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 }
 
 func main() {
-	if os.Getenv("BRITBUS_LOG_FORMAT") != "JSON" {
+	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	}
 
-	if os.Getenv("BRITBUS_DEBUG") == "YES" {
+	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
 		log.Logger = log.Logger.Level(zerolog.DebugLevel)
 	} else {
 		log.Logger = log.Logger.Level(zerolog.InfoLevel)
@@ -328,8 +328,8 @@ func main() {
 						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL
 						env := util.GetEnvironmentVariables()
-						if env["BRITBUS_BODS_API_KEY"] != "" {
-							source += fmt.Sprintf("?api_key=%s", env["BRITBUS_BODS_API_KEY"])
+						if env["TRAVIGO_BODS_API_KEY"] != "" {
+							source += fmt.Sprintf("?api_key=%s", env["TRAVIGO_BODS_API_KEY"])
 						}
 					}
 
@@ -412,8 +412,8 @@ func main() {
 
 					// Get the API key from the environment variables and append to the source URL
 					env := util.GetEnvironmentVariables()
-					if env["BRITBUS_BODS_API_KEY"] != "" {
-						source += fmt.Sprintf("&api_key=%s", env["BRITBUS_BODS_API_KEY"])
+					if env["TRAVIGO_BODS_API_KEY"] != "" {
+						source += fmt.Sprintf("&api_key=%s", env["TRAVIGO_BODS_API_KEY"])
 					}
 
 					timeTableDataset, err := bods.GetTimetableDataset(source)
@@ -605,16 +605,16 @@ func main() {
 					cleanupOldRecords("operator_groups", datasource)
 
 					env := util.GetEnvironmentVariables()
-					if env["BRITBUS_NATIONALRAIL_USERNAME"] == "" {
-						log.Fatal().Msg("BRITBUS_NATIONALRAIL_USERNAME must be set")
+					if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
 					}
-					if env["BRITBUS_NATIONALRAIL_PASSWORD"] == "" {
-						log.Fatal().Msg("BRITBUS_NATIONALRAIL_PASSWORD must be set")
+					if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
 					}
 
 					formData := url.Values{
-						"username": {env["BRITBUS_NATIONALRAIL_USERNAME"]},
-						"password": {env["BRITBUS_NATIONALRAIL_PASSWORD"]},
+						"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
+						"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
 					}
 
 					client := &http.Client{}

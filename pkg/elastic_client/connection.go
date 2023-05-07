@@ -19,10 +19,10 @@ var bulkIndexer esutil.BulkIndexer
 func Connect(required bool) error {
 	env := util.GetEnvironmentVariables()
 
-	if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" && !required {
+	if env["TRAVIGO_ELASTICSEARCH_ADDRESS"] == "" && !required {
 		log.Info().Msg("Skipping Elasticsearch setup")
 		return nil
-	} else if env["BRITBUS_ELASTICSEARCH_ADDRESS"] == "" && required {
+	} else if env["TRAVIGO_ELASTICSEARCH_ADDRESS"] == "" && required {
 		log.Fatal().Msg("Elasticsearch configuration not set")
 	}
 
@@ -34,9 +34,9 @@ func Connect(required bool) error {
 	retryBackoff := backoff.NewExponentialBackOff()
 
 	es, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{env["BRITBUS_ELASTICSEARCH_ADDRESS"]},
-		Username:  env["BRITBUS_ELASTICSEARCH_USERNAME"],
-		Password:  env["BRITBUS_ELASTICSEARCH_PASSWORD"],
+		Addresses: []string{env["TRAVIGO_ELASTICSEARCH_ADDRESS"]},
+		Username:  env["TRAVIGO_ELASTICSEARCH_USERNAME"],
+		Password:  env["TRAVIGO_ELASTICSEARCH_PASSWORD"],
 		Transport: tp,
 
 		RetryOnStatus: []int{502, 503, 504, 429},
@@ -68,7 +68,7 @@ func Connect(required bool) error {
 		return err
 	}
 
-	log.Info().Msgf("Elasticsearch client setup for %s", env["BRITBUS_ELASTICSEARCH_ADDRESS"])
+	log.Info().Msgf("Elasticsearch client setup for %s", env["TRAVIGO_ELASTICSEARCH_ADDRESS"])
 
 	return nil
 }

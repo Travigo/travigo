@@ -23,16 +23,16 @@ func Connect() error {
 
 	env := util.GetEnvironmentVariables()
 
-	if env["BRITBUS_REDIS_ADDRESS"] != "" {
-		address = env["BRITBUS_REDIS_ADDRESS"]
+	if env["TRAVIGO_REDIS_ADDRESS"] != "" {
+		address = env["TRAVIGO_REDIS_ADDRESS"]
 	}
 
-	if env["BRITBUS_REDIS_PASSWORD"] != "" {
-		password = env["BRITBUS_REDIS_PASSWORD"]
+	if env["TRAVIGO_REDIS_PASSWORD"] != "" {
+		password = env["TRAVIGO_REDIS_PASSWORD"]
 	}
 
-	if env["BRITBUS_REDIS_DATABASE"] != "" {
-		if n, err := strconv.Atoi(env["BRITBUS_REDIS_DATABASE"]); err == nil {
+	if env["TRAVIGO_REDIS_DATABASE"] != "" {
+		if n, err := strconv.Atoi(env["TRAVIGO_REDIS_DATABASE"]); err == nil {
 			database = n
 		} else {
 			return err

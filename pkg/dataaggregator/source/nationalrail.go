@@ -134,7 +134,7 @@ type nationalRailwayLocation struct {
 }
 
 func nationalRailGatewayLookup(path string) (*http.Response, error) {
-	endpoint := util.GetEnvironmentVariables()["BRITBUS_LDBWS_GATEWAY_ENDPOINT"]
+	endpoint := util.GetEnvironmentVariables()["TRAVIGO_LDBWS_GATEWAY_ENDPOINT"]
 	source := fmt.Sprintf("%s/%s", endpoint, path)
 
 	req, _ := http.NewRequest("GET", source, nil)

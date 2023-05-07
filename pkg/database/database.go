@@ -25,12 +25,12 @@ func Connect() error {
 
 	env := util.GetEnvironmentVariables()
 
-	if env["BRITBUS_MONGODB_CONNECTION"] != "" {
-		connectionString = env["BRITBUS_MONGODB_CONNECTION"]
+	if env["TRAVIGO_MONGODB_CONNECTION"] != "" {
+		connectionString = env["TRAVIGO_MONGODB_CONNECTION"]
 	}
 
-	if env["BRITBUS_MONGODB_DATABASE"] != "" {
-		dbName = env["BRITBUS_MONGODB_DATABASE"]
+	if env["TRAVIGO_MONGODB_DATABASE"] != "" {
+		dbName = env["TRAVIGO_MONGODB_DATABASE"]
 	}
 
 	client, err := mongo.NewClient(options.Client().ApplyURI(connectionString))

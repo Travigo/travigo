@@ -20,11 +20,11 @@ import (
 )
 
 func main() {
-	if os.Getenv("BRITBUS_LOG_FORMAT") != "JSON" {
+	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	}
 
-	if os.Getenv("BRITBUS_DEBUG") == "YES" {
+	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
 		log.Logger = log.Logger.Level(zerolog.DebugLevel)
 	} else {
 		log.Logger = log.Logger.Level(zerolog.InfoLevel)

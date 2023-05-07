@@ -38,11 +38,11 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            - name: BRITBUS_LOG_FORMAT
+            - name: TRAVIGO_LOG_FORMAT
               value: JSON
-            - name: BRITBUS_REDIS_ADDRESS
+            - name: TRAVIGO_REDIS_ADDRESS
               value: {{ $.Values.redis.address }}
-            - name: BRITBUS_REDIS_PASSWORD
+            - name: TRAVIGO_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.redis.passwordSecret }}
