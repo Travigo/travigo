@@ -18,12 +18,12 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v4"
-	"github.com/travigo/travigo/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/bods"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/naptan"
+	"github.com/travigo/travigo/pkg/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/siri_vm"
 	"github.com/travigo/travigo/pkg/transforms"

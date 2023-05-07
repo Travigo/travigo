@@ -64,8 +64,6 @@ func listStops(c *fiber.Ctx) error {
 			Stop: stop,
 		})
 
-		stop.RecalculateTransportTypes()
-
 		stops = append(stops, *stop)
 	}
 
@@ -90,8 +88,6 @@ func getStop(c *fiber.Ctx) error {
 		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
-
-		stop.RecalculateTransportTypes()
 
 		transforms.Transform(stop, 3)
 

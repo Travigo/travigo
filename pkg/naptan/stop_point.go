@@ -22,14 +22,43 @@ type StopPoint struct {
 	LocalityCentre  bool      `xml:"Place>LocalityCentre"`
 	Location        *Location `xml:"Place>Location"`
 
-	StopType       string `xml:"StopClassification>StopType"`
-	BusStopType    string `xml:"StopClassification>OnStreet>Bus>BusStopType"`
-	BusStopBearing string `xml:"StopClassification>OnStreet>Bus>MarkedPoint>Bearing>CompassPoint"`
-
-	RailTiplocRef string `xml:"StopClassification>OffStreet>Rail>AnnotatedRailRef>TiplocRef"`
-	RailCrsRef    string `xml:"StopClassification>OffStreet>Rail>AnnotatedRailRef>CrsRef"`
+	StopClassification StopClassification
 
 	StopAreas []StopPointStopAreaRef `xml:"StopAreas>StopAreaRef"`
+}
+
+type StopClassification struct {
+	StopType string
+
+	OnStreet struct {
+		Bus *BusStopClassification
+	}
+
+	OffStreet struct {
+		Bus   *BusStopClassification
+		Rail  *RailStopClassification
+		Coach *CoachStopClassification
+		Metro *MetroStopClassification
+	}
+}
+
+type BusStopClassification struct {
+	BusStopType string
+	Bearing     string `xml:"MarkedPoint>Bearing>CompassPoint"`
+}
+
+type RailStopClassification struct {
+	AnnotatedRailRef struct {
+		TiplocRef   string
+		CrsRef      string
+		StationName string
+	}
+}
+
+type CoachStopClassification struct {
+}
+
+type MetroStopClassification struct {
 }
 
 type StopPointDescriptor struct {
@@ -54,36 +83,20 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 	var TransportTypes []ctdf.TransportType
 
-	switch orig.StopType {
-	case "BCT": // busCoachTramStopOnStreet
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBus,
-			ctdf.TransportTypeCoach,
-			ctdf.TransportTypeTram,
+	switch orig.StopClassification.StopType {
+	case "BCT", "BCS", "BCQ": // busCoachTramStopOnStreet, busCoachTramStationBay, busCoachTramStationVariableBay
+		if orig.StopClassification.OnStreet.Bus != nil || orig.StopClassification.OffStreet.Bus != nil {
+			TransportTypes = append(TransportTypes, ctdf.TransportTypeBus)
 		}
-	case "BCS": // busCoachTramStationBay
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBus,
-			ctdf.TransportTypeCoach,
-			ctdf.TransportTypeTram,
+
+		if orig.StopClassification.OffStreet.Coach != nil {
+			TransportTypes = append(TransportTypes, ctdf.TransportTypeCoach)
 		}
-	case "BCQ": // busCoachTramStationVariableBay
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBus,
-			ctdf.TransportTypeCoach,
-			ctdf.TransportTypeTram,
+
+		if orig.StopClassification.OffStreet.Metro != nil {
+			TransportTypes = append(TransportTypes, ctdf.TransportTypeMetro)
 		}
-	case "BST": // busCoachAccess
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBus,
-			ctdf.TransportTypeCoach,
-		}
-	case "BCE": // busCoachStationEntrance
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBus,
-			ctdf.TransportTypeCoach,
-		}
-	case "BCP": // busCoachPrivate
+	case "BST", "BCE", "BCP": // busCoachAccess, busCoachStationEntrance, busCoachPrivate
 		TransportTypes = []ctdf.TransportType{
 			ctdf.TransportTypeBus,
 			ctdf.TransportTypeCoach,
@@ -101,9 +114,13 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	// 		ctdf.TransportTypeTrain,
 	// 	}
 	case "PLT": // tramMetroOrUndergroundPlatform
-		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
-			ctdf.TransportTypeMetro,
+		if orig.StopClassification.OffStreet.Rail != nil {
+			TransportTypes = append(TransportTypes, ctdf.TransportTypeTrain)
+		} else {
+			TransportTypes = []ctdf.TransportType{
+				ctdf.TransportTypeTram,
+				ctdf.TransportTypeMetro,
+			}
 		}
 	case "MET": // tramMetroOrUndergroundAccess
 		TransportTypes = []ctdf.TransportType{
@@ -173,11 +190,11 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	if orig.NaptanCode != "" {
 		ctdfStop.OtherIdentifiers["NaptanCode"] = orig.NaptanCode
 	}
-	if orig.RailTiplocRef != "" {
-		ctdfStop.OtherIdentifiers["Tiploc"] = orig.RailTiplocRef
+	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef != "" {
+		ctdfStop.OtherIdentifiers["Tiploc"] = orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef
 	}
-	if orig.RailCrsRef != "" {
-		ctdfStop.OtherIdentifiers["Crs"] = orig.RailCrsRef
+	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef != "" {
+		ctdfStop.OtherIdentifiers["Crs"] = orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef
 	}
 
 	for i := 0; i < len(orig.StopAreas); i++ {

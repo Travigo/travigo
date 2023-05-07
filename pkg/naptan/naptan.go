@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -44,7 +45,9 @@ func (n *NaPTAN) Validate() error {
 }
 
 func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
-	// pretty.Println(naptanDoc.StopPoints[1])
+	pretty.Println(naptanDoc.StopPoints[2].ToCTDF().TransportTypes)
+
+	return
 
 	// return
 	datasource.OriginalFormat = "naptan"

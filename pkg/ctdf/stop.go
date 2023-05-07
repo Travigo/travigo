@@ -28,24 +28,6 @@ type Stop struct {
 	Associations []*StopAssociation `groups:"detailed"`
 }
 
-func (s *Stop) RecalculateTransportTypes() {
-	if len(s.Services) == 0 {
-		return
-	}
-
-	transportTypes := []TransportType{}
-	presentTransportTypes := make(map[TransportType]bool)
-
-	for _, service := range s.Services {
-		if service.TransportType != "" && !presentTransportTypes[service.TransportType] {
-			transportTypes = append(transportTypes, service.TransportType)
-			presentTransportTypes[service.TransportType] = true
-		}
-	}
-
-	s.TransportTypes = transportTypes
-}
-
 type StopAssociation struct {
 	Type                 string
 	AssociatedIdentifier string
