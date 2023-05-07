@@ -35,7 +35,7 @@ web_api:
             pathType: ImplementationSpecific
 
 image:
-  repository: ghcr.io/britbus/britbus/stats
+  repository: ghcr.io/travigo/travigo/stats
   pullPolicy: Always
   tag: main
 

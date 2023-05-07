@@ -27,7 +27,7 @@ archiver:
   serviceAccountName: "realtime-archiver-service-account"
 
 image:
-  repository: ghcr.io/britbus/britbus/realtime
+  repository: ghcr.io/travigo/travigo/realtime
   pullPolicy: Always
   tag: main
 

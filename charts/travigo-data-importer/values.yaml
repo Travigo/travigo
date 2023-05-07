@@ -21,7 +21,7 @@ nationalRail:
   credentialsSecret: britbus-nationalrail-credentials
 
 image:
-  repository: ghcr.io/britbus/britbus/data-importer
+  repository: ghcr.io/travigo/travigo/data-importer
   pullPolicy: Always
   tag: main
 
