@@ -328,7 +328,7 @@ jobs:
           chmod 600 ~/.kube/config
       shell: bash
       env:
-        KUBECONFIG: ${{secrets.travigo_KUBECONFIG}}
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
 
     - name: Helm upgrade
       run: |-
