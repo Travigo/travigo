@@ -28,7 +28,6 @@ func (t TflSource) GetName() string {
 func (t TflSource) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf([]*ctdf.DepartureBoard{}),
-		reflect.TypeOf([]*ctdf.Service{}),
 	}
 }
 
@@ -65,9 +64,9 @@ func getTflStopID(stop *ctdf.Stop) (string, error) {
 func (t TflSource) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
 	case query.DepartureBoard:
-		query := q.(query.DepartureBoard)
+		departureBoardQuery := q.(query.DepartureBoard)
 
-		tflStopID, err := getTflStopID(query.Stop)
+		tflStopID, err := getTflStopID(departureBoardQuery.Stop)
 
 		if err != nil {
 			return nil, err
@@ -92,15 +91,48 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		var departureBoard []*ctdf.DepartureBoard
 		now := time.Now()
 
-		operatorRef := "GB:NOC:LULD"
+		operatorRef := "GB:NOC:TFLO"
 
 		nameRegex := regexp.MustCompile("(.+) Underground Station")
 
+		latestDepartureTime := time.Now()
+
+		// Get all the services running at this stop locally
+		databaseLookup := DatabaseLookupSource{}
+		servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
+			Stop: departureBoardQuery.Stop,
+		})
+
+		serviceNameMapping := map[string]*ctdf.Service{}
+		if err == nil {
+			for _, service := range servicesQueryResult.([]*ctdf.Service) {
+				serviceNameMapping[service.ServiceName] = service
+			}
+		}
+
+		// Convert the TfL results into a departure board
 		for _, prediction := range arrivalPredictions {
-			serviceRef := fmt.Sprintf("GB:TFLSERVICE:%s", prediction.LineID)
+			var service *ctdf.Service
+			if serviceNameMapping[prediction.LineID] == nil {
+				service = &ctdf.Service{
+					PrimaryIdentifier: fmt.Sprintf("GB:TFLSERVICE:%s", prediction.LineID),
+					ServiceName:       prediction.LineName,
+					OperatorRef:       operatorRef,
+				}
+			} else {
+				service = serviceNameMapping[prediction.LineID]
+			}
+
 			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
+			scheduledTime = scheduledTime.In(now.Location())
 
 			destinationName := prediction.DestinationName
+			if destinationName == "" && prediction.Towards != "" && prediction.Towards != "Check Front of Train" {
+				destinationName = prediction.Towards
+			} else if destinationName == "" {
+				destinationName = service.ServiceName
+			}
+
 			nameMatches := nameRegex.FindStringSubmatch(prediction.DestinationName)
 
 			if len(nameMatches) == 2 {
@@ -110,70 +142,46 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 			departure := &ctdf.DepartureBoard{
 				DestinationDisplay: destinationName,
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
-				Time:               scheduledTime.In(now.Location()),
+				Time:               scheduledTime,
 
 				Journey: &ctdf.Journey{
-					PrimaryIdentifier: serviceRef,
+					PrimaryIdentifier: "NOTIMPLEMENTEDYET",
 
-					ServiceRef: serviceRef,
-					Service: &ctdf.Service{
-						PrimaryIdentifier: serviceRef,
-						ServiceName:       prediction.LineName,
-					},
+					ServiceRef: service.PrimaryIdentifier,
+					Service:    service,
 
 					OperatorRef: operatorRef,
 					Operator: &ctdf.Operator{
 						PrimaryIdentifier: operatorRef,
-						PrimaryName:       "London Underground (TfL)",
+						PrimaryName:       "Transport for London",
 					},
 				},
 			}
 			transforms.Transform(departure, 2)
 			departureBoard = append(departureBoard, departure)
+
+			if scheduledTime.After(latestDepartureTime) {
+				latestDepartureTime = scheduledTime
+			}
+		}
+
+		// If the realtime data doesnt provide enough to cover our request then fill in with the local departure board
+		remainingCount := departureBoardQuery.Count - len(departureBoard)
+
+		if remainingCount > 0 {
+			localSource := LocalDepartureBoardSource{}
+
+			departureBoardQuery.StartDateTime = latestDepartureTime
+			departureBoardQuery.Count = remainingCount
+
+			localDepartures, err := localSource.Lookup(departureBoardQuery)
+
+			if err == nil {
+				departureBoard = append(departureBoard, localDepartures.([]*ctdf.DepartureBoard)...)
+			}
 		}
 
 		return departureBoard, nil
-
-	case query.ServicesByStop:
-		query := q.(query.ServicesByStop)
-		tflStopID, err := getTflStopID(query.Stop)
-
-		if err != nil {
-			return nil, err
-		}
-
-		source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/ServiceTypes?id=%s", tflStopID)
-		req, _ := http.NewRequest("GET", source, nil)
-		req.Header["user-agent"] = []string{"curl/7.54.1"}
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			return nil, err
-		}
-
-		byteValue, _ := ioutil.ReadAll(resp.Body)
-
-		var stopServices []tflStopService
-		json.Unmarshal(byteValue, &stopServices)
-
-		var services []*ctdf.Service
-
-		for _, stopService := range stopServices {
-			serviceRef := fmt.Sprintf("GB:TFLSERVICE:%s", stopService.LineName)
-
-			services = append(services, &ctdf.Service{
-				PrimaryIdentifier: serviceRef,
-				ServiceName:       stopService.LineName,
-
-				TransportType: ctdf.TransportTypeMetro, // TODO: not always correct
-
-				OperatorRef: "GB:NOC:LULD", // TODO: not always correct
-			})
-		}
-
-		return services, nil
 	}
 
 	return nil, nil
@@ -192,6 +200,8 @@ type tflArrivalPrediction struct {
 
 	DestinationNaptanID string `json:"destinationNaptanId"`
 	DestinationName     string `json:"destinationName"`
+
+	Towards string `json:"towards"`
 
 	ExpectedArrival string `json:"expectedArrival"`
 
