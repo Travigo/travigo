@@ -9,6 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/exp/slices"
 )
 
 type DepartureBoard struct {
@@ -27,7 +28,7 @@ const (
 	DepartureBoardRecordTypeEstimated                                = "Estimated"
 )
 
-func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*DepartureBoard {
+func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*DepartureBoard {
 	departureBoard := []*DepartureBoard{}
 	journeysCollection := database.GetCollection("journeys")
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -50,7 +51,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dat
 			journey.GetRealtimeJourney(realtimeTimeframe)
 
 			for _, path := range journey.Path {
-				if path.OriginStopRef == stopRef {
+				if slices.Contains(stopRefs, path.OriginStopRef) {
 					refTime := path.OriginDepartureTime
 
 					// Use the realtime estimated stop time based if realtime is available

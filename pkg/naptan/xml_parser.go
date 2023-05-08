@@ -8,7 +8,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-func ParseXMLFile(reader io.Reader, matchesFilter func(interface{}) bool) (*NaPTAN, error) {
+func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 	naptan := NaPTAN{}
 	naptan.StopPoints = []*StopPoint{}
 	naptan.StopAreas = []*StopArea{}
@@ -50,7 +50,7 @@ func ParseXMLFile(reader io.Reader, matchesFilter func(interface{}) bool) (*NaPT
 
 				if err = d.DecodeElement(&stopPoint, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
-				} else if matchesFilter(&stopPoint) {
+				} else {
 					stopPoint.Location.UpdateCoordinates()
 					naptan.StopPoints = append(naptan.StopPoints, &stopPoint)
 				}
@@ -59,7 +59,7 @@ func ParseXMLFile(reader io.Reader, matchesFilter func(interface{}) bool) (*NaPT
 
 				if err = d.DecodeElement(&stopArea, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
-				} else if matchesFilter(&stopArea) {
+				} else {
 					stopArea.Location.UpdateCoordinates()
 					naptan.StopAreas = append(naptan.StopAreas, &stopArea)
 				}

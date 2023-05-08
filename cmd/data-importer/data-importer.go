@@ -156,7 +156,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 	switch dataFormat {
 	case "naptan":
 		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
-		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader, naptan.BasicFilter)
+		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader)
 
 		if err != nil {
 			return err

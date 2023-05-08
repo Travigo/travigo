@@ -26,6 +26,12 @@ func createStopsIndexes() {
 		{
 			Keys: bsonx.Doc{{Key: "location", Value: bsonx.String("2dsphere")}},
 		},
+		{
+			Keys: bsonx.Doc{{Key: "platforms.primaryidentifier", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "entrances.primaryidentifier", Value: bsonx.Int32(1)}},
+		},
 	}
 
 	opts := options.CreateIndexes()

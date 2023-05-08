@@ -136,7 +136,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:bakerloo",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Bakerloo",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#994f14",
@@ -146,7 +147,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:central",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Central",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#d42e12",
@@ -156,7 +158,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:circle",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Circle",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#f7d117",
@@ -166,7 +169,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:district",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "District",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#007336",
@@ -176,7 +180,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:hammersmith-city",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Hammersmith & City",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#eb9ca8",
@@ -186,7 +191,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:jubilee",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Jubilee",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#8c8f91",
@@ -196,7 +202,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:metropolitan",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Metropolitan",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#8a004f",
@@ -206,7 +213,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:northern",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Northern",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#332b24",
@@ -216,7 +224,6 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			// "PrimaryIdentifier": "GB:TFLSERVICE:piccadilly",
 			"OperatorRef": "GB:NOC:TFLO",
 			"ServiceName": "Piccadilly",
 		},
@@ -228,7 +235,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:victoria",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Victoria",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#00a3e0",
@@ -238,7 +246,8 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:waterloo-city",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Waterloo & City",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#7dd1b8",

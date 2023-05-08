@@ -111,10 +111,13 @@ func (d DatabaseLookupSource) Lookup(q any) (interface{}, error) {
 		servicesCollection := database.GetCollection("services")
 		journeysCollection := database.GetCollection("journeys")
 
-		filter := bson.M{"$or": bson.A{
-			bson.M{"path.originstopref": query.Stop.PrimaryIdentifier},
-			bson.M{"path.destinationstopref": query.Stop.PrimaryIdentifier},
-		},
+		// Contains the stops primary id and all platforms primary ids
+		allStopIDs := query.Stop.GetAllStopIDs()
+		filter := bson.M{
+			"$or": bson.A{
+				bson.M{"path.originstopref": bson.M{"$in": allStopIDs}},
+				bson.M{"path.destinationstopref": bson.M{"$in": allStopIDs}},
+			},
 		}
 
 		results, _ := journeysCollection.Distinct(context.Background(), "serviceref", filter)

@@ -49,9 +49,7 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 		ctdfStopGroup.Type = "bus_station"
 	case "GMLT":
 		ctdfStopGroup.Type = "multimode_interchange"
-	case "GTMU":
-		ctdfStopGroup.Type = "dock"
-	case "GRLS":
+	case "GTMU", "GRLS":
 		ctdfStopGroup.Type = "station"
 	default:
 		ctdfStopGroup.Type = "unknown"

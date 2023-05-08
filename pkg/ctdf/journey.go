@@ -182,11 +182,21 @@ func (jpi *JourneyPathItem) GetReferences() {
 }
 func (jpi *JourneyPathItem) GetOriginStop() {
 	stopsCollection := database.GetCollection("stops")
-	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": jpi.OriginStopRef}).Decode(&jpi.OriginStop)
+	stopsCollection.FindOne(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": jpi.OriginStopRef},
+			bson.M{"platforms.primaryidentifier": jpi.OriginStopRef},
+		},
+	}).Decode(&jpi.OriginStop)
 }
 func (jpi *JourneyPathItem) GetDestinationStop() {
 	stopsCollection := database.GetCollection("stops")
-	stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": jpi.DestinationStopRef}).Decode(&jpi.DestinationStop)
+	stopsCollection.FindOne(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": jpi.DestinationStopRef},
+			bson.M{"platforms.primaryidentifier": jpi.DestinationStopRef},
+		},
+	}).Decode(&jpi.DestinationStop)
 }
 
 type JourneyPathItemActivity string

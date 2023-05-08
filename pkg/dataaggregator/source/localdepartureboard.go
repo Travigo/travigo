@@ -67,7 +67,10 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 			bson.E{Key: "path.originactivity", Value: 0},
 			bson.E{Key: "path.destinationactivity", Value: 0},
 		})
-		cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": query.Stop.PrimaryIdentifier}, opts)
+
+		// Contains the stops primary id and all platforms primary ids
+		allStopIDs := query.Stop.GetAllStopIDs()
+		cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}, opts)
 
 		if err := cursor.All(context.Background(), &journeys); err != nil {
 			log.Error().Err(err).Msg("Failed to decode Stop")
@@ -78,13 +81,13 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 		realtimeTimeframe := query.StartDateTime.Format("2006-01-02")
 
 		currentTime = time.Now()
-		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, query.StartDateTime, realtimeTimeframe, true)
+		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, query.StartDateTime, realtimeTimeframe, true)
 		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation today")
 
 		// If not enough journeys in todays departure board then look into tomorrows
 		if len(departureBoardToday) < query.Count {
 			currentTime = time.Now()
-			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, query.Stop.PrimaryIdentifier, dayAfterDateTime, realtimeTimeframe, false)
+			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, dayAfterDateTime, realtimeTimeframe, false)
 			log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation tomorrow")
 
 			departureBoard = append(departureBoardToday, departureBoardTomorrow...)

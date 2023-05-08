@@ -47,7 +47,7 @@ func getTflStopID(stop *ctdf.Stop) (string, error) {
 			var stopGroup *ctdf.StopGroup
 			collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
 
-			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "dock" {
+			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "station" {
 				tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
 
 				break

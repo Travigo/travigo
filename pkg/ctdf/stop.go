@@ -26,11 +26,49 @@ type Stop struct {
 	Active bool `groups:"basic"`
 
 	Associations []*StopAssociation `groups:"detailed"`
+
+	Platforms []*StopPlatform `groups:"detailed"`
+	Entrances []*StopEntrance `groups:"detailed"`
+}
+
+type StopPlatform struct {
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
+
+	PrimaryName string            `groups:"basic"`
+	OtherNames  map[string]string `groups:"basic"`
+
+	Location *Location `groups:"detailed"`
+}
+
+type StopEntrance struct {
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic"`
+
+	PrimaryName string            `groups:"basic"`
+	OtherNames  map[string]string `groups:"basic"`
+
+	Location *Location `groups:"detailed"`
+}
+
+func (stop *Stop) GetAllStopIDs() []string {
+	allStopIDs := []string{
+		stop.PrimaryIdentifier,
+	}
+	for _, platform := range stop.Platforms {
+		allStopIDs = append(allStopIDs, platform.PrimaryIdentifier)
+	}
+
+	return allStopIDs
 }
 
 func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
-	if service.StopNameOverrides[stop.PrimaryIdentifier] != "" {
-		stop.PrimaryName = service.StopNameOverrides[stop.PrimaryIdentifier]
+	for _, stopID := range stop.GetAllStopIDs() {
+		if service.StopNameOverrides[stopID] != "" {
+			stop.PrimaryName = service.StopNameOverrides[stopID]
+
+			return
+		}
 	}
 }
 
