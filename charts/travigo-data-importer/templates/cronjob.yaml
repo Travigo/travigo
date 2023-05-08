@@ -32,43 +32,43 @@ spec:
                 {{- with .env }}
                 {{- toYaml . | nindent 16 }}
                 {{- end }}
-                - name: travigo_LOG_FORMAT
+                - name: TRAVIGO_LOG_FORMAT
                   value: JSON
-                - name: travigo_BODS_API_KEY
+                - name: TRAVIGO_BODS_API_KEY
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.bods.apiKeySecret }}
                       key: api_key
                       optional: false
-                - name: travigo_NATIONALRAIL_USERNAME
+                - name: TRAVIGO_NATIONALRAIL_USERNAME
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.nationalRail.credentialsSecret }}
                       key: username
                       optional: true
-                - name: travigo_NATIONALRAIL_PASSWORD
+                - name: TRAVIGO_NATIONALRAIL_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.nationalRail.credentialsSecret }}
                       key: password
                       optional: true
-                - name: travigo_MONGODB_CONNECTION
+                - name: TRAVIGO_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.database.connectionStringSecret }}
                       key: connectionString.standard
                       optional: false
-                - name: travigo_MONGODB_DATABASE
+                - name: TRAVIGO_MONGODB_DATABASE
                   value: {{ $.Values.database.database }}
-                - name: travigo_ELASTICSEARCH_ADDRESS
+                - name: TRAVIGO__ELASTICSEARCH_ADDRESS
                   value: {{ $.Values.elasticsearch.address }}
-                - name: travigo_ELASTICSEARCH_USERNAME
+                - name: TRAVIGO_ELASTICSEARCH_USERNAME
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.elasticsearch.accountSecret }}
                       key: username
                       optional: false
-                - name: travigo_ELASTICSEARCH_PASSWORD
+                - name: TRAVIGO_ELASTICSEARCH_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: {{ $.Values.elasticsearch.accountSecret }}
