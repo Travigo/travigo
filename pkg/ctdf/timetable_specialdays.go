@@ -2,7 +2,9 @@ package ctdf
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,6 +17,8 @@ func LoadSpecialDayCache() {
 }
 
 func loadGBBankHolidayCache() {
+	nonAlphanumericRegex := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+
 	type BankHolidayEventsSchema struct {
 		Title string
 		Date  string
@@ -69,13 +73,18 @@ func loadGBBankHolidayCache() {
 			"2nd January":            "GB:BankHoliday:Jan2ndScotlandHoliday",
 		}
 
-		if specialDayMapping[event.Title] != "" {
-			if SpecialDays[eventDate.Year()] == nil {
-				SpecialDays[eventDate.Year()] = make(map[string]time.Time)
-			}
+		eventID := specialDayMapping[event.Title]
 
-			SpecialDays[eventDate.Year()][specialDayMapping[event.Title]] = eventDate
+		if eventID == "" {
+			basicTitle := nonAlphanumericRegex.ReplaceAllString(event.Title, "")
+			eventID = fmt.Sprintf("GB:UnknownBankHoliday:%s", basicTitle)
 		}
+
+		if SpecialDays[eventDate.Year()] == nil {
+			SpecialDays[eventDate.Year()] = make(map[string]time.Time)
+		}
+
+		SpecialDays[eventDate.Year()][eventID] = eventDate
 	}
 
 	// Hardcoded set days

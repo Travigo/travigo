@@ -123,6 +123,12 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 					} else {
 						bankHolidayName := elementChain[2]
 
+						if bankHolidayName == "Christmas" {
+							bankHolidayName = "ChristmasDayHoliday"
+						} else if bankHolidayName == "NewYearsDay" {
+							bankHolidayName = "NewYearsDayHoliday"
+						}
+
 						record = ctdf.AvailabilityRule{
 							Type:  ctdf.AvailabilitySpecialDay,
 							Value: fmt.Sprintf("GB:BankHoliday:%s", bankHolidayName),

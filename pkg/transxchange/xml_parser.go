@@ -43,6 +43,14 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 				if validate != nil {
 					return nil, validate
 				}
+			} else if ty.Name.Local == "StopPoint" {
+				var stopPoint StopPoint
+
+				if err = d.DecodeElement(&stopPoint, &ty); err != nil {
+					log.Fatal().Msgf("Error decoding item: %s", err)
+				} else {
+					transXChange.StopPoints = append(transXChange.StopPoints, &stopPoint)
+				}
 			} else if ty.Name.Local == "Operator" || ty.Name.Local == "LicensedOperator" {
 				var operator Operator
 

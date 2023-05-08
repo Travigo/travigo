@@ -119,6 +119,14 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRef string, dat
 					}
 				}
 
+				if destinationDisplay == "" {
+					lastPathItem := journey.Path[len(journey.Path)-1]
+					lastPathItem.GetDestinationStop()
+					lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+
+					destinationDisplay = lastPathItem.DestinationStop.PrimaryName
+				}
+
 				departureBoardGenerationMutex.Lock()
 				departureBoard = append(departureBoard, &DepartureBoard{
 					Journey:            journey,

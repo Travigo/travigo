@@ -31,6 +31,8 @@ type TransXChange struct {
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
 
+	StopPoints []*StopPoint
+
 	Operators              []*Operator
 	Routes                 []*Route
 	Services               []*Service
@@ -153,6 +155,13 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 			}
 			modificationTime, _ := time.Parse(modificationDateTimeFormat, modificationDateTimeString)
 
+			stopNameOverrides := map[string]string{}
+			for _, stopPoint := range doc.StopPoints {
+				if stopPoint.CommonName != "" {
+					stopNameOverrides[fmt.Sprintf(ctdf.StopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
+				}
+			}
+
 			ctdfService := ctdf.Service{
 				PrimaryIdentifier: serviceIdentifier,
 				OtherIdentifiers: map[string]string{
@@ -180,6 +189,8 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 					Destination: txcLine.OutboundDestination,
 					Description: txcLine.OutboundDescription,
 				},
+
+				StopNameOverrides: stopNameOverrides,
 			}
 
 			// Check if Service end date is before today and skip over it if that is true

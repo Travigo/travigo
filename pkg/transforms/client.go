@@ -216,7 +216,9 @@ func SetupClient() {
 	transforms = append(transforms, &TransformDefinition{
 		Type: "ctdf.Service",
 		Match: map[string]string{
-			"PrimaryIdentifier": "GB:TFLSERVICE:piccadilly",
+			// "PrimaryIdentifier": "GB:TFLSERVICE:piccadilly",
+			"OperatorRef": "GB:NOC:TFLO",
+			"ServiceName": "Piccadilly",
 		},
 		Data: map[string]interface{}{
 			"BrandColour": "#2905a1",

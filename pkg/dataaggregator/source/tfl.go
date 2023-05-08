@@ -107,12 +107,6 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 				destinationName = nameMatches[1]
 			}
 
-			// TODO: THIS IS JUST FOR TESTING ATM
-			lineName := prediction.LineName
-			if lineName == "Hammersmith & City" {
-				lineName = "H&C"
-			}
-
 			departure := &ctdf.DepartureBoard{
 				DestinationDisplay: destinationName,
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
@@ -124,7 +118,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 					ServiceRef: serviceRef,
 					Service: &ctdf.Service{
 						PrimaryIdentifier: serviceRef,
-						ServiceName:       lineName,
+						ServiceName:       prediction.LineName,
 					},
 
 					OperatorRef: operatorRef,

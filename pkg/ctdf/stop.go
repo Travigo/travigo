@@ -28,6 +28,12 @@ type Stop struct {
 	Associations []*StopAssociation `groups:"detailed"`
 }
 
+func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
+	if service.StopNameOverrides[stop.PrimaryIdentifier] != "" {
+		stop.PrimaryName = service.StopNameOverrides[stop.PrimaryIdentifier]
+	}
+}
+
 type StopAssociation struct {
 	Type                 string
 	AssociatedIdentifier string

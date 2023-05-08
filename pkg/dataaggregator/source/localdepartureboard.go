@@ -36,7 +36,7 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 		query := q.(query.DepartureBoard)
 
 		// Only support buses for local timetable so far
-		if !slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeBus) {
+		if !(slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeBus) || slices.Contains(query.Stop.TransportTypes, ctdf.TransportTypeMetro)) {
 			return nil, UnsupportedSourceError
 		}
 

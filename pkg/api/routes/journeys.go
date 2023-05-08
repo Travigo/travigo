@@ -32,6 +32,11 @@ func getJourney(c *fiber.Ctx) error {
 		journey.GetDeepReferences()
 		journey.GetRealtimeJourney(time.Now().Format("2006-01-02"))
 
+		for _, pathItem := range journey.Path {
+			pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
+			pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+		}
+
 		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
 			Groups: []string{"basic", "detailed"},
 		}, journey)

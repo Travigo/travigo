@@ -289,6 +289,11 @@ func main() {
 						Usage:    "Overwrite the file format (eg. zip or xml)",
 						Required: false,
 					},
+					&cli.StringFlag{
+						Name:     "transport-type",
+						Usage:    "Set the transport type for this file",
+						Required: false,
+					},
 				},
 				ArgsUsage: "<data-format> <source>",
 				Action: func(c *cli.Context) error {
@@ -297,6 +302,7 @@ func main() {
 					}
 
 					fileFormat := c.String("file-format")
+					transportType := c.String("transport-type")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
@@ -359,7 +365,7 @@ func main() {
 							cleanupOldRecords("operator_groups", datasource)
 						}
 
-						err := importFile(dataFormat, "", source, fileFormat, datasource, map[string]string{})
+						err := importFile(dataFormat, ctdf.TransportType(transportType), source, fileFormat, datasource, map[string]string{})
 
 						if err != nil {
 							return err
@@ -533,6 +539,7 @@ func main() {
 					defer archive.Close()
 
 					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART \\w+ \\d+.zip")
+					tflOtherMatchRegex, _ := regexp.Compile("(?i)LULDLRTRAMRIVERCABLE \\d+ FULL.zip")
 
 					// Cleanup right at the begining once, as we do it as 1 big import
 					datasource := &ctdf.DataSource{
@@ -545,21 +552,29 @@ func main() {
 					cleanupOldRecords("journeys", datasource)
 
 					for _, zipFile := range archive.File {
+
+						file, err := zipFile.Open()
+						if err != nil {
+							log.Fatal().Err(err).Msg("Failed to open file")
+						}
+						defer file.Close()
+
+						tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
+						if err != nil {
+							log.Fatal().Err(err).Msg("Cannot create temporary file")
+						}
+						defer os.Remove(tmpFile.Name())
+
+						io.Copy(tmpFile, file)
+
+						var transportType ctdf.TransportType
 						if tflBusesMatchRegex.MatchString(zipFile.Name) {
-							file, err := zipFile.Open()
-							if err != nil {
-								log.Fatal().Err(err).Msg("Failed to open file")
-							}
-							defer file.Close()
+							transportType = ctdf.TransportTypeBus
+						} else if tflOtherMatchRegex.MatchString(zipFile.Name) { // TODO: NOT TRUE
+							transportType = ctdf.TransportTypeMetro
+						}
 
-							tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
-							if err != nil {
-								log.Fatal().Err(err).Msg("Cannot create temporary file")
-							}
-							defer os.Remove(tmpFile.Name())
-
-							io.Copy(tmpFile, file)
-
+						if transportType != "" {
 							err = importFile("transxchange", ctdf.TransportTypeBus, tmpFile.Name(), "zip", datasource, map[string]string{
 								"OperatorRef": "GB:NOC:TFLO",
 							})

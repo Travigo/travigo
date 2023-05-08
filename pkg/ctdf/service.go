@@ -24,6 +24,8 @@ type Service struct {
 	BrandColour string `groups:"basic"`
 	BrandIcon   string `groups:"basic"`
 
+	StopNameOverrides map[string]string
+
 	TransportType TransportType `groups:"basic"`
 }
 
