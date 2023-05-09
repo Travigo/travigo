@@ -45,11 +45,19 @@ func (j *Journey) GetReferences() {
 	j.GetService()
 }
 func (j *Journey) GetOperator() {
+	if j.Operator != nil {
+		return
+	}
+
 	operatorsCollection := database.GetCollection("operators")
 	query := bson.M{"$or": bson.A{bson.M{"primaryidentifier": j.OperatorRef}, bson.M{"otheridentifiers": j.OperatorRef}}}
 	operatorsCollection.FindOne(context.Background(), query).Decode(&j.Operator)
 }
 func (j *Journey) GetService() {
+	if j.Service != nil {
+		return
+	}
+
 	servicesCollection := database.GetCollection("services")
 	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.ServiceRef}).Decode(&j.Service)
 }

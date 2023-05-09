@@ -93,8 +93,6 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		serviceNameMapping := t.getServiceNameMappings(stop)
 		service := serviceNameMapping[matchingPrediction.LineName]
 
-		pretty.Println(serviceNameMapping, matchingPrediction.LineName)
-
 		if service == nil {
 			return nil, errors.New("Could not find matching service")
 		}
@@ -105,6 +103,11 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		// 	PrimaryIdentifier: destinationStopID,
 		// })
 		// destinationStop := destinationStopObj.(*ctdf.Stop)
+
+		transforms.Transform(service, 1)
+		transforms.Transform(tflOperator, 1)
+
+		pretty.Println(service.BrandColour)
 
 		return &ctdf.Journey{
 			PrimaryIdentifier: journeyQuery.PrimaryIdentifier,
