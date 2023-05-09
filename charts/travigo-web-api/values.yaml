@@ -21,6 +21,9 @@ elasticsearch:
 bods:
   apiKeySecret: britbus-bods-api
 
+tfl:
+  apiKeySecret: travigo-tfl-api-key
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

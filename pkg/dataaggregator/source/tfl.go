@@ -3,6 +3,7 @@ package source
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
@@ -19,6 +21,7 @@ import (
 )
 
 type TflSource struct {
+	AppKey string
 }
 
 func (t TflSource) GetName() string {
@@ -28,41 +31,109 @@ func (t TflSource) GetName() string {
 func (t TflSource) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf([]*ctdf.DepartureBoard{}),
+		reflect.TypeOf(ctdf.Journey{}),
 	}
 }
 
-func getTflStopID(stop *ctdf.Stop) (string, error) {
-	// If the stop has no CrsRef then give up
-	if !slices.Contains(stop.TransportTypes, ctdf.TransportTypeMetro) {
-		return "", UnsupportedSourceError
+func (t TflSource) Lookup(q any) (interface{}, error) {
+	tflOperator := &ctdf.Operator{
+		PrimaryIdentifier: "GB:NOC:TFLO",
+		PrimaryName:       "Transport for London",
 	}
 
-	tflStopID := ""
+	switch q.(type) {
+	case query.Journey:
+		journeyQuery := q.(query.Journey)
 
-	for _, association := range stop.Associations {
-		if association.Type == "stop_group" {
-			// TODO: USE DATA AGGREGATOR FOR THIS
-			collection := database.GetCollection("stop_groups")
-			var stopGroup *ctdf.StopGroup
-			collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
+		tflLiveJourneyRegex := regexp.MustCompile("GB:TFLLIVEJOURNEY:(.+):(.+)")
+		tflLiveJourneyRegexMatches := tflLiveJourneyRegex.FindStringSubmatch(journeyQuery.PrimaryIdentifier)
 
-			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "station" {
-				tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
+		if len(tflLiveJourneyRegexMatches) != 3 {
+			return nil, UnsupportedSourceError
+		}
+
+		stopID := tflLiveJourneyRegexMatches[1]
+		predictionID := tflLiveJourneyRegexMatches[2]
+
+		databaseLookup := DatabaseLookupSource{}
+
+		stopObj, err := databaseLookup.Lookup(query.Stop{
+			PrimaryIdentifier: stopID,
+		})
+		stop := stopObj.(*ctdf.Stop)
+
+		if stop == nil {
+			return nil, errors.New("Cannot find Stop")
+		}
+
+		tflStopID, err := getTflStopID(stop)
+		if err != nil {
+			return nil, err
+		}
+
+		arrivalPredictions, err := t.getTflStopArrivals(tflStopID)
+		if err != nil {
+			return nil, err
+		}
+
+		var matchingPrediction *tflArrivalPrediction
+		for _, prediction := range arrivalPredictions {
+			if prediction.ID == predictionID {
+				matchingPrediction = &prediction
 
 				break
 			}
 		}
-	}
 
-	if tflStopID == "" {
-		return tflStopID, UnsupportedSourceError
-	}
+		if matchingPrediction == nil {
+			return nil, errors.New("Cannot find prediction")
+		}
 
-	return tflStopID, nil
-}
+		// Get all the services running at this stop locally
+		serviceNameMapping := t.getServiceNameMappings(stop)
+		service := serviceNameMapping[matchingPrediction.LineName]
 
-func (t TflSource) Lookup(q any) (interface{}, error) {
-	switch q.(type) {
+		pretty.Println(serviceNameMapping, matchingPrediction.LineName)
+
+		if service == nil {
+			return nil, errors.New("Could not find matching service")
+		}
+
+		// destinationStopID := fmt.Sprintf(ctdf.StopIDFormat, matchingPrediction.DestinationNaptanID)
+		// pretty.Println(destinationStopID)
+		// destinationStopObj, err := databaseLookup.Lookup(query.Stop{
+		// 	PrimaryIdentifier: destinationStopID,
+		// })
+		// destinationStop := destinationStopObj.(*ctdf.Stop)
+
+		return &ctdf.Journey{
+			PrimaryIdentifier: journeyQuery.PrimaryIdentifier,
+			OtherIdentifiers:  map[string]string{},
+
+			DataSource: &ctdf.DataSource{},
+
+			ServiceRef: service.PrimaryIdentifier,
+			Service:    service,
+
+			OperatorRef: tflOperator.PrimaryIdentifier,
+			Operator:    tflOperator,
+
+			DestinationDisplay: matchingPrediction.GetDestinationDisplay(service),
+
+			// Path: []*ctdf.JourneyPathItem{
+			// 	{
+			// 		OriginStopRef: stopID,
+			// 		OriginStop:    stop,
+
+			// 		DestinationStopRef: destinationStopID,
+			// 		DestinationStop:    destinationStop,
+			// 	},
+			// },
+
+			// RealtimeJourney: &ctdf.RealtimeJourney{
+			// 	Reliability: ctdf.RealtimeJourneyReliabilityLocationWithoutTrack,
+			// },
+		}, nil
 	case query.DepartureBoard:
 		departureBoardQuery := q.(query.DepartureBoard)
 
@@ -72,89 +143,48 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 			return nil, err
 		}
 
-		source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals", tflStopID)
-		req, _ := http.NewRequest("GET", source, nil)
-		req.Header["user-agent"] = []string{"curl/7.54.1"}
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			return nil, err
-		}
-
-		byteValue, _ := ioutil.ReadAll(resp.Body)
-
-		var arrivalPredictions []tflArrivalPrediction
-		json.Unmarshal(byteValue, &arrivalPredictions)
-
 		var departureBoard []*ctdf.DepartureBoard
 		now := time.Now()
-
-		operatorRef := "GB:NOC:TFLO"
-
-		nameRegex := regexp.MustCompile("(.+) Underground Station")
 
 		latestDepartureTime := time.Now()
 
 		// Get all the services running at this stop locally
-		databaseLookup := DatabaseLookupSource{}
-		servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
-			Stop: departureBoardQuery.Stop,
-		})
+		serviceNameMapping := t.getServiceNameMappings(departureBoardQuery.Stop)
 
-		serviceNameMapping := map[string]*ctdf.Service{}
-		if err == nil {
-			for _, service := range servicesQueryResult.([]*ctdf.Service) {
-				serviceNameMapping[service.ServiceName] = service
-			}
+		arrivalPredictions, err := t.getTflStopArrivals(tflStopID)
+		if err != nil {
+			return nil, err
 		}
 
 		// Convert the TfL results into a departure board
 		for _, prediction := range arrivalPredictions {
 			var service *ctdf.Service
-			if serviceNameMapping[prediction.LineID] == nil {
+			if serviceNameMapping[prediction.LineName] == nil {
 				service = &ctdf.Service{
 					PrimaryIdentifier: fmt.Sprintf("GB:TFLSERVICE:%s", prediction.LineID),
 					ServiceName:       prediction.LineName,
-					OperatorRef:       operatorRef,
+					OperatorRef:       tflOperator.PrimaryIdentifier,
 				}
 			} else {
-				service = serviceNameMapping[prediction.LineID]
+				service = serviceNameMapping[prediction.LineName]
 			}
 
 			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 			scheduledTime = scheduledTime.In(now.Location())
 
-			destinationName := prediction.DestinationName
-			if destinationName == "" && prediction.Towards != "" && prediction.Towards != "Check Front of Train" {
-				destinationName = prediction.Towards
-			} else if destinationName == "" {
-				destinationName = service.ServiceName
-			}
-
-			nameMatches := nameRegex.FindStringSubmatch(prediction.DestinationName)
-
-			if len(nameMatches) == 2 {
-				destinationName = nameMatches[1]
-			}
-
 			departure := &ctdf.DepartureBoard{
-				DestinationDisplay: destinationName,
+				DestinationDisplay: prediction.GetDestinationDisplay(service),
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 				Time:               scheduledTime,
 
 				Journey: &ctdf.Journey{
-					PrimaryIdentifier: "NOTIMPLEMENTEDYET",
+					PrimaryIdentifier: fmt.Sprintf("GB:TFLLIVEJOURNEY:%s:%s", departureBoardQuery.Stop.PrimaryIdentifier, prediction.ID),
 
 					ServiceRef: service.PrimaryIdentifier,
 					Service:    service,
 
-					OperatorRef: operatorRef,
-					Operator: &ctdf.Operator{
-						PrimaryIdentifier: operatorRef,
-						PrimaryName:       "Transport for London",
-					},
+					OperatorRef: tflOperator.PrimaryIdentifier,
+					Operator:    tflOperator,
 				},
 			}
 			transforms.Transform(departure, 2)
@@ -187,9 +217,45 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 	return nil, nil
 }
 
+func (t *TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
+	source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
+	req, _ := http.NewRequest("GET", source, nil)
+	req.Header["user-agent"] = []string{"curl/7.54.1"}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	byteValue, _ := ioutil.ReadAll(resp.Body)
+
+	var arrivalPredictions []tflArrivalPrediction
+	err = json.Unmarshal(byteValue, &arrivalPredictions)
+
+	return arrivalPredictions, err
+}
+
+func (t *TflSource) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
+	databaseLookup := DatabaseLookupSource{}
+	servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
+		Stop: stop,
+	})
+
+	serviceNameMapping := map[string]*ctdf.Service{}
+	if err == nil {
+		for _, service := range servicesQueryResult.([]*ctdf.Service) {
+			serviceNameMapping[service.ServiceName] = service
+		}
+	}
+
+	return serviceNameMapping
+}
+
 type tflArrivalPrediction struct {
 	ID            string `json:"id"`
-	OperationType string `json:"operationType"`
+	OperationType int    `json:"operationType"`
 	VehicleID     string `json:"vehicleId"`
 
 	LineID   string `json:"lineId"`
@@ -208,6 +274,55 @@ type tflArrivalPrediction struct {
 	ModeName string `json:"modeName"`
 }
 
+func (prediction *tflArrivalPrediction) GetDestinationDisplay(service *ctdf.Service) string {
+	nameRegex := regexp.MustCompile("(.+) Underground Station")
+
+	destinationName := prediction.DestinationName
+	if destinationName == "" && prediction.Towards != "" && prediction.Towards != "Check Front of Train" {
+		destinationName = prediction.Towards
+	} else if destinationName == "" {
+		destinationName = service.ServiceName
+	}
+
+	nameMatches := nameRegex.FindStringSubmatch(prediction.DestinationName)
+
+	if len(nameMatches) == 2 {
+		destinationName = nameMatches[1]
+	}
+
+	return destinationName
+}
+
 type tflStopService struct {
 	LineName string `json:"lineName"`
+}
+
+func getTflStopID(stop *ctdf.Stop) (string, error) {
+	// If the stop has no CrsRef then give up
+	if !slices.Contains(stop.TransportTypes, ctdf.TransportTypeMetro) {
+		return "", UnsupportedSourceError
+	}
+
+	tflStopID := ""
+
+	for _, association := range stop.Associations {
+		if association.Type == "stop_group" {
+			// TODO: USE DATA AGGREGATOR FOR THIS
+			collection := database.GetCollection("stop_groups")
+			var stopGroup *ctdf.StopGroup
+			collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
+
+			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "station" {
+				tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
+
+				break
+			}
+		}
+	}
+
+	if tflStopID == "" {
+		return tflStopID, UnsupportedSourceError
+	}
+
+	return tflStopID, nil
 }

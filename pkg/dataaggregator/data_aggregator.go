@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 type Aggregator struct {
@@ -18,7 +19,11 @@ var globalAggregator Aggregator
 func GlobalSetup() {
 	globalAggregator = Aggregator{}
 
-	globalAggregator.RegisterSource(source.TflSource{})
+	tflAppKey := util.GetEnvironmentVariables()["TRAVIGO_TFL_API_KEY"]
+
+	globalAggregator.RegisterSource(source.TflSource{
+		AppKey: tflAppKey,
+	})
 	globalAggregator.RegisterSource(source.DatabaseLookupSource{})
 	globalAggregator.RegisterSource(source.LocalDepartureBoardSource{})
 	globalAggregator.RegisterSource(source.NationalRailSource{})
