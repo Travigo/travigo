@@ -72,7 +72,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.tfl.apiKeySecret }}
-                  key: password
+                  key: api_key
                   optional: false
           ports:
             - name: http
