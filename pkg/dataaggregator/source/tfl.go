@@ -3,7 +3,6 @@ package source
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
@@ -31,7 +29,6 @@ func (t TflSource) GetName() string {
 func (t TflSource) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf([]*ctdf.DepartureBoard{}),
-		reflect.TypeOf(ctdf.Journey{}),
 	}
 }
 
@@ -42,101 +39,6 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 	}
 
 	switch q.(type) {
-	case query.Journey:
-		journeyQuery := q.(query.Journey)
-
-		tflLiveJourneyRegex := regexp.MustCompile("GB:TFLLIVEJOURNEY:(.+):(.+)")
-		tflLiveJourneyRegexMatches := tflLiveJourneyRegex.FindStringSubmatch(journeyQuery.PrimaryIdentifier)
-
-		if len(tflLiveJourneyRegexMatches) != 3 {
-			return nil, UnsupportedSourceError
-		}
-
-		stopID := tflLiveJourneyRegexMatches[1]
-		predictionID := tflLiveJourneyRegexMatches[2]
-
-		databaseLookup := DatabaseLookupSource{}
-
-		stopObj, err := databaseLookup.Lookup(query.Stop{
-			PrimaryIdentifier: stopID,
-		})
-		stop := stopObj.(*ctdf.Stop)
-
-		if stop == nil {
-			return nil, errors.New("Cannot find Stop")
-		}
-
-		tflStopID, err := getTflStopID(stop)
-		if err != nil {
-			return nil, err
-		}
-
-		arrivalPredictions, err := t.getTflStopArrivals(tflStopID)
-		if err != nil {
-			return nil, err
-		}
-
-		var matchingPrediction *tflArrivalPrediction
-		for _, prediction := range arrivalPredictions {
-			if prediction.ID == predictionID {
-				matchingPrediction = &prediction
-
-				break
-			}
-		}
-
-		if matchingPrediction == nil {
-			return nil, errors.New("Cannot find prediction")
-		}
-
-		// Get all the services running at this stop locally
-		serviceNameMapping := t.getServiceNameMappings(stop)
-		service := serviceNameMapping[matchingPrediction.LineName]
-
-		if service == nil {
-			return nil, errors.New("Could not find matching service")
-		}
-
-		// destinationStopID := fmt.Sprintf(ctdf.StopIDFormat, matchingPrediction.DestinationNaptanID)
-		// pretty.Println(destinationStopID)
-		// destinationStopObj, err := databaseLookup.Lookup(query.Stop{
-		// 	PrimaryIdentifier: destinationStopID,
-		// })
-		// destinationStop := destinationStopObj.(*ctdf.Stop)
-
-		transforms.Transform(service, 1)
-		transforms.Transform(tflOperator, 1)
-
-		pretty.Println(service.BrandColour)
-
-		return &ctdf.Journey{
-			PrimaryIdentifier: journeyQuery.PrimaryIdentifier,
-			OtherIdentifiers:  map[string]string{},
-
-			DataSource: &ctdf.DataSource{},
-
-			ServiceRef: service.PrimaryIdentifier,
-			Service:    service,
-
-			OperatorRef: tflOperator.PrimaryIdentifier,
-			Operator:    tflOperator,
-
-			DestinationDisplay: matchingPrediction.GetDestinationDisplay(service),
-
-			// Path: []*ctdf.JourneyPathItem{
-			// 	{
-			// 		OriginStopRef: stopID,
-			// 		OriginStop:    stop,
-
-			// 		DestinationStopRef: destinationStopID,
-			// 		DestinationStop:    destinationStop,
-			// 	},
-			// },
-
-			// RealtimeJourney: &ctdf.RealtimeJourney{
-			// 	Reliability: ctdf.RealtimeJourneyReliabilityLocationWithoutTrack,
-			// },
-		}, nil
 	case query.DepartureBoard:
 		departureBoardQuery := q.(query.DepartureBoard)
 
@@ -181,7 +83,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 				Time:               scheduledTime,
 
 				Journey: &ctdf.Journey{
-					PrimaryIdentifier: fmt.Sprintf("GB:TFLLIVEJOURNEY:%s:%s", departureBoardQuery.Stop.PrimaryIdentifier, prediction.ID),
+					PrimaryIdentifier: "",
 
 					ServiceRef: service.PrimaryIdentifier,
 					Service:    service,
