@@ -341,7 +341,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.britbus.app/core
+      url: https://api.travigo.app/core
 
     needs: web-api-docker
 
@@ -379,7 +379,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.britbus.app/stats
+      url: https://api.travigo.app/stats
 
     needs: stats-docker
 
