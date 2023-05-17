@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -136,7 +135,7 @@ func (i *Indexer) indexJourneysBundle(bundleName string, file io.Reader) {
 			break
 		}
 
-		fileBytes, _ := ioutil.ReadAll(tarReader)
+		fileBytes, _ := io.ReadAll(tarReader)
 
 		if header.Name == "stops.json" {
 			i.parseStopsFile(bundleName, fileBytes)

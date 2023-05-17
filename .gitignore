@@ -19,3 +19,5 @@ test/output
 test-data/
 
 .DS_store
+
+.idea/

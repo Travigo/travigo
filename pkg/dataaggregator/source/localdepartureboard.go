@@ -49,7 +49,7 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 			dayAfterDateTime.Year(), dayAfterDateTime.Month(), dayAfterDateTime.Day(), 0, 0, 0, 0, dayAfterDateTime.Location(),
 		)
 
-		journeys := []*ctdf.Journey{}
+		var journeys []*ctdf.Journey
 
 		journeysCollection := database.GetCollection("journeys")
 		currentTime := time.Now()
@@ -76,19 +76,17 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Database lookup")
-
-		realtimeTimeframe := query.StartDateTime.Format("2006-01-02")
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
 
 		currentTime = time.Now()
-		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, query.StartDateTime, realtimeTimeframe, true)
-		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation today")
+		departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, query.StartDateTime, true)
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 
 		// If not enough journeys in todays departure board then look into tomorrows
 		if len(departureBoardToday) < query.Count {
 			currentTime = time.Now()
-			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, dayAfterDateTime, realtimeTimeframe, false)
-			log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Departure Board generation tomorrow")
+			departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, dayAfterDateTime, false)
+			log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation tomorrow")
 
 			departureBoard = append(departureBoardToday, departureBoardTomorrow...)
 		} else {
@@ -102,7 +100,7 @@ func (l LocalDepartureBoardSource) Lookup(q any) (interface{}, error) {
 			transforms.Transform(item.Journey.Operator, 1)
 			transforms.Transform(item.Journey.Service, 1)
 		}
-		log.Debug().Str("Length", (time.Now().Sub(currentTime).String())).Msg("Transform")
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Transform")
 
 		return departureBoard, nil
 	default:

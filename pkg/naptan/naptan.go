@@ -29,15 +29,15 @@ type NaPTAN struct {
 	StopAreas  []*StopArea
 }
 
-func (n *NaPTAN) Validate() error {
-	if n.CreationDateTime == "" {
+func (naptanDoc *NaPTAN) Validate() error {
+	if naptanDoc.CreationDateTime == "" {
 		return errors.New("CreationDateTime must be set")
 	}
-	if n.ModificationDateTime == "" {
+	if naptanDoc.ModificationDateTime == "" {
 		return errors.New("ModificationDateTime must be set")
 	}
-	if n.SchemaVersion != "2.4" {
-		return errors.New(fmt.Sprintf("SchemaVersion must be 2.4 but is %s", n.SchemaVersion))
+	if naptanDoc.SchemaVersion != "2.4" {
+		return errors.New(fmt.Sprintf("SchemaVersion must be 2.4 but is %s", naptanDoc.SchemaVersion))
 	}
 
 	return nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -122,7 +122,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 	return nil, nil
 }
 
-func (t *TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
+func (t TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
 	source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
 	req, _ := http.NewRequest("GET", source, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"}
@@ -134,7 +134,7 @@ func (t *TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, e
 		return nil, err
 	}
 
-	byteValue, _ := ioutil.ReadAll(resp.Body)
+	byteValue, _ := io.ReadAll(resp.Body)
 
 	var arrivalPredictions []tflArrivalPrediction
 	err = json.Unmarshal(byteValue, &arrivalPredictions)
@@ -142,7 +142,7 @@ func (t *TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, e
 	return arrivalPredictions, err
 }
 
-func (t *TflSource) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
+func (t TflSource) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
 	databaseLookup := DatabaseLookupSource{}
 	servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
 		Stop: stop,
@@ -196,10 +196,6 @@ func (prediction *tflArrivalPrediction) GetDestinationDisplay(service *ctdf.Serv
 	}
 
 	return destinationName
-}
-
-type tflStopService struct {
-	LineName string `json:"lineName"`
 }
 
 func getTflStopID(stop *ctdf.Stop) (string, error) {

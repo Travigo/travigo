@@ -15,10 +15,6 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-const numConsumers = 5
-
-var identificationQueue chan *SiriVMVehicleIdentificationEvent = make(chan *SiriVMVehicleIdentificationEvent, 2000)
-
 type SiriVMVehicleIdentificationEvent struct {
 	VehicleActivity *VehicleActivity
 	DataSource      *ctdf.DataSource

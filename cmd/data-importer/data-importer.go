@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -72,7 +71,7 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 		fileExtension = filepath.Ext(params["filename"])
 	}
 
-	tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-")
+	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create temporary file")
 	}
@@ -559,7 +558,7 @@ func main() {
 						}
 						defer file.Close()
 
-						tmpFile, err := ioutil.TempFile(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
+						tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
 						if err != nil {
 							log.Fatal().Err(err).Msg("Cannot create temporary file")
 						}
@@ -646,7 +645,7 @@ func main() {
 					}
 					defer resp.Body.Close()
 
-					body, err := ioutil.ReadAll(resp.Body)
+					body, err := io.ReadAll(resp.Body)
 					if err != nil {
 						log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
 					}

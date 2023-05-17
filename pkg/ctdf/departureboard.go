@@ -28,8 +28,8 @@ const (
 	DepartureBoardRecordTypeEstimated                                = "Estimated"
 )
 
-func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, realtimeTimeframe string, doEstimates bool) []*DepartureBoard {
-	departureBoard := []*DepartureBoard{}
+func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool) []*DepartureBoard {
+	var departureBoard []*DepartureBoard
 	journeysCollection := database.GetCollection("journeys")
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
@@ -48,7 +48,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			var destinationDisplay string
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
-			journey.GetRealtimeJourney(realtimeTimeframe)
+			journey.GetRealtimeJourney()
 
 			for _, path := range journey.Path {
 				if slices.Contains(stopRefs, path.OriginStopRef) {
@@ -86,7 +86,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
 					journey.OtherIdentifiers["BlockNumber"] != "" {
 
-					blockJourneys := []string{}
+					var blockJourneys []string
 					opts := options.Find().SetProjection(bson.D{
 						bson.E{Key: "primaryidentifier", Value: 1},
 					})

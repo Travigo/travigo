@@ -44,14 +44,14 @@ type TransXChange struct {
 	SchemaVersion string `xml:",attr"`
 }
 
-func (n *TransXChange) Validate() error {
-	if n.CreationDateTime == "" {
+func (doc *TransXChange) Validate() error {
+	if doc.CreationDateTime == "" {
 		return errors.New("CreationDateTime must be set")
 	}
-	if n.ModificationDateTime == "" {
+	if doc.ModificationDateTime == "" {
 		return errors.New("ModificationDateTime must be set")
 	}
-	if !(n.SchemaVersion == "2.1" || n.SchemaVersion == "2.4") {
+	if !(doc.SchemaVersion == "2.1" || doc.SchemaVersion == "2.4") {
 		return errors.New("SchemaVersion must be 2.1 or 2.4")
 	}
 

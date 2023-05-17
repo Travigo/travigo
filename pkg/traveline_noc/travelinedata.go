@@ -106,7 +106,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 			operator.PrimaryName = nocTableRecord.OperatorPublicName
 
 			operator.OtherIdentifiers = append(operator.OtherIdentifiers, fmt.Sprintf(ctdf.OperatorNOCFormat, nocTableRecord.NOCCode))
-			operator.OtherNames = append(operator.OtherNames, nocTableRecord.OperatorPublicName, nocTableRecord.VOSA_PSVLicenseName)
+			operator.OtherNames = append(operator.OtherNames, nocTableRecord.OperatorPublicName, nocTableRecord.VOSAPSVLicenseName)
 
 			operatorNOCCodeRef[nocTableRecord.NOCCode] = operator
 			publicNameIDRef[nocTableRecord.PublicNameID] = operator

@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -30,7 +28,7 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-		journey.GetRealtimeJourney(time.Now().Format("2006-01-02"))
+		journey.GetRealtimeJourney()
 
 		for _, pathItem := range journey.Path {
 			pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)

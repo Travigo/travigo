@@ -66,7 +66,7 @@ func (j *Journey) GetDeepReferences() {
 		path.GetReferences()
 	}
 }
-func (j *Journey) GetRealtimeJourney(timeframe string) {
+func (j *Journey) GetRealtimeJourney() {
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -84,22 +84,22 @@ func (j *Journey) GetRealtimeJourney(timeframe string) {
 func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }
-func (journey *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) string {
+func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) string {
 	hash := sha256.New()
 
-	hash.Write([]byte(journey.ServiceRef))
-	hash.Write([]byte(journey.DestinationDisplay))
-	hash.Write([]byte(journey.Direction))
-	hash.Write([]byte(journey.DepartureTime.String()))
+	hash.Write([]byte(j.ServiceRef))
+	hash.Write([]byte(j.DestinationDisplay))
+	hash.Write([]byte(j.Direction))
+	hash.Write([]byte(j.DepartureTime.String()))
 
 	// TODO: REVERT THE CHAGES TO THIS LINE
 	// BUT THINK ABOUT IT - WE SHOULD ALWAYS IGNORE AVAILABILITY CONDITIONS WHEN FINDING IDENTICAL JOURNEYS
 	// IF WE FILTER OUT BASED ON BEING AVAILABLE TODAY THEN WE SHOULDNT CARE ABOUT THE SPECIFICS OF THE CONDITIONS???
 	if includeAvailabilityCondition {
-		rules := append(journey.Availability.Match, journey.Availability.MatchSecondary...)
-		rules = append(rules, journey.Availability.Exclude...)
+		rules := append(j.Availability.Match, j.Availability.MatchSecondary...)
+		rules = append(rules, j.Availability.Exclude...)
 
-		rules = append(rules, journey.Availability.Condition...)
+		rules = append(rules, j.Availability.Condition...)
 
 		for _, availabilityMatchRule := range rules {
 			hash.Write([]byte(availabilityMatchRule.Type))
@@ -108,7 +108,7 @@ func (journey *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool
 		}
 	}
 
-	for _, pathItem := range journey.Path {
+	for _, pathItem := range j.Path {
 		hash.Write([]byte(pathItem.OriginStopRef))
 		hash.Write([]byte(pathItem.OriginArrivalTime.GoString()))
 		hash.Write([]byte(pathItem.OriginDepartureTime.GoString()))

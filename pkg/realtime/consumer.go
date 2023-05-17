@@ -11,7 +11,7 @@ import (
 	"github.com/adjust/rmq/v4"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
-	redis_store "github.com/eko/gocache/store/redis/v4"
+	redisstore "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -40,12 +40,12 @@ func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
 }
 
 func CreateIdentificationCache() {
-	redisStore := redis_store.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
 
 	identificationCache = cache.New[string](redisStore)
 }
 func CreateJourneyCache() {
-	redisStore := redis_store.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
 
 	journeyCache = cache.New[string](redisStore)
 }
@@ -93,8 +93,8 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	for _, payload := range payloads {
 		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
-			if errors := batch.Reject(); err != nil {
-				for _, err := range errors {
+			if batchErrors := batch.Reject(); err != nil {
+				for _, err := range batchErrors {
 					log.Error().Err(err).Msg("Failed to reject realtime event")
 				}
 			}
@@ -121,8 +121,8 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		}
 	}
 
-	if errors := batch.Ack(); len(errors) > 0 {
-		for _, err := range errors {
+	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
+		for _, err := range ackErrors {
 			log.Error().Err(err).Msg("Failed to consume realtime event")
 		}
 	}

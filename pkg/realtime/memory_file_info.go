@@ -6,31 +6,31 @@ import (
 )
 
 type MemoryFileInfo struct {
-	MFI_Name    string
-	MFI_Size    int64
-	MFI_Mode    fs.FileMode
-	MFI_ModTime time.Time
-	MFI_IsDir   bool
+	MfiName    string
+	MfiSize    int64
+	MfiMode    fs.FileMode
+	MfiModTime time.Time
+	MfiIsDir   bool
 }
 
 func (m MemoryFileInfo) Name() string {
-	return m.MFI_Name
+	return m.MfiName
 }
 
 func (m MemoryFileInfo) Size() int64 {
-	return m.MFI_Size
+	return m.MfiSize
 }
 
 func (m MemoryFileInfo) Mode() fs.FileMode {
-	return m.MFI_Mode
+	return m.MfiMode
 }
 
 func (m MemoryFileInfo) ModTime() time.Time {
-	return m.MFI_ModTime
+	return m.MfiModTime
 }
 
 func (m MemoryFileInfo) IsDir() bool {
-	return m.MFI_IsDir
+	return m.MfiIsDir
 }
 
 func (m MemoryFileInfo) Sys() any {

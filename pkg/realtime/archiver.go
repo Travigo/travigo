@@ -210,11 +210,11 @@ func (a *Archiver) writeFile(filename string, contents []byte) {
 
 	if a.WriteBundle {
 		memoryFileInfo := MemoryFileInfo{
-			MFI_Name:    filename,
-			MFI_Size:    int64(len(contents)),
-			MFI_Mode:    777,
-			MFI_ModTime: a.currentTime,
-			MFI_IsDir:   false,
+			MfiName:    filename,
+			MfiSize:    int64(len(contents)),
+			MfiMode:    777,
+			MfiModTime: a.currentTime,
+			MfiIsDir:   false,
 		}
 
 		header, err := tar.FileInfoHeader(memoryFileInfo, filename)

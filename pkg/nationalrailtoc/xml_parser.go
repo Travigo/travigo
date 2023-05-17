@@ -3,13 +3,12 @@ package nationalrailtoc
 import (
 	"encoding/xml"
 	"io"
-	"io/ioutil"
 )
 
 func ParseXMLFile(reader io.Reader) (*TrainOperatingCompanyList, error) {
 	var tocList TrainOperatingCompanyList
 
-	byteValue, _ := ioutil.ReadAll(reader)
+	byteValue, _ := io.ReadAll(reader)
 
 	xml.Unmarshal(byteValue, &tocList)
 

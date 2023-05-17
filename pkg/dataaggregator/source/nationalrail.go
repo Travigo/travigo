@@ -3,7 +3,7 @@ package source
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"time"
@@ -46,7 +46,7 @@ func (n NationalRailSource) Lookup(q any) (interface{}, error) {
 			return nil, err
 		}
 
-		byteValue, _ := ioutil.ReadAll(xmlFile.Body)
+		byteValue, _ := io.ReadAll(xmlFile.Body)
 
 		var nationalRailDepartures nationalRailwayDepBoardWithDetailsResponse
 		xml.Unmarshal(byteValue, &nationalRailDepartures)

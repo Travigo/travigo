@@ -53,7 +53,7 @@ type HealthHandler struct {
 func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
-func (handler *HealthHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (handler *HealthHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
 	testRedis := redis_client.Client.ClientID(context.TODO())
 	if testRedis.Err() != nil {
 		writer.WriteHeader(http.StatusInternalServerError)

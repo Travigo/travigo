@@ -43,12 +43,12 @@ func (group *OperatorGroup) GetOperators() {
 	}
 }
 
-func (operatorGroup *OperatorGroup) UniqueHash() string {
+func (group *OperatorGroup) UniqueHash() string {
 	hash := sha256.New()
 
 	hash.Write([]byte(fmt.Sprintf("%s %s",
-		operatorGroup.Identifier,
-		operatorGroup.Name,
+		group.Identifier,
+		group.Name,
 	)))
 
 	return fmt.Sprintf("%x", hash.Sum(nil))

@@ -122,9 +122,3 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 
 	return &transXChange, nil
 }
-
-func parseVehicleJourney(element *xml.Token) VehicleJourney {
-	vehicleJourney := VehicleJourney{}
-
-	return vehicleJourney
-}
