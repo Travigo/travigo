@@ -44,8 +44,8 @@ func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 }
 
 func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup) {
-	operators := []*ctdf.Operator{}
-	operatorGroups := []*ctdf.OperatorGroup{}
+	var operators []*ctdf.Operator
+	var operatorGroups []*ctdf.OperatorGroup
 
 	groupExists := map[string]bool{}
 	mgmtDivisionGroupIDs := map[string]string{}
@@ -239,7 +239,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		batchSlice := operators[lower:upper]
 
 		go func(operatorsBatch []*ctdf.Operator) {
-			operatorOperations := []mongo.WriteModel{}
+			var operatorOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 
@@ -317,7 +317,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		batchSlice := operatorGroups[lower:upper]
 
 		go func(operatorGroupsBatch []*ctdf.OperatorGroup) {
-			operatorGroupOperations := []mongo.WriteModel{}
+			var operatorGroupOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 

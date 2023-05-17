@@ -2,7 +2,7 @@ package util
 
 func RemoveDuplicateStrings(strings []string, ignoreList []string) []string {
 	presentStrings := make(map[string]bool)
-	list := []string{}
+	var list []string
 
 	for _, ignoreString := range ignoreList {
 		presentStrings[ignoreString] = true

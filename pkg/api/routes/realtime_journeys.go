@@ -57,7 +57,7 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 		})
 	}
 
-	realtimeJourneys := []realtimeJourneyMinimised{}
+	var realtimeJourneys []realtimeJourneyMinimised
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()

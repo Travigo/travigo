@@ -88,7 +88,7 @@ func NewBatchConsumer(id int) *BatchConsumer {
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
-	locationEventOperations := []mongo.WriteModel{}
+	var locationEventOperations []mongo.WriteModel
 
 	for _, payload := range payloads {
 		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
@@ -397,7 +397,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
 
-			closestDistanceJourneyPathPercentComplete = (1 + (float64(previousJourneyPathDistance-closestDistance) / float64(previousJourneyPathDistance+closestDistance))) / 2
+			closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
 		}
 
 		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack

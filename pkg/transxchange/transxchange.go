@@ -96,7 +96,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 
 	// Get CTDF services from TransXChange Services & Lines
 	log.Debug().Msg("Converting & Importing CTDF Services into Mongo")
-	serviceOperations := []mongo.WriteModel{}
+	var serviceOperations []mongo.WriteModel
 	var serviceOperationInsert uint64
 	var serviceOperationUpdate uint64
 
@@ -291,7 +291,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 		batchSlice := doc.VehicleJourneys[lower:upper]
 
 		go func(vehicleJourneys []*VehicleJourney) {
-			stopOperations := []mongo.WriteModel{}
+			var stopOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 
@@ -588,7 +588,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 					}
 
 					// Convert the track
-					track := []ctdf.Location{}
+					var track []ctdf.Location
 					for _, point := range routeLink.Track {
 						// Have a wide range of different places the location can be defined
 						longitude := point.Longitude

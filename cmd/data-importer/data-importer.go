@@ -82,7 +82,7 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 }
 
 func importFile(dataFormat string, transportType ctdf.TransportType, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
-	dataFiles := []DataFile{}
+	var dataFiles []DataFile
 	fileExtension := filepath.Ext(source)
 
 	// Check if the source is a URL and load the http client stream if it is

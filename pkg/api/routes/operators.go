@@ -122,7 +122,7 @@ func getOperatorServices(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
-		services := []*ctdf.Service{}
+		var services []*ctdf.Service
 
 		servicesCollection := database.GetCollection("services")
 		cursor, _ := servicesCollection.Find(context.Background(), bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}})

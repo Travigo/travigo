@@ -89,7 +89,7 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 		batchSlice := operators[lower:upper]
 
 		go func(operatorsBatch []*ctdf.Operator) {
-			operatorOperations := []mongo.WriteModel{}
+			var operatorOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 

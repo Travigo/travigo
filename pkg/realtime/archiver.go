@@ -57,7 +57,7 @@ func (a *Archiver) Perform() {
 	log.Info().Msg("Writing stops")
 	stopsCollection := database.GetCollection("stops")
 	cursor, err := stopsCollection.Find(context.Background(), bson.M{})
-	stops := []*ctdf.Stop{}
+	var stops []*ctdf.Stop
 
 	for cursor.Next(context.TODO()) {
 		var stop ctdf.Stop
@@ -80,7 +80,7 @@ func (a *Archiver) Perform() {
 	log.Info().Msg("Writing services")
 	servicesCollection := database.GetCollection("services")
 	cursor, _ = servicesCollection.Find(context.Background(), bson.M{})
-	services := []*ctdf.Service{}
+	var services []*ctdf.Service
 
 	for cursor.Next(context.TODO()) {
 		var service ctdf.Service
@@ -103,7 +103,7 @@ func (a *Archiver) Perform() {
 	log.Info().Msg("Writing operators")
 	operatorsCollection := database.GetCollection("operators")
 	cursor, _ = operatorsCollection.Find(context.Background(), bson.M{})
-	operators := []*ctdf.Operator{}
+	var operators []*ctdf.Operator
 
 	for cursor.Next(context.TODO()) {
 		var operator ctdf.Operator
@@ -126,7 +126,7 @@ func (a *Archiver) Perform() {
 	log.Info().Msg("Writing operator groups")
 	operatorGroupsCollection := database.GetCollection("operator_groups")
 	cursor, _ = operatorGroupsCollection.Find(context.Background(), bson.M{})
-	operatorGroups := []*ctdf.OperatorGroup{}
+	var operatorGroups []*ctdf.OperatorGroup
 
 	for cursor.Next(context.TODO()) {
 		var operatorGroup ctdf.OperatorGroup
@@ -266,7 +266,7 @@ func (a *Archiver) uploadToStorage(filename string) {
 }
 
 func (a *Archiver) convertRealtimeToArchiveJourney(realtimeJourney *ctdf.RealtimeJourney) *ctdf.ArchivedJourney {
-	archivedStops := []*ctdf.ArchivedJourneyStops{}
+	var archivedStops []*ctdf.ArchivedJourneyStops
 
 	stops, arrivalTimes, departureTimes := realtimeJourney.Journey.FlattenStops()
 

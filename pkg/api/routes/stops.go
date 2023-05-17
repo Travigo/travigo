@@ -33,7 +33,7 @@ func listStops(c *fiber.Ctx) error {
 		})
 	}
 
-	stops := []ctdf.Stop{}
+	var stops []ctdf.Stop
 
 	stopsCollection := database.GetCollection("stops")
 

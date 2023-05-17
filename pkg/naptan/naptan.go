@@ -73,7 +73,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		batchSlice := naptanDoc.StopAreas[lower:upper]
 
 		go func(stopAreas []*StopArea) {
-			stopGroupOperations := []mongo.WriteModel{}
+			var stopGroupOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 
@@ -155,7 +155,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 		batchSlice := naptanDoc.StopPoints[lower:upper]
 
 		go func(stopPoints []*StopPoint) {
-			stopOperations := []mongo.WriteModel{}
+			var stopOperations []mongo.WriteModel
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 
@@ -217,7 +217,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	// Specially handle generating new station stops
 	log.Info().Msg("Converting & Importing CTDF station Stops into Mongo")
-	stationStopOperations := []mongo.WriteModel{}
+	var stationStopOperations []mongo.WriteModel
 	var stationStopOperationInsert int
 	var stationStopOperationUpdate int
 

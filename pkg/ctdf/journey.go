@@ -119,7 +119,7 @@ func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) stri
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 func (j Journey) FlattenStops() ([]string, map[string]time.Time, map[string]time.Time) {
-	stops := []string{}
+	var stops []string
 	arrivalTimes := map[string]time.Time{}
 	departureTimes := map[string]time.Time{}
 	alreadySeen := map[string]bool{}
@@ -147,7 +147,7 @@ func (j Journey) FlattenStops() ([]string, map[string]time.Time, map[string]time
 }
 
 func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition bool) []*Journey {
-	filtered := []*Journey{}
+	var filtered []*Journey
 
 	matches := map[string]bool{}
 	for _, journey := range journeys {

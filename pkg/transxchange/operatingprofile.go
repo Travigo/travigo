@@ -37,7 +37,7 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 	operatingProfile.BankHolidayNonOperation = []string{}
 
 	// var field string
-	elementChain := []string{}
+	var elementChain []string
 
 	d := xml.NewDecoder(strings.NewReader(operatingProfile.XMLValue))
 	for {
@@ -62,7 +62,7 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 				if elementChain[1] == "DaysOfWeek" {
 					dayValue := elementChain[2]
 
-					days := []string{}
+					var days []string
 
 					switch dayValue {
 					case "MondayToSunday":

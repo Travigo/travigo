@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var SpecialDays map[int]map[string]time.Time = make(map[int]map[string]time.Time) // year specialday time
+var SpecialDays = make(map[int]map[string]time.Time) // year specialday time
 
 func LoadSpecialDayCache() {
 	loadGBBankHolidayCache()

@@ -116,7 +116,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 		}
 	}
 
-	journeys := []*ctdf.Journey{}
+	var journeys []*ctdf.Journey
 
 	vehicleJourneyRef := i.IdentifyingInformation["VehicleJourneyRef"]
 	blockRef := i.IdentifyingInformation["BlockRef"]
@@ -151,7 +151,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 	}
 
 	// If we fail with the ID codes then try with the origin & destination stops
-	journeyQuery := []bson.M{}
+	var journeyQuery []bson.M
 	for _, service := range i.PotentialServices {
 		journeyQuery = append(journeyQuery, bson.M{"$or": bson.A{
 			bson.M{
@@ -189,7 +189,7 @@ func (i *Identifier) IdentifyJourney() (string, error) {
 }
 
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
-	journeys := []*ctdf.Journey{}
+	var journeys []*ctdf.Journey
 
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
@@ -228,7 +228,7 @@ func (i *Identifier) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilit
 	} else if len(journeys) == 1 {
 		return journeys[0], nil
 	} else {
-		timeFilteredJourneys := []*ctdf.Journey{}
+		var timeFilteredJourneys []*ctdf.Journey
 
 		// Filter based on exact time
 		for _, journey := range journeys {
