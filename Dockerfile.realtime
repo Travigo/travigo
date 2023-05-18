@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificat
 WORKDIR /
 
 COPY ./realtime /realtime
+COPY ./transforms /transforms
 
 RUN chmod +x /realtime
 

@@ -1,0 +1,77 @@
+# Default fallback brand colours for all Stagecoach East services
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+Data:
+  BrandColour: "#F2A83B"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCHU"
+Data:
+  BrandColour: "#F2A83B"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCBD"
+Data:
+  BrandColour: "#F2A83B"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCPB"
+Data:
+  BrandColour: "#F2A83B"
+
+# Route specific colours
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "A",
+Data:
+  BrandColour: "#04A387"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "B",
+Data:
+  BrandColour: "#04A387"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "PR1",
+Data:
+  BrandColour: "#E72D57"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "PR2",
+Data:
+  BrandColour: "#FF6500"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "PR3",
+Data:
+  BrandColour: "#4382B3"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "PR4",
+Data:
+  BrandColour: "#92BF73"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:SCCM"
+  ServiceName: "PR5",
+Data:
+  BrandColour: "#8547AC"
+---

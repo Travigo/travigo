@@ -6,9 +6,9 @@ import (
 )
 
 type TransformDefinition struct {
-	Type  string
-	Match map[string]string
-	Data  map[string]interface{}
+	Type  string                 `yaml:"Type"`
+	Match map[string]string      `yaml:"Match"`
+	Data  map[string]interface{} `yaml:"Data"`
 }
 
 func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue reflect.Value, depth int) {
