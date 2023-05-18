@@ -12,6 +12,8 @@ import (
 )
 
 const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
+
+//goland:noinspection GoUnusedConst
 const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {

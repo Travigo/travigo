@@ -2,6 +2,7 @@ package ctdf
 
 type TransportType string
 
+//goland:noinspection GoUnusedConst
 const (
 	TransportTypeBus      TransportType = "Bus"
 	TransportTypeCoach                  = "Coach"
