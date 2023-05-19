@@ -2,9 +2,8 @@ package main
 
 import (
 	"github.com/travigo/travigo/pkg/api"
-	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/realtime"
+	stats "github.com/travigo/travigo/pkg/stats/cli"
 	"os"
 	"time"
 
@@ -29,14 +28,6 @@ func main() {
 
 	transforms.SetupClient()
 
-	if err := database.Connect(); err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to database")
-	}
-
-	if err := elastic_client.Connect(false); err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
-	}
-
 	app := &cli.App{
 		Name:        "travigo",
 		Description: "Single binary of truth for Travigo - runs all the services",
@@ -44,6 +35,7 @@ func main() {
 		Commands: []*cli.Command{
 			api.RegisterCLI(),
 			realtime.RegisterCLI(),
+			stats.RegisterCLI(),
 		},
 	}
 

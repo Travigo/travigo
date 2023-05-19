@@ -1,9 +1,9 @@
 package realtime
 
 import (
-	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 	"os"
@@ -20,8 +20,14 @@ func RegisterCLI() *cli.Command {
 				Name:  "run",
 				Usage: "run an instance of the realtime engine",
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					if err := elastic_client.Connect(false); err != nil {
+						return err
+					}
 					if err := redis_client.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to redis")
+						return err
 					}
 
 					ctdf.LoadSpecialDayCache()
@@ -50,7 +56,7 @@ func RegisterCLI() *cli.Command {
 				Usage: "run an the queue cleaner for the realtime queue",
 				Action: func(c *cli.Context) error {
 					if err := redis_client.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to redis")
+						return err
 					}
 
 					StartCleaner()
@@ -82,7 +88,7 @@ func RegisterCLI() *cli.Command {
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to database")
+						return err
 					}
 
 					archiver := Archiver{

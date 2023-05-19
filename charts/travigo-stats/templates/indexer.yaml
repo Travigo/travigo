@@ -24,7 +24,7 @@ spec:
             - name: {{ .Chart.Name }}-indexer
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
-              args: ["index-DISABLED"]
+              args: ["stats", "index-DISABLED"]
               env:
                 {{- with .env }}
                 {{- toYaml . | nindent 16 }}

@@ -1,44 +1,25 @@
-package main
+package cli
 
 import (
-	"os"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/stats"
 	"github.com/travigo/travigo/pkg/stats/web_api"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/urfave/cli/v2"
-
-	_ "time/tzdata"
 )
 
-func main() {
-	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	}
-
-	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
-		log.Logger = log.Logger.Level(zerolog.DebugLevel)
-	} else {
-		log.Logger = log.Logger.Level(zerolog.InfoLevel)
-	}
-
-	transforms.SetupClient()
-
-	app := &cli.App{
-		Name: "stats",
-		Commands: []*cli.Command{
+func RegisterCLI() *cli.Command {
+	return &cli.Command{
+		Name:  "stats",
+		Usage: "Provides indexing & statistics API endpoints",
+		Subcommands: []*cli.Command{
 			{
 				Name:  "index",
 				Usage: "index the latest data into Elasticsearch",
 				Action: func(c *cli.Context) error {
 					if err := elastic_client.Connect(true); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
+						return err
 					}
 
 					ctdf.LoadSpecialDayCache()
@@ -65,10 +46,10 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to database")
+						return err
 					}
 					if err := elastic_client.Connect(true); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
+						return err
 					}
 
 					web_api.SetupServer(c.String("listen"))
@@ -77,10 +58,5 @@ func main() {
 				},
 			},
 		},
-	}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal().Err(err).Send()
 	}
 }
