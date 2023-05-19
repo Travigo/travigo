@@ -11,7 +11,6 @@ require (
 
 require (
 	cloud.google.com/go/storage v1.30.1
-	github.com/adjust/rmq/v4 v4.0.5
 	github.com/eko/gocache/lib/v4 v4.1.3
 	github.com/eko/gocache/store/redis/v4 v4.2.0
 	github.com/elastic/go-elasticsearch/v8 v8.7.1
