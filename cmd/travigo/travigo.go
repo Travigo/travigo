@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/travigo/travigo/pkg/api"
+	"github.com/travigo/travigo/pkg/dataimporter"
 	"github.com/travigo/travigo/pkg/realtime"
 	stats "github.com/travigo/travigo/pkg/stats/cli"
 	"os"
@@ -33,6 +34,7 @@ func main() {
 		Description: "Single binary of truth for Travigo - runs all the services",
 
 		Commands: []*cli.Command{
+			dataimporter.RegisterCLI(),
 			api.RegisterCLI(),
 			realtime.RegisterCLI(),
 			stats.RegisterCLI(),

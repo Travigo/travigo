@@ -1,4 +1,4 @@
-package main
+package dataimporter
 
 import (
 	"archive/zip"
@@ -25,7 +25,6 @@ import (
 	"github.com/travigo/travigo/pkg/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/siri_vm"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/transxchange"
 	travelinenoc "github.com/travigo/travigo/pkg/traveline_noc"
 	"github.com/travigo/travigo/pkg/util"
@@ -33,7 +32,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	_ "time/tzdata"
@@ -49,218 +47,7 @@ type DataFile struct {
 	TransportType ctdf.TransportType
 }
 
-func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
-	req, _ := http.NewRequest("GET", source, nil)
-	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
-
-	for _, header := range headers {
-		req.Header[header[0]] = []string{header[1]}
-	}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		log.Fatal().Err(err).Msg("Download file")
-	}
-	defer resp.Body.Close()
-
-	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	fileExtension := filepath.Ext(source)
-	if err == nil {
-		fileExtension = filepath.Ext(params["filename"])
-	}
-
-	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create temporary file")
-	}
-
-	io.Copy(tmpFile, resp.Body)
-
-	return tmpFile, fileExtension
-}
-
-func importFile(dataFormat string, transportType ctdf.TransportType, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
-	var dataFiles []DataFile
-	fileExtension := filepath.Ext(source)
-
-	// Check if the source is a URL and load the http client stream if it is
-	if isValidUrl(source) {
-		var tempFile *os.File
-		tempFile, fileExtension = tempDownloadFile(source)
-
-		source = tempFile.Name()
-		defer os.Remove(tempFile.Name())
-	}
-
-	if fileFormat != "" {
-		fileExtension = fmt.Sprintf(".%s", fileFormat)
-	}
-
-	// Check if its an XML file or ZIP file
-
-	if fileExtension == ".xml" {
-		file, err := os.Open(source)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to open file")
-		}
-		defer file.Close()
-
-		dataFiles = append(dataFiles, DataFile{
-			Name:          source,
-			Reader:        file,
-			Overrides:     overrides,
-			TransportType: transportType,
-		})
-	} else if fileExtension == ".zip" {
-		archive, err := zip.OpenReader(source)
-		if err != nil {
-			panic(err)
-		}
-		defer archive.Close()
-
-		for _, zipFile := range archive.File {
-			file, err := zipFile.Open()
-			if err != nil {
-				log.Fatal().Err(err).Msg("Failed to open file")
-			}
-			defer file.Close()
-
-			dataFiles = append(dataFiles, DataFile{
-				Name:          fmt.Sprintf("%s:%s", source, zipFile.Name),
-				Reader:        file,
-				Overrides:     overrides,
-				TransportType: transportType,
-			})
-		}
-	} else {
-		return errors.New(fmt.Sprintf("Unsupported file extension %s", fileExtension))
-	}
-
-	for _, dataFile := range dataFiles {
-		err := parseDataFile(dataFormat, &dataFile, sourceDatasource)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf.DataSource) error {
-	var datasource ctdf.DataSource
-
-	switch dataFormat {
-	case "naptan":
-		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
-		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider: "Department of Transport",
-				Dataset:  dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		naptanDoc.ImportIntoMongoAsCTDF(&datasource)
-	case "traveline-noc":
-		log.Info().Msgf("Traveline NOC file import from %s", dataFile.Name)
-		travelineData, err := travelinenoc.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Dataset: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		travelineData.ImportIntoMongoAsCTDF(&datasource)
-	case "transxchange":
-		log.Info().Msgf("TransXChange file import from %s ", dataFile.Name)
-		transXChangeDoc, err := transxchange.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider: "Department of Transport", // This may not always be true
-				Dataset:  dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.TransportType, dataFile.Overrides)
-	case "siri-vm":
-		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider: "Department of Transport", // This may not always be true
-				Dataset:  dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &datasource)
-
-		if err != nil {
-			return err
-		}
-	case "nationalrail-toc":
-		log.Info().Msgf("National Rail TOC file import from %s ", dataFile.Name)
-		nationalRailTOCDoc, err := nationalrailtoc.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider: "National Rail", // This may not always be true
-				Dataset:  dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
-	default:
-		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
-	}
-
-	return nil
-}
-
-func main() {
-	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	}
-
-	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
-		log.Logger = log.Logger.Level(zerolog.DebugLevel)
-	} else {
-		log.Logger = log.Logger.Level(zerolog.InfoLevel)
-	}
-
-	transforms.SetupClient()
-
+func RegisterCLI() *cli.Command {
 	if err := database.Connect(); err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
@@ -270,10 +57,10 @@ func main() {
 
 	ctdf.LoadSpecialDayCache()
 
-	app := &cli.App{
-		Name:        "data-importer",
-		Description: "Manages ingesting and verifying data in Travigo",
-		Commands: []*cli.Command{
+	return &cli.Command{
+		Name:  "data-importer",
+		Usage: "Download & convert third party datasets into CTDF",
+		Subcommands: []*cli.Command{
 			{
 				Name:  "file",
 				Usage: "Import a dataset into Travigo",
@@ -674,12 +461,205 @@ func main() {
 			},
 		},
 	}
+}
 
-	err := app.Run(os.Args)
+func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
+	req, _ := http.NewRequest("GET", source, nil)
+	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
+
+	for _, header := range headers {
+		req.Header[header[0]] = []string{header[1]}
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Fatal().Err(err).Send()
+		log.Fatal().Err(err).Msg("Download file")
 	}
+	defer resp.Body.Close()
+
+	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	fileExtension := filepath.Ext(source)
+	if err == nil {
+		fileExtension = filepath.Ext(params["filename"])
+	}
+
+	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot create temporary file")
+	}
+
+	io.Copy(tmpFile, resp.Body)
+
+	return tmpFile, fileExtension
+}
+
+func importFile(dataFormat string, transportType ctdf.TransportType, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
+	var dataFiles []DataFile
+	fileExtension := filepath.Ext(source)
+
+	// Check if the source is a URL and load the http client stream if it is
+	if isValidUrl(source) {
+		var tempFile *os.File
+		tempFile, fileExtension = tempDownloadFile(source)
+
+		source = tempFile.Name()
+		defer os.Remove(tempFile.Name())
+	}
+
+	if fileFormat != "" {
+		fileExtension = fmt.Sprintf(".%s", fileFormat)
+	}
+
+	// Check if its an XML file or ZIP file
+
+	if fileExtension == ".xml" {
+		file, err := os.Open(source)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to open file")
+		}
+		defer file.Close()
+
+		dataFiles = append(dataFiles, DataFile{
+			Name:          source,
+			Reader:        file,
+			Overrides:     overrides,
+			TransportType: transportType,
+		})
+	} else if fileExtension == ".zip" {
+		archive, err := zip.OpenReader(source)
+		if err != nil {
+			panic(err)
+		}
+		defer archive.Close()
+
+		for _, zipFile := range archive.File {
+			file, err := zipFile.Open()
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to open file")
+			}
+			defer file.Close()
+
+			dataFiles = append(dataFiles, DataFile{
+				Name:          fmt.Sprintf("%s:%s", source, zipFile.Name),
+				Reader:        file,
+				Overrides:     overrides,
+				TransportType: transportType,
+			})
+		}
+	} else {
+		return errors.New(fmt.Sprintf("Unsupported file extension %s", fileExtension))
+	}
+
+	for _, dataFile := range dataFiles {
+		err := parseDataFile(dataFormat, &dataFile, sourceDatasource)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf.DataSource) error {
+	var datasource ctdf.DataSource
+
+	switch dataFormat {
+	case "naptan":
+		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
+		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport",
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		naptanDoc.ImportIntoMongoAsCTDF(&datasource)
+	case "traveline-noc":
+		log.Info().Msgf("Traveline NOC file import from %s", dataFile.Name)
+		travelineData, err := travelinenoc.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Dataset: dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		travelineData.ImportIntoMongoAsCTDF(&datasource)
+	case "transxchange":
+		log.Info().Msgf("TransXChange file import from %s ", dataFile.Name)
+		transXChangeDoc, err := transxchange.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.TransportType, dataFile.Overrides)
+	case "siri-vm":
+		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "Department of Transport", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &datasource)
+
+		if err != nil {
+			return err
+		}
+	case "nationalrail-toc":
+		log.Info().Msgf("National Rail TOC file import from %s ", dataFile.Name)
+		nationalRailTOCDoc, err := nationalrailtoc.ParseXMLFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "National Rail", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
+	default:
+		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
+	}
+
+	return nil
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {

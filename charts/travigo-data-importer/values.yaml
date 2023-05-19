@@ -21,45 +21,45 @@ nationalRail:
   credentialsSecret: britbus-nationalrail-credentials
 
 image:
-  repository: ghcr.io/travigo/travigo/data-importer
+  repository: ghcr.io/travigo/travigo
   pullPolicy: Always
   tag: main
 
 cronjobs:
   - name: travelinenoc
     schedule: "0 2 * * 0"
-    args: ["file", "traveline-noc", "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"]
+    args: ["data-importer", "file", "traveline-noc", "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"]
   - name: nationarail-toc
     schedule: "10 2 * * 0"
-    args: ["nationalrail-toc"]
+    args: ["data-importer", "nationalrail-toc"]
   - name: naptan
     schedule: "0 3 * * 6"
-    args: ["file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]
+    args: ["data-importer", "file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]
   - name: bods-timetable
     schedule: "0 5 * * *"
-    args: ["bods-timetable"]
+    args: ["data-importer", "bods-timetable"]
   - name: tfl
     schedule: "0 3 * * *"
-    args: ["tfl"]
+    args: ["data-importer", "tfl"]
   - name: stagecoach-scfi
     schedule: "0 2 * * 6"
-    args: ["file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-scfi-route-schedule-data-transxchange.zip"]
+    args: ["data-importer", "file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-scfi-route-schedule-data-transxchange.zip"]
   - name: stagecoach-schi
     schedule: "5 2 * * 6"
-    args: ["file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-schi-route-schedule-data-transxchange.zip"]
+    args: ["data-importer", "file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-schi-route-schedule-data-transxchange.zip"]
   - name: stagecoach-stws
     schedule: "10 2 * * 6"
-    args: ["file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-stws-route-schedule-data-transxchange.zip"]
+    args: ["data-importer", "file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-stws-route-schedule-data-transxchange.zip"]
   - name: stagecoach-sblb
     schedule: "15 2 * * 6"
-    args: ["file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-sblb-route-schedule-data-transxchange.zip"]
+    args: ["data-importer", "file", "--transport-type", "Bus", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-sblb-route-schedule-data-transxchange.zip"]
   - name: stagecoach-sheffield-supertram
     schedule: "20 2 * * 6"
-    args: ["file", "--transport-type", "Tram", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-tram-route-schedule-data-transxchange.zip"]
+    args: ["data-importer", "file", "--transport-type", "Tram", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-tram-route-schedule-data-transxchange.zip"]
 
 deployments:
   - name: sirivm-all
-    args: ["file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"]
+    args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"]
 
 resources: {}
 podAnnotations: {}
