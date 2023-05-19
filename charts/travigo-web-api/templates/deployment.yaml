@@ -78,6 +78,11 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          args:
+            - "web-api"
+            - "run"
+            - "--listen"
+            - ":80"
           livenessProbe:
             httpGet:
               path: /core/version

@@ -4,14 +4,12 @@ RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificat
 
 WORKDIR /
 
-COPY ./web-api /web-api
+COPY ./travigo /travigo
 COPY ./transforms /transforms
 
-RUN chmod +x /web-api
+RUN chmod +x /travigo
 
 RUN useradd travigo
 USER travigo
 
-EXPOSE 80
-
-ENTRYPOINT ["/web-api", "run", "--listen", ":80"]
+ENTRYPOINT ["/travigo"]
