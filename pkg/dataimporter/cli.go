@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/travigo/travigo/pkg/bods"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/bods"
 	"github.com/travigo/travigo/pkg/dataimporter/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
