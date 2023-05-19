@@ -4,6 +4,7 @@ import (
 	"github.com/travigo/travigo/pkg/api"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime"
 	"os"
 	"time"
 
@@ -42,6 +43,7 @@ func main() {
 
 		Commands: []*cli.Command{
 			api.RegisterCLI(),
+			realtime.RegisterCLI(),
 		},
 	}
 

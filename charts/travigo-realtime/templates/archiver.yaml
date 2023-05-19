@@ -24,7 +24,7 @@ spec:
             - name: {{ .Chart.Name }}-archiver
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
-              args: ["archive", "--output-directory", "/tmp"]
+              args: ["realtime", "archive", "--output-directory", "/tmp"]
               env:
                 {{- with .env }}
                 {{- toYaml . | nindent 16 }}

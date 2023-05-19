@@ -1,65 +1,34 @@
-package main
+package realtime
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/realtime"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/urfave/cli/v2"
-
-	_ "time/tzdata"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
-func main() {
-	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	}
-
-	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
-		log.Logger = log.Logger.Level(zerolog.DebugLevel)
-	} else {
-		log.Logger = log.Logger.Level(zerolog.InfoLevel)
-	}
-
-	transforms.SetupClient()
-
-	app := &cli.App{
-		Name: "realtime",
-		Commands: []*cli.Command{
+func RegisterCLI() *cli.Command {
+	return &cli.Command{
+		Name:  "realtime",
+		Usage: "Realtime engine ingests location data and tracks vehicle journeys",
+		Subcommands: []*cli.Command{
 			{
 				Name:  "run",
 				Usage: "run an instance of the realtime engine",
 				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to database")
-					}
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to redis")
-					}
-					if err := elastic_client.Connect(false); err != nil {
-						log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
 					}
 
 					ctdf.LoadSpecialDayCache()
 
-					// journey, erro := ctdf.IdentifyJourney(map[string]string{"BlockRef": "208461", "DestinationRef": "GB:ATCO:0100BRA10811", "DirectionRef": "inbound", "FramedVehicleJourneyDate": "2023-02-11", "OperatorRef": "GB:NOC:FBRI", "OriginAimedDepartureTime": "2023-02-11T23:20:00+00:00", "OriginRef": "GB:ATCO:0170SGB20205", "PublishedLineName": "42", "ServiceNameRef": "42", "VehicleJourneyRef": "2320"})
-					// pretty.Println(journey)
-					// pretty.Println(erro)
+					StartConsumers()
 
-					// return nil
-
-					realtime.StartConsumers()
-
-					realtime.StartStatsServer()
+					StartStatsServer()
 
 					signals := make(chan os.Signal, 1)
 					signal.Notify(signals, syscall.SIGINT)
@@ -84,7 +53,7 @@ func main() {
 						log.Fatal().Err(err).Msg("Failed to connect to redis")
 					}
 
-					realtime.StartCleaner()
+					StartCleaner()
 
 					signals := make(chan os.Signal, 1)
 					signal.Notify(signals, syscall.SIGINT)
@@ -116,7 +85,7 @@ func main() {
 						log.Fatal().Err(err).Msg("Failed to connect to database")
 					}
 
-					archiver := realtime.Archiver{
+					archiver := Archiver{
 						OutputDirectory:     c.String("output-directory"),
 						WriteIndividualFile: false,
 						WriteBundle:         true,
@@ -129,10 +98,5 @@ func main() {
 				},
 			},
 		},
-	}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal().Err(err).Send()
 	}
 }
