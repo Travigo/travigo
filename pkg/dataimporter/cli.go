@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/travigo/travigo/pkg/elastic_client"
 	"io"
 	"mime"
 	"net/http"
@@ -20,7 +21,6 @@ import (
 	"github.com/travigo/travigo/pkg/bods"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/naptan"
 	"github.com/travigo/travigo/pkg/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/redis_client"
@@ -48,15 +48,6 @@ type DataFile struct {
 }
 
 func RegisterCLI() *cli.Command {
-	if err := database.Connect(); err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to database")
-	}
-	if err := elastic_client.Connect(false); err != nil {
-		log.Fatal().Err(err).Msg("Failed to connect to Elasticsearch")
-	}
-
-	ctdf.LoadSpecialDayCache()
-
 	return &cli.Command{
 		Name:  "data-importer",
 		Usage: "Download & convert third party datasets into CTDF",
@@ -83,6 +74,14 @@ func RegisterCLI() *cli.Command {
 				},
 				ArgsUsage: "<data-format> <source>",
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					if err := elastic_client.Connect(false); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+
 					if c.Args().Len() != 2 {
 						return errors.New("<data-format> and <source> must be provided")
 					}
@@ -185,6 +184,11 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+
 					bodsDatasetIdentifier := "GB-DfT-BODS"
 
 					source := c.String("url")
@@ -300,6 +304,11 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+
 					source := c.String("url")
 
 					// Default source of all published buses
@@ -384,6 +393,11 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+
 					source := c.String("url")
 
 					// Default source of all published buses
