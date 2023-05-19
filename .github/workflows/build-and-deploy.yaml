@@ -46,8 +46,8 @@ jobs:
         name: realtime
         path: ./realtime
 
-  web-api-build:
-    name: Build web-api
+  travigo-build:
+    name: Build travigo binary
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -56,12 +56,12 @@ jobs:
       with:
         go-version: '1.20'
     - name: Build
-      run: go build -v ./cmd/web-api
-    - name: Upload webapi
+      run: go build -v ./cmd/travigo
+    - name: Upload travigo
       uses: actions/upload-artifact@v3
       with:
-        name: web-api
-        path: ./web-api
+        name: travigo
+        path: ./travigo
 
   stats-build:
     name: Build stats
@@ -172,14 +172,14 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  web-api-docker:
-    name: Package web-api Docker image
+  travigo-docker:
+    name: Package travigo Docker image
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     needs:
-      - web-api-build
+      - travigo-build
 
     steps:
       - name: Checkout repository
@@ -188,7 +188,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v3
         with:
-          name: web-api
+          name: travigo
           path: ./
       
       - name: Log in to the Container registry
@@ -202,7 +202,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/web-api
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -213,7 +213,7 @@ jobs:
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
-          file: Dockerfile.web-api
+          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -343,7 +343,7 @@ jobs:
       name: production
       url: https://api.travigo.app/core
 
-    needs: web-api-docker
+    needs: travigo-docker
 
     permissions:
       contents: 'read'
