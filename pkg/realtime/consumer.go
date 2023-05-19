@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -18,7 +19,6 @@ import (
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/realtime/journeyidentifier"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"github.com/travigo/travigo/pkg/siri_vm"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
