@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/adjust/rmq/v4"
+	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/elastic_client"
