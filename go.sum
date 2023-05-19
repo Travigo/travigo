@@ -14,6 +14,8 @@ cloud.google.com/go/storage v1.30.1/go.mod h1:NfxhC0UJE1aXSx7CIIbCf7y9HKT7Biccwk
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/adjust/rmq/v4 v4.0.5 h1:VU3Xa9qbkIti7pTUiZE88qo3V4coMo3fmgO04l1aPro=
 github.com/adjust/rmq/v4 v4.0.5/go.mod h1:XSfjmFqSVBVA/tptvMEt/8BW/uGM1w88ZvUIt+HIRok=
+github.com/adjust/rmq/v5 v5.1.2 h1:+Wfi7Mfi9KFHVBDLG4h+comGwgq6MH1iHLoH9ITUtYc=
+github.com/adjust/rmq/v5 v5.1.2/go.mod h1:blTI5/hqe3ob/I0PcBI0vTMbclit1PMy2AXJny/BmlY=
 github.com/andybalholm/brotli v1.0.5 h1:8uQZIdzKmjc/iuPu7O2ioW48L81FgatrcpfFmiq/cCs=
 github.com/andybalholm/brotli v1.0.5/go.mod h1:fO7iG3H7G2nSZ7m0zPUDn85XEX2GTukHGRSepvi9Eig=
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=

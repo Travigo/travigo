@@ -2,9 +2,9 @@ package redis_client
 
 import (
 	"context"
+	"github.com/adjust/rmq/v5"
 	"strconv"
 
-	"github.com/adjust/rmq/v4"
 	"github.com/redis/go-redis/v9"
 	"github.com/travigo/travigo/pkg/util"
 )
