@@ -11,17 +11,17 @@ This is the core repository and contains all the Go code for the services that m
 ## Current Status
 Travigo is currently a heavy WIP and only has the following features implemented
 
-* Import bus stops & bus stop groups
-* Import bus operators & operator groups
+* Import stops & stop groups
+* Import bus/train operators & operator groups
 * Import bus lines
 * Import bus timetables
 * Endpoint for providing timetable for a given stop on each day
 * Calculate realtime bus progress and stop estimates using BODS SIRI-VM
+* Schedules & realtime departures for TfL services
+* Limited realtime departures for National Rail services
 
 The following are in the TODO list
 
-* Import bus lines from TfE API
-* Calculate realtime bus progress and stop estimates using TfE API
 * Import fares
 * Historical bus reliability analysis
 * Subscribe to changes in a bus line
