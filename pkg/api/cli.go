@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator"
+	dataaggregator "github.com/travigo/travigo/pkg/dataaggregator/global"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/urfave/cli/v2"

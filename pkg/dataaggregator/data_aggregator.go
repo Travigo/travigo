@@ -3,33 +3,19 @@ package dataaggregator
 import (
 	"errors"
 	"fmt"
+	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"reflect"
 
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/dataaggregator/source"
-	"github.com/travigo/travigo/pkg/util"
 )
 
 type Aggregator struct {
-	Sources []DataSource
+	Sources []source.DataSource
 }
 
-var globalAggregator Aggregator
+var GlobalAggregator Aggregator
 
-func GlobalSetup() {
-	globalAggregator = Aggregator{}
-
-	tflAppKey := util.GetEnvironmentVariables()["TRAVIGO_TFL_API_KEY"]
-
-	globalAggregator.RegisterSource(source.TflSource{
-		AppKey: tflAppKey,
-	})
-	globalAggregator.RegisterSource(source.DatabaseLookupSource{})
-	globalAggregator.RegisterSource(source.LocalDepartureBoardSource{})
-	globalAggregator.RegisterSource(source.NationalRailSource{})
-}
-
-func (a *Aggregator) RegisterSource(source DataSource) {
+func (a *Aggregator) RegisterSource(source source.DataSource) {
 	a.Sources = append(a.Sources, source)
 
 	log.Debug().Str("name", source.GetName()).Msg("Registering new Data Source")
@@ -43,15 +29,15 @@ func Lookup[T any](query any) (T, error) {
 		lookupType = lookupType.Elem()
 	}
 
-	for _, source := range globalAggregator.Sources {
-		for _, supportedType := range source.Supports() {
+	for _, dataSource := range GlobalAggregator.Sources {
+		for _, supportedType := range dataSource.Supports() {
 			if lookupType == supportedType {
 				var returnValue any
 				var returnError error
 
-				returnValue, returnError = source.Lookup(query)
+				returnValue, returnError = dataSource.Lookup(query)
 
-				if returnError != nil && returnError.Error() == "Unsupported Source for this query" {
+				if returnError != nil && returnError.Error() == "unsupported Source for this query" {
 					continue
 				}
 

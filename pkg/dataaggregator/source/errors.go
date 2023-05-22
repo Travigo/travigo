@@ -2,4 +2,4 @@ package source
 
 import "errors"
 
-var UnsupportedSourceError = errors.New("Unsupported Source for this query")
+var UnsupportedSourceError = errors.New("unsupported Source for this query")

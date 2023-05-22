@@ -1,4 +1,4 @@
-package dataaggregator
+package source
 
 import (
 	"reflect"

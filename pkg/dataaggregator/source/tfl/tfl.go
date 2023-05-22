@@ -1,9 +1,12 @@
-package source
+package tfl
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/travigo/travigo/pkg/dataaggregator/source"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/databaselookup"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"io"
 	"net/http"
 	"reflect"
@@ -18,21 +21,21 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type TflSource struct {
+type Source struct {
 	AppKey string
 }
 
-func (t TflSource) GetName() string {
+func (t Source) GetName() string {
 	return "Transport for London API"
 }
 
-func (t TflSource) Supports() []reflect.Type {
+func (t Source) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf([]*ctdf.DepartureBoard{}),
 	}
 }
 
-func (t TflSource) Lookup(q any) (interface{}, error) {
+func (t Source) Lookup(q any) (interface{}, error) {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "GB:NOC:TFLO",
 		PrimaryName:       "Transport for London",
@@ -104,7 +107,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 		remainingCount := departureBoardQuery.Count - len(departureBoard)
 
 		if remainingCount > 0 {
-			localSource := LocalDepartureBoardSource{}
+			localSource := localdepartureboard.Source{}
 
 			departureBoardQuery.StartDateTime = latestDepartureTime
 			departureBoardQuery.Count = remainingCount
@@ -122,7 +125,7 @@ func (t TflSource) Lookup(q any) (interface{}, error) {
 	return nil, nil
 }
 
-func (t TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
+func (t Source) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
 	source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
 	req, _ := http.NewRequest("GET", source, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"}
@@ -142,8 +145,8 @@ func (t TflSource) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, er
 	return arrivalPredictions, err
 }
 
-func (t TflSource) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
-	databaseLookup := DatabaseLookupSource{}
+func (t Source) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
+	databaseLookup := databaselookup.Source{}
 	servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
 		Stop: stop,
 	})
@@ -201,7 +204,7 @@ func (prediction *tflArrivalPrediction) GetDestinationDisplay(service *ctdf.Serv
 func getTflStopID(stop *ctdf.Stop) (string, error) {
 	// If the stop has no CrsRef then give up
 	if !slices.Contains(stop.TransportTypes, ctdf.TransportTypeMetro) {
-		return "", UnsupportedSourceError
+		return "", source.UnsupportedSourceError
 	}
 
 	tflStopID := ""
@@ -213,7 +216,7 @@ func getTflStopID(stop *ctdf.Stop) (string, error) {
 			var stopGroup *ctdf.StopGroup
 			collection.FindOne(context.Background(), bson.M{"primaryidentifier": association.AssociatedIdentifier}).Decode(&stopGroup)
 
-			if stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "station" {
+			if stopGroup != nil && stopGroup.OtherIdentifiers["AtcoCode"] != "" && stopGroup.Type == "station" {
 				tflStopID = stopGroup.OtherIdentifiers["AtcoCode"]
 
 				break
@@ -222,7 +225,7 @@ func getTflStopID(stop *ctdf.Stop) (string, error) {
 	}
 
 	if tflStopID == "" {
-		return tflStopID, UnsupportedSourceError
+		return tflStopID, source.UnsupportedSourceError
 	}
 
 	return tflStopID, nil
