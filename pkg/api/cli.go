@@ -31,7 +31,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					dataaggregator.GlobalSetup()
+					dataaggregator.Setup()
 
 					ctdf.LoadSpecialDayCache()
 

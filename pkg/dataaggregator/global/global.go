@@ -9,15 +9,17 @@ import (
 	"github.com/travigo/travigo/pkg/util"
 )
 
-func GlobalSetup() {
+func Setup() {
 	dataaggregator.GlobalAggregator = dataaggregator.Aggregator{}
 
-	tflAppKey := util.GetEnvironmentVariables()["TRAVIGO_TFL_API_KEY"]
+	env := util.GetEnvironmentVariables()
 
 	dataaggregator.GlobalAggregator.RegisterSource(tfl.Source{
-		AppKey: tflAppKey,
+		AppKey: env["TRAVIGO_TFL_API_KEY"],
 	})
 	dataaggregator.GlobalAggregator.RegisterSource(databaselookup.Source{})
 	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboard.Source{})
-	dataaggregator.GlobalAggregator.RegisterSource(nationalrail.Source{})
+	dataaggregator.GlobalAggregator.RegisterSource(nationalrail.Source{
+		GatewayEndpoint: env["TRAVIGO_LDBWS_GATEWAY_ENDPOINT"],
+	})
 }

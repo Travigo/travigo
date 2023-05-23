@@ -6,7 +6,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
-	"github.com/travigo/travigo/pkg/util"
 	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
@@ -22,7 +21,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	}
 
 	// Make the request to the gateway for the departures
-	xmlFile, err := nationalRailGatewayLookup(fmt.Sprintf("departures/%s", crs))
+	xmlFile, err := s.nationalRailGatewayLookup(fmt.Sprintf("departures/%s", crs))
 
 	if err != nil {
 		return nil, err
@@ -112,11 +111,10 @@ type nationalRailwayLocation struct {
 	Crs  string `xml:"crs"`
 }
 
-func nationalRailGatewayLookup(path string) (*http.Response, error) {
-	endpoint := util.GetEnvironmentVariables()["TRAVIGO_LDBWS_GATEWAY_ENDPOINT"]
-	source := fmt.Sprintf("%s/%s", endpoint, path)
+func (s Source) nationalRailGatewayLookup(path string) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", s.GatewayEndpoint, path)
 
-	req, _ := http.NewRequest("GET", source, nil)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"}
 
 	client := &http.Client{}

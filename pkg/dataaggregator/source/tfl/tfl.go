@@ -126,8 +126,8 @@ func (t Source) Lookup(q any) (interface{}, error) {
 }
 
 func (t Source) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
-	source := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
-	req, _ := http.NewRequest("GET", source, nil)
+	url := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
+	req, _ := http.NewRequest("GET", url, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"}
 
 	client := &http.Client{}

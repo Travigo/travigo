@@ -8,6 +8,7 @@ import (
 )
 
 type Source struct {
+	GatewayEndpoint string
 }
 
 func (s Source) GetName() string {
