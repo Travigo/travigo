@@ -22,10 +22,6 @@ runner:
       cpu: 200m
       memory: 150Mi
 
-archiver:
-  schedule: "0 3 * * 1"
-  serviceAccountName: "realtime-archiver-service-account"
-
 image:
   repository: ghcr.io/travigo/travigo
   pullPolicy: Always

@@ -76,33 +76,6 @@ func RegisterCLI() *cli.Command {
 					return nil
 				},
 			},
-			{
-				Name:  "archive",
-				Usage: "run archiver - takes realtime journeys out of database and puts in object store",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "output-directory",
-						Usage:    "Directory to write output files to",
-						Required: true,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-
-					archiver := Archiver{
-						OutputDirectory:     c.String("output-directory"),
-						WriteIndividualFile: false,
-						WriteBundle:         true,
-						CloudUpload:         true,
-						CloudBucketName:     "britbus-journey-history",
-					}
-					archiver.Perform()
-
-					return nil
-				},
-			},
 		},
 	}
 }
