@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -59,19 +60,19 @@ func UpdateRecordsStats() {
 		numberServices, _ := servicesCollection.CountDocuments(context.Background(), bson.D{})
 		CurrentRecordsStats.Services = numberServices
 
-		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
 		var numberActiveRealtimeJourneys int64
 		var numberActiveRealtimeJourneysWithTrack int64
 		var numberActiveRealtimeJourneysWithoutTrack int64
 		var numberActiveRealtimeJourneysExternal int64
-		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-		})
-		for activeRealtimeJourneys.Next(context.TODO()) {
+
+		scan := redis_client.Client.Scan(context.Background(), 0, "REALTIME:*", 0).Iterator()
+
+		for scan.Next(context.Background()) {
 			var realtimeJourney *ctdf.RealtimeJourney
-			activeRealtimeJourneys.Decode(&realtimeJourney)
+
+			realtimeJourneyID := scan.Val()
+			realtimeJourneyJSON := redis_client.Client.Get(context.Background(), realtimeJourneyID).Val()
+			json.Unmarshal([]byte(realtimeJourneyJSON), &realtimeJourney)
 
 			if realtimeJourney.IsActive() {
 				numberActiveRealtimeJourneys += 1
