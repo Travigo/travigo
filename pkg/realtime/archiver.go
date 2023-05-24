@@ -32,6 +32,8 @@ type Archiver struct {
 }
 
 func (a *Archiver) Perform() {
+	log.Fatal().Msg("No longer works and shouldn't really exist anymore") // TODO REMOVE ALL THIS ARCHIVER CODE
+
 	log.Info().Interface("archiver", a).Msg("Running Archive process")
 
 	currentTime := time.Now()

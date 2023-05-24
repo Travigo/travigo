@@ -5,7 +5,6 @@ import (
 	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 )
 
 func JourneysRouter(router fiber.Router) {
@@ -16,7 +15,7 @@ func getJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
 	var journey *ctdf.Journey
-	journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{
+	journey, err := dataaggregator.Lookup[*ctdf.Journey](ctdf.QueryJourney{
 		PrimaryIdentifier: identifier,
 	})
 

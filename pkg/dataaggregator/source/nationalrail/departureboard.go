@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"golang.org/x/exp/slices"
 	"io"
@@ -12,7 +11,7 @@ import (
 	"time"
 )
 
-func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+func (s Source) DepartureBoardQuery(q ctdf.QueryDepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	crs := q.Stop.OtherIdentifiers["Crs"]
 
 	// If the stop has no CrsRef then give up

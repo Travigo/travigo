@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 )
 
-func (s Source) OperatorQuery(operatorQuery query.Operator) (*ctdf.Operator, error) {
+func (s Source) OperatorQuery(operatorQuery ctdf.QueryOperator) (*ctdf.Operator, error) {
 	collection := database.GetCollection("operators")
 	var operator *ctdf.Operator
 	collection.FindOne(context.Background(), operatorQuery.ToBson()).Decode(&operator)

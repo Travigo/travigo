@@ -2,7 +2,6 @@ package nationalrail
 
 import (
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"reflect"
 )
@@ -23,8 +22,8 @@ func (s Source) Supports() []reflect.Type {
 
 func (s Source) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
-	case query.DepartureBoard:
-		return s.DepartureBoardQuery(q.(query.DepartureBoard))
+	case ctdf.QueryDepartureBoard:
+		return s.DepartureBoardQuery(q.(ctdf.QueryDepartureBoard))
 	default:
 		return nil, source.UnsupportedSourceError
 	}

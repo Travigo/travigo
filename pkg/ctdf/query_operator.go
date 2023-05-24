@@ -1,13 +1,13 @@
-package query
+package ctdf
 
 import "go.mongodb.org/mongo-driver/bson"
 
-type Operator struct {
+type QueryOperator struct {
 	PrimaryIdentifier string
 	AnyIdentifier     string
 }
 
-func (o *Operator) ToBson() bson.M {
+func (o *QueryOperator) ToBson() bson.M {
 	if o.PrimaryIdentifier != "" {
 		return bson.M{"primaryidentifier": o.PrimaryIdentifier}
 	} else if o.AnyIdentifier != "" {

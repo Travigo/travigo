@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -92,7 +91,7 @@ func getRealtimeJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
 	var realtimeJourney *ctdf.RealtimeJourney
-	realtimeJourney, err := dataaggregator.Lookup[*ctdf.RealtimeJourney](query.RealtimeJourney{
+	realtimeJourney, err := dataaggregator.Lookup[*ctdf.RealtimeJourney](ctdf.QueryRealtimeJourney{
 		PrimaryIdentifier: identifier,
 	})
 

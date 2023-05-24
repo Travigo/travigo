@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 )
 
 func OperatorGroupsRouter(router fiber.Router) {
@@ -15,7 +14,7 @@ func getOperatorGroup(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
 	var operatorGroup *ctdf.OperatorGroup
-	operatorGroup, err := dataaggregator.Lookup[*ctdf.OperatorGroup](query.OperatorGroup{
+	operatorGroup, err := dataaggregator.Lookup[*ctdf.OperatorGroup](ctdf.QueryOperatorGroup{
 		Identifier: identifier,
 	})
 

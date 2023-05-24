@@ -5,6 +5,7 @@ import (
 	dataaggregator "github.com/travigo/travigo/pkg/dataaggregator/global"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 )
 
@@ -28,6 +29,9 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					if err := elastic_client.Connect(false); err != nil {
+						return err
+					}
+					if err := redis_client.Connect(); err != nil {
 						return err
 					}
 

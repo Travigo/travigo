@@ -5,7 +5,6 @@ import (
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
@@ -15,7 +14,7 @@ import (
 	"time"
 )
 
-func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+func (s Source) DepartureBoardQuery(q ctdf.QueryDepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	// Only support buses for local timetable so far
 	if !(slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeBus) || slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeMetro)) {
 		return nil, source.UnsupportedSourceError
