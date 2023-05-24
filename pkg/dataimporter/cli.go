@@ -318,7 +318,7 @@ func RegisterCLI() *cli.Command {
 
 					currentTime := time.Now().Format(time.RFC3339)
 
-					log.Info().Msgf("TfL TransXChange import from %s", source)
+					log.Info().Msgf("TfL TransXChange bundle import from %s", source)
 
 					if isValidUrl(source) {
 						tempFile, _ := tempDownloadFile(source)
@@ -370,7 +370,7 @@ func RegisterCLI() *cli.Command {
 						}
 
 						if transportType != "" {
-							err = importFile("transxchange", ctdf.TransportTypeBus, tmpFile.Name(), "zip", datasource, map[string]string{
+							err = importFile("transxchange", transportType, tmpFile.Name(), "zip", datasource, map[string]string{
 								"OperatorRef": "GB:NOC:TFLO",
 							})
 							if err != nil {
