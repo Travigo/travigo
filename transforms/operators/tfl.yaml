@@ -1,11 +1,11 @@
----
-# Force TfL operator to be in London (not always set)
-Type: ctdf.Operator
-Match:
-  PrimaryIdentifier: "GB:NOCID:138416"
-Data:
-  Regions:
-    - "UK:REGION:LONDON"
+#---
+## Force TfL operator to be in London (not always set)
+#Type: ctdf.Operator
+#Match:
+#  PrimaryIdentifier: "GB:NOCID:138416"
+#Data:
+#  Regions:
+#    - "UK:REGION:LONDON"
 
 # London Underground
 ---
