@@ -221,17 +221,18 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var stationStopOperationInsert int
 	var stationStopOperationUpdate int
 
-	for _, stopPoints := range stationStopGroupContents {
+	for key, stopPoints := range stationStopGroupContents {
 		var stationStop *ctdf.Stop
 
 		// Find the main station descriptor and convert that first
 		for _, stopPoint := range stopPoints {
-			if stopPoint.StopClassification.StopType == "MET" {
+			if stopPoint.StopClassification.StopType == "MET" || stopPoint.StopClassification.StopType == "RLY" {
 				stationStop = stopPoint.ToCTDF()
 			}
 		}
 
 		if stationStop == nil {
+			log.Error().Str("key", key).Msg("Unhandled station stop group")
 			continue
 		}
 
@@ -249,7 +250,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					Location: stop.Location,
 				})
 			} else {
-				if stopPoint.StopClassification.StopType == "TMU" {
+				if stopPoint.StopClassification.StopType == "TMU" || stopPoint.StopClassification.StopType == "RSE" {
 					stop := stopPoint.ToCTDF()
 					stationStop.Entrances = append(stationStop.Entrances, &ctdf.StopEntrance{
 						PrimaryIdentifier: stop.PrimaryIdentifier,
