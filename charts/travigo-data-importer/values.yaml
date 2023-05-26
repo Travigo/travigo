@@ -3,8 +3,8 @@
 # Declare variables to be passed into your templates.
 
 database:
-  connectionStringSecret: britbus-mongodb-admin-britbus
-  database: britbus
+  connectionStringSecret: travigo-mongodb-admin-travigo
+  database: travigo
 
 redis:
   address: "redis-headless.redis:6379"
@@ -12,13 +12,13 @@ redis:
 
 elasticsearch:
   address: "https://primary-es-http.elastic:9200"
-  accountSecret: "britbus-elasticsearch-user"
+  accountSecret: "travigo-elasticsearch-user"
 
 bods:
-  apiKeySecret: britbus-bods-api
+  apiKeySecret: travigo-bods-api
 
 nationalRail:
-  credentialsSecret: britbus-nationalrail-credentials
+  credentialsSecret: travigo-nationalrail-credentials
 
 image:
   repository: ghcr.io/travigo/travigo

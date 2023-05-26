@@ -17,7 +17,7 @@ type MongoInstance struct {
 var Instance *MongoInstance
 
 const defaultConnectionString = "mongodb://localhost:27017/"
-const defaultDatabase = "britbus"
+const defaultDatabase = "travigo"
 
 func Connect() error {
 	connectionString := defaultConnectionString

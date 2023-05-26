@@ -58,7 +58,7 @@ func Connect() error {
 		return err
 	}
 
-	QueueConnection, err = rmq.OpenConnectionWithRedisClient("britbus", Client, nil)
+	QueueConnection, err = rmq.OpenConnectionWithRedisClient("travigo", Client, nil)
 
 	if err != nil {
 		return err
