@@ -14,11 +14,10 @@ import (
 )
 
 type RecordsStats struct {
-	Stops                      int64
-	Operators                  int64
-	Services                   int64
-	ActiveRealtimeJourneys     RecordsStatsActiveRealtimeJourneys
-	HistoricalRealtimeJourneys int64
+	Stops                  int64
+	Operators              int64
+	Services               int64
+	ActiveRealtimeJourneys RecordsStatsActiveRealtimeJourneys
 }
 type RecordsStatsActiveRealtimeJourneys struct {
 	Current              int64
