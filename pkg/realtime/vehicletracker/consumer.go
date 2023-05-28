@@ -23,7 +23,7 @@ import (
 )
 
 var identificationCache *cache.Cache[string]
-var realtimeJourneysStore *cache.Cache[string]
+var realtimeJourneysStore *cache.Cache[*ctdf.RealtimeJourney]
 var journeyToRealtimeJourneyStore *cache.Cache[string]
 var cacheExpirationTime = 90 * time.Minute
 
@@ -46,7 +46,7 @@ func CreateIdentificationCache() {
 func CreateRealtimeJourneysStore() {
 	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(6*time.Hour))
 
-	realtimeJourneysStore = cache.New[string](redisStore)
+	realtimeJourneysStore = cache.New[*ctdf.RealtimeJourney](redisStore)
 	journeyToRealtimeJourneyStore = cache.New[string](redisStore)
 }
 func StartConsumers() {
@@ -307,11 +307,11 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	// Get the realtime journey
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
 
-	var realtimeJourney ctdf.RealtimeJourney
-	realtimeJourneyJSON, err := realtimeJourneysStore.Get(context.Background(), realtimeJourneyIdentifier)
+	var realtimeJourney *ctdf.RealtimeJourney
+	realtimeJourney, err := realtimeJourneysStore.Get(context.Background(), realtimeJourneyIdentifier)
 
-	if realtimeJourneyJSON == "" {
-		realtimeJourney = ctdf.RealtimeJourney{
+	if realtimeJourney == nil {
+		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyIdentifier,
 			JourneyRef:        vehicleLocationEvent.JourneyRef,
 
@@ -324,8 +324,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 		realtimeJourney.GetReferences()
 		realtimeJourney.Journey.GetDeepReferences()
-	} else {
-		json.Unmarshal([]byte(realtimeJourneyJSON), &realtimeJourney)
 	}
 
 	closestDistance := 999999999999.0
@@ -504,9 +502,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	updateModel.SetUpdate(bsonRep)
 	updateModel.SetUpsert(true)
 
-	realtimeJourneyJSONbytes, _ := json.Marshal(realtimeJourney)
-
-	realtimeJourneysStore.Set(context.Background(), realtimeJourneyIdentifier, string(realtimeJourneyJSONbytes))
+	realtimeJourneysStore.Set(context.Background(), realtimeJourneyIdentifier, realtimeJourney)
 	journeyToRealtimeJourneyStore.Set(context.Background(), realtimeJourney.Journey.PrimaryIdentifier, realtimeJourneyIdentifier)
 
 	return updateModel, nil
