@@ -2,7 +2,6 @@ package ctdf
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -96,9 +95,6 @@ func (r *RealtimeJourney) IsActive() bool {
 
 	// If we're past the last path item arrival time & vehicle location is less than 150m from it then class journey as in-active
 	return !((timeFromlastPathItemArrival < 0) && (distanceEndStopLocation < 150))
-}
-func (r RealtimeJourney) MarshalBinary() ([]byte, error) {
-	return json.Marshal(r)
 }
 
 type RealtimeJourneyStops struct {
