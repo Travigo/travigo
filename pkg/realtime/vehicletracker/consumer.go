@@ -1,4 +1,4 @@
-package realtime
+package vehicletracker
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/realtime/journeyidentifier"
+	"github.com/travigo/travigo/pkg/realtime/vehicletracker/journeyidentifier"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
