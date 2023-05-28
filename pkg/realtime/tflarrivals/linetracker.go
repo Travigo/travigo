@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"io"
 	"time"
 )
 
 type Linetracker struct {
-	LineID       string
-	JourneyStore *cache.Cache[string]
+	LineID string
 }
 
 func (l Linetracker) Start() {
@@ -21,6 +24,8 @@ func (l Linetracker) Start() {
 
 func (l Linetracker) ParseArrivals(reader io.Reader) {
 	now := time.Now()
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	var realtimeJourneyUpdateOperations []mongo.WriteModel
 
 	jsonBytes, _ := io.ReadAll(reader)
 
@@ -44,25 +49,30 @@ func (l Linetracker) ParseArrivals(reader io.Reader) {
 
 	// Generate RealtimeJourneys for each group
 	for realtimeJourneyID, predictions := range groupedLineArrivals {
-		previousJourneyJSON, err := l.JourneyStore.Get(context.Background(), realtimeJourneyID)
+		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
-		var realtimeJourney ctdf.RealtimeJourney
-		if err == nil {
-			json.Unmarshal([]byte(previousJourneyJSON), &realtimeJourney)
-		} else {
-			realtimeJourney = ctdf.RealtimeJourney{
+		var realtimeJourney *ctdf.RealtimeJourney
+
+		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+		if realtimeJourney == nil {
+			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier: realtimeJourneyID,
+				CreationDateTime:  now,
+				VehicleRef:        predictions[0].VehicleID,
 
 				DataSource: &ctdf.DataSource{
 					OriginalFormat: "tfl-json",
 					Provider:       "GB-TfL",
-					Dataset:        "line/arrivals",
-					Identifier:     l.LineID,
+					Dataset:        fmt.Sprintf("line/%s/arrivals", l.LineID),
+					Identifier:     string(now.Unix()),
 				},
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
 		}
+
+		realtimeJourney.ModificationDateTime = now
 
 		for _, prediction := range predictions {
 			stopID := fmt.Sprintf(ctdf.StopIDFormat, prediction.NaptanID)
@@ -78,7 +88,21 @@ func (l Linetracker) ParseArrivals(reader io.Reader) {
 			}
 		}
 
-		realtimeJourneyJSON, _ := json.Marshal(realtimeJourney)
-		l.JourneyStore.Set(context.Background(), realtimeJourneyID, string(realtimeJourneyJSON))
+		// Create update
+		bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
+		updateModel := mongo.NewUpdateOneModel()
+		updateModel.SetFilter(searchQuery)
+		updateModel.SetUpdate(bsonRep)
+		updateModel.SetUpsert(true)
+
+		realtimeJourneyUpdateOperations = append(realtimeJourneyUpdateOperations, updateModel)
+	}
+
+	if len(realtimeJourneyUpdateOperations) > 0 {
+		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), realtimeJourneyUpdateOperations, &options.BulkWriteOptions{})
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
+		}
 	}
 }

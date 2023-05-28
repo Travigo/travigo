@@ -1,15 +1,11 @@
 package tflarrivals
 
 import (
-	"github.com/eko/gocache/lib/v4/cache"
-	"github.com/eko/gocache/lib/v4/store"
-	redisstore "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 	"os"
-	"time"
 )
 
 func RegisterCLI() *cli.Command {
@@ -34,13 +30,8 @@ func RegisterCLI() *cli.Command {
 					}
 					defer file.Close()
 
-					redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(2*time.Hour))
-
-					realtimeJourneysStore := cache.New[string](redisStore)
-
 					tracker := Linetracker{
-						LineID:       "victoria",
-						JourneyStore: realtimeJourneysStore,
+						LineID: "victoria",
 					}
 					tracker.ParseArrivals(file)
 
