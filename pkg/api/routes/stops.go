@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -59,7 +60,7 @@ func listStops(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](ctdf.QueryServicesByStop{
+		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
 
@@ -74,7 +75,7 @@ func getStop(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
 	var stop *ctdf.Stop
-	stop, err := dataaggregator.Lookup[*ctdf.Stop](ctdf.QueryStop{
+	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
 		PrimaryIdentifier: identifier,
 	})
 
@@ -84,7 +85,7 @@ func getStop(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](ctdf.QueryServicesByStop{
+		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
 
@@ -107,7 +108,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 	}
 
 	var stop *ctdf.Stop
-	stop, err = dataaggregator.Lookup[*ctdf.Stop](ctdf.QueryStop{
+	stop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
 		PrimaryIdentifier: stopIdentifier,
 	})
 
@@ -135,13 +136,13 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 	var departureBoard []*ctdf.DepartureBoard
 
-	departureBoard, err = dataaggregator.Lookup[[]*ctdf.DepartureBoard](ctdf.QueryDepartureBoard{
+	departureBoard, err = dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
 		Stop:          stop,
 		Count:         count,
 		StartDateTime: startDateTime,
 	})
 
-	// Sort departures by QueryDepartureBoard time
+	// Sort departures by DepartureBoard time
 	sort.Slice(departureBoard, func(i, j int) bool {
 		return departureBoard[i].Time.Before(departureBoard[j].Time)
 	})

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,8 +42,8 @@ func (t Source) Lookup(q any) (interface{}, error) {
 	}
 
 	switch q.(type) {
-	case ctdf.QueryDepartureBoard:
-		departureBoardQuery := q.(ctdf.QueryDepartureBoard)
+	case query.DepartureBoard:
+		departureBoardQuery := q.(query.DepartureBoard)
 
 		tflStopID, err := getTflStopID(departureBoardQuery.Stop)
 
@@ -146,7 +147,7 @@ func (t Source) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error
 
 func (t Source) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
 	databaseLookup := databaselookup.Source{}
-	servicesQueryResult, err := databaseLookup.Lookup(ctdf.QueryServicesByStop{
+	servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
 		Stop: stop,
 	})
 

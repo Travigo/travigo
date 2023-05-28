@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 
+	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -178,5 +179,19 @@ func createJourneysIndexes() {
 	}, options.CreateIndexes())
 	if err != nil {
 		panic(err)
+	}
+
+	// RealtimeJourneys
+	realtimeJourneysCollection := GetCollection("realtime_journeys")
+	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "journeyref", Value: bsonx.Int32(1)}},
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err)
 	}
 }

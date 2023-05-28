@@ -3,12 +3,13 @@ package databaselookup
 import (
 	"context"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (s Source) ServicesByStopQuery(q ctdf.QueryServicesByStop) ([]*ctdf.Service, error) {
+func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
 	servicesCollection := database.GetCollection("services")
 	journeysCollection := database.GetCollection("journeys")
 

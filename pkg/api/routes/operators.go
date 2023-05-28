@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -144,7 +145,7 @@ func getOperatorServices(c *fiber.Ctx) error {
 
 func getOperatorById(identifier string) (*ctdf.Operator, error) {
 	var operator *ctdf.Operator
-	operator, err := dataaggregator.Lookup[*ctdf.Operator](ctdf.QueryOperator{
+	operator, err := dataaggregator.Lookup[*ctdf.Operator](query.Operator{
 		AnyIdentifier: identifier,
 	})
 

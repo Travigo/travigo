@@ -1,12 +1,12 @@
-package ctdf
+package query
 
 import "go.mongodb.org/mongo-driver/bson"
 
-type QueryOperatorGroup struct {
+type OperatorGroup struct {
 	Identifier string
 }
 
-func (o *QueryOperatorGroup) ToBson() bson.M {
+func (o *OperatorGroup) ToBson() bson.M {
 	if o.Identifier != "" {
 		return bson.M{"identifier": o.Identifier}
 	}

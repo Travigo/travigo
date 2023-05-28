@@ -1,4 +1,4 @@
-package vehicletracker
+package realtime
 
 import (
 	"bytes"
@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
-	"github.com/travigo/travigo/pkg/realtime/vehicletracker/journeyidentifier"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -17,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime/journeyidentifier"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -44,7 +46,7 @@ func CreateIdentificationCache() {
 	identificationCache = cache.New[string](redisStore)
 }
 func CreateRealtimeJourneysStore() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(6*time.Hour))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(12*time.Hour))
 
 	realtimeJourneysStore = cache.New[*ctdf.RealtimeJourney](redisStore)
 	journeyToRealtimeJourneyStore = cache.New[string](redisStore)
@@ -88,6 +90,8 @@ func NewBatchConsumer(id int) *BatchConsumer {
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
+	var locationEventOperations []mongo.WriteModel
+
 	for _, payload := range payloads {
 		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
@@ -101,7 +105,21 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
 
 		if vehicleLocationEvent != nil {
-			updateRealtimeJourney(vehicleLocationEvent)
+			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
+
+			if writeModel != nil {
+				locationEventOperations = append(locationEventOperations, writeModel)
+			}
+		}
+	}
+
+	if len(locationEventOperations) > 0 {
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
 	}
 

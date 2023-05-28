@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 )
 
-func (s Source) ServiceQuery(q ctdf.QueryService) (*ctdf.Service, error) {
+func (s Source) ServiceQuery(q query.Service) (*ctdf.Service, error) {
 	collection := database.GetCollection("services")
 	var service *ctdf.Service
 	collection.FindOne(context.Background(), q.ToBson()).Decode(&service)

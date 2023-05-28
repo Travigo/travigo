@@ -1,14 +1,15 @@
-package ctdf
+package query
 
 import (
+	"github.com/travigo/travigo/pkg/ctdf"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type QueryService struct {
+type Service struct {
 	PrimaryIdentifier string
 }
 
-func (s *QueryService) ToBson() bson.M {
+func (s *Service) ToBson() bson.M {
 	if s.PrimaryIdentifier != "" {
 		return bson.M{"primaryidentifier": s.PrimaryIdentifier}
 	}
@@ -16,6 +17,6 @@ func (s *QueryService) ToBson() bson.M {
 	return nil
 }
 
-type QueryServicesByStop struct {
-	Stop *Stop
+type ServicesByStop struct {
+	Stop *ctdf.Stop
 }

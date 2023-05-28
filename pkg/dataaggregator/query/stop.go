@@ -1,12 +1,12 @@
-package ctdf
+package query
 
 import "go.mongodb.org/mongo-driver/bson"
 
-type QueryStop struct {
+type Stop struct {
 	PrimaryIdentifier string
 }
 
-func (s *QueryStop) ToBson() bson.M {
+func (s *Stop) ToBson() bson.M {
 	if s.PrimaryIdentifier != "" {
 		return bson.M{"primaryidentifier": s.PrimaryIdentifier}
 	}

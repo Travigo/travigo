@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/travigo/travigo/pkg/dataaggregator"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -70,9 +69,15 @@ func (j *Journey) GetDeepReferences() {
 	}
 }
 func (j *Journey) GetRealtimeJourney() {
-	realtimeJourney, _ := dataaggregator.Lookup[*RealtimeJourney](RealtimeJourneyForJourney{
-		Journey: j,
-	})
+	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
+
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+	var realtimeJourney *RealtimeJourney
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
+		"journeyref":           j.PrimaryIdentifier,
+		"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+	}).Decode(&realtimeJourney)
 
 	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
