@@ -4,33 +4,67 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"time"
+
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"io"
-	"time"
 )
 
-type Linetracker struct {
-	LineID string
+type LineTracker struct {
+	Line        TfLLine
+	RefreshRate time.Duration
 }
 
-func (l Linetracker) Start() {
+func (l LineTracker) Run() {
+	log.Info().Str("lineid", l.Line.LineID).Str("transporttype", string(l.Line.TransportType)).Msg("Registering new line")
 
+	for {
+		startTime := time.Now()
+
+		arrivals := l.GetLatestArrivals()
+		l.ParseArrivals(arrivals)
+
+		endTime := time.Now()
+		executionDuration := endTime.Sub(startTime)
+		waitTime := l.RefreshRate - executionDuration
+
+		if waitTime.Seconds() > 0 {
+			time.Sleep(waitTime)
+		}
+	}
 }
 
-func (l Linetracker) ParseArrivals(reader io.Reader) {
-	now := time.Now()
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	var realtimeJourneyUpdateOperations []mongo.WriteModel
+func (l LineTracker) GetLatestArrivals() []ArrivalPrediction {
+	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals", l.Line.LineID)
+	req, _ := http.NewRequest("GET", requestURL, nil)
+	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
-	jsonBytes, _ := io.ReadAll(reader)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Download file")
+	}
+	defer resp.Body.Close()
+
+	jsonBytes, _ := io.ReadAll(resp.Body)
 
 	var lineArrivals []ArrivalPrediction
 	json.Unmarshal(jsonBytes, &lineArrivals)
+
+	return lineArrivals
+}
+
+func (l LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
+	now := time.Now()
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	var realtimeJourneyUpdateOperations []mongo.WriteModel
 
 	// Group all the arrivals predictions that are part of the same journey
 	groupedLineArrivals := map[string][]ArrivalPrediction{}
@@ -60,12 +94,13 @@ func (l Linetracker) ParseArrivals(reader io.Reader) {
 				PrimaryIdentifier: realtimeJourneyID,
 				CreationDateTime:  now,
 				VehicleRef:        predictions[0].VehicleID,
+				Reliability:       ctdf.RealtimeJourneyReliabilityExternalProvided,
 
 				DataSource: &ctdf.DataSource{
 					OriginalFormat: "tfl-json",
 					Provider:       "GB-TfL",
-					Dataset:        fmt.Sprintf("line/%s/arrivals", l.LineID),
-					Identifier:     string(now.Unix()),
+					Dataset:        fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
+					Identifier:     fmt.Sprint(now.Unix()),
 				},
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},

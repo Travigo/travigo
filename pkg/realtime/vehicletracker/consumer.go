@@ -54,7 +54,7 @@ func StartConsumers() {
 	CreateIdentificationCache()
 	CreateJourneyCache()
 
-	// Start the background consumers
+	// Run the background consumers
 	log.Info().Msg("Starting realtime consumers")
 
 	queue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
