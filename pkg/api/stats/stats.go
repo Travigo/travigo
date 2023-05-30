@@ -23,6 +23,8 @@ type RecordsStatsActiveRealtimeJourneys struct {
 	LocationWithTrack    int64
 	LocationWithoutTrack int64
 	ExternalProvided     int64
+
+	TransportTypes map[ctdf.TransportType]int
 }
 type recordStatsElasticEvent struct {
 	Stats *RecordsStats
@@ -42,6 +44,8 @@ func UpdateRecordsStats() {
 			LocationWithTrack:    0,
 			LocationWithoutTrack: 0,
 			ExternalProvided:     0,
+
+			TransportTypes: map[ctdf.TransportType]int{},
 		},
 	}
 
@@ -64,6 +68,8 @@ func UpdateRecordsStats() {
 		var numberActiveRealtimeJourneysWithTrack int64
 		var numberActiveRealtimeJourneysWithoutTrack int64
 		var numberActiveRealtimeJourneysExternal int64
+		transportTypes := map[ctdf.TransportType]int{}
+
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
 			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
@@ -84,6 +90,9 @@ func UpdateRecordsStats() {
 				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityExternalProvided {
 					numberActiveRealtimeJourneysExternal += 1
 				}
+
+				realtimeJourney.Journey.GetService()
+				transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
 			}
 		}
 
@@ -91,6 +100,7 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithTrack = numberActiveRealtimeJourneysWithTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
+		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
