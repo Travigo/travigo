@@ -92,7 +92,9 @@ func UpdateRecordsStats() {
 				}
 
 				realtimeJourney.Journey.GetService()
-				transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
+				if realtimeJourney.Journey.Service != nil {
+					transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
+				}
 			}
 		}
 
