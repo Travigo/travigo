@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -36,7 +37,7 @@ func (l *LineTracker) Run() {
 	log.Info().
 		Str("id", l.Line.LineID).
 		Str("type", string(l.Line.TransportType)).
-		Str("service", string(l.Service.PrimaryIdentifier)).
+		Str("service", l.Service.PrimaryIdentifier).
 		Msg("Registering new line tracker")
 
 	for {
@@ -122,6 +123,21 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
 		if realtimeJourney == nil {
+			nameRegex := regexp.MustCompile("(.+) Underground Station")
+
+			destinationDisplay := predictions[0].DestinationName
+			if destinationDisplay == "" && predictions[0].Towards != "" && predictions[0].Towards != "Check Front of Train" {
+				destinationDisplay = predictions[0].Towards
+			} else if destinationDisplay == "" {
+				destinationDisplay = l.Service.ServiceName
+			}
+
+			nameMatches := nameRegex.FindStringSubmatch(predictions[0].DestinationName)
+
+			if len(nameMatches) == 2 {
+				destinationDisplay = nameMatches[1]
+			}
+
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier: realtimeJourneyID,
 				CreationDateTime:  now,
@@ -143,6 +159,8 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 					Service:    l.Service,
 					ServiceRef: l.Service.PrimaryIdentifier,
+
+					DestinationDisplay: destinationDisplay,
 				},
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},

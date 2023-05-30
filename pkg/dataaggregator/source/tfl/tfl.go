@@ -2,17 +2,12 @@ package tfl
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
-	"github.com/travigo/travigo/pkg/dataaggregator/source/databaselookup"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"github.com/travigo/travigo/pkg/transforms"
-	"io"
-	"net/http"
 	"reflect"
-	"regexp"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -57,16 +52,10 @@ func (t Source) Lookup(q any) (interface{}, error) {
 
 		latestDepartureTime := now
 
-		// Get all the services running at this stop locally
-		//serviceNameMapping := t.getServiceNameMappings(departureBoardQuery.Stop)
-		//pretty.Println(serviceNameMapping, tflOperator)
-
 		// Query for services from the realtime_journeys table
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 		cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-			fmt.Sprintf("stops.%s", tflStopID): bson.M{
-				"$exists": true,
-			},
+			fmt.Sprintf("stops.%s.timetype", tflStopID): ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 		})
 
 		var realtimeJourneys []ctdf.RealtimeJourney
@@ -86,7 +75,7 @@ func (t Source) Lookup(q any) (interface{}, error) {
 				}
 
 				departure := &ctdf.DepartureBoard{
-					DestinationDisplay: realtimeJourney.PrimaryIdentifier,
+					DestinationDisplay: realtimeJourney.Journey.DestinationDisplay,
 					Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 					Time:               scheduledTime,
 
@@ -125,82 +114,6 @@ func (t Source) Lookup(q any) (interface{}, error) {
 	}
 
 	return nil, nil
-}
-
-func (t Source) getTflStopArrivals(stopID string) ([]tflArrivalPrediction, error) {
-	url := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/%s/Arrivals?app_key=%s", stopID, t.AppKey)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header["user-agent"] = []string{"curl/7.54.1"}
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		return nil, err
-	}
-
-	byteValue, _ := io.ReadAll(resp.Body)
-
-	var arrivalPredictions []tflArrivalPrediction
-	err = json.Unmarshal(byteValue, &arrivalPredictions)
-
-	return arrivalPredictions, err
-}
-
-func (t Source) getServiceNameMappings(stop *ctdf.Stop) map[string]*ctdf.Service {
-	databaseLookup := databaselookup.Source{}
-	servicesQueryResult, err := databaseLookup.Lookup(query.ServicesByStop{
-		Stop: stop,
-	})
-
-	serviceNameMapping := map[string]*ctdf.Service{}
-	if err == nil {
-		for _, service := range servicesQueryResult.([]*ctdf.Service) {
-			serviceNameMapping[service.ServiceName] = service
-		}
-	}
-
-	return serviceNameMapping
-}
-
-type tflArrivalPrediction struct {
-	ID            string `json:"id"`
-	OperationType int    `json:"operationType"`
-	VehicleID     string `json:"vehicleId"`
-
-	LineID   string `json:"lineId"`
-	LineName string `json:"lineName"`
-
-	PlatformName string `json:"platformName"`
-	Direction    string `json:"direction"`
-
-	DestinationNaptanID string `json:"destinationNaptanId"`
-	DestinationName     string `json:"destinationName"`
-
-	Towards string `json:"towards"`
-
-	ExpectedArrival string `json:"expectedArrival"`
-
-	ModeName string `json:"modeName"`
-}
-
-func (prediction *tflArrivalPrediction) GetDestinationDisplay(service *ctdf.Service) string {
-	nameRegex := regexp.MustCompile("(.+) Underground Station")
-
-	destinationName := prediction.DestinationName
-	if destinationName == "" && prediction.Towards != "" && prediction.Towards != "Check Front of Train" {
-		destinationName = prediction.Towards
-	} else if destinationName == "" {
-		destinationName = service.ServiceName
-	}
-
-	nameMatches := nameRegex.FindStringSubmatch(prediction.DestinationName)
-
-	if len(nameMatches) == 2 {
-		destinationName = nameMatches[1]
-	}
-
-	return destinationName
 }
 
 func getTflStopID(stop *ctdf.Stop) (string, error) {
