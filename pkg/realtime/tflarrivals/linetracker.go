@@ -151,6 +151,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 		realtimeJourney.ModificationDateTime = now
 
+		updatedStops := map[string]bool{}
 		for _, prediction := range predictions {
 			stopID := fmt.Sprintf("GB:TFL:STOP:%s", prediction.NaptanID)
 
@@ -162,6 +163,15 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 				TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 				ArrivalTime:   scheduledTime,
 				DepartureTime: scheduledTime,
+			}
+
+			updatedStops[stopID] = true
+		}
+
+		// Iterate over stops in the realtime journey and any that arent included in this update get changed to historical
+		for _, stop := range realtimeJourney.Stops {
+			if !updatedStops[stop.StopRef] {
+				stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
 			}
 		}
 
