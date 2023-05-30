@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -189,6 +188,10 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bsonx.Doc{{Key: "journey.primaryidentifier", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys:    bsonx.Doc{{Key: "modificationdatetime", Value: bsonx.Int32(1)}},
+			Options: options.Index().SetExpireAfterSeconds(14400), // Expire after 4 hours
 		},
 	}, options.CreateIndexes())
 	if err != nil {
