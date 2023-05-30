@@ -16,6 +16,9 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "travigo-elasticsearch-user"
 
+tfl:
+  apiKeySecret: travigo-tfl-api-key
+
 runner:
   resources:
     requests:

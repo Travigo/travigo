@@ -80,8 +80,8 @@ func (t Source) Lookup(q any) (interface{}, error) {
 			if !timedOut {
 				scheduledTime := realtimeJourney.Stops[tflStopID].ArrivalTime
 
-				// Skip over this one if we've already past its arrival time
-				if scheduledTime.Before(now) {
+				// Skip over this one if we've already past its arrival time (allow 30 second overlap)
+				if scheduledTime.Before(now.Add(-30 * time.Second)) {
 					continue
 				}
 
