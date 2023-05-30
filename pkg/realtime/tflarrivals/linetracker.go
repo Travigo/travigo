@@ -19,6 +19,7 @@ import (
 
 type LineTracker struct {
 	Line        TfLLine
+	TfLAppKey   string
 	RefreshRate time.Duration
 	Service     *ctdf.Service
 }
@@ -69,7 +70,7 @@ func (l *LineTracker) GetService() {
 }
 
 func (l *LineTracker) GetLatestArrivals() []ArrivalPrediction {
-	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals", l.Line.LineID)
+	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals?app_key=%s", l.Line.LineID, l.TfLAppKey)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
