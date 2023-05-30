@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/databaselookup"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
+	"github.com/travigo/travigo/pkg/transforms"
 	"io"
 	"net/http"
 	"reflect"
@@ -16,7 +18,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
@@ -54,52 +55,53 @@ func (t Source) Lookup(q any) (interface{}, error) {
 		var departureBoard []*ctdf.DepartureBoard
 		now := time.Now()
 
-		latestDepartureTime := time.Now()
+		latestDepartureTime := now
 
 		// Get all the services running at this stop locally
-		serviceNameMapping := t.getServiceNameMappings(departureBoardQuery.Stop)
+		//serviceNameMapping := t.getServiceNameMappings(departureBoardQuery.Stop)
+		//pretty.Println(serviceNameMapping, tflOperator)
 
-		arrivalPredictions, err := t.getTflStopArrivals(tflStopID)
-		if err != nil {
-			return nil, err
+		// Query for services from the realtime_journeys table
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+		cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
+			fmt.Sprintf("stops.%s", tflStopID): bson.M{
+				"$exists": true,
+			},
+		})
+
+		var realtimeJourneys []ctdf.RealtimeJourney
+		if err := cursor.All(context.Background(), &realtimeJourneys); err != nil {
+			log.Error().Err(err).Msg("Failed to decode Realtime Journeys")
 		}
 
-		// Convert the TfL results into a departure board
-		for _, prediction := range arrivalPredictions {
-			var service *ctdf.Service
-			if serviceNameMapping[prediction.LineName] == nil {
-				service = &ctdf.Service{
-					PrimaryIdentifier: fmt.Sprintf("GB:TFLSERVICE:%s", prediction.LineID),
-					ServiceName:       prediction.LineName,
-					OperatorRef:       tflOperator.PrimaryIdentifier,
+		for _, realtimeJourney := range realtimeJourneys {
+			timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
+
+			if !timedOut {
+				scheduledTime := realtimeJourney.Stops[tflStopID].ArrivalTime
+
+				// Skip over this one if we've already past its arrival time
+				if scheduledTime.Before(now) {
+					continue
 				}
-			} else {
-				service = serviceNameMapping[prediction.LineName]
-			}
 
-			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
-			scheduledTime = scheduledTime.In(now.Location())
+				departure := &ctdf.DepartureBoard{
+					DestinationDisplay: realtimeJourney.PrimaryIdentifier,
+					Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
+					Time:               scheduledTime,
 
-			departure := &ctdf.DepartureBoard{
-				DestinationDisplay: prediction.GetDestinationDisplay(service),
-				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
-				Time:               scheduledTime,
+					Journey: realtimeJourney.Journey,
+				}
+				realtimeJourney.Journey.GetService()
+				departure.Journey.Operator = tflOperator
+				departure.Journey.OperatorRef = tflOperator.PrimaryIdentifier
 
-				Journey: &ctdf.Journey{
-					PrimaryIdentifier: "",
+				transforms.Transform(departure, 2)
+				departureBoard = append(departureBoard, departure)
 
-					ServiceRef: service.PrimaryIdentifier,
-					Service:    service,
-
-					OperatorRef: tflOperator.PrimaryIdentifier,
-					Operator:    tflOperator,
-				},
-			}
-			transforms.Transform(departure, 2)
-			departureBoard = append(departureBoard, departure)
-
-			if scheduledTime.After(latestDepartureTime) {
-				latestDepartureTime = scheduledTime
+				if scheduledTime.After(latestDepartureTime) {
+					latestDepartureTime = scheduledTime
+				}
 			}
 		}
 
@@ -228,5 +230,5 @@ func getTflStopID(stop *ctdf.Stop) (string, error) {
 		return tflStopID, source.UnsupportedSourceError
 	}
 
-	return tflStopID, nil
+	return fmt.Sprintf("GB:TFL:STOP:%s", tflStopID), nil
 }

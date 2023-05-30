@@ -19,10 +19,25 @@ import (
 type LineTracker struct {
 	Line        TfLLine
 	RefreshRate time.Duration
+	Service     *ctdf.Service
 }
 
-func (l LineTracker) Run() {
-	log.Info().Str("lineid", l.Line.LineID).Str("transporttype", string(l.Line.TransportType)).Msg("Registering new line")
+func (l *LineTracker) Run() {
+	l.GetService()
+
+	if l.Service == nil {
+		log.Error().
+			Str("id", l.Line.LineID).
+			Str("type", string(l.Line.TransportType)).
+			Msg("Failed setting up line tracker - couldnt find CTDF Service")
+		return
+	}
+
+	log.Info().
+		Str("id", l.Line.LineID).
+		Str("type", string(l.Line.TransportType)).
+		Str("service", string(l.Service.PrimaryIdentifier)).
+		Msg("Registering new line tracker")
 
 	for {
 		startTime := time.Now()
@@ -40,7 +55,19 @@ func (l LineTracker) Run() {
 	}
 }
 
-func (l LineTracker) GetLatestArrivals() []ArrivalPrediction {
+func (l *LineTracker) GetService() {
+	collection := database.GetCollection("services")
+
+	query := bson.M{
+		"operatorref":   "GB:NOC:TFLO",
+		"servicename":   l.Line.LineName,
+		"transporttype": l.Line.TransportType,
+	}
+
+	collection.FindOne(context.Background(), query).Decode(&l.Service)
+}
+
+func (l *LineTracker) GetLatestArrivals() []ArrivalPrediction {
 	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals", l.Line.LineID)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
@@ -61,7 +88,12 @@ func (l LineTracker) GetLatestArrivals() []ArrivalPrediction {
 	return lineArrivals
 }
 
-func (l LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
+func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
+	tflOperator := &ctdf.Operator{
+		PrimaryIdentifier: "GB:NOC:TFLO",
+		PrimaryName:       "Transport for London",
+	}
+
 	now := time.Now()
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	var realtimeJourneyUpdateOperations []mongo.WriteModel
@@ -103,6 +135,16 @@ func (l LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 					Identifier:     fmt.Sprint(now.Unix()),
 				},
 
+				Journey: &ctdf.Journey{
+					PrimaryIdentifier: realtimeJourneyID,
+
+					Operator:    tflOperator,
+					OperatorRef: tflOperator.PrimaryIdentifier,
+
+					Service:    l.Service,
+					ServiceRef: l.Service.PrimaryIdentifier,
+				},
+
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
 		}
@@ -110,7 +152,7 @@ func (l LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		realtimeJourney.ModificationDateTime = now
 
 		for _, prediction := range predictions {
-			stopID := fmt.Sprintf(ctdf.StopIDFormat, prediction.NaptanID)
+			stopID := fmt.Sprintf("GB:TFL:STOP:%s", prediction.NaptanID)
 
 			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 			scheduledTime = scheduledTime.In(now.Location())

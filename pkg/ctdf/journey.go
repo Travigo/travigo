@@ -75,8 +75,8 @@ func (j *Journey) GetRealtimeJourney() {
 
 	var realtimeJourney *RealtimeJourney
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
-		"journeyref":           j.PrimaryIdentifier,
-		"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+		"journey.primaryidentifier": j.PrimaryIdentifier,
+		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
 	}).Decode(&realtimeJourney)
 
 	if realtimeJourney != nil && realtimeJourney.IsActive() {

@@ -76,7 +76,6 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 		}
 
 		if realtimeJourney.IsActive() {
-			realtimeJourney.GetReferences()
 			realtimeJourney.Journey.GetService()
 			realtimeJourney.Journey.GetOperator()
 

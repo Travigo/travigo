@@ -1,11 +1,7 @@
 package ctdf
 
 import (
-	"context"
 	"time"
-
-	"github.com/travigo/travigo/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
@@ -13,8 +9,8 @@ var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
 type RealtimeJourney struct {
 	PrimaryIdentifier string `groups:"basic"`
 
-	JourneyRef string   `groups:"internal"`
-	Journey    *Journey `groups:"basic" bson:"-"`
+	//JourneyRef string   `groups:"internal"`
+	Journey *Journey `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
@@ -49,14 +45,6 @@ const (
 	RealtimeJourneyReliabilityLocationWithoutTrack                                = "LocationWithoutTrack"
 )
 
-func (r *RealtimeJourney) GetReferences() {
-	r.GetJourney()
-}
-func (r *RealtimeJourney) GetJourney() {
-	journeysCollection := database.GetCollection("journeys")
-	journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": r.JourneyRef}).Decode(&r.Journey)
-}
-
 func (r *RealtimeJourney) IsActive() bool {
 	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > 10
 
@@ -64,14 +52,12 @@ func (r *RealtimeJourney) IsActive() bool {
 		return false
 	}
 
-	if r.Journey == nil {
-		r.GetJourney()
-	}
-
 	// If tis still nil then give up
 	if r.Journey == nil {
 		return false
 	}
+
+	return true // TODO REMOVE THIS OBVIOUSLY YOU IDIOT
 
 	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
 

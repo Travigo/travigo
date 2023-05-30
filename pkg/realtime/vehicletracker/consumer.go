@@ -318,7 +318,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
 	currentTime := vehicleLocationEvent.CreationDateTime
 
-	var journey *CacheJourney
+	var journey *ctdf.Journey
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
 
@@ -495,7 +495,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	if realtimeJourney == nil {
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyIdentifier,
-			JourneyRef:        vehicleLocationEvent.JourneyRef,
+			Journey:           journey,
 
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,

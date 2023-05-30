@@ -32,8 +32,38 @@ func RegisterCLI() *cli.Command {
 					trackerManager := TrackerManager{
 						Lines: []TfLLine{
 							{
-								LineID:        "victoria",
-								LineName:      "Victoria",
+								LineID:        "bakerloo",
+								LineName:      "Bakerloo",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "central",
+								LineName:      "Central",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "circle",
+								LineName:      "Circle",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "district",
+								LineName:      "District",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "hammersmith-city",
+								LineName:      "Hammersmith & City",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "jubilee",
+								LineName:      "Jubilee",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "metropolitan",
+								LineName:      "Metropolitan",
 								TransportType: ctdf.TransportTypeMetro,
 							},
 							{
@@ -41,6 +71,27 @@ func RegisterCLI() *cli.Command {
 								LineName:      "Northern",
 								TransportType: ctdf.TransportTypeMetro,
 							},
+							{
+								LineID:        "piccadilly",
+								LineName:      "Piccadilly",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "victoria",
+								LineName:      "Victoria",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							{
+								LineID:        "waterloo-city",
+								LineName:      "Waterloo & City",
+								TransportType: ctdf.TransportTypeMetro,
+							},
+							// DLR
+							// Tram
+							// River boat
+							// River tour
+							// Cable car (?)
+							// Elizabeth line (?)
 						},
 					}
 					trackerManager.Run()

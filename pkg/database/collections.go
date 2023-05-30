@@ -188,7 +188,7 @@ func createJourneysIndexes() {
 			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "journeyref", Value: bsonx.Int32(1)}},
+			Keys: bsonx.Doc{{Key: "journey.primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 	}, options.CreateIndexes())
 	if err != nil {
