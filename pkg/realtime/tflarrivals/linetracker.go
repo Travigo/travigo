@@ -318,6 +318,17 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			}
 		} else {
 			realtimeJourney.Journey.DestinationDisplay = fmt.Sprintf("[X-%d] %s", len(potentialOrderLineRouteMatches), realtimeJourney.Journey.DestinationDisplay)
+
+			for i := 1; i < len(journeyOrderedNaptanIDs); i++ {
+				originStop := journeyOrderedNaptanIDs[i-1]
+				destinationStop := journeyOrderedNaptanIDs[i]
+
+				vehicleJourneyPath = append(vehicleJourneyPath, &ctdf.JourneyPathItem{
+					OriginStopRef: originStop,
+
+					DestinationStopRef: destinationStop,
+				})
+			}
 		}
 		realtimeJourney.Journey.Path = vehicleJourneyPath
 
