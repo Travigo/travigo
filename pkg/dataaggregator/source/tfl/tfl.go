@@ -117,7 +117,7 @@ func (t Source) Lookup(q any) (interface{}, error) {
 }
 
 func getTflStopID(stop *ctdf.Stop) (string, error) {
-	// If the stop has no CrsRef then give up
+	// Only care about metro stops
 	if !slices.Contains(stop.TransportTypes, ctdf.TransportTypeMetro) {
 		return "", source.UnsupportedSourceError
 	}
