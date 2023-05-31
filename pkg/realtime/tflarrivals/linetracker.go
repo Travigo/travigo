@@ -246,7 +246,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			journeyOrderedNaptanIDs = append(journeyOrderedNaptanIDs, lastPredictionDestination)
 		}
 
-		testJourneyID := "DISABLED" // TODO DELETE THIS STUFF
+		testJourneyID := "REALTIME:TFL:tube:piccadilly:outbound:325:940GZZLUCKS" // TODO DELETE THIS STUFF
 		if realtimeJourney.PrimaryIdentifier == testJourneyID {
 			pretty.Println("journey", journeyOrderedNaptanIDs)
 		}
@@ -338,7 +338,15 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 }
 
+// TODO convert to proper cache
+var stopTflStopCache map[string]*ctdf.Stop
+
 func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
+	cacheValue := stopTflStopCache[tflStopID]
+	if cacheValue != nil {
+		return cacheValue
+	}
+
 	stopGroupCollection := database.GetCollection("stop_groups")
 	var stopGroup *ctdf.StopGroup
 	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers.AtcoCode": tflStopID}).Decode(&stopGroup)
@@ -350,6 +358,8 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	stopCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
+
+	stopTflStopCache[tflStopID] = stop
 
 	return stop
 }

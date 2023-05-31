@@ -26,6 +26,9 @@ func (t TrackerManager) Run() {
 		log.Fatal().Msg("\"TRAVIGO_TFL_API_KEY\" not set in environment")
 	}
 
+	// TODO replace with proper cache
+	stopTflStopCache = map[string]*ctdf.Stop{}
+
 	for _, line := range t.Lines {
 		go func(line TfLLine) {
 			lineTracker := LineTracker{
