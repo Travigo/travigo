@@ -57,7 +57,9 @@ func (r *RealtimeJourney) IsActive() bool {
 		return false
 	}
 
-	return true // TODO REMOVE THIS OBVIOUSLY YOU IDIOT
+	if len(r.Journey.Path) == 0 {
+		return false
+	}
 
 	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
 
