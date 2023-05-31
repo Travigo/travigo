@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -340,10 +341,14 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 }
 
 // TODO convert to proper cache
+var stopTflStopCacheMutex sync.Mutex
 var stopTflStopCache map[string]*ctdf.Stop
 
 func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
+	stopTflStopCacheMutex.Lock()
 	cacheValue := stopTflStopCache[tflStopID]
+	stopTflStopCacheMutex.Unlock()
+
 	if cacheValue != nil {
 		return cacheValue
 	}
@@ -360,7 +365,9 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
 
+	stopTflStopCacheMutex.Lock()
 	stopTflStopCache[tflStopID] = stop
+	stopTflStopCacheMutex.Unlock()
 
 	return stop
 }

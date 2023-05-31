@@ -4,6 +4,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/util"
+	"sync"
 	"time"
 )
 
@@ -27,6 +28,7 @@ func (t TrackerManager) Run() {
 	}
 
 	// TODO replace with proper cache
+	stopTflStopCacheMutex = sync.Mutex{}
 	stopTflStopCache = map[string]*ctdf.Stop{}
 
 	for _, line := range t.Lines {
