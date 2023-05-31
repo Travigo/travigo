@@ -20,8 +20,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const tflStopFormat = "GB:TFL:STOP:%s"
-
 type LineTracker struct {
 	Line        TfLLine
 	TfLAppKey   string
@@ -241,12 +239,16 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 		lastPredictionStop := journeyOrderedNaptanIDs[len(journeyOrderedNaptanIDs)-1]
 		lastPrediction := predictions[len(predictions)-1]
-		lastPredictionDestination := fmt.Sprintf(tflStopFormat, lastPrediction.DestinationNaptanID)
-		if lastPredictionStop != lastPredictionDestination && lastPredictionDestination != fmt.Sprintf(tflStopFormat, "") {
+
+		lastPredictionDestination := lastPrediction.DestinationNaptanID
+		if lastPredictionDestination != "" {
+			lastPredictionDestination = getStopFromTfLStop(lastPrediction.DestinationNaptanID).PrimaryIdentifier
+		}
+		if lastPredictionStop != lastPredictionDestination && lastPredictionDestination != "" {
 			journeyOrderedNaptanIDs = append(journeyOrderedNaptanIDs, lastPredictionDestination)
 		}
 
-		testJourneyID := "REALTIME:TFL:tube:piccadilly:outbound:325:940GZZLUCKS" // TODO DELETE THIS STUFF
+		testJourneyID := "DISABLED" // TODO DELETE THIS STUFF
 		if realtimeJourney.PrimaryIdentifier == testJourneyID {
 			pretty.Println("journey", journeyOrderedNaptanIDs)
 		}
@@ -259,7 +261,6 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			// Reduce the route naptan ids so that it only contains the same stops in the predictions
 			var reducedRouteOrderedNaptanIDs []string
 			for _, naptanID := range routeOrderedNaptanIDs {
-				//tflFormattedNaptanID := fmt.Sprintf(tflStopFormat, naptanID)
 				tflFormattedNaptanID := getStopFromTfLStop(naptanID).PrimaryIdentifier
 				if slices.Contains[string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
 					reducedRouteOrderedNaptanIDs = append(reducedRouteOrderedNaptanIDs, tflFormattedNaptanID)
