@@ -296,14 +296,27 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		realtimeJourney.Journey.DestinationDisplay = destinationDisplay
 
 		// Work out the route the vehicle is on
+		var vehicleJourneyPath []*ctdf.JourneyPathItem
 		if len(potentialOrderLineRouteMatches) == 1 {
-			//pretty.Println(potentialOrderLineRouteMatches[0])
-			//pretty.Println("yay")
-			realtimeJourney.Journey.DestinationDisplay = fmt.Sprintf("[Y] %s", realtimeJourney.Journey.DestinationDisplay)
+			for i := 1; i < len(potentialOrderLineRouteMatches[0].NaptanIDs); i++ {
+				originTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i-1]
+				originStop := getStopFromTfLStop(originTfLID)
+
+				destinationTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i]
+				destinationStop := getStopFromTfLStop(destinationTfLID)
+
+				vehicleJourneyPath = append(vehicleJourneyPath, &ctdf.JourneyPathItem{
+					OriginStop:    originStop,
+					OriginStopRef: originStop.PrimaryIdentifier,
+
+					DestinationStop:    destinationStop,
+					DestinationStopRef: destinationStop.PrimaryIdentifier,
+				})
+			}
 		} else {
-			//pretty.Println("boooo")
 			realtimeJourney.Journey.DestinationDisplay = fmt.Sprintf("[X-%d] %s", len(potentialOrderLineRouteMatches), realtimeJourney.Journey.DestinationDisplay)
 		}
+		realtimeJourney.Journey.Path = vehicleJourneyPath
 
 		// Create update
 		bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
@@ -322,4 +335,20 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
 	}
+}
+
+func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
+	stopGroupCollection := database.GetCollection("stop_groups")
+	var stopGroup *ctdf.StopGroup
+	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers.AtcoCode": tflStopID}).Decode(&stopGroup)
+
+	if stopGroup == nil {
+		return nil
+	}
+
+	stopCollection := database.GetCollection("stops")
+	var stop *ctdf.Stop
+	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
+
+	return stop
 }
