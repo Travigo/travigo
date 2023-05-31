@@ -199,7 +199,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		// Add new predictions to the realtime journey
 		updatedStops := map[string]bool{}
 		for _, prediction := range predictions {
-			stopID := fmt.Sprintf(tflStopFormat, prediction.NaptanID)
+			stopID := getStopFromTfLStop(prediction.NaptanID).PrimaryIdentifier
 
 			scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 			scheduledTime = scheduledTime.In(now.Location())
@@ -259,7 +259,8 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			// Reduce the route naptan ids so that it only contains the same stops in the predictions
 			var reducedRouteOrderedNaptanIDs []string
 			for _, naptanID := range routeOrderedNaptanIDs {
-				tflFormattedNaptanID := fmt.Sprintf(tflStopFormat, naptanID)
+				//tflFormattedNaptanID := fmt.Sprintf(tflStopFormat, naptanID)
+				tflFormattedNaptanID := getStopFromTfLStop(naptanID).PrimaryIdentifier
 				if slices.Contains[string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
 					reducedRouteOrderedNaptanIDs = append(reducedRouteOrderedNaptanIDs, tflFormattedNaptanID)
 				}

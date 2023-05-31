@@ -19,11 +19,11 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		PrimaryName:       "Transport for London",
 	}
 
-	tflStopID, err := getTflStopID(q.Stop)
+	//tflStopID, err := getTflStopID(q.Stop)
 
-	if err != nil {
-		return nil, err
-	}
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	var departureBoard []*ctdf.DepartureBoard
 	now := time.Now()
@@ -33,7 +33,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	// Query for services from the realtime_journeys table
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-		fmt.Sprintf("stops.%s.timetype", tflStopID): ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+		fmt.Sprintf("stops.%s.timetype", q.Stop.PrimaryIdentifier): ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 	})
 
 	var realtimeJourneys []ctdf.RealtimeJourney
@@ -45,7 +45,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
-			scheduledTime := realtimeJourney.Stops[tflStopID].ArrivalTime
+			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime
 
 			// Skip over this one if we've already past its arrival time (allow 30 second overlap)
 			if scheduledTime.Before(now.Add(-30 * time.Second)) {
