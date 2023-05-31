@@ -17,6 +17,9 @@ import (
 )
 
 func main() {
+	ukTimezone, _ := time.LoadLocation("Europe/London")
+	time.Local = ukTimezone
+
 	if os.Getenv("TRAVIGO_LOG_FORMAT") != "JSON" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	}
