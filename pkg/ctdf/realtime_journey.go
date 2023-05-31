@@ -57,8 +57,9 @@ func (r *RealtimeJourney) IsActive() bool {
 		return false
 	}
 
+	// If the path is nil then we cant do the following checks so just assume true
 	if len(r.Journey.Path) == 0 {
-		return false
+		return true
 	}
 
 	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
