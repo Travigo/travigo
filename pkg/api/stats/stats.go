@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/kr/pretty"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -70,11 +71,15 @@ func UpdateRecordsStats() {
 		var numberActiveRealtimeJourneysExternal int64
 		transportTypes := map[ctdf.TransportType]int{}
 
-		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{})
-		for activeRealtimeJourneys.Next(context.TODO()) {
-			var realtimeJourney *ctdf.RealtimeJourney
-			activeRealtimeJourneys.Decode(&realtimeJourney)
+		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
+		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
+			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+		})
 
+		var realtimeJourneys []ctdf.RealtimeJourney
+		activeRealtimeJourneys.All(context.Background(), &realtimeJourneys)
+
+		for _, realtimeJourney := range realtimeJourneys {
 			if realtimeJourney.IsActive() {
 				numberActiveRealtimeJourneys += 1
 
@@ -100,6 +105,8 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
+
+		pretty.Println(CurrentRecordsStats)
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
