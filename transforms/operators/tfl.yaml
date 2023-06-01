@@ -125,3 +125,21 @@ Match:
   TransportType: "Bus"
 Data:
   BrandColour: "#DC241F"
+# Tram
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:TFLO"
+  ServiceName: "Tram"
+Data:
+  BrandColour: "#5FB526"
+  BrandIcon:   "/icons/tfl-roundel-white.svg"
+  BrandDisplayMode: short
+# Ferry
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:TFLO"
+  TransportType: "Ferry"
+Data:
+  BrandColour: "#039BE5"

@@ -103,19 +103,19 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		}
 	case "RPLY": // railPlatform
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
+			ctdf.TransportTypeRail,
 		}
 	case "RLY": // railAccess
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
+			ctdf.TransportTypeRail,
 		}
 	case "RSE": // railStationEntrance
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
+			ctdf.TransportTypeRail,
 		}
 	case "PLT": // tramMetroOrUndergroundPlatform
 		if orig.StopClassification.OffStreet.Rail != nil {
-			TransportTypes = append(TransportTypes, ctdf.TransportTypeTrain)
+			TransportTypes = append(TransportTypes, ctdf.TransportTypeRail)
 		} else {
 			TransportTypes = []ctdf.TransportType{
 				ctdf.TransportTypeTram,
@@ -124,21 +124,21 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		}
 	case "MET": // tramMetroOrUndergroundAccess
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
+			ctdf.TransportTypeRail,
 			ctdf.TransportTypeMetro,
 		}
 	case "TMU": // tramMetroOrUndergroundEntrance
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeTrain,
+			ctdf.TransportTypeRail,
 			ctdf.TransportTypeMetro,
 		}
 	case "FER": // ferryOrPortAccess
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBoat,
+			ctdf.TransportTypeFerry,
 		}
 	case "FTD": // ferryTerminalDockEntrance
 		TransportTypes = []ctdf.TransportType{
-			ctdf.TransportTypeBoat,
+			ctdf.TransportTypeFerry,
 		}
 	case "TXR": // taxiRank
 		TransportTypes = []ctdf.TransportType{

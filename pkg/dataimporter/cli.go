@@ -471,7 +471,7 @@ func RegisterCLI() *cli.Command {
 						defer os.Remove(tempFile.Name())
 					}
 
-					err = importFile("nationalrail-toc", ctdf.TransportTypeTrain, source, "xml", datasource, map[string]string{})
+					err = importFile("nationalrail-toc", ctdf.TransportTypeRail, source, "xml", datasource, map[string]string{})
 					if err != nil {
 						log.Fatal().Err(err).Msg("Cannot import National Rail TOC document")
 					}

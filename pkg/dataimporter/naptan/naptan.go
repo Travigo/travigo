@@ -61,6 +61,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	processingGroup.Add(numBatches)
 
 	stationStopGroups := map[string]bool{}
+	stationStopGroupsMutex := sync.Mutex{}
 
 	for i := 0; i < numBatches; i++ {
 		lower := maxBatchSize * i
@@ -82,8 +83,10 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				ctdfStopGroup.DataSource = datasource
 
 				// Mark stops that are directly part of a station, they are handled specially
-				if ctdfStopGroup.Type == "station" {
+				if ctdfStopGroup.Type == "station" || ctdfStopGroup.Type == "port" {
+					stationStopGroupsMutex.Lock()
 					stationStopGroups[ctdfStopGroup.PrimaryIdentifier] = true
+					stationStopGroupsMutex.Unlock()
 				}
 
 				var existingStopGroup *ctdf.StopGroup
@@ -226,7 +229,10 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		// Find the main station descriptor and convert that first
 		for _, stopPoint := range stopPoints {
-			if stopPoint.StopClassification.StopType == "MET" || stopPoint.StopClassification.StopType == "RLY" {
+			// MET - Metro/tram
+			// RLT - Rail
+			// FER - Ferry
+			if stopPoint.StopClassification.StopType == "MET" || stopPoint.StopClassification.StopType == "RLY" || stopPoint.StopClassification.StopType == "FER" {
 				stationStop = stopPoint.ToCTDF()
 			}
 		}
@@ -238,7 +244,10 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 		// Find all platforms & entrances and add them to the stops
 		for _, stopPoint := range stopPoints {
-			if stopPoint.StopClassification.StopType == "PLT" {
+			// PLT - Metro/tram
+			// RPL - Rail
+			// FBT - Ferry
+			if stopPoint.StopClassification.StopType == "PLT" || stopPoint.StopClassification.StopType == "RPL" || stopPoint.StopClassification.StopType == "FBT" {
 				stop := stopPoint.ToCTDF()
 				stationStop.Platforms = append(stationStop.Platforms, &ctdf.StopPlatform{
 					PrimaryIdentifier: stop.PrimaryIdentifier,
@@ -250,7 +259,10 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					Location: stop.Location,
 				})
 			} else {
-				if stopPoint.StopClassification.StopType == "TMU" || stopPoint.StopClassification.StopType == "RSE" {
+				// TMU - Metro/tram
+				// RSE - Rail
+				// FTD - Ferry
+				if stopPoint.StopClassification.StopType == "TMU" || stopPoint.StopClassification.StopType == "RSE" || stopPoint.StopClassification.StopType == "FTD" {
 					stop := stopPoint.ToCTDF()
 					stationStop.Entrances = append(stationStop.Entrances, &ctdf.StopEntrance{
 						PrimaryIdentifier: stop.PrimaryIdentifier,

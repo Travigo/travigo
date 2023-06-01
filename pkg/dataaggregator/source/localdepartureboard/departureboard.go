@@ -6,21 +6,14 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/exp/slices"
 	"time"
 )
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
-	// Only support buses for local timetable so far
-	if !(slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeBus) || slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeMetro)) {
-		return nil, source.UnsupportedSourceError
-	}
-
 	var departureBoard []*ctdf.DepartureBoard
 
 	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0

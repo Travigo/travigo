@@ -16,7 +16,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	crs := q.Stop.OtherIdentifiers["Crs"]
 
 	// If the stop has no CrsRef then give up
-	if !slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeTrain) || crs == "" {
+	if !slices.Contains(q.Stop.TransportTypes, ctdf.TransportTypeRail) || crs == "" {
 		return nil, source.UnsupportedSourceError
 	}
 

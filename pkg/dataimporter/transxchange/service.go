@@ -10,6 +10,8 @@ type Service struct {
 	PublicUse                bool
 	OperatingPeriod          DateRange
 
+	Mode string
+
 	OperatingProfile OperatingProfile // `xml:",innerxml" json:"-" bson:"-"`
 
 	Lines []Line `xml:"Lines>Line"`

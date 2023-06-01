@@ -51,6 +51,8 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 		ctdfStopGroup.Type = "multimode_interchange"
 	case "GTMU", "GRLS":
 		ctdfStopGroup.Type = "station"
+	case "GFTD":
+		ctdfStopGroup.Type = "port"
 	default:
 		ctdfStopGroup.Type = "unknown"
 	}

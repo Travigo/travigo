@@ -45,7 +45,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() []*ctdf.Operator {
 			PrimaryName: toc.Name,
 			OtherNames:  []string{toc.LegalName},
 
-			TransportType: []string{ctdf.TransportTypeTrain},
+			TransportType: []string{ctdf.TransportTypeRail},
 
 			Website:     toc.CompanyWebsite,
 			Email:       toc.CustomerService.EmailAddress,

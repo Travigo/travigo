@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -160,6 +161,18 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				if stopPoint.CommonName != "" {
 					stopNameOverrides[fmt.Sprintf(ctdf.StopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
 				}
+			}
+
+			// Provided transport type is the default fallback one if none is specified in service
+			switch strings.ToLower(txcService.Mode) {
+			case "underground", "metro":
+				transportType = ctdf.TransportTypeMetro
+			case "rail":
+				transportType = ctdf.TransportTypeRail
+			case "boat", "ferry":
+				transportType = ctdf.TransportTypeFerry
+			case "tram":
+				transportType = ctdf.TransportTypeTram
 			}
 
 			ctdfService := ctdf.Service{
