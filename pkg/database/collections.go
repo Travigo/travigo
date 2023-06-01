@@ -119,8 +119,6 @@ func createJourneysIndexes() {
 	// Journeys
 	journeysCollection := GetCollection("journeys")
 
-	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
-	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
 	journeyIdentificationServiceTicketMachineJourneycodeIndexName := "JourneyIdentificationServiceTicketMachineJourneyCode"
 	journeyIdentificationServiceBlockNumberIndexName := "JourneyIdentificationServiceBlockNumberJourneyCode"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
@@ -138,24 +136,6 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bsonx.Doc{{Key: "datasource.dataset", Value: bsonx.Int32(1)}},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceOriginStopsIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "path.originstopref", Value: 1},
-			},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceDestinationStopsIndexName,
-			},
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "path.destinationstopref", Value: 1},
-			},
 		},
 		{
 			Options: &options.IndexOptions{

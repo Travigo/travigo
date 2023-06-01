@@ -379,6 +379,12 @@ func RegisterCLI() *cli.Command {
 						}
 					}
 
+					// TfL love to split out services over many files with different IDs
+					// Use the squash function to turn them into 1
+					squashIdenticalServices(bson.M{
+						"operatorref": "GB:NOC:TFLO",
+					})
+
 					return nil
 				},
 			},

@@ -283,7 +283,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		}
 
 		// Update destination display
-		nameRegex := regexp.MustCompile("(.+) Underground Station")
+		nameRegex := regexp.MustCompile("(.+) (Underground|DLR) Station")
 
 		destinationDisplay := lastPrediction.DestinationName
 		if destinationDisplay == "" && lastPrediction.Towards != "" && lastPrediction.Towards != "Check Front of Train" {
