@@ -19,12 +19,6 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		PrimaryName:       "Transport for London",
 	}
 
-	//tflStopID, err := getTflStopID(q.Stop)
-
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	var departureBoard []*ctdf.DepartureBoard
 	now := time.Now()
 
@@ -40,6 +34,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	if err := cursor.All(context.Background(), &realtimeJourneys); err != nil {
 		log.Error().Err(err).Msg("Failed to decode Realtime Journeys")
 	}
+
+	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
+
+	generateDeparteBoardStart := time.Now()
 
 	for _, realtimeJourney := range realtimeJourneys {
 		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
@@ -71,6 +69,8 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			}
 		}
 	}
+
+	log.Debug().Str("Length", time.Now().Sub(generateDeparteBoardStart).String()).Msg("Generate TfL departure board from realtime journeys")
 
 	// If the realtime data doesnt provide enough to cover our request then fill in with the local departure board
 	remainingCount := q.Count - len(departureBoard)
