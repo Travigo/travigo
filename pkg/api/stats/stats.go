@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/kr/pretty"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -105,8 +104,6 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
-
-		pretty.Println(CurrentRecordsStats)
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
