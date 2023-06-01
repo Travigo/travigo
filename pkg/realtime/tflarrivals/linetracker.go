@@ -332,6 +332,23 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		}
 		realtimeJourney.Journey.Path = vehicleJourneyPath
 
+		// Work out what the departed & next stops are
+		if len(vehicleJourneyPath) > 0 {
+			for _, item := range vehicleJourneyPath {
+				realtimeStop := realtimeJourney.Stops[item.OriginStopRef]
+
+				if realtimeStop != nil && realtimeStop.TimeType == ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+					realtimeJourney.DepartedStopRef = item.OriginStopRef
+					realtimeJourney.DepartedStop = item.OriginStop
+
+					realtimeJourney.NextStopRef = item.DestinationStopRef
+					realtimeJourney.NextStop = item.DestinationStop
+
+					break
+				}
+			}
+		}
+
 		// Create update
 		bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
 		updateModel := mongo.NewUpdateOneModel()
