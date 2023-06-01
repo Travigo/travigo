@@ -35,7 +35,7 @@ func (t TrackerManager) Run() {
 		go func(line TfLLine) {
 			lineTracker := LineTracker{
 				Line:        line,
-				RefreshRate: time.Second * 10,
+				RefreshRate: time.Second * 15,
 				TfLAppKey:   env["TRAVIGO_TFL_API_KEY"],
 			}
 

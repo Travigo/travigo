@@ -62,8 +62,6 @@ func (r *RealtimeJourney) IsActive() bool {
 		return true
 	}
 
-	return true //TODO DEBUG
-
 	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
 
 	if lastPathItem.DestinationStop == nil {
@@ -73,6 +71,11 @@ func (r *RealtimeJourney) IsActive() bool {
 		if lastPathItem.DestinationStop == nil {
 			return false
 		}
+	}
+
+	// No proper location then give up and say valid
+	if r.VehicleLocation.Type != "Point" {
+		return true
 	}
 
 	now := time.Now()
