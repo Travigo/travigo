@@ -86,7 +86,11 @@ func RegisterCLI() *cli.Command {
 								LineName:      "Waterloo & City",
 								TransportType: ctdf.TransportTypeMetro,
 							},
-							// DLR
+							{
+								LineID:        "dlr",
+								LineName:      "DLR",
+								TransportType: ctdf.TransportTypeMetro,
+							},
 							// Tram
 							// River boat
 							// River tour

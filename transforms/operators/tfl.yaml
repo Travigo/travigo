@@ -96,3 +96,11 @@ Match:
 Data:
   BrandColour: "#7dd1b8"
   BrandIcon:   "/icons/tfl-roundel-underground.svg"
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:NOC:TFLO"
+  ServiceName: "DLR"
+Data:
+  BrandColour: "#00AFAD"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
