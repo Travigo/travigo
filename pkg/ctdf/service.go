@@ -21,10 +21,11 @@ type Service struct {
 	OutboundDescription *ServiceDescription `groups:"basic"`
 	InboundDescription  *ServiceDescription `groups:"basic"`
 
-	BrandColour string `groups:"basic"`
-	BrandIcon   string `groups:"basic"`
+	BrandColour      string `groups:"basic"`
+	BrandIcon        string `groups:"basic"`
+	BrandDisplayMode string `groups:"basic"`
 
-	StopNameOverrides map[string]string
+	StopNameOverrides map[string]string `groups:"internal"`
 
 	TransportType TransportType `groups:"basic"`
 }
