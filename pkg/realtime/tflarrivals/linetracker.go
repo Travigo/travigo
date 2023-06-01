@@ -333,19 +333,26 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		realtimeJourney.Journey.Path = vehicleJourneyPath
 
 		// Work out what the departed & next stops are
-		if len(vehicleJourneyPath) > 0 {
-			for _, item := range vehicleJourneyPath {
-				realtimeStop := realtimeJourney.Stops[item.OriginStopRef]
+		// We find the first stop with an estimate instead of historical value and then base the departed/origin stops
+		// on the journey path item right before that one
+		for i, item := range vehicleJourneyPath {
+			realtimeStop := realtimeJourney.Stops[item.OriginStopRef]
 
-				if realtimeStop != nil && realtimeStop.TimeType == ctdf.RealtimeJourneyStopTimeEstimatedFuture {
-					realtimeJourney.DepartedStopRef = item.OriginStopRef
-					realtimeJourney.DepartedStop = item.OriginStop
+			var referenceItem *ctdf.JourneyPathItem
+			if i == 0 {
+				referenceItem = vehicleJourneyPath[0]
+			} else {
+				referenceItem = vehicleJourneyPath[i-1]
+			}
 
-					realtimeJourney.NextStopRef = item.DestinationStopRef
-					realtimeJourney.NextStop = item.DestinationStop
+			if realtimeStop != nil && realtimeStop.TimeType == ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+				realtimeJourney.DepartedStopRef = referenceItem.OriginStopRef
+				realtimeJourney.DepartedStop = referenceItem.OriginStop
 
-					break
-				}
+				realtimeJourney.NextStopRef = referenceItem.DestinationStopRef
+				realtimeJourney.NextStop = referenceItem.DestinationStop
+
+				break
 			}
 		}
 
