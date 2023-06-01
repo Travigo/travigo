@@ -61,7 +61,8 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			departure.Journey.Operator = tflOperator
 			departure.Journey.OperatorRef = tflOperator.PrimaryIdentifier
 
-			transforms.Transform(departure, 2)
+			transforms.Transform(departure.Journey.Service, 2)
+			transforms.Transform(departure.Journey.Operator, 2)
 			departureBoard = append(departureBoard, departure)
 
 			if scheduledTime.After(latestDepartureTime) {

@@ -190,8 +190,11 @@ func createJourneysIndexes() {
 			Keys: bsonx.Doc{{Key: "journey.primaryidentifier", Value: bsonx.Int32(1)}},
 		},
 		{
+			Keys: bsonx.Doc{{Key: "stops.$**", Value: bsonx.Int32(1)}},
+		},
+		{
 			Keys:    bsonx.Doc{{Key: "modificationdatetime", Value: bsonx.Int32(1)}},
-			Options: options.Index().SetExpireAfterSeconds(7200), // Expire after 2 hours
+			Options: options.Index().SetExpireAfterSeconds(3600), // Expire after 1 hour
 		},
 	}, options.CreateIndexes())
 	if err != nil {
