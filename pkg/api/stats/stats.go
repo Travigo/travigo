@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/mongo"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -76,12 +77,47 @@ func UpdateRecordsStats() {
 		transportTypes := map[ctdf.TransportType]int{}
 
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-		activeRealtimeJourneys, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-		})
-
 		startTime = time.Now()
 
+		matchStage := bson.D{
+			{
+				"$match",
+				bson.D{
+					{"modificationdatetime", bson.M{"$gt": realtimeActiveCutoffDate}},
+				},
+			},
+		}
+		//lookupStage := bson.D{
+		//	{
+		//		"$lookup",
+		//		bson.M{
+		//			"from":         "services",
+		//			"localField":   "journey.serviceref",
+		//			"foreignField": "primaryidentifier",
+		//			"as":           "_journeyservice",
+		//		},
+		//	},
+		//}
+		//addFieldStage := bson.D{
+		//	{
+		//		"$addFields",
+		//		bson.M{"journey.service": bson.M{"$first": "$_journeyservice"}},
+		//	},
+		//}
+		projectStage := bson.D{
+			{
+				"$project",
+				bson.D{
+					bson.E{Key: "modificationdatetime", Value: 1},
+					bson.E{Key: "reliability", Value: 1},
+					bson.E{Key: "journey.serviceref", Value: 1},
+					bson.E{Key: "vehiclelocation", Value: 1},
+					bson.E{Key: "journey.path.destinationstopref", Value: 1},
+					bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
+				},
+			},
+		}
+		activeRealtimeJourneys, _ := realtimeJourneysCollection.Aggregate(context.TODO(), mongo.Pipeline{matchStage, projectStage})
 		var realtimeJourneys []ctdf.RealtimeJourney
 		activeRealtimeJourneys.All(context.Background(), &realtimeJourneys)
 
