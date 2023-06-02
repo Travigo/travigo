@@ -101,31 +101,31 @@ func RegisterCLI() *cli.Command {
 								LineName:      "RB1",
 								TransportType: ctdf.TransportTypeFerry,
 							},
-							{
-								LineID:        "rb2",
-								LineName:      "RB2",
-								TransportType: ctdf.TransportTypeFerry,
-							},
-							{
-								LineID:        "rb4",
-								LineName:      "RB4",
-								TransportType: ctdf.TransportTypeFerry,
-							},
+							//{
+							//	LineID:        "rb2",
+							//	LineName:      "RB2",
+							//	TransportType: ctdf.TransportTypeFerry,
+							//},
+							//{
+							//	LineID:        "rb4",
+							//	LineName:      "RB4",
+							//	TransportType: ctdf.TransportTypeFerry,
+							//},
 							{
 								LineID:        "rb6",
 								LineName:      "RB6",
 								TransportType: ctdf.TransportTypeFerry,
 							},
-							{
-								LineID:        "thames-river-services",
-								LineName:      "Thames River Sightseeing",
-								TransportType: ctdf.TransportTypeFerry,
-							},
-							{
-								LineID:        "woolwich-ferry",
-								LineName:      "Woolwich Ferry",
-								TransportType: ctdf.TransportTypeFerry,
-							},
+							//{
+							//	LineID:        "thames-river-services",
+							//	LineName:      "Thames River Sightseeing",
+							//	TransportType: ctdf.TransportTypeFerry,
+							//},
+							//{
+							//	LineID:        "woolwich-ferry",
+							//	LineName:      "Woolwich Ferry",
+							//	TransportType: ctdf.TransportTypeFerry,
+							//},
 							// Cable car (?)
 							// Elizabeth line (?)
 						},

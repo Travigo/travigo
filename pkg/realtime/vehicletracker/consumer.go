@@ -26,7 +26,6 @@ import (
 
 var journeyCache *cache.Cache[string]
 var identificationCache *cache.Cache[string]
-var cacheExpirationTime = 90 * time.Minute
 
 const numConsumers = 5
 
@@ -40,12 +39,12 @@ func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
 }
 
 func CreateIdentificationCache() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(90*time.Minute))
 
 	identificationCache = cache.New[string](redisStore)
 }
 func CreateJourneyCache() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(cacheExpirationTime))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(50*time.Minute))
 
 	journeyCache = cache.New[string](redisStore)
 }
@@ -324,7 +323,8 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	if cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
-		journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+		result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+		return nil, result
 
 		for _, pathItem := range journey.Path {
 			pathItem.GetDestinationStop()
