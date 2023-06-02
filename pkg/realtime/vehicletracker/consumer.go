@@ -324,7 +324,10 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	if cachedJourney == "" {
 		journeysCollection := database.GetCollection("journeys")
 		result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
-		return nil, result
+
+		if result != nil {
+			return nil, result
+		}
 
 		for _, pathItem := range journey.Path {
 			pathItem.GetDestinationStop()
