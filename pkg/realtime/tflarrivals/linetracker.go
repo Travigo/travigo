@@ -137,7 +137,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		PrimaryIdentifier: "GB:NOC:TFLO",
 		PrimaryName:       "Transport for London",
 	}
-
+	startTime := time.Now()
 	now := time.Now()
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	var realtimeJourneyUpdateOperations []mongo.WriteModel
@@ -377,6 +377,8 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
 	}
+
+	log.Info().Str("id", l.Line.LineID).Str("length", time.Now().Sub(startTime).String()).Msg("update line")
 }
 
 // TODO convert to proper cache
