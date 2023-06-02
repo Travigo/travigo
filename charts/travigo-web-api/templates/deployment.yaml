@@ -83,10 +83,10 @@ spec:
             - "run"
             - "--listen"
             - ":80"
-          livenessProbe:
-            httpGet:
-              path: /core/version
-              port: http
+{{/*          livenessProbe:*/}}
+{{/*            httpGet:*/}}
+{{/*              path: /core/version*/}}
+{{/*              port: http*/}}
           readinessProbe:
             httpGet:
               path: /core/version
