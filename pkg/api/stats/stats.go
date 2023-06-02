@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/rs/zerolog/log"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -50,6 +51,8 @@ func UpdateRecordsStats() {
 	}
 
 	for {
+		startTime := time.Now()
+
 		stopsCollection := database.GetCollection("stops")
 		numberStops, _ := stopsCollection.CountDocuments(context.Background(), bson.D{})
 		CurrentRecordsStats.Stops = numberStops
@@ -64,6 +67,8 @@ func UpdateRecordsStats() {
 
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
+		log.Debug().Str("Length", time.Now().Sub(startTime).String()).Msg("Stats - get basic")
+
 		var numberActiveRealtimeJourneys int64
 		var numberActiveRealtimeJourneysWithTrack int64
 		var numberActiveRealtimeJourneysWithoutTrack int64
@@ -75,8 +80,13 @@ func UpdateRecordsStats() {
 			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
 		})
 
+		startTime = time.Now()
+
 		var realtimeJourneys []ctdf.RealtimeJourney
 		activeRealtimeJourneys.All(context.Background(), &realtimeJourneys)
+
+		log.Debug().Str("Length", time.Now().Sub(startTime).String()).Msg("Stats - get all realtime journeys")
+		startTime = time.Now()
 
 		for _, realtimeJourney := range realtimeJourneys {
 			if realtimeJourney.IsActive() {
@@ -98,6 +108,7 @@ func UpdateRecordsStats() {
 				}
 			}
 		}
+		log.Debug().Str("Length", time.Now().Sub(startTime).String()).Msg("Stats - iterate over realtime journeys")
 
 		CurrentRecordsStats.ActiveRealtimeJourneys.Current = numberActiveRealtimeJourneys
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithTrack = numberActiveRealtimeJourneysWithTrack
