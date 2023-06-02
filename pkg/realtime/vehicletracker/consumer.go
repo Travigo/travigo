@@ -24,7 +24,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var journeyCache *cache.Cache[string]
 var identificationCache *cache.Cache[string]
 
 const numConsumers = 5
@@ -43,15 +42,9 @@ func CreateIdentificationCache() {
 
 	identificationCache = cache.New[string](redisStore)
 }
-func CreateJourneyCache() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(50*time.Minute))
-
-	journeyCache = cache.New[string](redisStore)
-}
 func StartConsumers() {
 	// Create Cache
 	CreateIdentificationCache()
-	CreateJourneyCache()
 
 	// Run the background consumers
 	log.Info().Msg("Starting realtime consumers")
@@ -317,11 +310,17 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
 	currentTime := vehicleLocationEvent.CreationDateTime
 
-	var journey *ctdf.Journey
-	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
-	cachedJourney, _ := journeyCache.Get(context.Background(), vehicleLocationEvent.JourneyRef)
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
+	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
-	if cachedJourney == "" {
+	var realtimeJourney *ctdf.RealtimeJourney
+	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
+
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+	if realtimeJourney == nil {
+		var journey *ctdf.Journey
 		journeysCollection := database.GetCollection("journeys")
 		result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
@@ -332,12 +331,16 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		for _, pathItem := range journey.Path {
 			pathItem.GetDestinationStop()
 		}
+		realtimeJourney = &ctdf.RealtimeJourney{
+			PrimaryIdentifier: realtimeJourneyIdentifier,
+			Journey:           journey,
 
-		journeyJson, _ := json.Marshal(journey)
+			CreationDateTime: currentTime,
+			DataSource:       vehicleLocationEvent.DataSource,
 
-		journeyCache.Set(context.Background(), vehicleLocationEvent.JourneyRef, string(journeyJson))
-	} else {
-		json.Unmarshal([]byte(cachedJourney), &journey)
+			VehicleRef: vehicleLocationEvent.VehicleRef,
+			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
+		}
 	}
 
 	closestDistance := 999999999999.0
@@ -346,7 +349,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
 
 	// Attempt to calculate using closest journey track
-	for i, journeyPathItem := range journey.Path {
+	for i, journeyPathItem := range realtimeJourney.Journey.Path {
 		journeyPathClosestDistance := 99999999999999.0 // TODO do this better
 
 		for i := 0; i < len(journeyPathItem.Track)-1; i++ {
@@ -374,7 +377,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	// If we fail to identify closest journey path item using track use fallback stop location method
 	if closestDistanceJourneyPath == nil {
 		closestDistance = 999999999999.0
-		for i, journeyPathItem := range journey.Path {
+		for i, journeyPathItem := range realtimeJourney.Journey.Path {
 			if journeyPathItem.DestinationStop == nil {
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
 			}
@@ -392,7 +395,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			// TODO this seems a bit hacky but I dont think we care much if we're on the first item
 			closestDistanceJourneyPathPercentComplete = 0.5
 		} else {
-			previousJourneyPath := journey.Path[len(journey.Path)-1]
+			previousJourneyPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
 
 			if previousJourneyPath.DestinationStop == nil {
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
@@ -461,14 +464,14 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	// Calculate all the estimated stop arrival & departure times
 	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
-	for i := closestDistanceJourneyPathIndex; i < len(journey.Path); i++ {
-		path := journey.Path[i]
+	for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
+		path := realtimeJourney.Journey.Path[i]
 
 		arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
 		var departureTime time.Time
 
-		if i < len(journey.Path)-1 {
-			nextPath := journey.Path[i+1]
+		if i < len(realtimeJourney.Journey.Path)-1 {
+			nextPath := realtimeJourney.Journey.Path[i+1]
 
 			if arrivalTime.Before(nextPath.OriginDepartureTime) {
 				departureTime = nextPath.OriginDepartureTime
@@ -487,27 +490,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	}
 
 	// Update database
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
-	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
-
-	var realtimeJourney *ctdf.RealtimeJourney
-
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-
-	if realtimeJourney == nil {
-		realtimeJourney = &ctdf.RealtimeJourney{
-			PrimaryIdentifier: realtimeJourneyIdentifier,
-			Journey:           journey,
-
-			CreationDateTime: currentTime,
-			DataSource:       vehicleLocationEvent.DataSource,
-			Reliability:      realtimeJourneyReliability,
-
-			VehicleRef: vehicleLocationEvent.VehicleRef,
-			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
-		}
-	} else if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
+	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
 		journeyStopUpdates[realtimeJourney.NextStopRef] = &ctdf.RealtimeJourneyStops{
 			StopRef:  realtimeJourney.NextStopRef,
 			TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
@@ -518,6 +501,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 	}
 
+	realtimeJourney.Reliability = realtimeJourneyReliability
 	realtimeJourney.ModificationDateTime = currentTime
 	realtimeJourney.VehicleLocation = vehicleLocationEvent.VehicleLocation
 	realtimeJourney.VehicleBearing = vehicleLocationEvent.VehicleBearing
