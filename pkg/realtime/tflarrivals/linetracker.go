@@ -165,6 +165,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
+		newRealtimeJourney := false
 		if realtimeJourney == nil {
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier: realtimeJourneyID,
@@ -191,9 +192,13 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
+
+			newRealtimeJourney = true
 		}
 
-		realtimeJourney.ModificationDateTime = now
+		updateMap := bson.M{
+			"modificationdatetime": now,
+		}
 
 		// Add new predictions to the realtime journey
 		updatedStops := map[string]bool{}
@@ -214,9 +219,13 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		}
 
 		// Iterate over stops in the realtime journey and any that arent included in this update get changed to historical
-		for _, stop := range realtimeJourney.Stops {
+		for key, stop := range realtimeJourney.Stops {
 			if !updatedStops[stop.StopRef] {
 				stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+			}
+
+			if key != "" {
+				updateMap[fmt.Sprintf("stops.%s", key)] = stop
 			}
 		}
 
@@ -353,15 +362,33 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 				if realtimeJourney.DepartedStopRef == "" && realtimeStop.TimeType == ctdf.RealtimeJourneyStopTimeEstimatedFuture {
 					realtimeJourney.DepartedStopRef = referenceItem.OriginStopRef
 					realtimeJourney.DepartedStop = referenceItem.OriginStop
+					updateMap["departedstopref"] = realtimeJourney.DepartedStopRef
+					updateMap["departedstop"] = realtimeJourney.DepartedStop
 
 					realtimeJourney.NextStopRef = referenceItem.DestinationStopRef
 					realtimeJourney.NextStop = referenceItem.DestinationStop
+					updateMap["nextstopref"] = realtimeJourney.NextStopRef
+					updateMap["nextstop"] = realtimeJourney.NextStop
 				}
 			}
 		}
 
+		// Update database
+		if newRealtimeJourney {
+			updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+
+			updateMap["reliability"] = realtimeJourney.Reliability
+
+			updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
+			updateMap["datasource"] = realtimeJourney.DataSource
+
+			updateMap["vehicleref"] = realtimeJourney.VehicleRef
+		}
+		// TODO Temporary - need detection if journey has actually changed
+		updateMap["journey"] = realtimeJourney.Journey
+
 		// Create update
-		bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
+		bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
 		updateModel := mongo.NewUpdateOneModel()
 		updateModel.SetFilter(searchQuery)
 		updateModel.SetUpdate(bsonRep)
