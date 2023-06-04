@@ -321,6 +321,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
+	newRealtimeJourney := false
 	if realtimeJourney == nil {
 		var journey *ctdf.Journey
 		journeysCollection := database.GetCollection("journeys")
@@ -343,6 +344,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			VehicleRef: vehicleLocationEvent.VehicleRef,
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
 		}
+		newRealtimeJourney = true
 	}
 
 	closestDistance := 999999999999.0
@@ -492,6 +494,25 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	}
 
 	// Update database
+	updateMap := bson.M{
+		"realiability":         realtimeJourneyReliability,
+		"modificationdatetime": currentTime,
+		"vehiclelocation":      vehicleLocationEvent.VehicleLocation,
+		"vehiclebearing":       vehicleLocationEvent.VehicleBearing,
+		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
+		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
+		"offset":               offset,
+	}
+	if newRealtimeJourney {
+		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+		updateMap["journey"] = realtimeJourney.Journey
+
+		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
+		updateMap["datasource"] = realtimeJourney.DataSource
+
+		updateMap["vehicleref"] = vehicleLocationEvent.VehicleRef
+	}
+
 	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
 		journeyStopUpdates[realtimeJourney.NextStopRef] = &ctdf.RealtimeJourneyStops{
 			StopRef:  realtimeJourney.NextStopRef,
@@ -503,19 +524,13 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 	}
 
-	realtimeJourney.Reliability = realtimeJourneyReliability
-	realtimeJourney.ModificationDateTime = currentTime
-	realtimeJourney.VehicleLocation = vehicleLocationEvent.VehicleLocation
-	realtimeJourney.VehicleBearing = vehicleLocationEvent.VehicleBearing
-	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
-	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
-	realtimeJourney.Offset = offset
-
 	for key, stopUpdate := range journeyStopUpdates {
-		realtimeJourney.Stops[key] = stopUpdate
+		if key != "" {
+			updateMap[fmt.Sprintf("stops.%s", key)] = stopUpdate
+		}
 	}
 
-	bsonRep, _ := bson.Marshal(bson.M{"$set": realtimeJourney})
+	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
 	updateModel := mongo.NewUpdateOneModel()
 	updateModel.SetFilter(searchQuery)
 	updateModel.SetUpdate(bsonRep)
