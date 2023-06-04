@@ -56,6 +56,7 @@ require (
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/savsgio/dictpool v0.0.0-20221023140959-7bf2e61cea94 // indirect
 	github.com/savsgio/gotils v0.0.0-20230208104028-c358bd845dee // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/stretchr/testify v1.8.3 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
