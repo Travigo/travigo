@@ -370,6 +370,9 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		realtimeJourneyUpdateOperations = append(realtimeJourneyUpdateOperations, updateModel)
 	}
 
+	processingTime := time.Now().Sub(startTime)
+	startTime = time.Now()
+
 	if len(realtimeJourneyUpdateOperations) > 0 {
 		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), realtimeJourneyUpdateOperations, &options.BulkWriteOptions{})
 
@@ -378,7 +381,12 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		}
 	}
 
-	log.Info().Str("id", l.Line.LineID).Str("length", time.Now().Sub(startTime).String()).Msg("update line")
+	log.Info().
+		Str("id", l.Line.LineID).
+		Str("processing", processingTime.String()).
+		Str("bulkwrite", time.Now().Sub(startTime).String()).
+		Int("length", len(realtimeJourneyUpdateOperations)).
+		Msg("update line")
 }
 
 // TODO convert to proper cache
