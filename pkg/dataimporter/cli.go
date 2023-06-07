@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kr/pretty"
+	"github.com/travigo/travigo/pkg/dataimporter/cif"
 	"io"
 	"mime"
 	"net/http"
@@ -534,7 +536,7 @@ func importFile(dataFormat string, transportType ctdf.TransportType, source stri
 
 	// Check if its an XML file or ZIP file
 
-	if fileExtension == ".xml" {
+	if fileExtension == ".xml" || fileExtension == ".cif" {
 		file, err := os.Open(source)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to open file")
@@ -675,6 +677,28 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
+	case "nationalrail-cif":
+		log.Info().Msgf("National Rail CIF file import from %s ", dataFile.Name)
+		cifFile, err := cif.ParseCifFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				Provider: "National Rail", // This may not always be true
+				Dataset:  dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		pretty.Println(len(cifFile.TrainDefinitionSets))
+		pretty.Println(cifFile.TrainDefinitionSets[0])
+		pretty.Println(cifFile.TrainDefinitionSets[9])
+
+		//cifFile.ImportIntoMongoAsCTDF(&datasource)
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
