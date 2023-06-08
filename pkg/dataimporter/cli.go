@@ -391,6 +391,51 @@ func RegisterCLI() *cli.Command {
 				},
 			},
 			{
+				Name:  "nationalrail-timetable",
+				Usage: "Import Train Operating Companies from the National Rail Open Data API",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "Overwrite URL",
+						Required: false,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+
+					source := c.String("url")
+
+					if source == "" {
+						source = "https://NOTREAL"
+					}
+
+					log.Info().Msgf("National Rail Timetable import from %s", source)
+
+					if isValidUrl(source) {
+						tempFile, _ := tempDownloadFile(source)
+
+						source = tempFile.Name()
+						defer os.Remove(tempFile.Name())
+					}
+
+					cifBundle, err := cif.ParseCifBundle(source)
+
+					if err != nil {
+						return err
+					}
+
+					log.Info().Msg("Converting to CTDF")
+
+					journeys := cifBundle.ConvertToCTDF()
+					pretty.Println(journeys[0])
+
+					return nil
+				},
+			},
+			{
 				Name:  "nationalrail-toc",
 				Usage: "Import Train Operating Companies from the National Rail Open Data API",
 				Flags: []cli.Flag{
@@ -677,28 +722,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
-	case "nationalrail-cif":
-		log.Info().Msgf("National Rail CIF file import from %s ", dataFile.Name)
-		cifFile, err := cif.ParseCifFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider: "National Rail", // This may not always be true
-				Dataset:  dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		pretty.Println(len(cifFile.TrainDefinitionSets))
-		pretty.Println(cifFile.TrainDefinitionSets[0])
-		pretty.Println(cifFile.TrainDefinitionSets[9])
-
-		//cifFile.ImportIntoMongoAsCTDF(&datasource)
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
