@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -23,6 +24,8 @@ type CommonInterfaceFormat struct {
 
 	PhysicalStations []PhysicalStation
 	StationAliases   []StationAlias
+
+	TIPLOCToCrsMap map[string]string
 }
 
 type Association struct {
@@ -79,6 +82,11 @@ func ParseCifBundle(source string) (CommonInterfaceFormat, error) {
 		}
 	}
 
+	cifBundle.TIPLOCToCrsMap = map[string]string{}
+	for _, station := range cifBundle.PhysicalStations {
+		cifBundle.TIPLOCToCrsMap[station.TIPLOCCode] = station.CRSCode
+	}
+
 	return cifBundle, nil
 }
 
@@ -88,6 +96,16 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []ctdf.Journey {
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Skip buses (WHY ARE THEY IN THE TRAIN SCHEDULE??)
 		if trainDef.BasicSchedule.TrainStatus == "B" {
+			continue
+		}
+
+		// Skip London Underground (?) records
+		if trainDef.BasicScheduleExtraDetails.ATOCCode == "LT" {
+			continue
+		}
+		// TODO Skip Nexus (Tyne & Wear Metro) records
+		// The naptan data puts the stops as bus/metro stops with no CRS/TIPLOC
+		if trainDef.BasicScheduleExtraDetails.ATOCCode == "TW" {
 			continue
 		}
 
@@ -147,10 +165,10 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []ctdf.Journey {
 
 			for i := 1; i < len(passengerStops); i++ {
 				originTIPLOC := passengerStops[i-1].Location
-				originStop := getStopFromTIPLOC(originTIPLOC)
+				originStop := c.getStopFromTIPLOC(originTIPLOC)
 
 				destinationTIPLOC := passengerStops[i].Location
-				destinationStop := getStopFromTIPLOC(destinationTIPLOC)
+				destinationStop := c.getStopFromTIPLOC(destinationTIPLOC)
 
 				if originStop == nil {
 					log.Error().Str("tiploc", originTIPLOC).Msg("Unknown stop")
@@ -169,6 +187,8 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []ctdf.Journey {
 					DestinationStopRef: destinationStop.PrimaryIdentifier,
 				})
 			}
+
+			pretty.Println(trainDef.BasicScheduleExtraDetails.ATOCCode)
 
 			journey := ctdf.Journey{
 				PrimaryIdentifier: journeyID,
@@ -204,7 +224,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []ctdf.Journey {
 	return journeys
 }
 
-func getStopFromTIPLOC(tiploc string) *ctdf.Stop {
+func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 	cacheValue := stopTIPLOCCache[tiploc]
 
 	if cacheValue != nil {
@@ -213,7 +233,13 @@ func getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 
 	stopCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
+
 	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Tiploc": tiploc}).Decode(&stop)
+
+	// If cant directly find the stop using tiploc then use the MSN map to lookup by CRS
+	if stop == nil && c.TIPLOCToCrsMap[tiploc] != "" {
+		stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Crs": c.TIPLOCToCrsMap[tiploc]}).Decode(&stop)
+	}
 
 	stopTIPLOCCache[tiploc] = stop
 
