@@ -63,6 +63,10 @@ func (stop *Stop) GetAllStopIDs() []string {
 }
 
 func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
+	if service == nil {
+		return
+	}
+
 	for _, stopID := range stop.GetAllStopIDs() {
 		if service.StopNameOverrides[stopID] != "" {
 			stop.PrimaryName = service.StopNameOverrides[stopID]

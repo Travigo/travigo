@@ -277,6 +277,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 	passengerStops := []BasicLocation{
 		{
 			Location:               strings.TrimSpace(trainDef.OriginLocation.Location),
+			ScheduledArrivalTime:   trainDef.OriginLocation.ScheduledDepartureTime,
+			PublicArrivalTime:      trainDef.OriginLocation.PublicDepartureTime,
 			ScheduledDepartureTime: trainDef.OriginLocation.ScheduledDepartureTime,
 			PublicDepartureTime:    trainDef.OriginLocation.PublicDepartureTime,
 		},

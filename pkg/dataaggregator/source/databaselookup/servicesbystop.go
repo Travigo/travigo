@@ -30,7 +30,9 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		var service *ctdf.Service
 		servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceID}).Decode(&service)
 
-		services = append(services, service)
+		if service != nil {
+			services = append(services, service)
+		}
 	}
 
 	if len(services) == 0 {
