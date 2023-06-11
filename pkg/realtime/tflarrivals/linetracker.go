@@ -201,10 +201,12 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 
 	d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
-	log.Info().
-		Str("id", l.Line.LineID).
-		Int64("length", d.DeletedCount).
-		Msg("delete expired journeys")
+	if d.DeletedCount > 0 {
+		log.Info().
+			Str("id", l.Line.LineID).
+			Int64("length", d.DeletedCount).
+			Msg("delete expired journeys")
+	}
 }
 
 func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
