@@ -136,6 +136,13 @@ func (l *LineTracker) GetLatestArrivals() []ArrivalPrediction {
 func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime := time.Now()
 
+	datasource := &ctdf.DataSource{
+		OriginalFormat: "tfl-json",
+		Provider:       "GB-TfL",
+		Dataset:        fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
+		Identifier:     fmt.Sprint(startTime.Unix()),
+	}
+
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	//var realtimeJourneyUpdateOperations []mongo.WriteModel
 	p := pool.NewWithResults[mongo.WriteModel]()
@@ -161,7 +168,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		predictions := predictions
 
 		p.Go(func() mongo.WriteModel {
-			return l.parseGroupedArrivals(realtimeJourneyID, predictions)
+			return l.parseGroupedArrivals(realtimeJourneyID, predictions, datasource)
 		})
 	}
 
@@ -184,9 +191,23 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		Str("bulkwrite", time.Now().Sub(startTime).String()).
 		Int("length", len(realtimeJourneyUpdateOperations)).
 		Msg("update line")
+
+	// Remove any tfl realtime journey that wasnt updated in this run
+	// This means its dropped off all the stop arrivals (most likely as its finished)
+	deleteQuery := bson.M{
+		"datasource.provider":   datasource.Provider,
+		"datasource.dataset":    datasource.Dataset,
+		"datasource.identifier": bson.M{"$ne": datasource.Identifier},
+	}
+
+	d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
+	log.Info().
+		Str("id", l.Line.LineID).
+		Int64("length", d.DeletedCount).
+		Msg("delete expired journeys")
 }
 
-func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction) mongo.WriteModel {
+func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "GB:NOC:TFLO",
 		PrimaryName:       "Transport for London",
@@ -208,12 +229,7 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 			VehicleRef:        predictions[0].VehicleID,
 			Reliability:       ctdf.RealtimeJourneyReliabilityExternalProvided,
 
-			DataSource: &ctdf.DataSource{
-				OriginalFormat: "tfl-json",
-				Provider:       "GB-TfL",
-				Dataset:        fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
-				Identifier:     fmt.Sprint(now.Unix()),
-			},
+			DataSource: datasource,
 
 			Journey: &ctdf.Journey{
 				PrimaryIdentifier: realtimeJourneyID,
@@ -418,6 +434,8 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 		updateMap["datasource"] = realtimeJourney.DataSource
 
 		updateMap["vehicleref"] = realtimeJourney.VehicleRef
+	} else {
+		updateMap["datasource.identifier"] = datasource.Identifier
 	}
 	// TODO Temporary - need detection if journey has actually changed
 	updateMap["journey"] = realtimeJourney.Journey
