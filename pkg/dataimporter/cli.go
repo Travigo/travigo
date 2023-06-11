@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kr/pretty"
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
 	"io"
 	"mime"
@@ -427,10 +426,16 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					log.Info().Msg("Converting to CTDF")
+					// Cleanup right at the begining once, as we do it as 1 big import
+					datasource := &ctdf.DataSource{
+						OriginalFormat: "CIF",
+						Provider:       "GB-NationalRail",
+						Dataset:        "timetable",
+						Identifier:     "",
+					}
+					cleanupOldRecords("journeys", datasource)
 
-					journeys := cifBundle.ConvertToCTDF()
-					pretty.Println(journeys[0])
+					cifBundle.ImportIntoMongoAsCTDF(datasource)
 
 					return nil
 				},
@@ -465,8 +470,8 @@ func RegisterCLI() *cli.Command {
 					// Cleanup right at the begining once, as we do it as 1 big import
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "nationalrail-toc",
-						Provider:       "GB-NationalRail-TOC",
-						Dataset:        "ALL",
+						Provider:       "GB-NationalRail",
+						Dataset:        "TOC",
 						Identifier:     currentTime,
 					}
 					cleanupOldRecords("operators", datasource)

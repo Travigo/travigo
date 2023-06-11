@@ -61,7 +61,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() []*ctdf.Operator {
 func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	operators := t.convertToCTDF()
 
-	log.Info().Msg("Coverting to CTDF")
+	log.Info().Msg("Converting to CTDF")
 	log.Info().Msgf(" - %d Operators", len(operators))
 
 	// Operators table

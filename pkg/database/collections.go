@@ -34,6 +34,12 @@ func createStopsIndexes() {
 		{
 			Keys: bsonx.Doc{{Key: "associations.associatedidentifier", Value: bsonx.Int32(1)}},
 		},
+		{
+			Keys: bsonx.Doc{{Key: "otheridentifiers.Tiploc", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys: bsonx.Doc{{Key: "otheridentifiers.Crs", Value: bsonx.Int32(1)}},
+		},
 	}
 
 	opts := options.CreateIndexes()
