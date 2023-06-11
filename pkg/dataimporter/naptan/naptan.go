@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/travigo/travigo/pkg/util"
 	"math"
 	"runtime"
 	"sync"
@@ -143,6 +144,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	stationStopGroupContents := map[string][]*StopPoint{}
 	stationStopGroupContentsnMutex := sync.Mutex{}
+	var stationStops []*StopPoint
+	stationStopsMutex := sync.Mutex{}
 
 	processingGroup = sync.WaitGroup{}
 	processingGroup.Add(numBatches)
@@ -162,7 +165,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			var localOperationInsert uint64
 			var localOperationUpdate uint64
 
-		CREATESTOPLOOP:
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
 
@@ -171,9 +173,25 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 						stationStopGroupContentsnMutex.Lock()
 						stationStopGroupContents[association.AssociatedIdentifier] = append(stationStopGroupContents[association.AssociatedIdentifier], naptanStopPoint)
 						stationStopGroupContentsnMutex.Unlock()
-
-						continue CREATESTOPLOOP
 					}
+				}
+
+				// Add to list of stations for processing later and then skip it
+				if util.ContainsString([]string{
+					"MET", "RLY", "FER",
+				}, naptanStopPoint.StopClassification.StopType) {
+					stationStopsMutex.Lock()
+					stationStops = append(stationStops, naptanStopPoint)
+					stationStopsMutex.Unlock()
+
+					continue
+				}
+
+				// Also skip any station entrances/platforms
+				if util.ContainsString([]string{
+					"PLT", "RPL", "FBT", "TMU", "RSE", "FTD",
+				}, naptanStopPoint.StopClassification.StopType) {
+					continue
 				}
 
 				ctdfStop.DataSource = datasource
@@ -224,26 +242,16 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	var stationStopOperationInsert int
 	var stationStopOperationUpdate int
 
-	for key, stopPoints := range stationStopGroupContents {
-		var stationStop *ctdf.Stop
+	for _, stationNaptanStop := range stationStops {
+		stationStop := stationNaptanStop.ToCTDF()
 
-		// Find the main station descriptor and convert that first
-		for _, stopPoint := range stopPoints {
-			// MET - Metro/tram
-			// RLT - Rail
-			// FER - Ferry
-			if stopPoint.StopClassification.StopType == "MET" || stopPoint.StopClassification.StopType == "RLY" || stopPoint.StopClassification.StopType == "FER" {
-				stationStop = stopPoint.ToCTDF()
-			}
-		}
-
-		if stationStop == nil {
-			log.Error().Str("key", key).Msg("Unhandled station stop group")
-			continue
+		var stopGroupStops []*StopPoint
+		for _, area := range stationNaptanStop.StopAreas {
+			stopGroupStops = append(stopGroupStops, stationStopGroupContents[fmt.Sprintf("GB:STOPGRP:%s", area.StopAreaCode)]...)
 		}
 
 		// Find all platforms & entrances and add them to the stops
-		for _, stopPoint := range stopPoints {
+		for _, stopPoint := range stopGroupStops {
 			// PLT - Metro/tram
 			// RPL - Rail
 			// FBT - Ferry
@@ -297,6 +305,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			stationStopOperationUpdate += 1
 		}
 	}
+
 	if len(stationStopOperations) > 0 {
 		_, err := stopsCollection.BulkWrite(context.TODO(), stationStopOperations, &options.BulkWriteOptions{})
 		if err != nil {
