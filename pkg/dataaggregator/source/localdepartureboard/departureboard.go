@@ -44,10 +44,24 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	// Contains the stops primary id and all platforms primary ids
 	allStopIDs := q.Stop.GetAllStopIDs()
-	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}, opts)
+
+	journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
+	if q.Filter != nil {
+		journeyQuery = bson.M{
+			"$and": bson.A{
+				bson.M{"path.originstopref": bson.M{"$in": allStopIDs}},
+				q.Filter,
+			},
+		}
+	}
+
+	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query Journeys")
+	}
 
 	if err := cursor.All(context.Background(), &journeys); err != nil {
-		log.Error().Err(err).Msg("Failed to decode Stop")
+		log.Error().Err(err).Msg("Failed to decode Journeys")
 	}
 
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")

@@ -29,6 +29,8 @@ func SetupServer(listen string) {
 
 	routes.RealtimeJourneysRouter(group.Group("/realtime_journeys"))
 
+	routes.PlannerRouter(group.Group("/planner"))
+
 	group.Get("stats", routes.Stats)
 
 	webApp.Listen(listen)
