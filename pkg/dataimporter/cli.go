@@ -408,13 +408,16 @@ func RegisterCLI() *cli.Command {
 					source := c.String("url")
 
 					if source == "" {
-						source = "https://NOTREAL"
+						source = "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
 					}
 
 					log.Info().Msgf("National Rail Timetable import from %s", source)
 
 					if isValidUrl(source) {
-						tempFile, _ := tempDownloadFile(source)
+						token := nationalRailLogin()
+						tempFile, _ := tempDownloadFile(source, []string{
+							"X-Auth-Token", token,
+						})
 
 						source = tempFile.Name()
 						defer os.Remove(tempFile.Name())
@@ -477,53 +480,17 @@ func RegisterCLI() *cli.Command {
 					cleanupOldRecords("operators", datasource)
 					cleanupOldRecords("operator_groups", datasource)
 
-					env := util.GetEnvironmentVariables()
-					if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
-						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
-					}
-					if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
-						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
-					}
-
-					formData := url.Values{
-						"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
-						"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
-					}
-
-					client := &http.Client{}
-					req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
-					}
-
-					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-					resp, err := client.Do(req)
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
-					}
-					defer resp.Body.Close()
-
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
-					}
-
-					var loginResponse struct {
-						Token string `json:"token"`
-					}
-					json.Unmarshal(body, &loginResponse)
-
 					if isValidUrl(source) {
+						token := nationalRailLogin()
 						tempFile, _ := tempDownloadFile(source, []string{
-							"X-Auth-Token", loginResponse.Token,
+							"X-Auth-Token", token,
 						})
 
 						source = tempFile.Name()
 						defer os.Remove(tempFile.Name())
 					}
 
-					err = importFile("nationalrail-toc", ctdf.TransportTypeRail, source, "xml", datasource, map[string]string{})
+					err := importFile("nationalrail-toc", ctdf.TransportTypeRail, source, "xml", datasource, map[string]string{})
 					if err != nil {
 						log.Fatal().Err(err).Msg("Cannot import National Rail TOC document")
 					}
@@ -533,6 +500,47 @@ func RegisterCLI() *cli.Command {
 			},
 		},
 	}
+}
+
+func nationalRailLogin() string {
+	env := util.GetEnvironmentVariables()
+	if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
+		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
+	}
+	if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
+		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
+	}
+
+	formData := url.Values{
+		"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
+		"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
+	}
+
+	var loginResponse struct {
+		Token string `json:"token"`
+	}
+	json.Unmarshal(body, &loginResponse)
+
+	return loginResponse.Token
 }
 
 func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
