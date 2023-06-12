@@ -171,6 +171,9 @@ type JourneyPathItem struct {
 	OriginStop      *Stop `groups:"basic"`
 	DestinationStop *Stop `groups:"basic"`
 
+	OriginPlatform      string `groups:"basic"`
+	DestinationPlatform string `groups:"basic"`
+
 	Distance int `groups:"basic"`
 
 	OriginArrivalTime      time.Time `groups:"basic"`

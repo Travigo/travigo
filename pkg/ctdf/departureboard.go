@@ -17,6 +17,8 @@ type DepartureBoard struct {
 	DestinationDisplay string                   `groups:"basic"`
 	Type               DepartureBoardRecordType `groups:"basic"`
 
+	Platform string `groups:"basic"`
+
 	Time time.Time `groups:"basic"`
 }
 
@@ -45,6 +47,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			defer wg.Done()
 
 			var stopDeperatureTime time.Time
+			var stopPlatform string
 			var destinationDisplay string
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
@@ -63,6 +66,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					stopDeperatureTime = time.Date(
 						dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 					)
+					stopPlatform = path.OriginPlatform
 
 					destinationDisplay = path.DestinationDisplay
 					break
@@ -134,6 +138,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					Time:               stopDeperatureTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
+					Platform:           stopPlatform,
 				})
 				departureBoardGenerationMutex.Unlock()
 			}

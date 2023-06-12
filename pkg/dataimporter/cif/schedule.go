@@ -117,6 +117,8 @@ type BasicLocation struct {
 
 	ScheduledDepartureTime string
 	PublicDepartureTime    string
+
+	Platform string
 }
 
 func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {

@@ -143,21 +143,23 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			// Do this by excluding the date range on the original journey and then creating a new one with the overlay
 			originalJourney := journeys[journeyID]
 
-			if originalJourney != nil {
-				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
-				dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
-
-				originalJourney.Availability.Exclude = append(originalJourney.Availability.Exclude, ctdf.AvailabilityRule{
-					Type:  ctdf.AvailabilityDateRange,
-					Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
-				})
-			}
-
 			newJourneyID := fmt.Sprintf(
 				"GB:RAIL:%s:OVERLAY:%s:%s",
 				trainDef.BasicSchedule.TrainUID,
 				trainDef.BasicSchedule.DateRunsFrom,
 				trainDef.BasicSchedule.DateRunsTo)
+
+			if originalJourney != nil {
+				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
+				dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
+
+				originalJourney.Availability.Exclude = append(originalJourney.Availability.Exclude, ctdf.AvailabilityRule{
+					Type:        ctdf.AvailabilityDateRange,
+					Value:       fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
+					Description: fmt.Sprintf("Overlay with %s", newJourneyID),
+				})
+			}
+
 			journeys[newJourneyID] = c.createJourneyFromTraindef(newJourneyID, trainDef)
 		} else {
 			log.Error().
@@ -281,6 +283,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			PublicArrivalTime:      trainDef.OriginLocation.PublicDepartureTime,
 			ScheduledDepartureTime: trainDef.OriginLocation.ScheduledDepartureTime,
 			PublicDepartureTime:    trainDef.OriginLocation.PublicDepartureTime,
+			Platform:               trainDef.OriginLocation.Platform,
 		},
 	}
 
@@ -306,6 +309,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 
 			ScheduledArrivalTime: location.ScheduledArrivalTime,
 			PublicArrivalTime:    location.PublicArrivalTime,
+
+			Platform: location.Platform,
 		})
 	}
 
@@ -319,6 +324,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		Location:             strings.TrimSpace(terminatingTiploc),
 		ScheduledArrivalTime: trainDef.TerminatingLocation.ScheduledArrivalTime,
 		PublicArrivalTime:    trainDef.TerminatingLocation.PublicArrivalTime,
+		Platform:             trainDef.TerminatingLocation.Platform,
 	})
 
 	// Generate a CTDF path from the passenger stops
@@ -352,10 +358,12 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			OriginStopRef:       originStop.PrimaryIdentifier,
 			OriginArrivalTime:   originArrivalTime,
 			OriginDepartureTime: originDepartureTime,
+			OriginPlatform:      strings.TrimSpace(originPassengerStop.Platform),
 
 			DestinationStop:        destinationStop,
 			DestinationStopRef:     destinationStop.PrimaryIdentifier,
 			DestinationArrivalTime: destinationArrivalTime,
+			DestinationPlatform:    strings.TrimSpace(destinationPassengerStop.Platform),
 		})
 	}
 
