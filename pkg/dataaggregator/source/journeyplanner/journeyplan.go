@@ -70,6 +70,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) ([]ctdf.JourneyPlan, error
 			},
 			StartTime:   startTime,
 			ArrivalTime: arrivalTime,
+			Duration:    arrivalTime.Sub(startTime),
 		}
 
 		journeyPlans = append(journeyPlans, journeyPlan)
