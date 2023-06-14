@@ -36,7 +36,6 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		bson.E{Key: "datasource", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "destinationdisplay", Value: 0},
 		bson.E{Key: "path.track", Value: 0},
 		bson.E{Key: "path.originactivity", Value: 0},
 		bson.E{Key: "path.destinationactivity", Value: 0},
