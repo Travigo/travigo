@@ -396,6 +396,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
 	})
 
+	operatorRef := fmt.Sprintf("GB:TOC:%s", trainDef.BasicScheduleExtraDetails.ATOCCode)
+
 	// Put it all together
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: journeyID,
@@ -413,8 +415,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			Dataset:        "timetable",
 			Identifier:     "",
 		},
-		ServiceRef:         "",
-		OperatorRef:        fmt.Sprintf("GB:TOC:%s", trainDef.BasicScheduleExtraDetails.ATOCCode),
+		ServiceRef:         operatorRef,
+		OperatorRef:        operatorRef,
 		DepartureTime:      departureTime,
 		DestinationDisplay: destinationDisplay,
 		Availability:       availability,

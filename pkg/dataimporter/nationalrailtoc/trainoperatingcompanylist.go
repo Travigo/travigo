@@ -22,8 +22,9 @@ type TrainOperatingCompanyList struct {
 	Companies []TrainOperatingCompany `xml:"TrainOperatingCompany"`
 }
 
-func (t *TrainOperatingCompanyList) convertToCTDF() []*ctdf.Operator {
+func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.Service) {
 	var operators []*ctdf.Operator
+	var services []*ctdf.Service
 
 	now := time.Now()
 
@@ -53,19 +54,30 @@ func (t *TrainOperatingCompanyList) convertToCTDF() []*ctdf.Operator {
 			PhoneNumber: toc.CustomerService.Telephone,
 			SocialMedia: map[string]string{},
 		})
+
+		services = append(services, &ctdf.Service{
+			PrimaryIdentifier:    operatorRef,
+			CreationDateTime:     now,
+			ModificationDateTime: now,
+			ServiceName:          toc.Name,
+			OperatorRef:          operatorRef,
+			TransportType:        ctdf.TransportTypeRail,
+		})
 	}
 
-	return operators
+	return operators, services
 }
 
 func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
-	operators := t.convertToCTDF()
+	operators, services := t.convertToCTDF()
 
 	log.Info().Msg("Converting to CTDF")
 	log.Info().Msgf(" - %d Operators", len(operators))
+	log.Info().Msgf(" - %d Services", len(services))
 
-	// Operators table
+	// Tables
 	operatorsCollection := database.GetCollection("operators")
+	servicesCollection := database.GetCollection("services")
 
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
@@ -144,4 +156,82 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
 	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
+
+	// Import services
+	log.Info().Msg("Importing CTDF Services into Mongo")
+	var servicesOperationInsert uint64
+	var servicesOperationUpdate uint64
+
+	maxBatchSize = int(math.Ceil(float64(len(services)) / float64(runtime.NumCPU())))
+	numBatches = int(math.Ceil(float64(len(services)) / float64(maxBatchSize)))
+
+	processingGroup = sync.WaitGroup{}
+	processingGroup.Add(numBatches)
+
+	for i := 0; i < numBatches; i++ {
+		lower := maxBatchSize * i
+		upper := maxBatchSize * (i + 1)
+
+		if upper > len(services) {
+			upper = len(operators)
+		}
+
+		batchSlice := services[lower:upper]
+
+		go func(servicesBatch []*ctdf.Service) {
+			var servicesOperations []mongo.WriteModel
+			var localServicesInsert uint64
+			var localServicesUpdate uint64
+
+			for _, service := range servicesBatch {
+				var existingCtdfService *ctdf.Service
+				servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": service.PrimaryIdentifier}).Decode(&existingCtdfService)
+
+				if existingCtdfService == nil {
+					service.CreationDateTime = time.Now()
+					service.ModificationDateTime = time.Now()
+					service.DataSource = datasource
+
+					insertModel := mongo.NewInsertOneModel()
+
+					bsonRep, _ := bson.Marshal(service)
+					insertModel.SetDocument(bsonRep)
+
+					servicesOperations = append(servicesOperations, insertModel)
+					localServicesInsert += 1
+				} else if existingCtdfService.ModificationDateTime != service.ModificationDateTime {
+					service.CreationDateTime = existingCtdfService.CreationDateTime
+					service.ModificationDateTime = time.Now()
+					service.DataSource = datasource
+
+					updateModel := mongo.NewUpdateOneModel()
+					updateModel.SetFilter(bson.M{"primaryidentifier": service.PrimaryIdentifier})
+
+					bsonRep, _ := bson.Marshal(bson.M{"$set": service})
+					updateModel.SetUpdate(bsonRep)
+
+					servicesOperations = append(servicesOperations, updateModel)
+					localServicesUpdate += 1
+				}
+			}
+
+			atomic.AddUint64(&servicesOperationInsert, localServicesInsert)
+			atomic.AddUint64(&servicesOperationUpdate, localServicesUpdate)
+
+			if len(servicesOperations) > 0 {
+				_, err := servicesCollection.BulkWrite(context.TODO(), servicesOperations, &options.BulkWriteOptions{})
+				if err != nil {
+					log.Fatal().Err(err).Msg("Failed to bulk write Services")
+				}
+			}
+
+			processingGroup.Done()
+		}(batchSlice)
+	}
+
+	processingGroup.Wait()
+
+	log.Info().Msg(" - Written to MongoDB")
+	log.Info().Msgf(" - %d inserts", servicesOperationInsert)
+	log.Info().Msgf(" - %d updates", servicesOperationUpdate)
 }
