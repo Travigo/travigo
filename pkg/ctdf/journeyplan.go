@@ -2,6 +2,13 @@ package ctdf
 
 import "time"
 
+type JourneyPlanResults struct {
+	JourneyPlans []JourneyPlan
+
+	OriginStop      Stop
+	DestinationStop Stop
+}
+
 type JourneyPlan struct {
 	RouteItems []JourneyPlanRouteItem
 

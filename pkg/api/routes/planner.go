@@ -67,9 +67,9 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	}
 
 	// Do the lookup
-	var journeyPlans []ctdf.JourneyPlan
+	var journeyPlans *ctdf.JourneyPlanResults
 
-	journeyPlans, err = dataaggregator.Lookup[[]ctdf.JourneyPlan](query.JourneyPlan{
+	journeyPlans, err = dataaggregator.Lookup[*ctdf.JourneyPlanResults](query.JourneyPlan{
 		OriginStop:      originStop,
 		DestinationStop: destinationStop,
 		Count:           count,
@@ -77,13 +77,13 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	})
 
 	// Sort departures by DepartureBoard time
-	sort.Slice(journeyPlans, func(i, j int) bool {
-		return journeyPlans[i].StartTime.Before(journeyPlans[j].StartTime)
+	sort.Slice(journeyPlans.JourneyPlans, func(i, j int) bool {
+		return journeyPlans.JourneyPlans[i].StartTime.Before(journeyPlans.JourneyPlans[j].StartTime)
 	})
 
 	// Once sorted cut off any records higher than our max count
-	if len(journeyPlans) > count {
-		journeyPlans = journeyPlans[:count]
+	if len(journeyPlans.JourneyPlans) > count {
+		journeyPlans.JourneyPlans = journeyPlans.JourneyPlans[:count]
 	}
 
 	return c.JSON(journeyPlans)

@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (s Source) JourneyPlanQuery(q query.JourneyPlan) ([]ctdf.JourneyPlan, error) {
+func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
 	// THIS IS A BASIC NO CHANGE PLANNER
 
 	// Do a departure board query
@@ -37,7 +37,11 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) ([]ctdf.JourneyPlan, error
 	}
 
 	// Turn the departure board into a journey plan
-	var journeyPlans []ctdf.JourneyPlan
+	journeyPlanResults := &ctdf.JourneyPlanResults{
+		JourneyPlans:    []ctdf.JourneyPlan{},
+		OriginStop:      *q.OriginStop,
+		DestinationStop: *q.DestinationStop,
+	}
 
 	for _, departure := range departureBoard {
 		startTime := departure.Time
@@ -73,8 +77,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) ([]ctdf.JourneyPlan, error
 			Duration:    arrivalTime.Sub(startTime),
 		}
 
-		journeyPlans = append(journeyPlans, journeyPlan)
+		journeyPlanResults.JourneyPlans = append(journeyPlanResults.JourneyPlans, journeyPlan)
 	}
 
-	return journeyPlans, nil
+	return journeyPlanResults, nil
 }

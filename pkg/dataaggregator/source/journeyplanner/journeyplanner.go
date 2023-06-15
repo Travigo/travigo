@@ -16,7 +16,7 @@ func (s Source) GetName() string {
 
 func (s Source) Supports() []reflect.Type {
 	return []reflect.Type{
-		reflect.TypeOf([]ctdf.JourneyPlan{}),
+		reflect.TypeOf(ctdf.JourneyPlanResults{}),
 	}
 }
 
