@@ -40,6 +40,8 @@ type Journey struct {
 	Path []*JourneyPathItem `groups:"detailed"`
 
 	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
+
+	Annotations map[string]interface{} `groups:"basic"`
 }
 
 func (j *Journey) GetReferences() {

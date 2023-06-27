@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/travigo/travigo/pkg/dataimporter/cif"
 	"io"
 	"mime"
 	"net/http"
@@ -16,6 +15,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/travigo/travigo/pkg/dataimporter/cif"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"

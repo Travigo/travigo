@@ -4,13 +4,6 @@ import (
 	"archive/zip"
 	"context"
 	"fmt"
-	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/util"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"math"
 	"path/filepath"
 	"regexp"
@@ -19,6 +12,14 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/util"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var suffixCheck = regexp.MustCompile(`^[2-9]+$`)
@@ -103,8 +104,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Skip buses and ships
-		// TODO handle rail replacement buses
-		if trainDef.BasicSchedule.TrainCategory == "BR" || trainDef.BasicSchedule.TrainCategory == "BS" || trainDef.BasicSchedule.TrainCategory == "SS" {
+		if trainDef.BasicSchedule.TrainCategory == "BS" || trainDef.BasicSchedule.TrainCategory == "SS" {
 			continue
 		}
 
@@ -398,6 +398,12 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 
 	operatorRef := fmt.Sprintf("GB:TOC:%s", trainDef.BasicScheduleExtraDetails.ATOCCode)
 
+	// Calculate transport type (rail or replacement bus)
+	annotations := map[string]interface{}{}
+	if trainDef.BasicSchedule.TrainCategory == "BR" {
+		annotations["transporttype.rail.replacementbus"] = true
+	}
+
 	// Put it all together
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: journeyID,
@@ -421,6 +427,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		DestinationDisplay: destinationDisplay,
 		Availability:       availability,
 		Path:               path,
+		Annotations:        annotations,
 	}
 
 	return journey
