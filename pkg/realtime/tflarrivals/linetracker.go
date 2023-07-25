@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/kr/pretty"
-	"github.com/sourcegraph/conc/pool"
-	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
 	"regexp"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/kr/pretty"
+	"github.com/sourcegraph/conc/pool"
+	"golang.org/x/exp/slices"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -325,13 +326,13 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 		var reducedRouteOrderedNaptanIDs []string
 		for _, naptanID := range routeOrderedNaptanIDs {
 			tflFormattedNaptanID := getStopFromTfLStop(naptanID).PrimaryIdentifier
-			if slices.Contains[string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
+			if slices.Contains[[]string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
 				reducedRouteOrderedNaptanIDs = append(reducedRouteOrderedNaptanIDs, tflFormattedNaptanID)
 			}
 		}
 
 		// If the slices equal then we have a potential match
-		if slices.Equal[string](journeyOrderedNaptanIDs, reducedRouteOrderedNaptanIDs) {
+		if slices.Equal[[]string](journeyOrderedNaptanIDs, reducedRouteOrderedNaptanIDs) {
 			potentialOrderLineRouteMatches = append(potentialOrderLineRouteMatches, route)
 		}
 
