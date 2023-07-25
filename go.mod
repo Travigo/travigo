@@ -23,7 +23,7 @@ require (
 	github.com/rs/zerolog v1.29.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sourcegraph/conc v0.3.0
-	go.mongodb.org/mongo-driver v1.11.6
+	go.mongodb.org/mongo-driver v1.12.0
 	golang.org/x/exp v0.0.0-20230725093048-515e97ebf090
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -62,7 +62,6 @@ require (
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect

@@ -2,11 +2,11 @@ package database
 
 import (
 	"context"
+
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 func createIndexes() {
@@ -20,25 +20,25 @@ func createStopsIndexes() {
 	stopsCollection := GetCollection("stops")
 	stopsIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "location", Value: bsonx.String("2dsphere")}},
+			Keys: bson.D{{Key: "location", Value: "2dsphere"}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "platforms.primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "platforms.primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "entrances.primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "entrances.primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "associations.associatedidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "associations.associatedidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "otheridentifiers.Tiploc", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "otheridentifiers.Tiploc", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "otheridentifiers.Crs", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "otheridentifiers.Crs", Value: 1}},
 		},
 	}
 
@@ -52,7 +52,7 @@ func createStopsIndexes() {
 	stopGroupsCollection := GetCollection("stop_groups")
 	stopGroupsIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "identifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "identifier", Value: 1}},
 		},
 	}
 
@@ -69,13 +69,13 @@ func createOperatorsIndexes() {
 
 	operatorIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "otheridentifiers", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "operatorgroupref", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "operatorgroupref", Value: 1}},
 		},
 	}
 
@@ -89,7 +89,7 @@ func createOperatorsIndexes() {
 	operatorGroupsCollection := GetCollection("operator_groups")
 	operatorGroupsIndex := []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "identifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "identifier", Value: 1}},
 		},
 	}
 
@@ -106,10 +106,10 @@ func createJourneysIndexes() {
 	serviceNameOperatorRefIndexName := "ServiceNameOperatorRef"
 	_, err := servicesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "datasource.dataset", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "datasource.dataset", Value: 1}},
 		},
 		{
 			Options: &options.IndexOptions{
@@ -134,19 +134,19 @@ func createJourneysIndexes() {
 	journeyIdentificationServiceBlockNumberIndexName := "JourneyIdentificationServiceBlockNumberJourneyCode"
 	_, err = journeysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "serviceref", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "serviceref", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "path.originstopref", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "path.originstopref", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "path.destinationstopref", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "path.destinationstopref", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "datasource.dataset", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "datasource.dataset", Value: 1}},
 		},
 		{
 			Options: &options.IndexOptions{
@@ -193,16 +193,16 @@ func createJourneysIndexes() {
 	realtimeJourneysCollection := GetCollection("realtime_journeys")
 	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
-			Keys: bsonx.Doc{{Key: "primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "journey.primaryidentifier", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "journey.primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bsonx.Doc{{Key: "stops.$**", Value: bsonx.Int32(1)}},
+			Keys: bson.D{{Key: "stops.$**", Value: 1}},
 		},
 		{
-			Keys:    bsonx.Doc{{Key: "modificationdatetime", Value: bsonx.Int32(1)}},
+			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(3600), // Expire after 1 hour
 		},
 	}, options.CreateIndexes())
