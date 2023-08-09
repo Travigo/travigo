@@ -184,6 +184,9 @@ func createJourneysIndexes() {
 				{Key: "otheridentifiers.BlockNumber", Value: 1},
 			},
 		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers.TrainUID", Value: 1}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		panic(err)

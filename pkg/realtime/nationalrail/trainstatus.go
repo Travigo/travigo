@@ -30,6 +30,8 @@ type TrainStatusTiming struct {
 
 	SRC     string `xml:"src,attr"`
 	SRCINST string `xml:"srcInst,attr"`
+
+	Delayed string `xml:"delayed,attr"`
 }
 
 type TrainStatusPlatform struct {

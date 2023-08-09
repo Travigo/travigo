@@ -4,12 +4,13 @@ import (
 	"encoding/xml"
 	"io"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
 )
 
-func ParseXMLFile(reader io.Reader) (interface{}, error) {
+func ParseXMLFile(reader io.Reader) (PushPortData, error) {
+	pushPortData := PushPortData{}
+
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel
 	for {
@@ -19,7 +20,7 @@ func ParseXMLFile(reader io.Reader) (interface{}, error) {
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return nil, err
+			return pushPortData, err
 		}
 
 		switch ty := tok.(type) {
@@ -30,11 +31,11 @@ func ParseXMLFile(reader io.Reader) (interface{}, error) {
 				if err = d.DecodeElement(&trainStatus, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					pretty.Println(trainStatus)
+					pushPortData.TrainStatuses = append(pushPortData.TrainStatuses, trainStatus)
 				}
 			}
 		}
 	}
 
-	return nil, nil
+	return pushPortData, nil
 }

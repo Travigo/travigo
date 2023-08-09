@@ -33,7 +33,12 @@ func RegisterCLI() *cli.Command {
 					}
 					defer file.Close()
 
-					ParseXMLFile(file)
+					pushPortData, err := ParseXMLFile(file)
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to parse push port data xml")
+					}
+
+					pushPortData.UpdateRealtimeJourneys()
 
 					return nil
 				},
