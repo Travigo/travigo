@@ -27,7 +27,7 @@ func RegisterCLI() *cli.Command {
 
 					log.Info().Msg("Starting National Rail train tracker")
 
-					file, err := os.Open("/Users/aaronclaydon/Downloads/pPortData.log.2023-06-27_1953")
+					file, err := os.Open("/Users/aaronclaydon/Downloads/darwin.xml")
 					if err != nil {
 						log.Fatal().Err(err).Msg("Failed to open file")
 					}

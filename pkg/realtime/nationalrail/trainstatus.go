@@ -15,10 +15,10 @@ type TrainStatusLocation struct {
 	WTD string `xml:"wtd,attr"`
 	PTD string `xml:"ptd,attr"`
 
-	Departure TrainStatusTiming   `xml:"dep"`
-	Arrival   TrainStatusTiming   `xml:"arr"`
-	Pass      TrainStatusTiming   `xml:"pass"`
-	Platform  TrainStatusPlatform `xml:"plat"`
+	Departure *TrainStatusTiming   `xml:"dep"`
+	Arrival   *TrainStatusTiming   `xml:"arr"`
+	Pass      *TrainStatusTiming   `xml:"pass"`
+	Platform  *TrainStatusPlatform `xml:"plat"`
 }
 
 type TrainStatusTiming struct {
