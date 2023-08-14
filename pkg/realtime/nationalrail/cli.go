@@ -2,8 +2,10 @@ package nationalrail
 
 import (
 	"os"
+	"sync"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
@@ -26,6 +28,10 @@ func RegisterCLI() *cli.Command {
 					}
 
 					log.Info().Msg("Starting National Rail train tracker")
+
+					// TODO replace with proper cache
+					tiplocStopCacheMutex = sync.Mutex{}
+					tiplocStopCache = map[string]*ctdf.Stop{}
 
 					file, err := os.Open("/Users/aaronclaydon/Downloads/darwin.xml")
 					if err != nil {

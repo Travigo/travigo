@@ -3,6 +3,7 @@ package nationalrail
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -99,26 +100,44 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		}
 
 		for _, location := range trainStatus.Locations {
-			stopID := fmt.Sprintf("GB:ATCO:%s", location.TPL)
+			stop := getStopFromTiploc(location.TPL)
 
-			// if realtimeJourney.Stops[stopID] == nil {
-			// 	updateMap[fmt.Sprintf("stops.%s", stopID)] = &ctdf.RealtimeJourneyStops{
-			// 		StopRef:  stopID,
-			// 		TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
-			// 	}
-			// }
+			if stop == nil {
+				log.Error().Str("tiploc", location.TPL).Msg("Failed to find stop")
+				continue
+			}
+
+			journeyStop := realtimeJourney.Stops[stop.PrimaryIdentifier]
+			journeyStopUpdated := false
+
+			if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
+				journeyStop = &ctdf.RealtimeJourneyStops{
+					StopRef:  stop.PrimaryIdentifier,
+					TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+				}
+			}
 
 			if location.Arrival != nil {
 				arrivalTime, _ := time.Parse("15:04", location.Arrival.ET)
 
-				updateMap[fmt.Sprintf("stops.%s.arrivaltime", stopID)] = arrivalTime
+				journeyStop.ArrivalTime = arrivalTime
+				journeyStopUpdated = true
 			}
 
 			if location.Departure != nil {
 				departureTime, _ := time.Parse("15:04", location.Departure.ET)
 
-				updateMap[fmt.Sprintf("stops.%s.departuretime", stopID)] = departureTime
+				journeyStop.DepartureTime = departureTime
+				journeyStopUpdated = true
 			}
+
+			if journeyStopUpdated {
+				updateMap[fmt.Sprintf("stops.%s", stop.PrimaryIdentifier)] = journeyStop
+			}
+		}
+
+		if trainStatus.LateReason != "" {
+			updateMap["annotations.LateReason"] = trainStatus.LateReason
 		}
 
 		// Create update
@@ -137,4 +156,28 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 		}
 	}
+}
+
+// TODO convert to proper cache
+var tiplocStopCacheMutex sync.Mutex
+var tiplocStopCache map[string]*ctdf.Stop
+
+func getStopFromTiploc(tiploc string) *ctdf.Stop {
+	tiplocStopCacheMutex.Lock()
+	cacheValue := tiplocStopCache[tiploc]
+	tiplocStopCacheMutex.Unlock()
+
+	if cacheValue != nil {
+		return cacheValue
+	}
+
+	stopCollection := database.GetCollection("stops")
+	var stop *ctdf.Stop
+	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Tiploc": tiploc}).Decode(&stop)
+
+	tiplocStopCacheMutex.Lock()
+	tiplocStopCache[tiploc] = stop
+	tiplocStopCacheMutex.Unlock()
+
+	return stop
 }

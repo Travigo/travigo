@@ -35,6 +35,8 @@ type RealtimeJourney struct {
 	Reliability RealtimeJourneyReliabilityType `groups:"basic"`
 
 	VehicleRef string `groups:"internal"`
+
+	Annotations map[string]interface{} `groups:"basic"`
 }
 
 type RealtimeJourneyReliabilityType string

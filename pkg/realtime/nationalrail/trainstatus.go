@@ -1,5 +1,7 @@
 package nationalrail
 
+import "time"
+
 type TrainStatus struct {
 	RID string `xml:"rid,attr"`
 	UID string `xml:"uid,attr"`
@@ -32,6 +34,10 @@ type TrainStatusTiming struct {
 	SRCINST string `xml:"srcInst,attr"`
 
 	Delayed string `xml:"delayed,attr"`
+}
+
+func (t *TrainStatusTiming) GetTiming() time.Time {
+	return time.Now()
 }
 
 type TrainStatusPlatform struct {
