@@ -35,7 +35,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args: ["realtime", "nationalrail", "run"]
+          args: ["realtime", "national-rail", "run"]
           env:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
