@@ -14,6 +14,7 @@ require (
 	github.com/eko/gocache/lib/v4 v4.1.4
 	github.com/eko/gocache/store/redis/v4 v4.2.0
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
+	github.com/go-stomp/stomp/v3 v3.0.5
 	github.com/gofiber/fiber/v2 v2.48.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/kr/pretty v0.3.1

@@ -19,6 +19,9 @@ elasticsearch:
 tfl:
   apiKeySecret: travigo-tfl-api-key
 
+nationRail:
+  stompCredentialsSecret: travigo-nationalrail-stomp-credentials
+
 runner:
   resources:
     requests:

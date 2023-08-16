@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "travigo-realtime.fullname" . }}-nationalrail-stomp
+  labels:
+    {{- include "travigo-realtime.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "travigo-realtime.selectorLabels" . | nindent 6 }}
+      appModule: nationalrail-stomp
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "travigo-realtime.selectorLabels" . | nindent 8 }}
+        appModule: nationalrail-stomp
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "travigo-realtime.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["realtime", "nationalrail", "run"]
+          env:
+            {{- with .env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: TRAVIGO_LOG_FORMAT
+              value: JSON
+            - name: TRAVIGO_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: TRAVIGO_MONGODB_DATABASE
+              value: {{ $.Values.database.database }}
+            - name: TRAVIGO_REDIS_ADDRESS
+              value: {{ $.Values.redis.address }}
+            - name: TRAVIGO_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.redis.passwordSecret }}
+                  key: password
+                  optional: false
+            - name: TRAVIGO_ELASTICSEARCH_ADDRESS
+              value: {{ $.Values.elasticsearch.address }}
+            - name: TRAVIGO_ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: username
+                  optional: false
+            - name: TRAVIGO_ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: password
+                  optional: false
+            - name: TRAVIGO_NATIONALRAIL_STOMP_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.nationRail.stompCredentialsSecret }}
+                  key: username
+                  optional: false
+            - name: TRAVIGO_NATIONALRAIL_STOMP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.nationRail.stompCredentialsSecret }}
+                  key: password
+                  optional: false
+          resources:
+            {{- toYaml .Values.runner.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
