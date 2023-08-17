@@ -335,7 +335,7 @@ func RegisterCLI() *cli.Command {
 					}
 					defer archive.Close()
 
-					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART \\w+ \\d+.zip")
+					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART.+.zip")
 					tflOtherMatchRegex, _ := regexp.Compile("(?i)LULDLRTRAMRIVERCABLE.*\\.zip")
 
 					// Cleanup right at the begining once, as we do it as 1 big import
