@@ -27,6 +27,8 @@ type RecordsStatsActiveRealtimeJourneys struct {
 	LocationWithoutTrack int64
 	ExternalProvided     int64
 
+	NotActivelyTracked int64
+
 	TransportTypes map[ctdf.TransportType]int
 }
 type recordStatsElasticEvent struct {
@@ -75,6 +77,7 @@ func UpdateRecordsStats() {
 		var numberActiveRealtimeJourneysWithTrack int64
 		var numberActiveRealtimeJourneysWithoutTrack int64
 		var numberActiveRealtimeJourneysExternal int64
+		var numberActiveRealtimeJourneysNotActivelyTracked int64
 		transportTypes := map[ctdf.TransportType]int{}
 
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
@@ -110,6 +113,7 @@ func UpdateRecordsStats() {
 				Key: "$project",
 				Value: bson.D{
 					bson.E{Key: "primaryidentifier", Value: 1},
+					bson.E{Key: "activelytracked", Value: 1},
 					bson.E{Key: "modificationdatetime", Value: 1},
 					bson.E{Key: "reliability", Value: 1},
 					bson.E{Key: "journey.serviceref", Value: 1},
@@ -127,22 +131,26 @@ func UpdateRecordsStats() {
 		startTime = time.Now()
 
 		for _, realtimeJourney := range realtimeJourneys {
-			if realtimeJourney.IsActive() && realtimeJourney.ActivelyTracked {
-				numberActiveRealtimeJourneys += 1
+			if realtimeJourney.IsActive() {
+				if realtimeJourney.ActivelyTracked {
+					numberActiveRealtimeJourneys += 1
 
-				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithTrack {
-					numberActiveRealtimeJourneysWithTrack += 1
-				}
-				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithoutTrack {
-					numberActiveRealtimeJourneysWithoutTrack += 1
-				}
-				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityExternalProvided {
-					numberActiveRealtimeJourneysExternal += 1
-				}
+					if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithTrack {
+						numberActiveRealtimeJourneysWithTrack += 1
+					}
+					if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithoutTrack {
+						numberActiveRealtimeJourneysWithoutTrack += 1
+					}
+					if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityExternalProvided {
+						numberActiveRealtimeJourneysExternal += 1
+					}
 
-				realtimeJourney.Journey.GetService()
-				if realtimeJourney.Journey.Service != nil {
-					transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
+					realtimeJourney.Journey.GetService()
+					if realtimeJourney.Journey.Service != nil {
+						transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
+					}
+				} else {
+					numberActiveRealtimeJourneysNotActivelyTracked += 1
 				}
 			}
 		}
@@ -153,6 +161,7 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
+		CurrentRecordsStats.ActiveRealtimeJourneys.NotActivelyTracked = numberActiveRealtimeJourneysNotActivelyTracked
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
