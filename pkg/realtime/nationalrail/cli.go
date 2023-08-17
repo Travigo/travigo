@@ -82,7 +82,7 @@ func RegisterCLI() *cli.Command {
 						log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 					}
 
-					pushPortData.UpdateRealtimeJourneys()
+					pushPortData.UpdateRealtimeJourneys(nil)
 
 					return nil
 				},

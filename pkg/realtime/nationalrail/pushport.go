@@ -11,14 +11,13 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PushPortData struct {
 	TrainStatuses []TrainStatus
 }
 
-func (p *PushPortData) UpdateRealtimeJourneys() {
+func (p *PushPortData) UpdateRealtimeJourneys(queue *BatchProcessingQueue) {
 	now := time.Now()
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "DarwinPushPort",
@@ -29,8 +28,6 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
-
-	operations := []mongo.WriteModel{}
 
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("GB:DARWIN:%s:%s", trainStatus.SSD, trainStatus.UID)
@@ -149,14 +146,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		updateModel.SetUpdate(bsonRep)
 		updateModel.SetUpsert(true)
 
-		operations = append(operations, updateModel)
-	}
-
-	if len(operations) > 0 {
-		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), operations, &options.BulkWriteOptions{})
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
-		}
+		queue.Add(updateModel)
 	}
 }
 
