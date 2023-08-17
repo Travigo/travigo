@@ -162,6 +162,6 @@ func UpdateRecordsStats() {
 
 		elastic_client.IndexRequest("overall-stats-1", bytes.NewReader(elasticEvent))
 
-		time.Sleep(10 * time.Minute)
+		time.Sleep(30 * time.Minute)
 	}
 }
