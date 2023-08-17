@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"time"
+
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/mongo"
-	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -81,9 +82,9 @@ func UpdateRecordsStats() {
 
 		matchStage := bson.D{
 			{
-				"$match",
-				bson.D{
-					{"modificationdatetime", bson.M{"$gt": realtimeActiveCutoffDate}},
+				Key: "$match",
+				Value: bson.D{
+					{Key: "modificationdatetime", Value: bson.M{"$gt": realtimeActiveCutoffDate}},
 				},
 			},
 		}
@@ -106,8 +107,9 @@ func UpdateRecordsStats() {
 		//}
 		projectStage := bson.D{
 			{
-				"$project",
-				bson.D{
+				Key: "$project",
+				Value: bson.D{
+					bson.E{Key: "primaryidentifier", Value: 1},
 					bson.E{Key: "modificationdatetime", Value: 1},
 					bson.E{Key: "reliability", Value: 1},
 					bson.E{Key: "journey.serviceref", Value: 1},

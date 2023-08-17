@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"time"
+
+	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -495,7 +496,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	// Update database
 	updateMap := bson.M{
-		"realiability":         realtimeJourneyReliability,
+		"reliability":          realtimeJourneyReliability,
 		"modificationdatetime": currentTime,
 		"vehiclelocation":      vehicleLocationEvent.VehicleLocation,
 		"vehiclebearing":       vehicleLocationEvent.VehicleBearing,
