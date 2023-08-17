@@ -337,6 +337,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyIdentifier,
+			ActivelyTracked:   true,
 			Journey:           journey,
 
 			CreationDateTime: currentTime,
@@ -506,6 +507,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
 		updateMap["journey"] = realtimeJourney.Journey
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime

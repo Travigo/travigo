@@ -9,6 +9,8 @@ var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
 type RealtimeJourney struct {
 	PrimaryIdentifier string `groups:"basic"`
 
+	ActivelyTracked bool `groups:"basic"`
+
 	//JourneyRef string   `groups:"internal"`
 	Journey *Journey `groups:"basic"`
 

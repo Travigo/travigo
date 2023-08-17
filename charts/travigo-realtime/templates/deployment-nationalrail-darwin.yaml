@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "travigo-realtime.fullname" . }}-nationalrail-stomp
+  name: {{ include "travigo-realtime.fullname" . }}-nationalrail-darwin
   labels:
     {{- include "travigo-realtime.labels" . | nindent 4 }}
 spec:
@@ -11,7 +11,7 @@ spec:
   selector:
     matchLabels:
       {{- include "travigo-realtime.selectorLabels" . | nindent 6 }}
-      appModule: nationalrail-stomp
+      appModule: nationalrail-darwin
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -20,7 +20,7 @@ spec:
       {{- end }}
       labels:
         {{- include "travigo-realtime.selectorLabels" . | nindent 8 }}
-        appModule: nationalrail-stomp
+        appModule: nationalrail-darwin
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

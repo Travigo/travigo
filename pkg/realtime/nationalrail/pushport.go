@@ -68,6 +68,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier: realtimeJourneyID,
+				ActivelyTracked:   false,
 				CreationDateTime:  now,
 				Reliability:       ctdf.RealtimeJourneyReliabilityExternalProvided,
 
@@ -88,6 +89,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		// Update database
 		if newRealtimeJourney {
 			updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+			updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
 
 			updateMap["reliability"] = realtimeJourney.Reliability
 

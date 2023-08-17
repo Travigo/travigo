@@ -228,6 +228,7 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 	if realtimeJourney == nil {
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,
+			ActivelyTracked:   true,
 			CreationDateTime:  now,
 			VehicleRef:        predictions[0].VehicleID,
 			Reliability:       ctdf.RealtimeJourneyReliabilityExternalProvided,
@@ -430,6 +431,7 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 	// Update database
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
 
 		updateMap["reliability"] = realtimeJourney.Reliability
 

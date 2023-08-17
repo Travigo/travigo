@@ -127,7 +127,7 @@ func UpdateRecordsStats() {
 		startTime = time.Now()
 
 		for _, realtimeJourney := range realtimeJourneys {
-			if realtimeJourney.IsActive() {
+			if realtimeJourney.IsActive() && realtimeJourney.ActivelyTracked {
 				numberActiveRealtimeJourneys += 1
 
 				if realtimeJourney.Reliability == ctdf.RealtimeJourneyReliabilityLocationWithTrack {
