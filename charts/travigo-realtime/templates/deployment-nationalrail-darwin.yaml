@@ -75,13 +75,13 @@ spec:
             - name: TRAVIGO_NATIONALRAIL_STOMP_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.nationRail.stompCredentialsSecret }}
+                  name: {{ $.Values.nationRail.darwinCredentialsSecret }}
                   key: username
                   optional: false
             - name: TRAVIGO_NATIONALRAIL_STOMP_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.nationRail.stompCredentialsSecret }}
+                  name: {{ $.Values.nationRail.darwinCredentialsSecret }}
                   key: password
                   optional: false
           resources:
