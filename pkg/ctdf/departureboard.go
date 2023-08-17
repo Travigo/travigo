@@ -58,7 +58,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					refTime := path.OriginDepartureTime
 
 					// Use the realtime estimated stop time based if realtime is available
-					if journey.RealtimeJourney != nil && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+					if journey.RealtimeJourney != nil && journey.RealtimeJourney.ActivelyTracked && journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
 						refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
 						departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
 					}

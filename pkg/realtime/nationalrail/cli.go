@@ -22,11 +22,11 @@ func RegisterCLI() *cli.Command {
 				Usage: "run an instance an instance of train tracker",
 				Action: func(c *cli.Context) error {
 					env := util.GetEnvironmentVariables()
-					if env["TRAVIGO_NATIONALRAIL_STOMP_USERNAME"] == "" {
-						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_STOMP_USERNAME must be set")
+					if env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME must be set")
 					}
-					if env["TRAVIGO_NATIONALRAIL_STOMP_PASSWORD"] == "" {
-						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_STOMP_PASSWORD must be set")
+					if env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD must be set")
 					}
 
 					if err := database.Connect(); err != nil {
@@ -44,8 +44,8 @@ func RegisterCLI() *cli.Command {
 
 					stompClient := StompClient{
 						Address:   "darwin-dist-44ae45.nationalrail.co.uk:61613",
-						Username:  env["TRAVIGO_NATIONALRAIL_STOMP_USERNAME"],
-						Password:  env["TRAVIGO_NATIONALRAIL_STOMP_PASSWORD"],
+						Username:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"],
+						Password:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD"],
 						QueueName: "/topic/darwin.pushport-v16",
 					}
 
