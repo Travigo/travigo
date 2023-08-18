@@ -1,12 +1,12 @@
-package nationalrail
+package darwin
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/batchprocessor"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,7 +17,7 @@ type PushPortData struct {
 	TrainStatuses []TrainStatus
 }
 
-func (p *PushPortData) UpdateRealtimeJourneys(queue *BatchProcessingQueue) {
+func (p *PushPortData) UpdateRealtimeJourneys(queue *batchprocessor.BatchProcessingQueue) {
 	now := time.Now()
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "DarwinPushPort",
@@ -99,7 +99,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *BatchProcessingQueue) {
 		}
 
 		for _, location := range trainStatus.Locations {
-			stop := getStopFromTiploc(location.TPL)
+			stop := tiplocCache.Get(location.TPL)
 
 			if stop == nil {
 				log.Error().Str("tiploc", location.TPL).Msg("Failed to find stop")
@@ -148,28 +148,4 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *BatchProcessingQueue) {
 
 		queue.Add(updateModel)
 	}
-}
-
-// TODO convert to proper cache
-var tiplocStopCacheMutex sync.Mutex
-var tiplocStopCache map[string]*ctdf.Stop
-
-func getStopFromTiploc(tiploc string) *ctdf.Stop {
-	tiplocStopCacheMutex.Lock()
-	cacheValue := tiplocStopCache[tiploc]
-	tiplocStopCacheMutex.Unlock()
-
-	if cacheValue != nil {
-		return cacheValue
-	}
-
-	stopCollection := database.GetCollection("stops")
-	var stop *ctdf.Stop
-	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Tiploc": tiploc}).Decode(&stop)
-
-	tiplocStopCacheMutex.Lock()
-	tiplocStopCache[tiploc] = stop
-	tiplocStopCacheMutex.Unlock()
-
-	return stop
 }

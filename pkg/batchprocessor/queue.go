@@ -1,4 +1,4 @@
-package nationalrail
+package batchprocessor
 
 import (
 	"context"

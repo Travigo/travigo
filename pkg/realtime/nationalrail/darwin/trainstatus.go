@@ -1,4 +1,4 @@
-package nationalrail
+package darwin
 
 import "time"
 

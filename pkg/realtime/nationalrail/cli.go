@@ -1,12 +1,13 @@
 package nationalrail
 
 import (
+	"io"
 	"os"
-	"sync"
 
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/darwin"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/nrod"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
 	"github.com/urfave/cli/v2"
@@ -15,11 +16,11 @@ import (
 func RegisterCLI() *cli.Command {
 	return &cli.Command{
 		Name:  "national-rail",
-		Usage: "Track trains using Darwin Push Port",
+		Usage: "Track GB trains using Darwin Push Port & Network Rail",
 		Subcommands: []*cli.Command{
 			{
-				Name:  "run",
-				Usage: "run an instance an instance of train tracker",
+				Name:  "darwin",
+				Usage: "run an instance an instance of the Darwin train tracker",
 				Action: func(c *cli.Context) error {
 					env := util.GetEnvironmentVariables()
 					if env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"] == "" {
@@ -36,13 +37,9 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					// TODO replace with proper cache
-					tiplocStopCacheMutex = sync.Mutex{}
-					tiplocStopCache = map[string]*ctdf.Stop{}
+					log.Info().Msg("Starting National Rail Darwin Push Port train tracker")
 
-					log.Info().Msg("Starting National Rail train tracker")
-
-					stompClient := StompClient{
+					stompClient := darwin.StompClient{
 						Address:   "darwin-dist-44ae45.nationalrail.co.uk:61613",
 						Username:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"],
 						Password:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD"],
@@ -55,9 +52,17 @@ func RegisterCLI() *cli.Command {
 				},
 			},
 			{
-				Name:  "test",
-				Usage: "run an instance an instance of train tracker",
+				Name:  "nrod",
+				Usage: "run an instance an instance of the Network Rail Open Data train tracker",
 				Action: func(c *cli.Context) error {
+					env := util.GetEnvironmentVariables()
+					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
+					}
+					if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
+					}
+
 					if err := database.Connect(); err != nil {
 						return err
 					}
@@ -65,24 +70,27 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					log.Info().Msg("Starting National Rail train tracker")
+					log.Info().Msg("Starting Network Rail Open Data train tracker")
 
-					// TODO replace with proper cache
-					tiplocStopCacheMutex = sync.Mutex{}
-					tiplocStopCache = map[string]*ctdf.Stop{}
-
-					file, err := os.Open("/Users/aaronclaydon/Downloads/darwin.xml")
+					file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/nrod.json")
 					if err != nil {
 						log.Fatal().Err(err).Msg("Failed to open file")
 					}
 					defer file.Close()
 
-					pushPortData, err := ParseXMLFile(file)
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to parse push port data xml")
+					bytes, _ := io.ReadAll(file)
+					nrod.ParseMessages(bytes)
+
+					return nil
+
+					stompClient := nrod.StompClient{
+						Address:   "publicdatafeeds.networkrail.co.uk:61618",
+						Username:  env["TRAVIGO_NETWORKRAIL_USERNAME"],
+						Password:  env["TRAVIGO_NETWORKRAIL_PASSWORD"],
+						QueueName: "/topic/TRAIN_MVT_ALL_TOC",
 					}
 
-					pushPortData.UpdateRealtimeJourneys(nil)
+					stompClient.Run()
 
 					return nil
 				},
