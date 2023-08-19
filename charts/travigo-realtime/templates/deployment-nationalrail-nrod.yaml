@@ -72,16 +72,16 @@ spec:
                   name: {{ $.Values.elasticsearch.accountSecret }}
                   key: password
                   optional: false
-            - name: TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME
+            - name: TRAVIGO_NETWORKRAIL_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.nationalRail.darwinCredentialsSecret }}
+                  name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
                   key: username
                   optional: false
-            - name: TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD
+            - name: TRAVIGO_NETWORKRAIL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.nationalRail.darwinCredentialsSecret }}
+                  name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
                   key: password
                   optional: false
           resources:
