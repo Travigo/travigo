@@ -1,12 +1,12 @@
 package nrod
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/go-stomp/stomp/v3"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/batchprocessor"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -15,15 +15,21 @@ type StompClient struct {
 	Username  string
 	Password  string
 	QueueName string
+
+	Queue       *railutils.BatchProcessingQueue
+	TiplocCache railutils.TiplocCache
 }
 
 func (s *StompClient) Run() {
+	s.TiplocCache = railutils.TiplocCache{}
+	s.TiplocCache.Setup()
+
 	// Setup batch queue processor first
-	queue := &batchprocessor.BatchProcessingQueue{
+	s.Queue = &railutils.BatchProcessingQueue{
 		Timeout: time.Second * 5,
 		Items:   make(chan mongo.WriteModel, 500),
 	}
-	queue.Process()
+	s.Queue.Process()
 
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
@@ -43,14 +49,36 @@ func (s *StompClient) Run() {
 	for true {
 		msg := <-sub.C
 
-		// b := bytes.NewReader(msg.Body)
-		// gzipDecoder, err := gzip.NewReader(b)
-		// if err != nil {
-		// 	log.Error().Err(err).Msg("cannot decode gzip stream")
-		// 	continue
-		// }
-		// defer gzipDecoder.Close()
+		s.ParseMessages(msg.Body)
+	}
+}
 
-		pretty.Println(string(msg.Body))
+func (s *StompClient) ParseMessages(messagesBytes []byte) {
+	var rawMessages []*json.RawMessage
+	json.Unmarshal(messagesBytes, &rawMessages)
+
+	for _, jsonObj := range rawMessages {
+		var message *Message
+		json.Unmarshal(*jsonObj, &message)
+
+		switch message.Header.MsgType {
+		case "0001":
+			var activationMessage TrustActivation
+			json.Unmarshal(message.Body, &activationMessage)
+
+			activationMessage.Process(s)
+		case "0002":
+			var cancellationMessage TrustCancellation
+			json.Unmarshal(message.Body, &cancellationMessage)
+
+			// pretty.Println(cancellationMessage)
+		case "0003":
+			var movementMessage TrustMovement
+			json.Unmarshal(message.Body, &movementMessage)
+
+			// pretty.Println(movementMessage)
+		default:
+			log.Debug().Str("type", message.Header.MsgType).Msg("Unhandled message type")
+		}
 	}
 }

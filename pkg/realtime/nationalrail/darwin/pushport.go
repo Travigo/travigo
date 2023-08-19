@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/batchprocessor"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -17,7 +17,7 @@ type PushPortData struct {
 	TrainStatuses []TrainStatus
 }
 
-func (p *PushPortData) UpdateRealtimeJourneys(queue *batchprocessor.BatchProcessingQueue) {
+func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
 	now := time.Now()
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "DarwinPushPort",
@@ -30,7 +30,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *batchprocessor.BatchProcess
 	journeysCollection := database.GetCollection("journeys")
 
 	for _, trainStatus := range p.TrainStatuses {
-		realtimeJourneyID := fmt.Sprintf("GB:DARWIN:%s:%s", trainStatus.SSD, trainStatus.UID)
+		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", trainStatus.SSD, trainStatus.UID)
 		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
 		var realtimeJourney *ctdf.RealtimeJourney

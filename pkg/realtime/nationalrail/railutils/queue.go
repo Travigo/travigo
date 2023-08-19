@@ -1,4 +1,4 @@
-package batchprocessor
+package railutils
 
 import (
 	"context"

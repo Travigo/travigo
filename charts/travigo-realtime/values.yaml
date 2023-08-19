@@ -19,8 +19,9 @@ elasticsearch:
 tfl:
   apiKeySecret: travigo-tfl-api-key
 
-nationRail:
+nationalRail:
   darwinCredentialsSecret: travigo-nationalrail-darwin-stomp-credentials
+  networkRailCredentialsSecret: travigo-networkrail-credentials
 
 runner:
   resources:

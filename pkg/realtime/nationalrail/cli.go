@@ -1,9 +1,6 @@
 package nationalrail
 
 import (
-	"io"
-	"os"
-
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/darwin"
@@ -72,23 +69,23 @@ func RegisterCLI() *cli.Command {
 
 					log.Info().Msg("Starting Network Rail Open Data train tracker")
 
-					file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/nrod.json")
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to open file")
-					}
-					defer file.Close()
-
-					bytes, _ := io.ReadAll(file)
-					nrod.ParseMessages(bytes)
-
-					return nil
-
 					stompClient := nrod.StompClient{
 						Address:   "publicdatafeeds.networkrail.co.uk:61618",
 						Username:  env["TRAVIGO_NETWORKRAIL_USERNAME"],
 						Password:  env["TRAVIGO_NETWORKRAIL_PASSWORD"],
 						QueueName: "/topic/TRAIN_MVT_ALL_TOC",
 					}
+
+					// file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/nrod.json")
+					// if err != nil {
+					// 	log.Fatal().Err(err).Msg("Failed to open file")
+					// }
+					// defer file.Close()
+
+					// bytes, _ := io.ReadAll(file)
+					// stompClient.ParseMessages(bytes)
+
+					// return nil
 
 					stompClient.Run()
 

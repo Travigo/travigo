@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-stomp/stomp/v3"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/batchprocessor"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -26,7 +25,7 @@ func (s *StompClient) Run() {
 	tiplocCache.Setup()
 
 	// Setup batch queue processor first
-	queue := &batchprocessor.BatchProcessingQueue{
+	queue := &railutils.BatchProcessingQueue{
 		Timeout: time.Second * 5,
 		Items:   make(chan mongo.WriteModel, 500),
 	}

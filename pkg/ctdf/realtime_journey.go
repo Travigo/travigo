@@ -7,7 +7,8 @@ import (
 var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
 
 type RealtimeJourney struct {
-	PrimaryIdentifier string `groups:"basic"`
+	PrimaryIdentifier string            `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"detailed"`
 
 	ActivelyTracked bool `groups:"basic"`
 
