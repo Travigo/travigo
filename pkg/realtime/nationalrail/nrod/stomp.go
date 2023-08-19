@@ -76,7 +76,7 @@ func (s *StompClient) ParseMessages(messagesBytes []byte) {
 			var movementMessage TrustMovement
 			json.Unmarshal(message.Body, &movementMessage)
 
-			// pretty.Println(movementMessage)
+			movementMessage.Process(s)
 		default:
 			log.Debug().Str("type", message.Header.MsgType).Msg("Unhandled message type")
 		}

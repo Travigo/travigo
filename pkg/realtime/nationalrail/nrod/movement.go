@@ -1,5 +1,17 @@
 package nrod
 
+import (
+	"context"
+	"time"
+
+	"github.com/kr/pretty"
+	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+)
+
 type TrustMovement struct {
 	EventType  string `json:"event_type"`
 	TrainID    string `json:"train_id"`
@@ -31,4 +43,44 @@ type TrustMovement struct {
 	PlannedEventType       string `json:"planned_event_type"`
 	NextReportStanox       string `json:"next_report_stanox"`
 	Line                   string `json:"line_ind"`
+}
+
+func (m *TrustMovement) Process(stompClient *StompClient) {
+	now := time.Now()
+
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+	var realtimeJourney *ctdf.RealtimeJourney
+
+	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"otheridentifiers.TrainID": m.TrainID}).Decode(&realtimeJourney)
+
+	if realtimeJourney == nil {
+		return
+	}
+
+	updateMap := bson.M{
+		"modificationdatetime": now,
+		"activelytracked":      m.TrainTerminated != "true",
+	}
+
+	if m.EventType == "ARRIVAL" {
+
+	}
+
+	// Create update
+	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
+	updateModel := mongo.NewUpdateOneModel()
+	updateModel.SetFilter(bson.M{"primaryidentifier": realtimeJourney.PrimaryIdentifier})
+	updateModel.SetUpdate(bsonRep)
+	updateModel.SetUpsert(true)
+
+	stompClient.Queue.Add(updateModel)
+	pretty.Println(updateMap)
+
+	log.Info().
+		Str("trainid", m.TrainID).
+		Str("eventtype", m.EventType).
+		Str("stanox", m.LocationStanox).
+		Str("realtimejourney", realtimeJourney.PrimaryIdentifier).
+		Msg("Train movement")
 }
