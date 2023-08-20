@@ -114,6 +114,7 @@ func UpdateRecordsStats() {
 				Value: bson.D{
 					bson.E{Key: "primaryidentifier", Value: 1},
 					bson.E{Key: "activelytracked", Value: 1},
+					bson.E{Key: "timeoutdurationminutes", Value: 1},
 					bson.E{Key: "modificationdatetime", Value: 1},
 					bson.E{Key: "reliability", Value: 1},
 					bson.E{Key: "journey.serviceref", Value: 1},
