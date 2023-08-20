@@ -19,6 +19,7 @@ bods:
 
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
+  networkRailCredentialsSecret: travigo-networkrail-credentials
 
 image:
   repository: ghcr.io/travigo/travigo
@@ -38,6 +39,9 @@ cronjobs:
   - name: naptan
     schedule: "0 3 * * 6"
     args: ["data-importer", "file", "naptan", "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"]
+  - name: networkrail-corpus
+    schedule: "30 3 * * 6"
+    args: ["data-importer", "networkrail-corpus"]
   - name: bods-timetable
     schedule: "0 5 * * *"
     args: ["data-importer", "bods-timetable"]

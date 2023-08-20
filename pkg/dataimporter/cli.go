@@ -2,6 +2,7 @@ package dataimporter
 
 import (
 	"archive/zip"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
+	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -499,6 +501,72 @@ func RegisterCLI() *cli.Command {
 					return nil
 				},
 			},
+			{
+				Name:  "networkrail-corpus",
+				Usage: "Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "Overwrite URL",
+						Required: false,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+
+					env := util.GetEnvironmentVariables()
+					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
+					}
+					if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
+					}
+
+					source := c.String("url")
+					if source == "" {
+						source = "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS"
+					}
+
+					log.Info().Msgf("Network Rail CORPUS import from %s", source)
+
+					req, _ := http.NewRequest("GET", source, nil)
+					req.SetBasicAuth(env["TRAVIGO_NETWORKRAIL_USERNAME"], env["TRAVIGO_NETWORKRAIL_PASSWORD"])
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+
+					gzipDecoder, err := gzip.NewReader(resp.Body)
+					if err != nil {
+						log.Fatal().Err(err).Msg("cannot decode gzip stream")
+					}
+					defer gzipDecoder.Close()
+
+					if err != nil {
+						log.Fatal().Err(err).Msg("Download file")
+					}
+					defer resp.Body.Close()
+
+					corpus, err := networkrailcorpus.ParseJSONFile(gzipDecoder)
+
+					if err != nil {
+						return err
+					}
+
+					// Cleanup right at the begining once, as we do it as 1 big import
+					datasource := &ctdf.DataSource{
+						OriginalFormat: "JSON-CORPUS",
+						Provider:       "GB-NetworkRail",
+						Dataset:        source,
+						Identifier:     "",
+					}
+
+					corpus.ImportIntoMongoAsCTDF(datasource)
+
+					return nil
+				},
+			},
 		},
 	}
 }
@@ -595,7 +663,7 @@ func importFile(dataFormat string, transportType ctdf.TransportType, source stri
 
 	// Check if its an XML file or ZIP file
 
-	if fileExtension == ".xml" || fileExtension == ".cif" {
+	if fileExtension == ".xml" || fileExtension == ".cif" || fileExtension == ".json" {
 		file, err := os.Open(source)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to open file")
@@ -736,6 +804,25 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
+	case "networkrail-corpus":
+		log.Info().Msgf("Network Rail Corpus file import from %s ", dataFile.Name)
+		corpus, err := networkrailcorpus.ParseJSONFile(dataFile.Reader)
+
+		if err != nil {
+			return err
+		}
+
+		if sourceDatasource == nil {
+			datasource = ctdf.DataSource{
+				OriginalFormat: "JSON-CORPUS",
+				Provider:       "GB-NetworkRail",
+				Dataset:        dataFile.Name,
+			}
+		} else {
+			datasource = *sourceDatasource
+		}
+
+		corpus.ImportIntoMongoAsCTDF(&datasource)
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}

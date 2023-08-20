@@ -65,6 +65,18 @@ spec:
                   name: {{ $.Values.elasticsearch.accountSecret }}
                   key: password
                   optional: false
+            - name: TRAVIGO_NETWORKRAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
+                  key: username
+                  optional: false
+            - name: TRAVIGO_NETWORKRAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
+                  key: password
+                  optional: false
           resources:
             {{- toYaml $.Values.resources | nindent 12 }}
 {{- end }}
