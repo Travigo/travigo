@@ -18,6 +18,8 @@ type RealtimeJourney struct {
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
+	TimeoutDurationMinutes int `groups:"internal"`
+
 	DataSource *DataSource `groups:"internal"`
 
 	VehicleLocation Location `groups:"basic"`
@@ -51,7 +53,7 @@ const (
 )
 
 func (r *RealtimeJourney) IsActive() bool {
-	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > 10
+	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > float64(r.TimeoutDurationMinutes)
 
 	if timedOut {
 		return false

@@ -2,9 +2,9 @@ package nrod
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -53,7 +53,6 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	var realtimeJourney *ctdf.RealtimeJourney
 
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"otheridentifiers.TrainID": m.TrainID}).Decode(&realtimeJourney)
-
 	if realtimeJourney == nil {
 		return
 	}
@@ -63,8 +62,27 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		"activelytracked":      m.TrainTerminated != "true",
 	}
 
-	if m.EventType == "ARRIVAL" {
+	locationStop := stompClient.StopCache.Get("STANOX", m.LocationStanox)
+	if locationStop == nil {
+		return
+	}
 
+	if m.EventType == "DEPARTURE" {
+		for _, path := range realtimeJourney.Journey.Path {
+			if path.OriginStopRef == locationStop.PrimaryIdentifier {
+				realtimeJourney.DepartedStopRef = path.OriginStopRef
+				realtimeJourney.NextStopRef = path.DestinationStopRef
+
+				updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
+				updateMap[fmt.Sprintf("stops.%s.departuretime", locationStop.PrimaryIdentifier)] = now
+				updateMap[fmt.Sprintf("stops.%s.timetype", locationStop.PrimaryIdentifier)] = ctdf.RealtimeJourneyStopTimeHistorical
+
+				break
+			}
+		}
+	} else if m.EventType == "ARRIVAL" {
+		updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
+		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
 	}
 
 	// Create update
@@ -75,7 +93,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	updateModel.SetUpsert(true)
 
 	stompClient.Queue.Add(updateModel)
-	pretty.Println(updateMap)
+	// pretty.Println(updateMap)
 
 	log.Info().
 		Str("trainid", m.TrainID).

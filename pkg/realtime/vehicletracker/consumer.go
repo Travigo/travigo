@@ -336,9 +336,10 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			pathItem.GetDestinationStop()
 		}
 		realtimeJourney = &ctdf.RealtimeJourney{
-			PrimaryIdentifier: realtimeJourneyIdentifier,
-			ActivelyTracked:   true,
-			Journey:           journey,
+			PrimaryIdentifier:      realtimeJourneyIdentifier,
+			ActivelyTracked:        true,
+			TimeoutDurationMinutes: 10,
+			Journey:                journey,
 
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,

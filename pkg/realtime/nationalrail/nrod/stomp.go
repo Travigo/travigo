@@ -16,13 +16,13 @@ type StompClient struct {
 	Password  string
 	QueueName string
 
-	Queue       *railutils.BatchProcessingQueue
-	TiplocCache railutils.TiplocCache
+	Queue     *railutils.BatchProcessingQueue
+	StopCache railutils.StopCache
 }
 
 func (s *StompClient) Run() {
-	s.TiplocCache = railutils.TiplocCache{}
-	s.TiplocCache.Setup()
+	s.StopCache = railutils.StopCache{}
+	s.StopCache.Setup()
 
 	// Setup batch queue processor first
 	s.Queue = &railutils.BatchProcessingQueue{
@@ -30,6 +30,8 @@ func (s *StompClient) Run() {
 		Items:   make(chan mongo.WriteModel, 500),
 	}
 	s.Queue.Process()
+
+	// return
 
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{

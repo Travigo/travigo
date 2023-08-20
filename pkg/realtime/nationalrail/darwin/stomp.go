@@ -18,11 +18,11 @@ type StompClient struct {
 	QueueName string
 }
 
-var tiplocCache railutils.TiplocCache
+var stopCache railutils.StopCache
 
 func (s *StompClient) Run() {
-	tiplocCache = railutils.TiplocCache{}
-	tiplocCache.Setup()
+	stopCache = railutils.StopCache{}
+	stopCache.Setup()
 
 	// Setup batch queue processor first
 	queue := &railutils.BatchProcessingQueue{

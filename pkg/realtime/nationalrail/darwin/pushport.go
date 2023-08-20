@@ -64,10 +64,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
-				PrimaryIdentifier: realtimeJourneyID,
-				ActivelyTracked:   false,
-				CreationDateTime:  now,
-				Reliability:       ctdf.RealtimeJourneyReliabilityExternalProvided,
+				PrimaryIdentifier:      realtimeJourneyID,
+				ActivelyTracked:        false,
+				TimeoutDurationMinutes: 60,
+				CreationDateTime:       now,
+				Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
 
 				DataSource: datasource,
 
@@ -99,7 +100,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		for _, location := range trainStatus.Locations {
-			stop := tiplocCache.Get(location.TPL)
+			stop := stopCache.Get("Tiploc", location.TPL)
 
 			if stop == nil {
 				log.Error().Str("tiploc", location.TPL).Msg("Failed to find stop")

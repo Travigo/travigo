@@ -15,21 +15,21 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-type TiplocCache struct {
+type StopCache struct {
 	Cache *cache.Cache[string]
 }
 
-func (t *TiplocCache) Setup() {
+func (s *StopCache) Setup() {
 	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(90*time.Minute))
 
-	t.Cache = cache.New[string](redisStore)
+	s.Cache = cache.New[string](redisStore)
 }
 
-func (t *TiplocCache) Get(tiploc string) *ctdf.Stop {
+func (s *StopCache) Get(identifierType string, identifier string) *ctdf.Stop {
 	var stop *ctdf.Stop
-	fullTiplocID := fmt.Sprintf("GB:TIPLOC:%s", tiploc)
+	fullStopCacheID := fmt.Sprintf("GB:%s:%s", identifierType, identifier)
 
-	stopCacheValue, err := t.Cache.Get(context.Background(), fullTiplocID)
+	stopCacheValue, err := s.Cache.Get(context.Background(), fullStopCacheID)
 	if err == nil {
 		if stopCacheValue == "N/A" {
 			return nil
@@ -40,13 +40,13 @@ func (t *TiplocCache) Get(tiploc string) *ctdf.Stop {
 	}
 
 	stopCollection := database.GetCollection("stops")
-	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Tiploc": tiploc}).Decode(&stop)
+	stopCollection.FindOne(context.Background(), bson.M{fmt.Sprintf("otheridentifiers.%s", identifierType): identifier}).Decode(&stop)
 
 	if stop == nil {
-		t.Cache.Set(context.Background(), fullTiplocID, "N/A")
+		s.Cache.Set(context.Background(), fullStopCacheID, "N/A")
 	} else {
 		stopJSON, _ := json.Marshal(stop)
-		t.Cache.Set(context.Background(), fullTiplocID, string(stopJSON))
+		s.Cache.Set(context.Background(), fullStopCacheID, string(stopJSON))
 	}
 
 	return stop
