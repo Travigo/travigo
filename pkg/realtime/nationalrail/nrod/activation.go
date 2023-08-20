@@ -109,6 +109,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
 		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
+		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
 
 		updateMap["reliability"] = realtimeJourney.Reliability
 

@@ -88,6 +88,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		if newRealtimeJourney {
 			updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
 			updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
+			updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
 
 			updateMap["reliability"] = realtimeJourney.Reliability
 

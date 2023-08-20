@@ -509,6 +509,8 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
 		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
+		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
+
 		updateMap["journey"] = realtimeJourney.Journey
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime

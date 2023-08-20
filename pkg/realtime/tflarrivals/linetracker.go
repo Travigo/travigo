@@ -433,6 +433,7 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
 		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
+		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
 
 		updateMap["reliability"] = realtimeJourney.Reliability
 
