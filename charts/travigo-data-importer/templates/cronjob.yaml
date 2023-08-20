@@ -52,6 +52,18 @@ spec:
                       name: {{ $.Values.nationalRail.credentialsSecret }}
                       key: password
                       optional: true
+                - name: TRAVIGO_NETWORKRAIL_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
+                      key: username
+                      optional: false
+                - name: TRAVIGO_NETWORKRAIL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.nationalRail.networkRailCredentialsSecret }}
+                      key: password
+                      optional: false
                 - name: TRAVIGO_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:
