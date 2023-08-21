@@ -118,7 +118,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			continue
 		}
 
-		journeyID := fmt.Sprintf("GB:RAIL:%s", trainDef.BasicSchedule.TrainUID)
+		journeyID := fmt.Sprintf("GB:RAIL:%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
 
 		// Create whole new journeys
 		if trainDef.BasicSchedule.TransactionType == "N" && (trainDef.BasicSchedule.STPIndicator == "P" || trainDef.BasicSchedule.STPIndicator == "N") {
@@ -143,12 +143,6 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			// Do this by excluding the date range on the original journey and then creating a new one with the overlay
 			originalJourney := journeys[journeyID]
 
-			newJourneyID := fmt.Sprintf(
-				"GB:RAIL:%s:OVERLAY:%s:%s",
-				trainDef.BasicSchedule.TrainUID,
-				trainDef.BasicSchedule.DateRunsFrom,
-				trainDef.BasicSchedule.DateRunsTo)
-
 			if originalJourney != nil {
 				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
 				dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
@@ -156,11 +150,11 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 				originalJourney.Availability.Exclude = append(originalJourney.Availability.Exclude, ctdf.AvailabilityRule{
 					Type:        ctdf.AvailabilityDateRange,
 					Value:       fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
-					Description: fmt.Sprintf("Overlay with %s", newJourneyID),
+					Description: fmt.Sprintf("Overlay with %s", journeyID),
 				})
 			}
 
-			journeys[newJourneyID] = c.createJourneyFromTraindef(newJourneyID, trainDef)
+			journeys[journeyID] = c.createJourneyFromTraindef(journeyID, trainDef)
 		} else {
 			log.Error().
 				Str("transactiontype", trainDef.BasicSchedule.TransactionType).
