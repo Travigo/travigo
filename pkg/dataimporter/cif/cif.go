@@ -191,7 +191,7 @@ func (c *CommonInterfaceFormat) ImportIntoMongoAsCTDF(datasource *ctdf.DataSourc
 	var operationInsert uint64
 	var operationUpdate uint64
 
-	maxBatchSize := int(math.Ceil(float64(len(journeys)) / float64(5*runtime.NumCPU())))
+	maxBatchSize := int(math.Ceil(float64(len(journeys)) / float64(50*runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(journeys)) / float64(maxBatchSize)))
 
 	processingGroup := sync.WaitGroup{}
