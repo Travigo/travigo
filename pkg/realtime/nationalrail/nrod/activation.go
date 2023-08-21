@@ -85,7 +85,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			OtherIdentifiers: map[string]string{
 				"TrainID": a.TrainID,
 			},
-			TimeoutDurationMinutes: 60,
+			TimeoutDurationMinutes: 90,
 			ActivelyTracked:        false,
 			CreationDateTime:       now,
 			Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
