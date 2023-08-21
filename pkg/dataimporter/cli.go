@@ -437,7 +437,7 @@ func RegisterCLI() *cli.Command {
 						OriginalFormat: "CIF",
 						Provider:       "GB-NationalRail",
 						Dataset:        "timetable",
-						Identifier:     "",
+						Identifier:     time.Now().Format(time.RFC3339),
 					}
 					cleanupOldRecords("journeys", datasource)
 
