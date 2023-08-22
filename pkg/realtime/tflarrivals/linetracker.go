@@ -228,7 +228,7 @@ func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions
 	if realtimeJourney == nil {
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyID,
-			TimeoutDurationMinutes: 5,
+			TimeoutDurationMinutes: 10,
 			ActivelyTracked:        true,
 			CreationDateTime:       now,
 			VehicleRef:             predictions[0].VehicleID,
