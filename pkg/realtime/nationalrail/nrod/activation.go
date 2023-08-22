@@ -75,7 +75,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		}
 
 		if journey == nil {
-			log.Error().Str("uid", a.TrainUID).Msg("Failed to find respective Journey for this train")
+			log.Error().Str("uid", a.TrainUID).Str("toc", a.OperatorID).Msg("Failed to find respective Journey for this train")
 			return
 		}
 

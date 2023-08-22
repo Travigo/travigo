@@ -54,7 +54,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"otheridentifiers.TrainID": m.TrainID}).Decode(&realtimeJourney)
 	if realtimeJourney == nil {
-		log.Error().Str("trainid", m.TrainID).Msg("Could not find Realtime Journey for train movement")
+		log.Error().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
 
