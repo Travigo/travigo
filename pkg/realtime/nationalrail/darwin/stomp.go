@@ -49,19 +49,21 @@ func (s *StompClient) Run() {
 	for true {
 		msg := <-sub.C
 
-		b := bytes.NewReader(msg.Body)
-		gzipDecoder, err := gzip.NewReader(b)
-		if err != nil {
-			log.Error().Err(err).Msg("cannot decode gzip stream")
-			continue
-		}
-		defer gzipDecoder.Close()
+		if msg != nil {
+			b := bytes.NewReader(msg.Body)
+			gzipDecoder, err := gzip.NewReader(b)
+			if err != nil {
+				log.Error().Err(err).Msg("cannot decode gzip stream")
+				continue
+			}
+			defer gzipDecoder.Close()
 
-		pushPortData, err := ParseXMLFile(gzipDecoder)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to parse push port data xml")
-		}
+			pushPortData, err := ParseXMLFile(gzipDecoder)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
+			}
 
-		pushPortData.UpdateRealtimeJourneys(queue)
+			pushPortData.UpdateRealtimeJourneys(queue)
+		}
 	}
 }

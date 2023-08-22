@@ -51,7 +51,9 @@ func (s *StompClient) Run() {
 	for true {
 		msg := <-sub.C
 
-		s.ParseMessages(msg.Body)
+		if msg != nil {
+			s.ParseMessages(msg.Body)
+		}
 	}
 }
 
