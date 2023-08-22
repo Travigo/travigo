@@ -61,6 +61,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		cursor, _ := journeysCollection.Find(context.Background(), bson.M{"otheridentifiers.TrainUID": a.TrainUID})
 
 		journeyDate, _ := time.Parse("2006-01-02", a.TrainPlannedOriginTimestamp)
+		journeyPotentials := 0
 
 		for cursor.Next(context.TODO()) {
 			var potentialJourney *ctdf.Journey
@@ -68,6 +69,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to decode Journey")
 			}
+			journeyPotentials += 1
 
 			if potentialJourney.Availability.MatchDate(journeyDate) {
 				journey = potentialJourney
@@ -75,7 +77,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		}
 
 		if journey == nil {
-			log.Error().Str("uid", a.TrainUID).Str("toc", a.OperatorID).Msg("Failed to find respective Journey for this train")
+			log.Error().Str("uid", a.TrainUID).Str("toc", a.OperatorID).Int("journeypotentials", journeyPotentials).Msg("Failed to find respective Journey for this train")
 			return
 		}
 
