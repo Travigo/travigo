@@ -102,7 +102,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 	updateMap := bson.M{
 		"modificationdatetime":     now,
-		"otheridentifiers.TrainID": realtimeJourney.OtherIdentifiers["TrainID"],
+		"otheridentifiers.TrainID": a.TrainID,
 	}
 
 	// Update database
