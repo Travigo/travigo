@@ -72,6 +72,8 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier {
 				realtimeJourney.DepartedStopRef = path.OriginStopRef
 				realtimeJourney.NextStopRef = path.DestinationStopRef
+				realtimeJourney.DepartedStop = path.OriginStop
+				realtimeJourney.NextStop = path.DestinationStop
 
 				updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
 				updateMap[fmt.Sprintf("stops.%s.departuretime", locationStop.PrimaryIdentifier)] = now
@@ -84,6 +86,11 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
 		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
 	}
+
+	updateMap["departedstopref"] = realtimeJourney.DepartedStopRef
+	updateMap["nextstopref"] = realtimeJourney.NextStopRef
+	updateMap["departedstop"] = realtimeJourney.DepartedStop
+	updateMap["nextstop"] = realtimeJourney.NextStop
 
 	// Create update
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
