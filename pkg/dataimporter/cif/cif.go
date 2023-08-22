@@ -54,7 +54,7 @@ type Association struct {
 	STPIndicator        string
 }
 
-func ParseCifBundle(source string) (CommonInterfaceFormat, error) {
+func ParseNationalRailCifBundle(source string, loadMCATimetable bool) (CommonInterfaceFormat, error) {
 	cifBundle := CommonInterfaceFormat{}
 
 	archive, err := zip.OpenReader(source)
@@ -75,12 +75,16 @@ func ParseCifBundle(source string) (CommonInterfaceFormat, error) {
 
 		switch fileExtension {
 		case ".MCA":
-			log.Info().Str("file", zipFile.Name).Msgf("Parsing Full Basic Timetable Detail")
-			cifBundle.ParseMCA(file)
-			log.Info().
-				Int("schedules", len(cifBundle.TrainDefinitionSets)).
-				Int("associations", len(cifBundle.Associations)).
-				Msgf("Parsed Full Basic Timetable Detail")
+			if loadMCATimetable {
+				log.Info().Str("file", zipFile.Name).Msgf("Parsing Full Basic Timetable Detail")
+				cifBundle.ParseMCA(file)
+				log.Info().
+					Int("schedules", len(cifBundle.TrainDefinitionSets)).
+					Int("associations", len(cifBundle.Associations)).
+					Msgf("Parsed Full Basic Timetable Detail")
+			} else {
+				log.Info().Str("file", zipFile.Name).Msgf("Skipping parse Full Basic Timetable Detail")
+			}
 		case ".MSN":
 			log.Info().Str("file", zipFile.Name).Msgf("Parsing Master Station Names")
 			cifBundle.ParseMSN(file)

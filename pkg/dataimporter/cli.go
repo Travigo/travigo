@@ -397,7 +397,12 @@ func RegisterCLI() *cli.Command {
 				Usage: "Import Train Operating Companies from the National Rail Open Data API",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "url",
+						Name:     "nationalrailbundle",
+						Usage:    "Overwrite URL",
+						Required: false,
+					},
+					&cli.StringFlag{
+						Name:     "networkrailbundle",
 						Usage:    "Overwrite URL",
 						Required: false,
 					},
@@ -408,29 +413,54 @@ func RegisterCLI() *cli.Command {
 					}
 					ctdf.LoadSpecialDayCache()
 
-					source := c.String("url")
-
-					if source == "" {
-						source = "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
+					env := util.GetEnvironmentVariables()
+					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
+					}
+					if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
 					}
 
-					log.Info().Msgf("National Rail Timetable import from %s", source)
+					nationalRailBundleSource := c.String("nationalrailbundle")
+					if nationalRailBundleSource == "" {
+						nationalRailBundleSource = "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
+					}
+					networkRailBundleSource := c.String("networkrailbundle")
+					if networkRailBundleSource == "" {
+						networkRailBundleSource = "https://publicdatafeeds.networkrail.co.uk/ntrod/CifFileAuthenticate?type=CIF_ALL_FULL_DAILY&day=toc-full.CIF.gz"
+					}
 
-					if isValidUrl(source) {
+					log.Info().Msgf("National Rail Timetable import from %s", nationalRailBundleSource)
+
+					if isValidUrl(nationalRailBundleSource) {
 						token := nationalRailLogin()
-						tempFile, _ := tempDownloadFile(source, []string{
+						tempFile, _ := tempDownloadFile(nationalRailBundleSource, []string{
 							"X-Auth-Token", token,
 						})
 
-						source = tempFile.Name()
+						nationalRailBundleSource = tempFile.Name()
 						defer os.Remove(tempFile.Name())
 					}
 
-					cifBundle, err := cif.ParseCifBundle(source)
+					cifBundle, err := cif.ParseNationalRailCifBundle(nationalRailBundleSource, false)
 
 					if err != nil {
 						return err
 					}
+
+					req, _ := http.NewRequest("GET", networkRailBundleSource, nil)
+					req.SetBasicAuth(env["TRAVIGO_NETWORKRAIL_USERNAME"], env["TRAVIGO_NETWORKRAIL_PASSWORD"])
+
+					client := &http.Client{}
+					resp, err := client.Do(req)
+
+					nrbGzip, err := gzip.NewReader(resp.Body)
+					if err != nil {
+						log.Fatal().Err(err).Msg("cannot decode gzip stream")
+					}
+					defer nrbGzip.Close()
+					log.Info().Msgf("Network Rail Timetable import from %s", networkRailBundleSource)
+					cifBundle.ParseMCA(nrbGzip)
 
 					// Cleanup right at the begining once, as we do it as 1 big import
 					datasource := &ctdf.DataSource{
