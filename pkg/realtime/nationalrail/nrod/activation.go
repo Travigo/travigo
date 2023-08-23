@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -53,6 +54,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	var realtimeJourney *ctdf.RealtimeJourney
 
 	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+	pretty.Println(a)
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
