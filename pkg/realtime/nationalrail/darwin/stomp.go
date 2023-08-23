@@ -63,7 +63,7 @@ func (s *StompClient) Run() {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
 
-			pushPortData.UpdateRealtimeJourneys(queue)
+			go pushPortData.UpdateRealtimeJourneys(queue)
 		}
 	}
 }

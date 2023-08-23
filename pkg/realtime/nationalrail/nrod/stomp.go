@@ -52,7 +52,7 @@ func (s *StompClient) Run() {
 		msg := <-sub.C
 
 		if msg != nil {
-			s.ParseMessages(msg.Body)
+			go s.ParseMessages(msg.Body)
 		}
 	}
 }
