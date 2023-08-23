@@ -85,7 +85,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,
 			OtherIdentifiers: map[string]string{
-				"TrainID": a.TrainID,
+				"TrainID":  a.TrainID,
+				"TrainUID": a.TrainUID,
 			},
 			TimeoutDurationMinutes: 90,
 			ActivelyTracked:        false,

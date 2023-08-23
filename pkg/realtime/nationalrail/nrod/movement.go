@@ -65,6 +65,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	locationStop := stompClient.StopCache.Get("STANOX", m.LocationStanox)
 	if locationStop == nil {
+		log.Error().Str("stanox", m.LocationStanox).Msg("Cannot find stop for movement")
 		return
 	}
 
