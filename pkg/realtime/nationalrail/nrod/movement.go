@@ -65,7 +65,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	locationStop := stompClient.StopCache.Get("STANOX", m.LocationStanox)
 	if locationStop == nil {
-		log.Error().Str("stanox", m.LocationStanox).Msg("Cannot find stop for movement")
+		log.Debug().Str("stanox", m.LocationStanox).Msg("Cannot find stop for movement")
 		return
 	}
 
@@ -108,6 +108,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		Str("trainid", m.TrainID).
 		Str("eventtype", m.EventType).
 		Str("stanox", m.LocationStanox).
+		Str("stop", locationStop.PrimaryIdentifier).
 		Str("realtimejourney", realtimeJourney.PrimaryIdentifier).
 		Msg("Train movement")
 }
