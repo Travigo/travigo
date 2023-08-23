@@ -30,7 +30,7 @@ func (i *IdentificationRateStats) CalculateRating() {
 		i.Rating = "EXCELLENT"
 	} else if i.LastDayRate <= 0.5 && i.LastWeekRate >= 0.75 {
 		i.Rating = "TEMPORARY-ISSUES"
-	} else if i.LastDayRate >= 0.6 {
+	} else if i.LastDayRate >= 0.53 {
 		i.Rating = "GOOD"
 	} else {
 		i.Rating = "POOR"
