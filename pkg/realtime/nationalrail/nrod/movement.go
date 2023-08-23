@@ -103,7 +103,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	stompClient.Queue.Add(updateModel)
 	// pretty.Println(updateMap)
 
-	log.Debug().
+	log.Info().
 		Str("trainid", m.TrainID).
 		Str("eventtype", m.EventType).
 		Str("stanox", m.LocationStanox).
