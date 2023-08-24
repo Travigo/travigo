@@ -103,6 +103,8 @@ type RealtimeJourneyStops struct {
 	StopRef string `groups:"basic"`
 	Stop    *Stop  `groups:"basic" bson:"-"`
 
+	Platform string `groups:"basic"`
+
 	ArrivalTime   time.Time `groups:"basic"`
 	DepartureTime time.Time `groups:"basic"`
 

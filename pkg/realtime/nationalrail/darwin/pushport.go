@@ -132,6 +132,10 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				journeyStopUpdated = true
 			}
 
+			if location.Platform != nil && location.Platform.CISPLATSUP != "true" && location.Platform.PLATSUP != "true" {
+				journeyStop.Platform = location.Platform.Name
+			}
+
 			if journeyStopUpdated {
 				updateMap[fmt.Sprintf("stops.%s", stop.PrimaryIdentifier)] = journeyStop
 			}
