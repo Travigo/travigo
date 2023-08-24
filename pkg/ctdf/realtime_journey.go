@@ -22,8 +22,9 @@ type RealtimeJourney struct {
 
 	DataSource *DataSource `groups:"internal"`
 
-	VehicleLocation Location `groups:"basic"`
-	VehicleBearing  float64  `groups:"basic"`
+	VehicleLocation            Location `groups:"basic"`
+	VehicleLocationDescription string   `groups:"basic"`
+	VehicleBearing             float64  `groups:"basic"`
 
 	DepartedStopRef string `groups:"basic"`
 	DepartedStop    *Stop  `groups:"basic" bson:"-"`

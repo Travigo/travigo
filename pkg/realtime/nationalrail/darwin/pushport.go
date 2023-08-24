@@ -104,7 +104,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			stop := stopCache.Get("Tiploc", location.TPL)
 
 			if stop == nil {
-				log.Error().Str("tiploc", location.TPL).Msg("Failed to find stop")
+				log.Debug().Str("tiploc", location.TPL).Msg("Failed to find stop")
 				continue
 			}
 

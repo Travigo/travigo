@@ -84,9 +84,13 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				break
 			}
 		}
+
+		updateMap["vehiclelocationdescription"] = fmt.Sprintf("Departed %s", locationStop.PrimaryName)
 	} else if m.EventType == "ARRIVAL" {
 		updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
 		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
+
+		updateMap["vehiclelocationdescription"] = fmt.Sprintf("Arrived at %s", locationStop.PrimaryName)
 	}
 
 	// Create update
