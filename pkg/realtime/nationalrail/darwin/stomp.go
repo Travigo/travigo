@@ -53,7 +53,7 @@ func (s *StompClient) Run() {
 			b := bytes.NewReader(msg.Body)
 			gzipDecoder, err := gzip.NewReader(b)
 			if err != nil {
-				log.Error().Err(err).Msg("cannot decode gzip stream")
+				log.Fatal().Err(err).Msg("cannot decode gzip stream")
 				continue
 			}
 			defer gzipDecoder.Close()
