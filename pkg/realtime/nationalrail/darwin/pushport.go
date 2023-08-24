@@ -119,17 +119,21 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if location.Arrival != nil {
-				arrivalTime, _ := time.Parse("15:04", location.Arrival.ET)
+				arrivalTime, err := location.Arrival.GetTiming()
 
-				journeyStop.ArrivalTime = arrivalTime
-				journeyStopUpdated = true
+				if err == nil {
+					journeyStop.ArrivalTime = arrivalTime
+					journeyStopUpdated = true
+				}
 			}
 
 			if location.Departure != nil {
-				departureTime, _ := time.Parse("15:04", location.Departure.ET)
+				departureTime, err := location.Departure.GetTiming()
 
-				journeyStop.DepartureTime = departureTime
-				journeyStopUpdated = true
+				if err == nil {
+					journeyStop.DepartureTime = departureTime
+					journeyStopUpdated = true
+				}
 			}
 
 			if location.Platform != nil && location.Platform.CISPLATSUP != "true" && location.Platform.PLATSUP != "true" {

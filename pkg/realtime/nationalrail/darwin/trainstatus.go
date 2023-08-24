@@ -1,6 +1,9 @@
 package darwin
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 type TrainStatus struct {
 	RID string `xml:"rid,attr"`
@@ -36,8 +39,29 @@ type TrainStatusTiming struct {
 	Delayed string `xml:"delayed,attr"`
 }
 
-func (t *TrainStatusTiming) GetTiming() time.Time {
-	return time.Now()
+func (t *TrainStatusTiming) GetTiming() (time.Time, error) {
+	var statusTimeString string
+
+	if t.ET != "" {
+		statusTimeString = t.ET
+	}
+	if t.ETMIN != "" {
+		statusTimeString = t.ETMIN
+	}
+
+	if t.AT != "" {
+		statusTimeString = t.AT
+	}
+	if t.ATMIN != "" {
+		statusTimeString = t.ATMIN
+	}
+
+	if statusTimeString == "" {
+		return time.Time{}, errors.New("Cannot find time")
+	}
+
+	statusTime, err := time.Parse("15:04", statusTimeString)
+	return statusTime, err
 }
 
 type TrainStatusPlatform struct {
