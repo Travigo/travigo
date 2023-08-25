@@ -17,8 +17,8 @@ type reason struct {
 }
 
 func LoadLateAndCancelledReasons() {
-	LateReasons := map[string]string{}
-	CancelledReasons := map[string]string{}
+	LateReasons = map[string]string{}
+	CancelledReasons = map[string]string{}
 
 	var reasons lateCancelledReasons
 
