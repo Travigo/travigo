@@ -146,7 +146,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		if trainStatus.LateReason != "" {
-			updateMap["annotations.LateReason"] = railutils.LateReasons[trainStatus.LateReason]
+			updateMap["annotations.LateReasonID"] = trainStatus.LateReason
+			updateMap["annotations.LateReasonText"] = railutils.LateReasons[trainStatus.LateReason]
 		}
 
 		// Create update
