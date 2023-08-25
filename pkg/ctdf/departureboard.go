@@ -74,10 +74,10 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						}
 
 						departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
+					}
 
-						if journey.RealtimeJourney.Cancelled {
-							departureBoardRecordType = DepartureBoardRecordTypeCancelled
-						}
+					if journey.RealtimeJourney != nil && journey.RealtimeJourney.Cancelled {
+						departureBoardRecordType = DepartureBoardRecordTypeCancelled
 					}
 
 					stopDeperatureTime = time.Date(
