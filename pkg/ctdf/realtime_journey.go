@@ -42,6 +42,8 @@ type RealtimeJourney struct {
 
 	VehicleRef string `groups:"internal"`
 
+	Cancelled bool `groups:"basic"`
+
 	Annotations map[string]interface{} `groups:"basic"`
 }
 

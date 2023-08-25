@@ -164,9 +164,92 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Schedules
 	for _, schedule := range p.Schedules {
-		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", schedule.SSD, schedule.UID)
-
 		if schedule.CancelReason != "" {
+			realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", schedule.SSD, schedule.UID)
+			searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
+
+			var realtimeJourney *ctdf.RealtimeJourney
+
+			realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+			newRealtimeJourney := false
+			if realtimeJourney == nil {
+				// Find the journey for this train
+				var journey *ctdf.Journey
+				cursor, _ := journeysCollection.Find(context.Background(), bson.M{"otheridentifiers.TrainUID": schedule.UID})
+
+				journeyDate, _ := time.Parse("2006-01-02", schedule.SSD)
+
+				for cursor.Next(context.TODO()) {
+					var potentialJourney *ctdf.Journey
+					err := cursor.Decode(&potentialJourney)
+					if err != nil {
+						log.Error().Err(err).Msg("Failed to decode Journey")
+					}
+
+					if potentialJourney.Availability.MatchDate(journeyDate) {
+						journey = potentialJourney
+					}
+				}
+
+				if journey == nil {
+					log.Error().Str("uid", schedule.UID).Msg("Failed to find respective Journey for this train")
+					continue
+				}
+
+				// Construct the base realtime journey
+				realtimeJourney = &ctdf.RealtimeJourney{
+					PrimaryIdentifier:      realtimeJourneyID,
+					ActivelyTracked:        false,
+					TimeoutDurationMinutes: 90,
+					CreationDateTime:       now,
+					Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
+
+					Cancelled: true,
+
+					DataSource: datasource,
+
+					Journey: journey,
+
+					Stops: map[string]*ctdf.RealtimeJourneyStops{},
+				}
+
+				newRealtimeJourney = true
+			}
+
+			updateMap := bson.M{
+				"modificationdatetime": now,
+			}
+
+			// Update database
+			if newRealtimeJourney {
+				updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
+				updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
+				updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
+
+				updateMap["reliability"] = realtimeJourney.Reliability
+
+				updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
+				updateMap["datasource"] = realtimeJourney.DataSource
+
+				updateMap["journey"] = realtimeJourney.Journey
+			} else {
+				updateMap["datasource.identifier"] = datasource.Identifier
+			}
+
+			updateMap["cancelled"] = true
+			updateMap["annotations.CancelledReasonID"] = schedule.CancelReason
+			updateMap["annotations.CancelledReasonText"] = railutils.LateReasons[schedule.CancelReason]
+
+			// Create update
+			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(searchQuery)
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+
+			queue.Add(updateModel)
+
 			log.Info().
 				Str("realtimejourneyid", realtimeJourneyID).
 				Str("reason", schedule.CancelReason).
