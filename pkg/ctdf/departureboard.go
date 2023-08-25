@@ -29,6 +29,7 @@ const (
 	DepartureBoardRecordTypeScheduled       DepartureBoardRecordType = "Scheduled"
 	DepartureBoardRecordTypeRealtimeTracked                          = "RealtimeTracked"
 	DepartureBoardRecordTypeEstimated                                = "Estimated"
+	DepartureBoardRecordTypeCancelled                                = "Cancelled"
 )
 
 func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool) []*DepartureBoard {
@@ -73,6 +74,10 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						}
 
 						departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
+
+						if journey.RealtimeJourney.Cancelled {
+							departureBoardRecordType = DepartureBoardRecordTypeCancelled
+						}
 					}
 
 					stopDeperatureTime = time.Date(
