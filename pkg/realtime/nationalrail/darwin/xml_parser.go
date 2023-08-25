@@ -33,6 +33,14 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.TrainStatuses = append(pushPortData.TrainStatuses, trainStatus)
 				}
+			} else if ty.Name.Local == "schedule" {
+				var schedule Schedule
+
+				if err = d.DecodeElement(&schedule, &ty); err != nil {
+					log.Fatal().Msgf("Error decoding item: %s", err)
+				} else {
+					pushPortData.Schedules = append(pushPortData.Schedules, schedule)
+				}
 			}
 		}
 	}
