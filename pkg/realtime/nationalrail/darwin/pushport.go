@@ -148,7 +148,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		if trainStatus.LateReason != "" {
-			updateMap["annotations.LateReasonID"] = trainStatus.LateReason
+			updateMap["annotations.LateReasonID"] = fmt.Sprintf("GB:RAILDELAY:%s", trainStatus.LateReason)
 			updateMap["annotations.LateReasonText"] = railutils.LateReasons[trainStatus.LateReason]
 		}
 
@@ -238,7 +238,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			updateMap["cancelled"] = true
-			updateMap["annotations.CancelledReasonID"] = schedule.CancelReason
+			updateMap["annotations.CancelledReasonID"] = fmt.Sprintf("GB:RAILCANCEL:%s", schedule.CancelReason)
 			updateMap["annotations.CancelledReasonText"] = railutils.CancelledReasons[schedule.CancelReason]
 
 			// Create update
