@@ -33,8 +33,6 @@ func (s *StompClient) Run() {
 	}
 	s.Queue.Process()
 
-	// return
-
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(s.Username, s.Password),
@@ -77,7 +75,7 @@ func (s *StompClient) ParseMessages(messagesBytes []byte) {
 			var cancellationMessage TrustCancellation
 			json.Unmarshal(message.Body, &cancellationMessage)
 
-			// pretty.Println(cancellationMessage)
+			cancellationMessage.Process(s)
 		case "0003":
 			var movementMessage TrustMovement
 			json.Unmarshal(message.Body, &movementMessage)

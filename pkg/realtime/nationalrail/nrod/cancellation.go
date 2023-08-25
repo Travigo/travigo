@@ -1,5 +1,10 @@
 package nrod
 
+import (
+	"github.com/kr/pretty"
+	"github.com/rs/zerolog/log"
+)
+
 type TrustCancellation struct {
 	EventType  string `json:"event_type"`
 	TrainID    string `json:"train_id"`
@@ -15,4 +20,9 @@ type TrustCancellation struct {
 	OriginLocationStanox    string `json:"orig_loc_stanox"`
 	OriginLocationTimestamp string `json:"orig_loc_timestamp"`
 	CancellationReasonCode  string `json:"canx_reason_code"`
+}
+
+func (c *TrustCancellation) Process(stompClient *StompClient) {
+	log.Info().Msg("Train cancelled")
+	pretty.Println(c)
 }
