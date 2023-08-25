@@ -239,7 +239,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			updateMap["cancelled"] = true
 			updateMap["annotations.CancelledReasonID"] = schedule.CancelReason
-			updateMap["annotations.CancelledReasonText"] = railutils.LateReasons[schedule.CancelReason]
+			updateMap["annotations.CancelledReasonText"] = railutils.CancelledReasons[schedule.CancelReason]
 
 			// Create update
 			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
