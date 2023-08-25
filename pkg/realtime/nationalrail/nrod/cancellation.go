@@ -1,13 +1,7 @@
 package nrod
 
 import (
-	"context"
-
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type TrustCancellation struct {
@@ -28,16 +22,5 @@ type TrustCancellation struct {
 }
 
 func (c *TrustCancellation) Process(stompClient *StompClient) {
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-	var realtimeJourney *ctdf.RealtimeJourney
-
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"otheridentifiers.TrainID": c.TrainID}).Decode(&realtimeJourney)
-	if realtimeJourney == nil {
-		log.Debug().Str("trainid", c.TrainID).Str("toc", c.OperatorID).Msg("Could not find Realtime Journey for train cancellation")
-		return
-	}
-
-	log.Info().Msg("Train cancelled")
-	pretty.Println(c, realtimeJourney)
+	log.Debug().Str("trainid", c.TrainID).Str("reason", c.CancellationReasonCode).Msg("Train cancelled")
 }

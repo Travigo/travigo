@@ -15,6 +15,7 @@ import (
 
 type PushPortData struct {
 	TrainStatuses []TrainStatus
+	Schedules     []Schedule
 }
 
 func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
@@ -29,6 +30,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 
+	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", trainStatus.SSD, trainStatus.UID)
 		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
@@ -158,5 +160,17 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		updateModel.SetUpsert(true)
 
 		queue.Add(updateModel)
+	}
+
+	// Schedules
+	for _, schedule := range p.Schedules {
+		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", schedule.SSD, schedule.UID)
+
+		if schedule.CancelReason != "" {
+			log.Info().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("reason", schedule.CancelReason).
+				Msg("Train cancelled")
+		}
 	}
 }
