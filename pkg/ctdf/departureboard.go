@@ -17,7 +17,8 @@ type DepartureBoard struct {
 	DestinationDisplay string                   `groups:"basic"`
 	Type               DepartureBoardRecordType `groups:"basic"`
 
-	Platform string `groups:"basic"`
+	Platform     string `groups:"basic"`
+	PlatformType string `groups:"basic"`
 
 	Time time.Time `groups:"basic"`
 }
@@ -48,6 +49,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 			var stopDeperatureTime time.Time
 			var stopPlatform string
+			var stopPlatformType string
 			var destinationDisplay string
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
@@ -56,11 +58,18 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			for _, path := range journey.Path {
 				if slices.Contains(stopRefs, path.OriginStopRef) {
 					refTime := path.OriginDepartureTime
+					stopPlatform = path.OriginPlatform
+					stopPlatformType = "ESTIMATED"
 
 					// Use the realtime estimated stop time based if realtime is available
 					if journey.RealtimeJourney != nil && journey.RealtimeJourney.ActivelyTracked {
 						if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
 							refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
+
+							if journey.RealtimeJourney.Stops[path.OriginStopRef].Platform != "" {
+								stopPlatform = journey.RealtimeJourney.Stops[path.OriginStopRef].Platform
+								stopPlatformType = "ACTUAL"
+							}
 						}
 
 						departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
@@ -69,7 +78,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					stopDeperatureTime = time.Date(
 						dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 					)
-					stopPlatform = path.OriginPlatform
 
 					destinationDisplay = path.DestinationDisplay
 					break
@@ -142,6 +150,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
 					Platform:           stopPlatform,
+					PlatformType:       stopPlatformType,
 				})
 				departureBoardGenerationMutex.Unlock()
 			}
