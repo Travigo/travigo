@@ -21,6 +21,8 @@ type StompClient struct {
 var stopCache railutils.StopCache
 
 func (s *StompClient) Run() {
+	railutils.LoadLateAndCancelledReasons()
+
 	stopCache = railutils.StopCache{}
 	stopCache.Setup()
 
