@@ -49,9 +49,16 @@ func (s *StompClient) Run() {
 	}
 
 	for true {
+		if !sub.Active() {
+			log.Fatal().Msg("STOMP channel no longer active")
+		}
 		msg := <-sub.C
 
 		if msg != nil {
+			if msg.Err != nil {
+				log.Fatal().Err(err).Msg("STOMP error")
+			}
+
 			go s.ParseMessages(msg.Body)
 		}
 	}
