@@ -1,8 +1,9 @@
 package nationalrail
 
 import (
-	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
@@ -73,22 +74,31 @@ func RegisterCLI() *cli.Command {
 					log.Info().Msg("Starting Network Rail Open Data train tracker")
 
 					stompClient := nrod.StompClient{
-						Address:   "publicdatafeeds.networkrail.co.uk:61618",
-						Username:  env["TRAVIGO_NETWORKRAIL_USERNAME"],
-						Password:  env["TRAVIGO_NETWORKRAIL_PASSWORD"],
-						QueueName: "/topic/TRAIN_MVT_ALL_TOC",
+						Address:  "publicdatafeeds.networkrail.co.uk:61618",
+						Username: env["TRAVIGO_NETWORKRAIL_USERNAME"],
+						Password: env["TRAVIGO_NETWORKRAIL_PASSWORD"],
 					}
 
 					stompClient.Run()
 
-					file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/nrod.json")
-					if err != nil {
-						log.Fatal().Err(err).Msg("Failed to open file")
-					}
-					defer file.Close()
+					signals := make(chan os.Signal, 1)
+					signal.Notify(signals, syscall.SIGINT)
+					defer signal.Stop(signals)
 
-					bytes, _ := io.ReadAll(file)
-					stompClient.ParseMessages(bytes)
+					<-signals // wait for signal
+					go func() {
+						<-signals // hard exit on second signal (in case shutdown gets stuck)
+						os.Exit(1)
+					}()
+
+					// file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/nrod.json")
+					// if err != nil {
+					// 	log.Fatal().Err(err).Msg("Failed to open file")
+					// }
+					// defer file.Close()
+
+					// bytes, _ := io.ReadAll(file)
+					// stompClient.ParseMessages(bytes)
 
 					return nil
 				},

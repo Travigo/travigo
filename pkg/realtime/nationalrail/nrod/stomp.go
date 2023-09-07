@@ -5,16 +5,16 @@ import (
 	"time"
 
 	"github.com/go-stomp/stomp/v3"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type StompClient struct {
-	Address   string
-	Username  string
-	Password  string
-	QueueName string
+	Address  string
+	Username string
+	Password string
 
 	Queue     *railutils.BatchProcessingQueue
 	StopCache railutils.StopCache
@@ -36,6 +36,7 @@ func (s *StompClient) Run() {
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(s.Username, s.Password),
+		stomp.ConnOpt.HeartBeat(5*time.Second, 5*time.Second),
 	}
 	conn, err := stomp.Dial("tcp", s.Address, stompOptions...)
 
@@ -43,28 +44,37 @@ func (s *StompClient) Run() {
 		log.Fatal().Err(err).Msg("cannot connect to server")
 	}
 
-	sub, err := conn.Subscribe(s.QueueName, stomp.AckAuto)
+	go s.StartTrainMovementSubscription(conn)
+	go s.StartVSTPSubscription(conn)
+}
+
+func (s *StompClient) StartTrainMovementSubscription(conn *stomp.Conn) {
+	queueName := "/topic/TRAIN_MVT_ALL_TOC"
+
+	sub, err := conn.Subscribe(queueName, stomp.AckAuto)
 	if err != nil {
-		log.Fatal().Str("queue", s.QueueName).Err(err).Msg("cannot subscribe to queue")
+		log.Fatal().Str("queue", queueName).Err(err).Msg("cannot subscribe to queue")
 	}
+
+	log.Info().Str("queue", queueName).Msg("Started subscription")
 
 	for true {
 		if !sub.Active() {
-			log.Fatal().Msg("STOMP channel no longer active")
+			log.Fatal().Str("queue", queueName).Msg("STOMP channel no longer active")
 		}
 		msg := <-sub.C
 
 		if msg != nil {
 			if msg.Err != nil {
-				log.Fatal().Err(err).Msg("STOMP error")
+				log.Fatal().Str("queue", queueName).Err(err).Msg("STOMP error")
 			}
 
-			go s.ParseMessages(msg.Body)
+			go s.ParseTrainMovementMessages(msg.Body)
 		}
 	}
 }
 
-func (s *StompClient) ParseMessages(messagesBytes []byte) {
+func (s *StompClient) ParseTrainMovementMessages(messagesBytes []byte) {
 	var rawMessages []*json.RawMessage
 	json.Unmarshal(messagesBytes, &rawMessages)
 
@@ -92,4 +102,34 @@ func (s *StompClient) ParseMessages(messagesBytes []byte) {
 			log.Debug().Str("type", message.Header.MsgType).Msg("Unhandled message type")
 		}
 	}
+}
+
+func (s *StompClient) StartVSTPSubscription(conn *stomp.Conn) {
+	queueName := "/topic/VSTP_ALL"
+
+	sub, err := conn.Subscribe(queueName, stomp.AckAuto)
+	if err != nil {
+		log.Fatal().Str("queue", queueName).Err(err).Msg("cannot subscribe to queue")
+	}
+
+	log.Info().Str("queue", queueName).Msg("Started subscription")
+
+	for true {
+		if !sub.Active() {
+			log.Fatal().Str("queue", queueName).Msg("STOMP channel no longer active")
+		}
+		msg := <-sub.C
+
+		if msg != nil {
+			if msg.Err != nil {
+				log.Fatal().Str("queue", queueName).Err(msg.Err).Msg("STOMP error")
+			}
+
+			go s.ParseVSTPMessages(msg.Body)
+		}
+	}
+}
+
+func (s *StompClient) ParseVSTPMessages(messagesBytes []byte) {
+	pretty.Println(string(messagesBytes))
 }
