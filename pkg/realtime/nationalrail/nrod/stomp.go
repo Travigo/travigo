@@ -98,6 +98,11 @@ func (s *StompClient) ParseTrainMovementMessages(messagesBytes []byte) {
 			json.Unmarshal(message.Body, &movementMessage)
 
 			movementMessage.Process(s)
+		case "0005":
+			var reinstatementMessage TrustReinstatement
+			json.Unmarshal(message.Body, &reinstatementMessage)
+
+			reinstatementMessage.Process(s)
 		default:
 			log.Debug().Str("type", message.Header.MsgType).Msg("Unhandled message type")
 		}
