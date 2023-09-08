@@ -58,6 +58,11 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		return
 	}
 
+	if realtimeJourney.Journey == nil {
+		log.Error().Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).Msg("Somehow realtime journey had no journey attached?")
+		return
+	}
+
 	updateMap := bson.M{
 		"modificationdatetime": now,
 		"activelytracked":      m.TrainTerminated != "true",
