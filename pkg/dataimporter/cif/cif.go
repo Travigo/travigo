@@ -116,6 +116,12 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 		if trainDef.BasicScheduleExtraDetails.ATOCCode == "LT" {
 			continue
 		}
+
+		// Skip obfuscated operator records
+		if trainDef.BasicScheduleExtraDetails.ATOCCode == "ZZ" {
+			continue
+		}
+
 		// TODO Skip Nexus (Tyne & Wear Metro) records
 		// The naptan data puts the stops as bus/metro stops with no CRS/TIPLOC
 		if trainDef.BasicScheduleExtraDetails.ATOCCode == "TW" {
@@ -394,7 +400,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
 	})
 
-	operatorRef := fmt.Sprintf("GB:TOC:%s", trainDef.BasicScheduleExtraDetails.ATOCCode)
+	operatorRef := fmt.Sprintf(ctdf.OperatorTOCFormat, trainDef.BasicScheduleExtraDetails.ATOCCode)
 
 	// Calculate transport type (rail or replacement bus)
 	annotations := map[string]interface{}{}
