@@ -118,7 +118,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
 		for _, err := range ackErrors {
-			log.Error().Err(err).Msg("Failed to consume realtime event")
+			log.Fatal().Err(err).Msg("Failed to consume realtime event")
 		}
 	}
 }
