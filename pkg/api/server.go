@@ -31,6 +31,8 @@ func SetupServer(listen string) {
 
 	routes.PlannerRouter(group.Group("/planner"))
 
+	routes.ServiceAlertRouter(group.Group("/service_alerts"))
+
 	group.Get("stats", routes.Stats)
 
 	webApp.Listen(listen)

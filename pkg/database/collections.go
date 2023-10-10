@@ -212,4 +212,18 @@ func createJourneysIndexes() {
 	if err != nil {
 		log.Error().Err(err)
 	}
+
+	// ServiceAlerts
+	serviceAlertsCollection := GetCollection("service_alerts")
+	_, err = serviceAlertsCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "matchedidentifiers", Value: 1}},
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err)
+	}
 }

@@ -190,7 +190,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		Str("processing", processingTime.String()).
 		Str("bulkwrite", time.Now().Sub(startTime).String()).
 		Int("length", len(realtimeJourneyUpdateOperations)).
-		Msg("update line")
+		Msg("update line arrivals")
 
 	// Remove any tfl realtime journey that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)

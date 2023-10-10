@@ -25,6 +25,7 @@ func (s Source) Supports() []reflect.Type {
 		reflect.TypeOf(ctdf.OperatorGroup{}),
 		reflect.TypeOf(ctdf.Service{}),
 		reflect.TypeOf([]*ctdf.Service{}),
+		reflect.TypeOf([]*ctdf.ServiceAlert{}),
 	}
 }
 
@@ -46,6 +47,8 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.ServicesByStopQuery(q.(query.ServicesByStop))
 	case query.RealtimeJourney:
 		return s.RealtimeJourneyQuery(q.(query.RealtimeJourney))
+	case query.ServiceAlertsForMatchingIdentifier:
+		return s.ServiceAlertsForMatchingIdentifierQuery(q.(query.ServiceAlertsForMatchingIdentifier))
 	}
 
 	return nil, errors.New("unable to lookup")

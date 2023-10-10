@@ -13,13 +13,12 @@ type ServiceAlert struct {
 
 	AlertType ServiceAlertType `groups:"basic"`
 
-	Title string `groups:"basic"`
-	Text  string `groups:"basic"`
+	Text string `groups:"basic"`
 
-	MatchedStops    []string  `groups:"internal"`
-	MatchedServices []string  `groups:"internal"`
-	ValidFrom       time.Time `groups:"internal"`
-	ValidUntil      time.Time `groups:"internal"`
+	MatchedIdentifiers []string `groups:"internal"`
+
+	ValidFrom  time.Time `groups:"internal"`
+	ValidUntil time.Time `groups:"internal"`
 }
 
 type ServiceAlertType string
@@ -31,4 +30,5 @@ const (
 	ServiceAlertTypeStopClosed                        = "StopClosed"
 	ServiceAlertTypeServiceSuspended                  = "ServiceSuspended"
 	ServiceAlertTypeDisruption                        = "Disruption"
+	ServiceAlertTypePlanned                           = "Planned"
 )
