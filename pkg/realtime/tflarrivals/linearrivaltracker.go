@@ -23,16 +23,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type LineTracker struct {
+type LineArrivalTracker struct {
 	Line        TfLLine
-	TfLAppKey   string
 	RefreshRate time.Duration
 	Service     *ctdf.Service
 
 	OrderedLineRoutes []OrderedLineRoute
 }
 
-func (l *LineTracker) Run() {
+func (l *LineArrivalTracker) Run() {
 	l.GetService()
 	if l.Service == nil {
 		log.Error().
@@ -56,7 +55,7 @@ func (l *LineTracker) Run() {
 		Str("type", string(l.Line.TransportType)).
 		Str("service", l.Service.PrimaryIdentifier).
 		Int("numroutes", len(l.OrderedLineRoutes)).
-		Msg("Registering new line tracker")
+		Msg("Registering new line arrival tracker")
 
 	for {
 		startTime := time.Now()
@@ -74,7 +73,7 @@ func (l *LineTracker) Run() {
 	}
 }
 
-func (l *LineTracker) GetService() {
+func (l *LineArrivalTracker) GetService() {
 	collection := database.GetCollection("services")
 
 	query := bson.M{
@@ -86,13 +85,13 @@ func (l *LineTracker) GetService() {
 	collection.FindOne(context.Background(), query).Decode(&l.Service)
 }
 
-func (l *LineTracker) GetTfLRouteSequences() {
+func (l *LineArrivalTracker) GetTfLRouteSequences() {
 	for _, direction := range []string{"inbound", "outbound"} {
 		requestURL := fmt.Sprintf(
 			"https://api.tfl.gov.uk/line/%s/route/sequence/%s/?app_key=%s",
 			l.Line.LineID,
 			direction,
-			l.TfLAppKey)
+			TfLAppKey)
 		req, _ := http.NewRequest("GET", requestURL, nil)
 		req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
@@ -113,8 +112,8 @@ func (l *LineTracker) GetTfLRouteSequences() {
 	}
 }
 
-func (l *LineTracker) GetLatestArrivals() []ArrivalPrediction {
-	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals?app_key=%s", l.Line.LineID, l.TfLAppKey)
+func (l *LineArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
+	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals?app_key=%s", l.Line.LineID, TfLAppKey)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
@@ -134,7 +133,7 @@ func (l *LineTracker) GetLatestArrivals() []ArrivalPrediction {
 	return lineArrivals
 }
 
-func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
+func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime := time.Now()
 
 	datasource := &ctdf.DataSource{
@@ -210,7 +209,7 @@ func (l *LineTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 }
 
-func (l *LineTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
+func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "GB:NOC:TFLO",
 		PrimaryName:       "Transport for London",

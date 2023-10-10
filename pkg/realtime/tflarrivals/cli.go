@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -28,104 +29,70 @@ func RegisterCLI() *cli.Command {
 					}
 
 					trackerManager := TrackerManager{
-						Lines: []TfLLine{
+						Modes: []TfLMode{
 							{
-								LineID:        "bakerloo",
-								LineName:      "Bakerloo",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "bus",
+								TransportType:         ctdf.TransportTypeBus,
+								TrackArrivals:         false,
+								TrackDisruptions:      true,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								LineID:        "central",
-								LineName:      "Central",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "dlr",
+								TransportType:         ctdf.TransportTypeRail,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    15 * time.Second,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								LineID:        "circle",
-								LineName:      "Circle",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "overground",
+								TransportType:         ctdf.TransportTypeRail,
+								TrackArrivals:         false,
+								TrackDisruptions:      true,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								LineID:        "district",
-								LineName:      "District",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "river-bus",
+								TransportType:         ctdf.TransportTypeFerry,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    45 * time.Second,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								LineID:        "hammersmith-city",
-								LineName:      "Hammersmith & City",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "tram",
+								TransportType:         ctdf.TransportTypeTram,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    15 * time.Second,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								LineID:        "jubilee",
-								LineName:      "Jubilee",
-								TransportType: ctdf.TransportTypeMetro,
+								ModeID:                "tube",
+								TransportType:         ctdf.TransportTypeMetro,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    15 * time.Second,
+								DisruptionRefreshRate: 5 * time.Minute,
 							},
-							{
-								LineID:        "metropolitan",
-								LineName:      "Metropolitan",
-								TransportType: ctdf.TransportTypeMetro,
-							},
-							{
-								LineID:        "northern",
-								LineName:      "Northern",
-								TransportType: ctdf.TransportTypeMetro,
-							},
-							{
-								LineID:        "piccadilly",
-								LineName:      "Piccadilly",
-								TransportType: ctdf.TransportTypeMetro,
-							},
-							{
-								LineID:        "victoria",
-								LineName:      "Victoria",
-								TransportType: ctdf.TransportTypeMetro,
-							},
-							{
-								LineID:        "waterloo-city",
-								LineName:      "Waterloo & City",
-								TransportType: ctdf.TransportTypeMetro,
-							},
-							{
-								LineID:        "dlr",
-								LineName:      "DLR",
-								TransportType: ctdf.TransportTypeRail,
-							},
-							{
-								LineID:        "tram",
-								LineName:      "Tram",
-								TransportType: ctdf.TransportTypeTram,
-							},
-							{
-								LineID:        "rb1",
-								LineName:      "RB1",
-								TransportType: ctdf.TransportTypeFerry,
-							},
-							//{
-							//	LineID:        "rb2",
-							//	LineName:      "RB2",
-							//	TransportType: ctdf.TransportTypeFerry,
-							//},
-							//{
-							//	LineID:        "rb4",
-							//	LineName:      "RB4",
-							//	TransportType: ctdf.TransportTypeFerry,
-							//},
-							{
-								LineID:        "rb6",
-								LineName:      "RB6",
-								TransportType: ctdf.TransportTypeFerry,
-							},
-							//{
-							//	LineID:        "thames-river-services",
-							//	LineName:      "Thames River Sightseeing",
-							//	TransportType: ctdf.TransportTypeFerry,
-							//},
-							//{
-							//	LineID:        "woolwich-ferry",
-							//	LineName:      "Woolwich Ferry",
-							//	TransportType: ctdf.TransportTypeFerry,
-							//},
-							// Cable car (?)
-							// Elizabeth line (?)
+
+							// { // HAS ZERO LINES
+							// 	ModeID:                "river-tour",
+							// 	TransportType:         ctdf.TransportTypeFerry,
+							// 	TrackArrivals:         true,
+							// 	TrackDisruptions:      true,
+							// 	ArrivalRefreshRate:    45 * time.Second,
+							// 	DisruptionRefreshRate: 5 * time.Minute,
+							// },
+							// { // NO CTDF SERVICE
+							// 	ModeID:                "cable-car",
+							// 	TransportType:         ctdf.TransportTypeCableCar,
+							// 	TrackArrivals:         true,
+							// 	TrackDisruptions:      true,
+							// 	ArrivalRefreshRate:    45 * time.Second,
+							// 	DisruptionRefreshRate: 5 * time.Minute,
+							// },
 						},
 					}
 					trackerManager.Run()
