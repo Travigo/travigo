@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -95,6 +96,8 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 
 		serviceAlertsCollection.FindOne(context.Background(), searchQuery).Decode(&serviceAlert)
 
+		alertText := strings.ReplaceAll(tflDisruption.Description, "\\n", "")
+
 		if serviceAlert == nil {
 			validFrom, _ := time.Parse(time.RFC3339, tflDisruption.FromDate)
 			validUntil, _ := time.Parse(time.RFC3339, tflDisruption.ToDate)
@@ -119,7 +122,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 				ValidUntil: validUntil,
 
 				AlertType: alertType,
-				Text:      tflDisruption.Description,
+				Text:      alertText,
 
 				MatchedIdentifiers: []string{
 					fmt.Sprintf(ctdf.StopIDFormat, tflDisruption.ATCO),
@@ -129,7 +132,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 		} else {
 			serviceAlert.DataSource = datasource
 			serviceAlert.ModificationDateTime = now
-			serviceAlert.Text = tflDisruption.Description
+			serviceAlert.Text = alertText
 		}
 
 		bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
