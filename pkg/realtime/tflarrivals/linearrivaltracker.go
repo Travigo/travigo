@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/exp/slices"
 
@@ -313,10 +312,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		journeyOrderedNaptanIDs = append(journeyOrderedNaptanIDs, lastPredictionDestination)
 	}
 
-	testJourneyID := "DISABLED" // TODO DELETE THIS STUFF
-	if realtimeJourney.PrimaryIdentifier == testJourneyID {
-		pretty.Println("journey", journeyOrderedNaptanIDs)
-	}
+	realtimeJourney.VehicleLocationDescription = lastPrediction.CurrentLocation
 
 	// Identify the route the vehicle is on
 	var potentialOrderLineRouteMatches []OrderedLineRoute
@@ -336,14 +332,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		if slices.Equal[[]string](journeyOrderedNaptanIDs, reducedRouteOrderedNaptanIDs) {
 			potentialOrderLineRouteMatches = append(potentialOrderLineRouteMatches, route)
 		}
-
-		if realtimeJourney.PrimaryIdentifier == testJourneyID {
-			pretty.Println("route", reducedRouteOrderedNaptanIDs)
-		}
-	}
-
-	if realtimeJourney.PrimaryIdentifier == testJourneyID {
-		pretty.Println(len(potentialOrderLineRouteMatches))
 	}
 
 	// Update destination display
@@ -445,6 +433,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 	// TODO Temporary - need detection if journey has actually changed
 	updateMap["journey"] = realtimeJourney.Journey
+
+	updateMap["vehiclelocationdescription"] = realtimeJourney.VehicleLocationDescription
 
 	// Create update
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
