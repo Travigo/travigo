@@ -49,6 +49,8 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.RealtimeJourneyQuery(q.(query.RealtimeJourney))
 	case query.ServiceAlertsForMatchingIdentifier:
 		return s.ServiceAlertsForMatchingIdentifierQuery(q.(query.ServiceAlertsForMatchingIdentifier))
+	case query.ServiceAlertsForMatchingIdentifiers:
+		return s.ServiceAlertsForMatchingIdentifiersQuery(q.(query.ServiceAlertsForMatchingIdentifiers))
 	}
 
 	return nil, errors.New("unable to lookup")

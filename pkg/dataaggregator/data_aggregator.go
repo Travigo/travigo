@@ -3,8 +3,9 @@ package dataaggregator
 import (
 	"errors"
 	"fmt"
-	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"reflect"
+
+	"github.com/travigo/travigo/pkg/dataaggregator/source"
 
 	"github.com/rs/zerolog/log"
 )

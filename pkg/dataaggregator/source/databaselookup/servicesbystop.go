@@ -2,9 +2,9 @@ package databaselookup
 
 import (
 	"context"
+
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -33,10 +33,6 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		if service != nil {
 			services = append(services, service)
 		}
-	}
-
-	if len(services) == 0 {
-		return nil, source.UnsupportedSourceError
 	}
 
 	return services, nil

@@ -20,3 +20,15 @@ func (s Source) ServiceAlertsForMatchingIdentifierQuery(q query.ServiceAlertsFor
 
 	return serviceAlerts, nil
 }
+
+func (s Source) ServiceAlertsForMatchingIdentifiersQuery(q query.ServiceAlertsForMatchingIdentifiers) ([]*ctdf.ServiceAlert, error) {
+	collection := database.GetCollection("service_alerts")
+	var serviceAlerts []*ctdf.ServiceAlert
+
+	cursor, _ := collection.Find(context.Background(), q.ToBson())
+	if err := cursor.All(context.Background(), &serviceAlerts); err != nil {
+		log.Error().Err(err).Msg("Failed to decode Service Alerts")
+	}
+
+	return serviceAlerts, nil
+}

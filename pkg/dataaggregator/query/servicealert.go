@@ -15,3 +15,11 @@ func (s *ServiceAlertsForMatchingIdentifier) ToBson() bson.M {
 
 	return nil
 }
+
+type ServiceAlertsForMatchingIdentifiers struct {
+	MatchingIdentifiers []string
+}
+
+func (s *ServiceAlertsForMatchingIdentifiers) ToBson() bson.M {
+	return bson.M{"matchedidentifiers": bson.M{"$in": s.MatchingIdentifiers}}
+}
