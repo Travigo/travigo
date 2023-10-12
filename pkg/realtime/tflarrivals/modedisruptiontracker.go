@@ -241,9 +241,9 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			switch lineStatusUpdate.StatusSeverityDescription {
 			case "Closed", "Suspended", "Part Suspended", "Part Closure", "Planned Closure", "Part Closed", "Service Closed":
 				serviceAlertType = ctdf.ServiceAlertTypeServiceSuspended
-			case "Severe Delays", "Reduced Service":
+			case "Severe Delays", "Reduced Service", "Minor Delays":
 				serviceAlertType = ctdf.ServiceAlertTypeDisruption
-			case "Bus Service", "Minor Delays", "Exit Only", "Change of frequency", "Diverted", "Not Running", "Issues Reported":
+			case "Bus Service", "Exit Only", "Change of frequency", "Diverted", "Not Running", "Issues Reported":
 				serviceAlertType = ctdf.ServiceAlertTypeWarning
 			case "No Step Free Access", "Information":
 				serviceAlertType = ctdf.ServiceAlertTypeInformation
