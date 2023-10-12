@@ -16,8 +16,8 @@ func getMatchingIdentifierServiceAlerts(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
 	var serviceAlerts []*ctdf.ServiceAlert
-	serviceAlerts, err := dataaggregator.Lookup[[]*ctdf.ServiceAlert](query.ServiceAlertsForMatchingIdentifier{
-		MatchingIdentifier: identifier,
+	serviceAlerts, err := dataaggregator.Lookup[[]*ctdf.ServiceAlert](query.ServiceAlertsForMatchingIdentifiers{
+		MatchingIdentifiers: []string{identifier},
 	})
 
 	if err != nil {

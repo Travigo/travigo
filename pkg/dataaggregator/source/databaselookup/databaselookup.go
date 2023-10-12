@@ -47,8 +47,6 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.ServicesByStopQuery(q.(query.ServicesByStop))
 	case query.RealtimeJourney:
 		return s.RealtimeJourneyQuery(q.(query.RealtimeJourney))
-	case query.ServiceAlertsForMatchingIdentifier:
-		return s.ServiceAlertsForMatchingIdentifierQuery(q.(query.ServiceAlertsForMatchingIdentifier))
 	case query.ServiceAlertsForMatchingIdentifiers:
 		return s.ServiceAlertsForMatchingIdentifiersQuery(q.(query.ServiceAlertsForMatchingIdentifiers))
 	}

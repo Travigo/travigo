@@ -32,3 +32,7 @@ const (
 	ServiceAlertTypeDisruption                        = "Disruption"
 	ServiceAlertTypePlanned                           = "Planned"
 )
+
+func (a *ServiceAlert) IsValid(checkTime time.Time) bool {
+	return checkTime.After(a.ValidFrom) && checkTime.Before(a.ValidUntil)
+}
