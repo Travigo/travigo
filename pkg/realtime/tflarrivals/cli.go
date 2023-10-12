@@ -29,7 +29,7 @@ func RegisterCLI() *cli.Command {
 					}
 
 					trackerManager := TrackerManager{
-						Modes: []TfLMode{
+						Modes: []*TfLMode{
 							{
 								ModeID:                "bus",
 								TransportType:         ctdf.TransportTypeBus,

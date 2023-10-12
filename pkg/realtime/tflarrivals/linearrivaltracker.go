@@ -23,16 +23,14 @@ import (
 )
 
 type LineArrivalTracker struct {
-	Line        TfLLine
+	Line        *TfLLine
 	RefreshRate time.Duration
-	Service     *ctdf.Service
 
 	OrderedLineRoutes []OrderedLineRoute
 }
 
 func (l *LineArrivalTracker) Run() {
-	l.GetService()
-	if l.Service == nil {
+	if l.Line.Service == nil {
 		log.Error().
 			Str("id", l.Line.LineID).
 			Str("type", string(l.Line.TransportType)).
@@ -52,7 +50,7 @@ func (l *LineArrivalTracker) Run() {
 	log.Info().
 		Str("id", l.Line.LineID).
 		Str("type", string(l.Line.TransportType)).
-		Str("service", l.Service.PrimaryIdentifier).
+		Str("service", l.Line.Service.PrimaryIdentifier).
 		Int("numroutes", len(l.OrderedLineRoutes)).
 		Msg("Registering new line arrival tracker")
 
@@ -70,18 +68,6 @@ func (l *LineArrivalTracker) Run() {
 			time.Sleep(waitTime)
 		}
 	}
-}
-
-func (l *LineArrivalTracker) GetService() {
-	collection := database.GetCollection("services")
-
-	query := bson.M{
-		"operatorref":   "GB:NOC:TFLO",
-		"servicename":   l.Line.LineName,
-		"transporttype": l.Line.TransportType,
-	}
-
-	collection.FindOne(context.Background(), query).Decode(&l.Service)
 }
 
 func (l *LineArrivalTracker) GetTfLRouteSequences() {
@@ -240,8 +226,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				Operator:    tflOperator,
 				OperatorRef: tflOperator.PrimaryIdentifier,
 
-				Service:    l.Service,
-				ServiceRef: l.Service.PrimaryIdentifier,
+				Service:    l.Line.Service,
+				ServiceRef: l.Line.Service.PrimaryIdentifier,
 			},
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
@@ -341,7 +327,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	if destinationDisplay == "" && lastPrediction.Towards != "" && lastPrediction.Towards != "Check Front of Train" {
 		destinationDisplay = lastPrediction.Towards
 	} else if destinationDisplay == "" {
-		destinationDisplay = l.Service.ServiceName
+		destinationDisplay = l.Line.Service.ServiceName
 	}
 
 	nameMatches := nameRegex.FindStringSubmatch(lastPrediction.DestinationName)

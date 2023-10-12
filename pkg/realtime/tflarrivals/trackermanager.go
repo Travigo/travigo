@@ -1,6 +1,7 @@
 package tflarrivals
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,26 +11,42 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/util"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var TfLAppKey string
 
 type TrackerManager struct {
-	Modes []TfLMode
+	Modes []*TfLMode
 }
 
 type TfLLine struct {
 	LineID        string
 	LineName      string
 	TransportType ctdf.TransportType
+
+	Service *ctdf.Service
+}
+
+func (l *TfLLine) GetService() {
+	collection := database.GetCollection("services")
+
+	query := bson.M{
+		"operatorref":   "GB:NOC:TFLO",
+		"servicename":   l.LineName,
+		"transporttype": l.TransportType,
+	}
+
+	collection.FindOne(context.Background(), query).Decode(&l.Service)
 }
 
 type TfLMode struct {
 	ModeID        string
 	TransportType ctdf.TransportType
 
-	Lines []TfLLine
+	Lines []*TfLLine
 
 	TrackArrivals    bool
 	TrackDisruptions bool
@@ -60,11 +77,14 @@ func (m *TfLMode) GetLines() {
 	json.Unmarshal(jsonBytes, &modeLines)
 
 	for _, line := range modeLines {
-		m.Lines = append(m.Lines, TfLLine{
+		tflLine := &TfLLine{
 			LineID:        line.ID,
 			LineName:      line.Name,
 			TransportType: m.TransportType,
-		})
+		}
+		tflLine.GetService()
+
+		m.Lines = append(m.Lines, tflLine)
 	}
 }
 
@@ -104,7 +124,7 @@ func (t TrackerManager) Run() {
 					Dur("refresharrivals", mode.ArrivalRefreshRate).
 					Msg("Starting line trackers")
 
-				go func(line TfLLine, mode TfLMode) {
+				go func(line *TfLLine, mode *TfLMode) {
 					lineArrivalTracker := LineArrivalTracker{
 						Line:        line,
 						RefreshRate: mode.ArrivalRefreshRate,
@@ -121,7 +141,7 @@ func (t TrackerManager) Run() {
 				Dur("refreshdisruptions", mode.DisruptionRefreshRate).
 				Msg("Starting mode trackers")
 
-			go func(mode TfLMode) {
+			go func(mode *TfLMode) {
 				modeDisruptionTracker := ModeDisruptionTracker{
 					Mode:        mode,
 					RefreshRate: mode.DisruptionRefreshRate,

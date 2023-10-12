@@ -18,7 +18,7 @@ import (
 )
 
 type ModeDisruptionTracker struct {
-	Mode        TfLMode
+	Mode        *TfLMode
 	RefreshRate time.Duration
 	Service     *ctdf.Service
 }
@@ -32,6 +32,7 @@ func (d *ModeDisruptionTracker) Run() {
 		startTime := time.Now()
 
 		d.GetDisruptions()
+		d.GetLineStatuses()
 
 		endTime := time.Now()
 		executionDuration := endTime.Sub(startTime)
@@ -97,10 +98,10 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 		serviceAlertsCollection.FindOne(context.Background(), searchQuery).Decode(&serviceAlert)
 
 		alertText := strings.ReplaceAll(tflDisruption.Description, "\\n", "")
+		validFrom, _ := time.Parse(time.RFC3339, tflDisruption.FromDate)
+		validUntil, _ := time.Parse(time.RFC3339, tflDisruption.ToDate)
 
 		if serviceAlert == nil {
-			validFrom, _ := time.Parse(time.RFC3339, tflDisruption.FromDate)
-			validUntil, _ := time.Parse(time.RFC3339, tflDisruption.ToDate)
 
 			alertType := ctdf.ServiceAlertTypeInformation
 
@@ -133,6 +134,9 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 			serviceAlert.DataSource = datasource
 			serviceAlert.ModificationDateTime = now
 			serviceAlert.Text = alertText
+
+			serviceAlert.ValidFrom = validFrom
+			serviceAlert.ValidUntil = validUntil
 		}
 
 		bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
@@ -156,6 +160,168 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 		Str("mode", d.Mode.ModeID).
 		Int("length", len(serviceAlertsUpdateOperation)).
 		Msg("update mode disruptions")
+
+	d.cleanupOldServiceAlerts(datasource)
+}
+
+func (d *ModeDisruptionTracker) GetLineStatuses() {
+	now := time.Now()
+	datasource := &ctdf.DataSource{
+		OriginalFormat: "JSON",
+		Provider:       "GB-TfL",
+		Dataset:        fmt.Sprintf("Line/Mode/%s/Status", d.Mode.ModeID),
+		Identifier:     fmt.Sprint(now.Unix()),
+	}
+
+	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/Line/Mode/%s/Status?app_key=%s", d.Mode.ModeID, TfLAppKey)
+	req, _ := http.NewRequest("GET", requestURL, nil)
+	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Download file")
+	}
+	defer resp.Body.Close()
+
+	jsonBytes, _ := io.ReadAll(resp.Body)
+
+	var tflLineStatusData []struct {
+		LineID string `json:"id"`
+
+		LineStatuses []struct {
+			LineID                    string `json:"lineId"`
+			StatusSeverity            int    `json:"statusSeverity"`
+			StatusSeverityDescription string `json:"statusSeverityDescription"`
+			Reason                    string `json:"reason"`
+
+			ValidityPeriods []struct {
+				IsNow bool `json:"isNow"`
+			} `json:"validityPeriods"`
+		} `json:"lineStatuses"`
+	}
+	json.Unmarshal(jsonBytes, &tflLineStatusData)
+
+	serviceAlertsCollection := database.GetCollection("service_alerts")
+	serviceAlertsUpdateOperation := []mongo.WriteModel{}
+
+	for _, lineStatuses := range tflLineStatusData {
+		var service *ctdf.Service
+
+		for _, line := range d.Mode.Lines {
+			if line.LineID == lineStatuses.LineID {
+				service = line.Service
+				break
+			}
+		}
+
+		if service == nil {
+			log.Error().Str("line", lineStatuses.LineID).Msg("Failed to get Service for line status")
+			continue
+		}
+
+		for _, lineStatusUpdate := range lineStatuses.LineStatuses {
+			if lineStatusUpdate.StatusSeverityDescription == "Good Service" || lineStatusUpdate.StatusSeverityDescription == "No Issues" {
+				continue
+			}
+
+			validNow := false
+			for _, validityPeriods := range lineStatusUpdate.ValidityPeriods {
+				if validityPeriods.IsNow {
+					validNow = true
+				}
+			}
+			if !validNow {
+				continue
+			}
+
+			var serviceAlertType ctdf.ServiceAlertType
+
+			switch lineStatusUpdate.StatusSeverityDescription {
+			case "Closed", "Suspended", "Part Suspended", "Part Closure", "Planned Closure", "Part Closed", "Service Closed":
+				serviceAlertType = ctdf.ServiceAlertTypeServiceSuspended
+			case "Severe Delays", "Reduced Service":
+				serviceAlertType = ctdf.ServiceAlertTypeDisruption
+			case "Bus Service", "Minor Delays", "Exit Only", "Change of frequency", "Diverted", "Not Running", "Issues Reported":
+				serviceAlertType = ctdf.ServiceAlertTypeWarning
+			case "No Step Free Access", "Information":
+				serviceAlertType = ctdf.ServiceAlertTypeInformation
+			default:
+				serviceAlertType = ctdf.ServiceAlertTypeInformation
+			}
+
+			primaryIdentifier := fmt.Sprintf(
+				"GB:TFLLINESTATUS:%s:%d",
+				service.PrimaryIdentifier, lineStatusUpdate.StatusSeverity,
+			)
+
+			searchQuery := bson.M{"primaryidentifier": primaryIdentifier}
+
+			var serviceAlert *ctdf.ServiceAlert
+
+			serviceAlertsCollection.FindOne(context.Background(), searchQuery).Decode(&serviceAlert)
+
+			// Little hack to keep it always valid
+			validFrom := now.Add(-4 * time.Hour)
+			validUntil := now.Add(4 * time.Hour)
+
+			if serviceAlert == nil {
+				serviceAlert = &ctdf.ServiceAlert{
+					PrimaryIdentifier: primaryIdentifier,
+
+					DataSource: datasource,
+
+					CreationDateTime:     now,
+					ModificationDateTime: now,
+
+					ValidFrom:  validFrom,
+					ValidUntil: validUntil,
+
+					AlertType: serviceAlertType,
+					Text:      lineStatusUpdate.Reason,
+
+					MatchedIdentifiers: []string{
+						service.PrimaryIdentifier,
+					},
+				}
+			} else {
+				serviceAlert.DataSource = datasource
+				serviceAlert.ModificationDateTime = now
+				serviceAlert.Text = lineStatusUpdate.Reason
+
+				serviceAlert.ValidFrom = validFrom
+				serviceAlert.ValidUntil = validUntil
+			}
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(searchQuery)
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+
+			serviceAlertsUpdateOperation = append(serviceAlertsUpdateOperation, updateModel)
+		}
+	}
+
+	if len(serviceAlertsUpdateOperation) > 0 {
+		_, err := serviceAlertsCollection.BulkWrite(context.TODO(), serviceAlertsUpdateOperation, &options.BulkWriteOptions{})
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write ServiceAlerts")
+		}
+	}
+
+	log.Info().
+		Str("mode", d.Mode.ModeID).
+		Int("length", len(serviceAlertsUpdateOperation)).
+		Msg("update mode line status")
+
+	d.cleanupOldServiceAlerts(datasource)
+}
+
+func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSource) {
+	serviceAlertsCollection := database.GetCollection("service_alerts")
 
 	// Remove any tfl service alerts that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
