@@ -13,7 +13,8 @@ type ServiceAlert struct {
 
 	AlertType ServiceAlertType `groups:"basic"`
 
-	Text string `groups:"basic"`
+	Title string `groups:"basic"`
+	Text  string `groups:"basic"`
 
 	MatchedIdentifiers []string `groups:"internal"`
 
@@ -23,7 +24,6 @@ type ServiceAlert struct {
 
 type ServiceAlertType string
 
-//goland:noinspection GoUnusedConst
 const (
 	ServiceAlertTypeInformation      ServiceAlertType = "Information"
 	ServiceAlertTypeWarning                           = "Warning"

@@ -279,7 +279,9 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 					ValidUntil: validUntil,
 
 					AlertType: serviceAlertType,
-					Text:      lineStatusUpdate.Reason,
+
+					Title: lineStatusUpdate.StatusSeverityDescription,
+					Text:  lineStatusUpdate.Reason,
 
 					MatchedIdentifiers: []string{
 						service.PrimaryIdentifier,

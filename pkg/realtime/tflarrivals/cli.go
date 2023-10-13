@@ -46,13 +46,6 @@ func RegisterCLI() *cli.Command {
 								DisruptionRefreshRate: 5 * time.Minute,
 							},
 							{
-								ModeID:                "overground",
-								TransportType:         ctdf.TransportTypeRail,
-								TrackArrivals:         false,
-								TrackDisruptions:      true,
-								DisruptionRefreshRate: 5 * time.Minute,
-							},
-							{
 								ModeID:                "river-bus",
 								TransportType:         ctdf.TransportTypeFerry,
 								TrackArrivals:         true,
@@ -91,6 +84,13 @@ func RegisterCLI() *cli.Command {
 							// 	TrackArrivals:         true,
 							// 	TrackDisruptions:      true,
 							// 	ArrivalRefreshRate:    45 * time.Second,
+							// 	DisruptionRefreshRate: 5 * time.Minute,
+							// },
+							// { // NO CTDF SERVICE
+							// 	ModeID:                "overground",
+							// 	TransportType:         ctdf.TransportTypeRail,
+							// 	TrackArrivals:         false,
+							// 	TrackDisruptions:      true,
 							// 	DisruptionRefreshRate: 5 * time.Minute,
 							// },
 						},
