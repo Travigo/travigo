@@ -16,9 +16,12 @@ import (
 )
 
 type RecordsStats struct {
+	GeneratedAt time.Time
+
 	Stops                  int64
 	Operators              int64
 	Services               int64
+	ServiceAlerts          int64
 	ActiveRealtimeJourneys RecordsStatsActiveRealtimeJourneys
 }
 type RecordsStatsActiveRealtimeJourneys struct {
@@ -163,6 +166,29 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
 		CurrentRecordsStats.ActiveRealtimeJourneys.NotActivelyTracked = numberActiveRealtimeJourneysNotActivelyTracked
+
+		numberServiceAlerts := 0
+		startTime = time.Now()
+		collection := database.GetCollection("service_alerts")
+
+		now := time.Now()
+
+		cursor, _ := collection.Find(context.Background(), bson.M{})
+		for cursor.Next(context.Background()) {
+			var serviceAlert ctdf.ServiceAlert
+			err := cursor.Decode(&serviceAlert)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to decode ServiceAlert")
+			}
+
+			if serviceAlert.IsValid(now) {
+				numberServiceAlerts += 1
+			}
+		}
+		log.Debug().Str("Length", time.Now().Sub(startTime).String()).Msg("Stats - iterate over service alerts")
+		CurrentRecordsStats.ServiceAlerts = int64(numberServiceAlerts)
+
+		CurrentRecordsStats.GeneratedAt = time.Now()
 
 		// Publish stats to Elasticsearch
 		elasticEvent, _ := json.Marshal(&recordStatsElasticEvent{
