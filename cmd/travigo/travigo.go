@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/travigo/travigo/pkg/api"
-	"github.com/travigo/travigo/pkg/dataimporter"
-	"github.com/travigo/travigo/pkg/realtime"
-	stats "github.com/travigo/travigo/pkg/stats/cli"
 	"os"
 	"time"
+
+	"github.com/travigo/travigo/pkg/api"
+	"github.com/travigo/travigo/pkg/dataimporter"
+	"github.com/travigo/travigo/pkg/events"
+	"github.com/travigo/travigo/pkg/realtime"
+	stats "github.com/travigo/travigo/pkg/stats/cli"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -41,6 +43,7 @@ func main() {
 			api.RegisterCLI(),
 			realtime.RegisterCLI(),
 			stats.RegisterCLI(),
+			events.RegisterCLI(),
 		},
 	}
 

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travigo-events.fullname" . }}
+  labels:
+    {{- include "travigo-events.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 3333
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "travigo-events.selectorLabels" . | nindent 4 }}
