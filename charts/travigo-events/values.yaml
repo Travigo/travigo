@@ -4,6 +4,18 @@
 
 replicaCount: 1
 
+database:
+  connectionStringSecret: travigo-mongodb-admin-travigo
+  database: travigo
+
+redis:
+  address: "redis-headless.redis:6379"
+  passwordSecret: redis-password
+
+elasticsearch:
+  address: "https://primary-es-http.elastic:9200"
+  accountSecret: "travigo-elasticsearch-user"
+
 image:
   repository: ghcr.io/travigo/travigo
   pullPolicy: Always

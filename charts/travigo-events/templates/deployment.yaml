@@ -5,9 +5,7 @@ metadata:
   labels:
     {{- include "travigo-events.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "travigo-events.selectorLabels" . | nindent 6 }}
@@ -36,18 +34,47 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["events", "run"]
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 3333
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: http
-          readinessProbe:
-            httpGet:
-              path: /
-              port: http
+          env:
+            {{- with .env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: TRAVIGO_LOG_FORMAT
+              value: JSON
+            - name: TRAVIGO_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: TRAVIGO_MONGODB_DATABASE
+              value: {{ $.Values.database.database }}
+            - name: TRAVIGO_REDIS_ADDRESS
+              value: {{ $.Values.redis.address }}
+            - name: TRAVIGO_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.redis.passwordSecret }}
+                  key: password
+                  optional: false
+            - name: TRAVIGO_ELASTICSEARCH_ADDRESS
+              value: {{ $.Values.elasticsearch.address }}
+            - name: TRAVIGO_ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: username
+                  optional: false
+            - name: TRAVIGO_ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.elasticsearch.accountSecret }}
+                  key: password
+                  optional: false
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- with .Values.volumeMounts }}

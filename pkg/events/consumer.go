@@ -16,7 +16,7 @@ func StartConsumers() {
 	// Run the background consumers
 	log.Info().Msg("Starting events consumers")
 
-	queue, err := redis_client.QueueConnection.OpenQueue("events")
+	queue, err := redis_client.QueueConnection.OpenQueue("events-queue")
 	if err != nil {
 		panic(err)
 	}
