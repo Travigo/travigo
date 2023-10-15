@@ -1,4 +1,4 @@
-# Default values for travigo-events.
+# Default values for travigo-basic-consumer.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -35,7 +35,7 @@ ingress:
   hosts:
     - host: api.travigo.app
       paths:
-        - path: /events
+        - path: /basic-consumer
           pathType: ImplementationSpecific
 
 imagePullSecrets: []

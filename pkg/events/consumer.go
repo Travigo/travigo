@@ -11,6 +11,7 @@ import (
 )
 
 const numConsumers = 5
+const batchSize = 20
 
 func StartConsumers() {
 	// Run the background consumers
@@ -20,7 +21,7 @@ func StartConsumers() {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(numConsumers*200, 1*time.Second); err != nil {
+	if err := queue.StartConsuming(numConsumers*batchSize, 1*time.Second); err != nil {
 		panic(err)
 	}
 
@@ -31,7 +32,7 @@ func StartConsumers() {
 func startEventConsumer(queue rmq.Queue, id int) {
 	log.Info().Msgf("Starting events consumer %d", id)
 
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("event-queue-%d", id), 20, 2*time.Second, NewBatchConsumer(id)); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("event-queue-%d", id), batchSize, 2*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }

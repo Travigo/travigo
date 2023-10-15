@@ -28,6 +28,7 @@ import (
 var identificationCache *cache.Cache[string]
 
 const numConsumers = 5
+const batchSize = 200
 
 type localJourneyIDMap struct {
 	JourneyID   string
@@ -54,7 +55,7 @@ func StartConsumers() {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(numConsumers*200, 1*time.Second); err != nil {
+	if err := queue.StartConsuming(numConsumers*batchSize, 1*time.Second); err != nil {
 		panic(err)
 	}
 
@@ -65,7 +66,7 @@ func StartConsumers() {
 func startRealtimeConsumer(queue rmq.Queue, id int) {
 	log.Info().Msgf("Starting realtime consumer %d", id)
 
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), 200, 2*time.Second, NewBatchConsumer(id)); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), batchSize, 2*time.Second, NewBatchConsumer(id)); err != nil {
 		panic(err)
 	}
 }
