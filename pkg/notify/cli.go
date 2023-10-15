@@ -32,7 +32,7 @@ func RegisterCLI() *cli.Command {
 					ctdf.LoadSpecialDayCache()
 
 					redisConsumer := consumer.RedisConsumer{
-						QueueName:       "events-queue",
+						QueueName:       "notify-queue",
 						NumberConsumers: 5,
 						BatchSize:       20,
 						Timeout:         2 * time.Second,

@@ -1,0 +1,12 @@
+image:
+  args:
+  - events
+  - run
+
+ingress:
+  enabled: true
+  hosts:
+    - host: api.travigo.app
+      paths:
+        - path: /events-queue
+          pathType: ImplementationSpecific

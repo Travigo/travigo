@@ -108,7 +108,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-data-importer ./charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-data-importer ./deploy/charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
 
   realtime-deploy-helm:
     if: github.ref == 'refs/heads/main'
@@ -145,7 +145,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-realtime ./charts/travigo-realtime --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-realtime ./deploy/charts/travigo-realtime --set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
@@ -183,7 +183,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-web-api ./charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-web-api ./deploy/charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
 
   stats-deploy-helm:
     if: github.ref == 'refs/heads/main'
@@ -220,7 +220,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-stats ./charts/travigo-stats --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-stats ./deploy/charts/travigo-stats --set image.tag=sha-${{ github.sha }}
 
   events-deploy-helm:
     if: github.ref == 'refs/heads/main'
@@ -257,12 +257,12 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-events ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} --set "image.args={events,run}"
+        helm upgrade -i travigo-events ./deploy/charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
 
   notify-deploy-helm:
     if: github.ref == 'refs/heads/main'
 
-    name: Deploy events to Kubernetes
+    name: Deploy notify to Kubernetes
     runs-on: ubuntu-latest
     environment: 
       name: production
@@ -294,4 +294,4 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-notify ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} --set "image.args={notify,run}"
+        helm upgrade -i travigo-notify ./deploy/charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml

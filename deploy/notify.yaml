@@ -1,0 +1,12 @@
+image:
+  args:
+  - notify
+  - run
+
+ingress:
+  enabled: true
+  hosts:
+    - host: api.travigo.app
+      paths:
+        - path: /notify-queue
+          pathType: ImplementationSpecific
