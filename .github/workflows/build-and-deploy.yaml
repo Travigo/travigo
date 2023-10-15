@@ -257,4 +257,4 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-events ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }}
+        helm upgrade -i travigo-events ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} --set "image.args={events,run}"
