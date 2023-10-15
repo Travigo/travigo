@@ -1,4 +1,4 @@
-package events
+package notify
 
 import (
 	"github.com/rs/zerolog/log"
@@ -7,14 +7,14 @@ import (
 	"github.com/kr/pretty"
 )
 
-type EventsBatchConsumer struct {
+type NotifyBatchConsumer struct {
 }
 
-func NewEventsBatchConsumer() *EventsBatchConsumer {
-	return &EventsBatchConsumer{}
+func NewNotifyBatchConsumer() *NotifyBatchConsumer {
+	return &NotifyBatchConsumer{}
 }
 
-func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
+func (c *NotifyBatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
 	for _, payload := range payloads {

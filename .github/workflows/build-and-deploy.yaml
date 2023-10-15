@@ -229,7 +229,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.app/events/queue
+      url: https://api.travigo.app/events-queue/stats
 
     needs: travigo-docker
 
@@ -258,3 +258,40 @@ jobs:
     - name: Helm upgrade
       run: |-
         helm upgrade -i travigo-events ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} --set "image.args={events,run}"
+
+  notify-deploy-helm:
+    if: github.ref == 'refs/heads/main'
+
+    name: Deploy events to Kubernetes
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+      url: https://api.travigo.app/notify-queue/stats
+
+    needs: travigo-docker
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Helm tool installer
+      uses: Azure/setup-helm@v3
+
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
+
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+
+    - name: Helm upgrade
+      run: |-
+        helm upgrade -i travigo-notify ./charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} --set "image.args={notify,run}"

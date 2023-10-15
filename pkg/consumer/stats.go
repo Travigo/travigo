@@ -1,4 +1,4 @@
-package events
+package consumer
 
 import (
 	"context"
@@ -7,20 +7,9 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
-
-func StartStatsServer() {
-	http.Handle("/events/queue", NewStatsHandler(redis_client.QueueConnection))
-	http.Handle("/health", NewHealthHandler())
-
-	log.Info().Msg("Stats server listening on http://localhost:3333/events/queue")
-	if err := http.ListenAndServe(":3333", nil); err != nil {
-		panic(err)
-	}
-}
 
 type StatsServerHandler struct {
 	redisConnection rmq.Connection

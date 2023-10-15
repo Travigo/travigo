@@ -1,4 +1,4 @@
-package events
+package notify
 
 import (
 	"os"
@@ -15,12 +15,12 @@ import (
 
 func RegisterCLI() *cli.Command {
 	return &cli.Command{
-		Name:  "events",
-		Usage: "Provides the events runner",
+		Name:  "notify",
+		Usage: "Provides the notification system",
 		Subcommands: []*cli.Command{
 			{
 				Name:  "run",
-				Usage: "run events server",
+				Usage: "run notify server",
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
 						return err
@@ -36,7 +36,7 @@ func RegisterCLI() *cli.Command {
 						NumberConsumers: 5,
 						BatchSize:       20,
 						Timeout:         2 * time.Second,
-						Consumer:        NewEventsBatchConsumer(),
+						Consumer:        NewNotifyBatchConsumer(),
 					}
 					redisConsumer.Setup()
 
