@@ -257,7 +257,7 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-events ./deploy/charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
+        helm upgrade -i travigo-events ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
 
   notify-deploy-helm:
     if: github.ref == 'refs/heads/main'
@@ -294,4 +294,4 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-notify ./deploy/charts/travigo-basic-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml
+        helm upgrade -i travigo-notify ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml

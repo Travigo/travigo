@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "travigo-basic-consumer.fullname" . }}
+  name: {{ include "travigo-consumer.fullname" . }}
   labels:
-    {{- include "travigo-basic-consumer.labels" . | nindent 4 }}
+    {{- include "travigo-consumer.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "travigo-basic-consumer.selectorLabels" . | nindent 6 }}
+      {{- include "travigo-consumer.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -16,7 +16,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "travigo-basic-consumer.labels" . | nindent 8 }}
+        {{- include "travigo-consumer.labels" . | nindent 8 }}
 	{{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -25,7 +25,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "travigo-basic-consumer.serviceAccountName" . }}
+      serviceAccountName: {{ include "travigo-consumer.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
