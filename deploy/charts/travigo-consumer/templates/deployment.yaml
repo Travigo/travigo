@@ -41,7 +41,7 @@ spec:
               containerPort: 3333
               protocol: TCP
           env:
-            {{- with .env }}
+            {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: TRAVIGO_LOG_FORMAT
