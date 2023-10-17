@@ -226,4 +226,15 @@ func createJourneysIndexes() {
 	if err != nil {
 		log.Error().Err(err)
 	}
+
+	// UserPushNotificationTarget
+	userPushNotificationTargetCollection := GetCollection("user_push_notification_target")
+	_, err = userPushNotificationTargetCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "userid", Value: 1}},
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err)
+	}
 }

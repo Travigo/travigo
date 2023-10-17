@@ -1,11 +1,13 @@
 package notify
 
 import (
+	"encoding/json"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/consumer"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -31,12 +33,18 @@ func RegisterCLI() *cli.Command {
 
 					ctdf.LoadSpecialDayCache()
 
+					pushManager := &PushManager{}
+					err := pushManager.Setup()
+					if err != nil {
+						return err
+					}
+
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "notify-queue",
 						NumberConsumers: 5,
 						BatchSize:       20,
 						Timeout:         2 * time.Second,
-						Consumer:        NewNotifyBatchConsumer(),
+						Consumer:        NewNotifyBatchConsumer(pushManager),
 					}
 					redisConsumer.Setup()
 
@@ -51,6 +59,34 @@ func RegisterCLI() *cli.Command {
 					}()
 
 					<-redis_client.QueueConnection.StopAllConsuming() // wait for all Consume() calls to finish
+
+					return nil
+				},
+			},
+
+			{
+				Name:  "test-notification",
+				Usage: "generate a test notification",
+				Action: func(c *cli.Context) error {
+					if err := redis_client.Connect(); err != nil {
+						return err
+					}
+
+					notifyQueue, err := redis_client.QueueConnection.OpenQueue("notify-queue")
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to start notify queue")
+					}
+
+					notification := ctdf.Notification{
+						TargetUser: "auth0|651c491ffcd735ea268f65fb",
+						Type:       ctdf.NotificationTypePush,
+						Title:      "Line Suspended",
+						Message:    "Northern Line has been suspended due to a fault on the line",
+					}
+
+					notificationBytes, _ := json.Marshal(notification)
+
+					notifyQueue.PublishBytes(notificationBytes)
 
 					return nil
 				},

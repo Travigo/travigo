@@ -1,24 +1,45 @@
 package notify
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 )
 
 type NotifyBatchConsumer struct {
+	PushManager *PushManager
 }
 
-func NewNotifyBatchConsumer() *NotifyBatchConsumer {
-	return &NotifyBatchConsumer{}
+func NewNotifyBatchConsumer(pushManager *PushManager) *NotifyBatchConsumer {
+	return &NotifyBatchConsumer{
+		PushManager: pushManager,
+	}
 }
 
 func (c *NotifyBatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
 	for _, payload := range payloads {
-		pretty.Println(string(payload))
+		var notification ctdf.Notification
+		err := json.Unmarshal([]byte(payload), &notification)
+
+		if err != nil {
+			continue
+		}
+
+		switch notification.Type {
+		case ctdf.NotificationTypePush:
+			err = c.PushManager.SendPush(notification)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to send Push Notification")
+			}
+		default:
+			log.Error().Str("type", fmt.Sprintf("%s", notification.Type)).Msg("Unknown notification type")
+		}
 	}
 
 	if ackErrors := batch.Ack(); len(ackErrors) > 0 {

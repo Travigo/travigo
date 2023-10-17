@@ -10,3 +10,11 @@ ingress:
       paths:
         - path: /notify-queue
           pathType: ImplementationSpecific
+
+env:
+  - name: TRAVIGO_FIREBASE_SERVICE_ACCOUNT
+    valueFrom:
+      secretKeyRef:
+        name: travigo-notify-firebase-service-account
+        key: credentials
+        optional: false

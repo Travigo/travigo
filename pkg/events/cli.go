@@ -1,11 +1,13 @@
 package events
 
 import (
+	"encoding/json"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/consumer"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -51,6 +53,40 @@ func RegisterCLI() *cli.Command {
 					}()
 
 					<-redis_client.QueueConnection.StopAllConsuming() // wait for all Consume() calls to finish
+
+					return nil
+				},
+			},
+			{
+				Name:  "test-event",
+				Usage: "generate a test event",
+				Action: func(c *cli.Context) error {
+					if err := redis_client.Connect(); err != nil {
+						return err
+					}
+
+					eventsQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
+					if err != nil {
+						log.Fatal().Err(err).Msg("Failed to start event queue")
+					}
+
+					event := ctdf.Event{
+						Type: ctdf.EventTypeServiceAlertCreated,
+						Body: ctdf.ServiceAlert{
+							PrimaryIdentifier: "GB:SERVICEALERT:TEST",
+
+							AlertType: ctdf.ServiceAlertTypeServiceSuspended,
+
+							Title: "Line Suspended",
+							Text:  "Northern Line has been suspended due to a fault on the line",
+
+							MatchedIdentifiers: []string{"GB:NOC:TFLO:1-NTN-_-y05-590847:1-NTN-_-y05-590847"},
+						},
+					}
+
+					eventBytes, _ := json.Marshal(event)
+
+					eventsQueue.PublishBytes(eventBytes)
 
 					return nil
 				},
