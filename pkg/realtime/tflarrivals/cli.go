@@ -35,7 +35,7 @@ func RegisterCLI() *cli.Command {
 								TransportType:         ctdf.TransportTypeBus,
 								TrackArrivals:         false,
 								TrackDisruptions:      true,
-								DisruptionRefreshRate: 5 * time.Minute,
+								DisruptionRefreshRate: 2 * time.Minute,
 							},
 							{
 								ModeID:                "dlr",
@@ -43,7 +43,7 @@ func RegisterCLI() *cli.Command {
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    15 * time.Second,
-								DisruptionRefreshRate: 5 * time.Minute,
+								DisruptionRefreshRate: 2 * time.Minute,
 							},
 							{
 								ModeID:                "river-bus",
@@ -51,7 +51,7 @@ func RegisterCLI() *cli.Command {
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    45 * time.Second,
-								DisruptionRefreshRate: 5 * time.Minute,
+								DisruptionRefreshRate: 2 * time.Minute,
 							},
 							{
 								ModeID:                "tram",
@@ -59,7 +59,7 @@ func RegisterCLI() *cli.Command {
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    15 * time.Second,
-								DisruptionRefreshRate: 5 * time.Minute,
+								DisruptionRefreshRate: 2 * time.Minute,
 							},
 							{
 								ModeID:                "tube",
@@ -67,7 +67,7 @@ func RegisterCLI() *cli.Command {
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    15 * time.Second,
-								DisruptionRefreshRate: 5 * time.Minute,
+								DisruptionRefreshRate: 2 * time.Minute,
 							},
 
 							// { // HAS ZERO LINES
