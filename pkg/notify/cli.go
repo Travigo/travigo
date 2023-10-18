@@ -43,7 +43,7 @@ func RegisterCLI() *cli.Command {
 						QueueName:       "notify-queue",
 						NumberConsumers: 5,
 						BatchSize:       20,
-						Timeout:         2 * time.Second,
+						Timeout:         1 * time.Second,
 						Consumer:        NewNotifyBatchConsumer(pushManager),
 					}
 					redisConsumer.Setup()

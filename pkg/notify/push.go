@@ -8,6 +8,7 @@ import (
 
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/messaging"
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -69,6 +70,8 @@ func (m *PushManager) SendPush(notification ctdf.Notification) error {
 	if err != nil {
 		return err
 	}
+
+	log.Info().Str("target", notification.TargetUser).Msg("Sent Push Notification")
 
 	return nil
 }

@@ -34,7 +34,7 @@ func (c *RedisConsumer) startConsumers() {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(int64(c.NumberConsumers*c.BatchSize), 1*time.Second); err != nil {
+	if err := queue.StartConsuming(int64(c.NumberConsumers*c.BatchSize), c.Timeout/3); err != nil {
 		panic(err)
 	}
 
