@@ -65,6 +65,17 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
+					serviceAlert := ctdf.ServiceAlert{
+						PrimaryIdentifier: "GB:SERVICEALERT:TEST",
+
+						AlertType: ctdf.ServiceAlertTypeServiceSuspended,
+
+						Title: "Line Suspended",
+						Text:  "Northern Line has been suspended due to a fault on the line",
+
+						MatchedIdentifiers: []string{"GB:NOC:TFLO:1-NTN-_-y05-590847:1-NTN-_-y05-590847"},
+					}
+
 					eventsQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
 					if err != nil {
 						log.Fatal().Err(err).Msg("Failed to start event queue")
@@ -72,16 +83,7 @@ func RegisterCLI() *cli.Command {
 
 					event := ctdf.Event{
 						Type: ctdf.EventTypeServiceAlertCreated,
-						Body: ctdf.ServiceAlert{
-							PrimaryIdentifier: "GB:SERVICEALERT:TEST",
-
-							AlertType: ctdf.ServiceAlertTypeServiceSuspended,
-
-							Title: "Line Suspended",
-							Text:  "Northern Line has been suspended due to a fault on the line",
-
-							MatchedIdentifiers: []string{"GB:NOC:TFLO:1-NTN-_-y05-590847:1-NTN-_-y05-590847"},
-						},
+						Body: serviceAlert,
 					}
 
 					eventBytes, _ := json.Marshal(event)

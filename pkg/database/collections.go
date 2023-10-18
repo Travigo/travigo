@@ -237,4 +237,18 @@ func createJourneysIndexes() {
 	if err != nil {
 		log.Error().Err(err)
 	}
+
+	// UserEventNotificationExpression
+	userEventNotificationExpressionCollection := GetCollection("user_event_notification_expression")
+	_, err = userEventNotificationExpressionCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "userid", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "eventtype", Value: 1}},
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err)
+	}
 }

@@ -23,7 +23,7 @@ type RedisConsumer struct {
 
 func (c *RedisConsumer) Setup() {
 	c.startConsumers()
-	c.startStatsServer()
+	//c.startStatsServer()
 }
 
 func (c *RedisConsumer) startConsumers() {
