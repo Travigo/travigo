@@ -243,6 +243,13 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 				continue
 			}
 
+			// Ignore the daily update about the service closing for the day
+			if lineStatusUpdate.StatusSeverityDescription == "Service Closed" &&
+				(strings.Contains(lineStatusUpdate.Reason, "Service will resume later this morning.") ||
+					strings.Contains(lineStatusUpdate.Reason, "Service will resume at 06:00.")) {
+				continue
+			}
+
 			var serviceAlertType ctdf.ServiceAlertType
 
 			switch lineStatusUpdate.StatusSeverityDescription {
