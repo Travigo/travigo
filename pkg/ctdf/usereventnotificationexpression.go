@@ -1,6 +1,6 @@
 package ctdf
 
-type UserEventNotificationExpression struct {
+type UserEventSubscription struct {
 	UserID string
 
 	EventType        EventType

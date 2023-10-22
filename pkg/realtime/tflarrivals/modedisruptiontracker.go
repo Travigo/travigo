@@ -246,7 +246,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			// Ignore the daily update about the service closing for the day
 			if lineStatusUpdate.StatusSeverityDescription == "Service Closed" &&
 				(strings.Contains(lineStatusUpdate.Reason, "Service will resume later this morning") ||
-					strings.Contains(lineStatusUpdate.Reason, "Service will resume at 06:00.") ||
+					strings.Contains(lineStatusUpdate.Reason, "Service will resume at 06:00") ||
 					strings.Contains(lineStatusUpdate.Reason, "Service will resume at 06.00") ||
 					strings.Contains(lineStatusUpdate.Reason, "The Woolwich Ferry operates a one boat service from 0630 to 1900 on weekdays only.")) {
 				continue

@@ -43,20 +43,20 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 
 		log.Info().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
 
-		userEventNotificationExpressionCollection := database.GetCollection("user_event_notification_expression")
-		cursor, _ := userEventNotificationExpressionCollection.Find(context.Background(), bson.M{
+		userEventSubscriptionCollection := database.GetCollection("user_event_subscription")
+		cursor, _ := userEventSubscriptionCollection.Find(context.Background(), bson.M{
 			"eventtype": event.Type,
 		})
 
 		for cursor.Next(context.TODO()) {
-			var notificationExpression ctdf.UserEventNotificationExpression
-			err := cursor.Decode(&notificationExpression)
+			var userEventSubscription ctdf.UserEventSubscription
+			err := cursor.Decode(&userEventSubscription)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to decode UserEventNotificationExpression")
+				log.Error().Err(err).Msg("Failed to decode UserEventSubscription")
 				continue
 			}
 
-			program, err := expr.Compile(notificationExpression.Expression, expr.AsBool(), expr.AllowUndefinedVariables())
+			program, err := expr.Compile(userEventSubscription.Expression, expr.AsBool(), expr.AllowUndefinedVariables())
 			if err != nil {
 				continue
 			}
@@ -71,8 +71,8 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 				notificationData := event.GetNotificationData()
 
 				notification := ctdf.Notification{
-					TargetUser: notificationExpression.UserID,
-					Type:       notificationExpression.NotificationType,
+					TargetUser: userEventSubscription.UserID,
+					Type:       userEventSubscription.NotificationType,
 					Title:      notificationData.Title,
 					Message:    notificationData.Message,
 				}
@@ -80,7 +80,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 				notificationBytes, _ := json.Marshal(notification)
 				c.NotifyQueue.PublishBytes(notificationBytes)
 
-				log.Info().Str("user", notificationExpression.UserID).Msg("Sending notification")
+				log.Info().Str("user", userEventSubscription.UserID).Msg("Sending notification")
 			}
 		}
 	}

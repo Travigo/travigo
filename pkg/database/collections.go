@@ -239,8 +239,8 @@ func createJourneysIndexes() {
 	}
 
 	// UserEventNotificationExpression
-	userEventNotificationExpressionCollection := GetCollection("user_event_notification_expression")
-	_, err = userEventNotificationExpressionCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	userEventSubscriptionCollection := GetCollection("user_event_subscription")
+	_, err = userEventSubscriptionCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bson.D{{Key: "userid", Value: 1}},
 		},
