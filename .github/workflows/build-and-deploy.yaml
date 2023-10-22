@@ -295,3 +295,39 @@ jobs:
     - name: Helm upgrade
       run: |-
         helm upgrade -i travigo-notify ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml
+
+  dbwatch-deploy-helm:
+    if: github.ref == 'refs/heads/main'
+
+    name: Deploy dbwatch to Kubernetes
+    runs-on: ubuntu-latest
+    environment: 
+      name: production
+
+    needs: travigo-docker
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Helm tool installer
+      uses: Azure/setup-helm@v3
+
+    - name: Kubectl tool installer
+      uses: Azure/setup-kubectl@v3
+
+    - name: Setup kubeconfig
+      run: |
+          mkdir ~/.kube/
+          echo "$KUBECONFIG" >> ~/.kube/config
+          chmod 600 ~/.kube/config
+      shell: bash
+      env:
+        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+
+    - name: Helm upgrade
+      run: |-
+        helm upgrade -i travigo-dbwatch ./deploy/charts/travigo-dbwatch --set image.tag=sha-${{ github.sha }}

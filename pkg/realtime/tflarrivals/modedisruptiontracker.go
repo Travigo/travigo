@@ -12,7 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -102,10 +101,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 		validFrom, _ := time.Parse(time.RFC3339, tflDisruption.FromDate)
 		validUntil, _ := time.Parse(time.RFC3339, tflDisruption.ToDate)
 
-		newServiceAlert := false
-
 		if serviceAlert == nil {
-			newServiceAlert = true
 			alertType := ctdf.ServiceAlertTypeInformation
 
 			if tflDisruption.Type == "Closure" {
@@ -147,10 +143,6 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 		updateModel.SetFilter(searchQuery)
 		updateModel.SetUpdate(bsonRep)
 		updateModel.SetUpsert(true)
-
-		if newServiceAlert {
-			CreateServiceAlertCreatedEvent(serviceAlert)
-		}
 
 		serviceAlertsUpdateOperation = append(serviceAlertsUpdateOperation, updateModel)
 	}
@@ -260,7 +252,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			case "Part Suspended", "Part Closure", "Part Closed":
 				serviceAlertType = ctdf.ServiceAlertTypeServicePartSuspended
 			case "Severe Delays":
-				serviceAlertType = ctdf.ServiceAlertTypeSeverDelays
+				serviceAlertType = ctdf.ServiceAlertTypeSevereDelays
 			case "Reduced Service":
 				serviceAlertType = ctdf.ServiceAlertTypeDelays
 			case "Minor Delays":
@@ -288,10 +280,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			validFrom := now.Add(-4 * time.Hour)
 			validUntil := now.Add(4 * time.Hour)
 
-			newServiceAlert := false
-
 			if serviceAlert == nil {
-				newServiceAlert = true
 				serviceAlert = &ctdf.ServiceAlert{
 					PrimaryIdentifier: primaryIdentifier,
 
@@ -326,10 +315,6 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			updateModel.SetFilter(searchQuery)
 			updateModel.SetUpdate(bsonRep)
 			updateModel.SetUpsert(true)
-
-			if newServiceAlert {
-				CreateServiceAlertCreatedEvent(serviceAlert)
-			}
 
 			serviceAlertsUpdateOperation = append(serviceAlertsUpdateOperation, updateModel)
 		}
@@ -369,21 +354,4 @@ func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSou
 			Int64("length", deleted.DeletedCount).
 			Msg("delete expired journeys")
 	}
-}
-
-// TODO move and handle this somewhere better
-func CreateServiceAlertCreatedEvent(serviceAlert *ctdf.ServiceAlert) {
-	eventsQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to start event queue")
-	}
-
-	event := ctdf.Event{
-		Type: ctdf.EventTypeServiceAlertCreated,
-		Body: serviceAlert,
-	}
-
-	eventBytes, _ := json.Marshal(event)
-
-	eventsQueue.PublishBytes(eventBytes)
 }

@@ -30,7 +30,7 @@ const (
 	ServiceAlertTypeStopClosed                            = "StopClosed"
 	ServiceAlertTypeServiceSuspended                      = "ServiceSuspended"
 	ServiceAlertTypeServicePartSuspended                  = "ServicePartSuspended"
-	ServiceAlertTypeSeverDelays                           = "SeverDelays"
+	ServiceAlertTypeSevereDelays                          = "SevereDelays"
 	ServiceAlertTypeDelays                                = "Delays"
 	ServiceAlertTypeMinorDelays                           = "MinorDelays"
 	ServiceAlertTypePlanned                               = "Planned"

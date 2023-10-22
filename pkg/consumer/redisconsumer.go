@@ -45,7 +45,7 @@ func (c *RedisConsumer) startConsumers() {
 func (c *RedisConsumer) startQueueConsumer(queue rmq.Queue, id int) {
 	log.Info().Msgf("Starting %s consumer %d", c.QueueName, id)
 
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("event-queue-%d", id), int64(c.BatchSize), c.Timeout, c.Consumer); err != nil {
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("%s-%d", c.QueueName, id), int64(c.BatchSize), c.Timeout, c.Consumer); err != nil {
 		panic(err)
 	}
 }
