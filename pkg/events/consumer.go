@@ -61,7 +61,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 				continue
 			}
 
-			output, err := expr.Run(program, event.Body)
+			output, err := expr.Run(program, event)
 			if err != nil {
 				continue
 			}

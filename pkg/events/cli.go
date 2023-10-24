@@ -82,8 +82,9 @@ func RegisterCLI() *cli.Command {
 					}
 
 					event := ctdf.Event{
-						Type: ctdf.EventTypeServiceAlertCreated,
-						Body: serviceAlert,
+						Type:      ctdf.EventTypeServiceAlertCreated,
+						Timestamp: time.Now(),
+						Body:      serviceAlert,
 					}
 
 					eventBytes, _ := json.Marshal(event)

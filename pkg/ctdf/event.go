@@ -1,8 +1,11 @@
 package ctdf
 
+import "time"
+
 type Event struct {
-	Type EventType
-	Body interface{}
+	Type      EventType
+	Timestamp time.Time
+	Body      interface{}
 }
 
 type EventType string

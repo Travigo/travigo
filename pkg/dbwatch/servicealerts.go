@@ -3,6 +3,7 @@ package dbwatch
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
@@ -62,8 +63,9 @@ func (w *ServiceAlertsWatch) Run() {
 		log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New ServiceAlert inserted")
 
 		eventBytes, _ := json.Marshal(ctdf.Event{
-			Type: ctdf.EventTypeServiceAlertCreated,
-			Body: data.FullDocument,
+			Type:      ctdf.EventTypeServiceAlertCreated,
+			Timestamp: time.Now(),
+			Body:      data.FullDocument,
 		})
 		w.EventQueue.PublishBytes(eventBytes)
 	}
