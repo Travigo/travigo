@@ -34,15 +34,15 @@ func NewRealtimeJourneysWatch() *RealtimeJourneysWatch {
 func (w *RealtimeJourneysWatch) Run() {
 	log.Info().Msg("Starting dbwatch on collection realtime_journeys")
 	collection := database.GetCollection("realtime_journeys")
-	// matchPipeline := bson.D{
-	// 	{
-	// 		Key: "$match", Value: bson.D{
-	// 			{Key: "operationType", Value: "insert"},
-	// 		},
-	// 	},
-	// }
+	matchPipeline := bson.D{
+		{
+			Key: "$match", Value: bson.D{
+				{Key: "operationType", Value: "update"}, //ignore inserts for now
+			},
+		},
+	}
 	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.Required)
-	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{}, opts)
+	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{matchPipeline}, opts)
 	if err != nil {
 		panic(err)
 	}
