@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -40,7 +41,7 @@ func (w *RealtimeJourneysWatch) Run() {
 	// 		},
 	// 	},
 	// }
-	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable)
+	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.Required)
 	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{}, opts)
 	if err != nil {
 		panic(err)
@@ -50,8 +51,10 @@ func (w *RealtimeJourneysWatch) Run() {
 
 	for stream.Next(context.TODO()) {
 		var data struct {
-			OperationType            string               `bson:"operationType"`
-			UpdateDescription        bson.M               `bson:"updateDescription"`
+			OperationType     string `bson:"operationType"`
+			UpdateDescription struct {
+				UpdatedFields bson.M `bson:"updatedFields"`
+			} `bson:"updateDescription"`
 			FullDocument             ctdf.RealtimeJourney `bson:"fullDocument"`
 			FullDocumentBeforeChange ctdf.RealtimeJourney `bson:"fullDocumentBeforeChange"`
 		}
@@ -70,8 +73,18 @@ func (w *RealtimeJourneysWatch) Run() {
 			})
 			w.EventQueue.PublishBytes(eventBytes)
 		} else if data.OperationType == "update" {
-			// pretty.Println(data)
-			// log.Info().Msg("RealtimeJourneys updated")
+			// Detect newly cancelled journeys
+			if data.UpdateDescription.UpdatedFields["cancelled"] == true && !data.FullDocumentBeforeChange.Cancelled {
+				pretty.Println(data.UpdateDescription.UpdatedFields["cancelled"])
+				log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourneys has been cancelled")
+
+				eventBytes, _ := json.Marshal(ctdf.Event{
+					Type:      ctdf.EventTypeRealtimeJourneyCancelled,
+					Timestamp: time.Now(),
+					Body:      data.FullDocument,
+				})
+				w.EventQueue.PublishBytes(eventBytes)
+			}
 		}
 	}
 }

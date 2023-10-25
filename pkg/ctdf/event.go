@@ -1,6 +1,9 @@
 package ctdf
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type Event struct {
 	Type      EventType
@@ -16,7 +19,7 @@ const (
 	EventTypeRealtimeJourneyCreated         = "RealtimeJourneyCreated"
 	EventTypeRealtimeJourneyPlatformSet     = "RealtimeJourneyPlatformSet"
 	EventTypeRealtimeJourneyPlatformChanged = "RealtimeJourneyPlatformChanged"
-	EventTypeRealtimeJourneyCanceled        = "RealtimeJourneyPlatformCanceled"
+	EventTypeRealtimeJourneyCancelled       = "RealtimeJourneyPlatformCancelled"
 )
 
 func (e *Event) GetNotificationData() EventNotificationData {
@@ -32,6 +35,18 @@ func (e *Event) GetNotificationData() EventNotificationData {
 		title := eventBody["Title"].(string)
 		if title != "" {
 			eventNotificationData.Title = title
+		}
+	case EventTypeRealtimeJourneyCancelled:
+		eventNotificationData.Title = "Journey cancelled"
+
+		journey := eventBody["journey"].(map[string]string)
+
+		departureTime := "TEST"
+		destination := journey["destinationdisplay"]
+		eventNotificationData.Message = fmt.Sprintf("The %s to %s has been cancelled.", departureTime, destination)
+
+		if eventBody["annotations"].(map[string]string)["CancelledReasonText"] != "" {
+			eventNotificationData.Message = fmt.Sprintf("%s %s", eventNotificationData.Message, eventBody["annotations"].(map[string]string)["CancelledReasonText"])
 		}
 	}
 
