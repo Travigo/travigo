@@ -3,6 +3,8 @@ package ctdf
 import (
 	"fmt"
 	"time"
+
+	"github.com/kr/pretty"
 )
 
 type Event struct {
@@ -39,13 +41,14 @@ func (e *Event) GetNotificationData() EventNotificationData {
 	case EventTypeRealtimeJourneyCancelled:
 		eventNotificationData.Title = "Journey cancelled"
 
-		journey := eventBody["journey"].(map[string]string)
+		pretty.Println(eventBody)
+		journey := eventBody["Journey"].(map[string]string)
 
 		departureTime := "TEST"
 		destination := journey["destinationdisplay"]
 		eventNotificationData.Message = fmt.Sprintf("The %s to %s has been cancelled.", departureTime, destination)
 
-		if eventBody["annotations"].(map[string]string)["CancelledReasonText"] != "" {
+		if eventBody["Annotations"].(map[string]string)["CancelledReasonText"] != "" {
 			eventNotificationData.Message = fmt.Sprintf("%s %s", eventNotificationData.Message, eventBody["annotations"].(map[string]string)["CancelledReasonText"])
 		}
 	}
