@@ -12,6 +12,11 @@ type EventType string
 
 const (
 	EventTypeServiceAlertCreated EventType = "ServiceAlertCreated"
+
+	EventTypeRealtimeJourneyCreated         = "RealtimeJourneyCreated"
+	EventTypeRealtimeJourneyPlatformSet     = "RealtimeJourneyPlatformSet"
+	EventTypeRealtimeJourneyPlatformChanged = "RealtimeJourneyPlatformChanged"
+	EventTypeRealtimeJourneyCanceled        = "RealtimeJourneyPlatformCanceled"
 )
 
 func (e *Event) GetNotificationData() EventNotificationData {

@@ -32,6 +32,9 @@ func RegisterCLI() *cli.Command {
 					serviceAlerts := NewServiceAlertsWatch()
 					go serviceAlerts.Run()
 
+					realtimeJourneys := NewRealtimeJourneysWatch()
+					go realtimeJourneys.Run()
+
 					signals := make(chan os.Signal, 1)
 					signal.Notify(signals, syscall.SIGINT)
 					defer signal.Stop(signals)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/util"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -57,9 +58,30 @@ func Connect() error {
 
 	createIndexes()
 
+	// runCommands()
+
 	return nil
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
 	return Instance.Database.Collection(collectionName)
+}
+
+// Requires
+// use admin
+// db.runCommand( {
+//    setClusterParameter:
+//       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 100 } } }
+// } )
+
+func runCommands() {
+	var result bson.M
+	err := Instance.Database.RunCommand(context.TODO(), bson.D{
+		{Key: "collMod", Value: "realtime_journeys"},
+		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
+	}).Decode(&result)
+
+	if err != nil {
+		panic(err)
+	}
 }
