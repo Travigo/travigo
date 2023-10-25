@@ -41,7 +41,7 @@ func (e *Event) GetNotificationData() EventNotificationData {
 
 		journey := eventBody["Journey"].(map[string]interface{})
 
-		departureTime := journey["DepartureTime"].(time.Time)
+		departureTime, _ := time.Parse(time.RFC3339, journey["DepartureTime"].(string))
 		departureTimeText := departureTime.Format("15:04")
 		destination := journey["DestinationDisplay"]
 		eventNotificationData.Message = fmt.Sprintf("The %s to %s has been cancelled.", departureTimeText, destination)
