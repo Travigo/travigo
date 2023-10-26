@@ -229,6 +229,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				Service:    l.Line.Service,
 				ServiceRef: l.Line.Service.PrimaryIdentifier,
 			},
+			JourneyRunDate: time.Now(), // TODO may not always be correct?
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
@@ -414,6 +415,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		updateMap["datasource"] = realtimeJourney.DataSource
 
 		updateMap["vehicleref"] = realtimeJourney.VehicleRef
+
+		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}

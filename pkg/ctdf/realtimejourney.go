@@ -15,10 +15,13 @@ type RealtimeJourney struct {
 	//JourneyRef string   `groups:"internal"`
 	Journey *Journey `groups:"basic"`
 
+	JourneyRunDate time.Time `groups:"basic"`
+
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
-	TimeoutDurationMinutes int `groups:"internal"`
+	Expiry                 time.Time `groups:"internal"`
+	TimeoutDurationMinutes int       `groups:"internal"`
 
 	DataSource *DataSource `groups:"internal"`
 

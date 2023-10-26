@@ -336,11 +336,15 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		for _, pathItem := range journey.Path {
 			pathItem.GetDestinationStop()
 		}
+
+		journeyDate, _ := time.Parse("2009-10-11", vehicleLocationEvent.Timeframe)
+
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
 			ActivelyTracked:        true,
 			TimeoutDurationMinutes: 10,
 			Journey:                journey,
+			JourneyRunDate:         journeyDate,
 
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,
@@ -513,6 +517,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
 
 		updateMap["journey"] = realtimeJourney.Journey
+		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 		updateMap["datasource"] = realtimeJourney.DataSource

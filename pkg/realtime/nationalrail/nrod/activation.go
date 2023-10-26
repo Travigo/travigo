@@ -95,7 +95,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 			DataSource: datasource,
 
-			Journey: journey,
+			Journey:        journey,
+			JourneyRunDate: journeyDate,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
@@ -120,6 +121,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		updateMap["datasource"] = realtimeJourney.DataSource
 
 		updateMap["journey"] = realtimeJourney.Journey
+		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}
