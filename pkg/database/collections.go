@@ -45,7 +45,7 @@ func createStopsIndexes() {
 	opts := options.CreateIndexes()
 	_, err := stopsCollection.Indexes().CreateMany(context.Background(), stopsIndex, opts)
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// Stop Groups
@@ -59,7 +59,7 @@ func createStopsIndexes() {
 	opts = options.CreateIndexes()
 	_, err = stopGroupsCollection.Indexes().CreateMany(context.Background(), stopGroupsIndex, opts)
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 }
 
@@ -82,7 +82,7 @@ func createOperatorsIndexes() {
 	opts := options.CreateIndexes()
 	_, err := operatorsCollection.Indexes().CreateMany(context.Background(), operatorIndex, opts)
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// OperatorGroups
@@ -96,7 +96,7 @@ func createOperatorsIndexes() {
 	opts = options.CreateIndexes()
 	_, err = operatorGroupsCollection.Indexes().CreateMany(context.Background(), operatorGroupsIndex, opts)
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 }
 
@@ -122,7 +122,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// Journeys
@@ -189,7 +189,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// RealtimeJourneys
@@ -218,7 +218,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// ServiceAlerts
@@ -232,7 +232,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// UserPushNotificationTarget
@@ -243,7 +243,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 
 	// UserEventNotificationExpression
@@ -257,6 +257,6 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("Creating Index")
 	}
 }
