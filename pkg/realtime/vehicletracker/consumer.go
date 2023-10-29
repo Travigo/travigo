@@ -338,6 +338,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 
 		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		expiry := journeyDate.Add(32 * time.Hour)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
@@ -345,6 +346,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			TimeoutDurationMinutes: 10,
 			Journey:                journey,
 			JourneyRunDate:         journeyDate,
+			Expiry:                 expiry,
 
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,

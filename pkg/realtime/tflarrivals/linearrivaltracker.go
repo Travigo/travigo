@@ -210,6 +210,9 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
+		journeyDate := time.Now() // TODO may not always be correct?
+		expiry := journeyDate.Add(6 * time.Hour)
+
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyID,
 			TimeoutDurationMinutes: 10,
@@ -229,7 +232,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				Service:    l.Line.Service,
 				ServiceRef: l.Line.Service.PrimaryIdentifier,
 			},
-			JourneyRunDate: time.Now(), // TODO may not always be correct?
+			JourneyRunDate: journeyDate,
+			Expiry:         expiry,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}

@@ -76,6 +76,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Journey:        journey,
 				JourneyRunDate: journeyDate,
+				Expiry:         journeyDate.Add(72 * time.Hour),
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
@@ -100,6 +101,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+			updateMap["expiry"] = realtimeJourney.Expiry
 		} else {
 			updateMap["datasource.identifier"] = datasource.Identifier
 		}
@@ -213,6 +215,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 					Journey:        journey,
 					JourneyRunDate: journeyDate,
+					Expiry:         journeyDate.Add(72 * time.Hour),
 
 					Stops: map[string]*ctdf.RealtimeJourneyStops{},
 				}
@@ -237,6 +240,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				updateMap["journey"] = realtimeJourney.Journey
 				updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+				updateMap["expiry"] = realtimeJourney.Expiry
 			} else {
 				updateMap["datasource.identifier"] = datasource.Identifier
 			}
