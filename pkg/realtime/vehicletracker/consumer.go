@@ -337,7 +337,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			pathItem.GetDestinationStop()
 		}
 
-		journeyDate, _ := time.Parse("2009-10-11", vehicleLocationEvent.Timeframe)
+		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
