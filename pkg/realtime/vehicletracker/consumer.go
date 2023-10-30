@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
+	"github.com/travigo/travigo/pkg/util"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -338,7 +339,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 
 		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
-		expiry := journeyDate.Add(32 * time.Hour)
+		expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(2 * time.Hour)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,

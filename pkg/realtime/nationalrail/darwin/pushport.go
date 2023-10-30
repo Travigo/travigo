@@ -9,6 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -64,6 +65,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
+			expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
@@ -76,7 +79,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Journey:        journey,
 				JourneyRunDate: journeyDate,
-				Expiry:         journeyDate.Add(72 * time.Hour),
+				Expiry:         expiry,
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
@@ -201,6 +204,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 					continue
 				}
 
+				expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+
 				// Construct the base realtime journey
 				realtimeJourney = &ctdf.RealtimeJourney{
 					PrimaryIdentifier:      realtimeJourneyID,
@@ -215,7 +220,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 					Journey:        journey,
 					JourneyRunDate: journeyDate,
-					Expiry:         journeyDate.Add(72 * time.Hour),
+					Expiry:         expiry,
 
 					Stops: map[string]*ctdf.RealtimeJourneyStops{},
 				}

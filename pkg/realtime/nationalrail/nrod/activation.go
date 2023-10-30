@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -81,6 +82,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			return
 		}
 
+		expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+
 		// Construct the base realtime journey
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,
@@ -97,7 +100,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 			Journey:        journey,
 			JourneyRunDate: journeyDate,
-			Expiry:         journeyDate.Add(72 * time.Hour),
+			Expiry:         expiry,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
