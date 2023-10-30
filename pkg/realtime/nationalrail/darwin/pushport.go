@@ -65,7 +65,12 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
-			expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+			var expiry time.Time
+			if len(journey.Path) == 0 {
+				expiry = journeyDate.Add(32 * time.Hour)
+			} else {
+				expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+			}
 
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
@@ -204,7 +209,12 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 					continue
 				}
 
-				expiry := util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+				var expiry time.Time
+				if len(journey.Path) == 0 {
+					expiry = journeyDate.Add(32 * time.Hour)
+				} else {
+					expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
+				}
 
 				// Construct the base realtime journey
 				realtimeJourney = &ctdf.RealtimeJourney{
