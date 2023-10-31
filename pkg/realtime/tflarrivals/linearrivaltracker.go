@@ -211,7 +211,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
 		journeyDate := time.Now() // TODO may not always be correct?
-		expiry := journeyDate.Add(6 * time.Hour)
+		expiry := journeyDate.Add(3 * time.Hour)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyID,

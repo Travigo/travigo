@@ -328,10 +328,10 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 	if realtimeJourney == nil {
 		var journey *ctdf.Journey
 		journeysCollection := database.GetCollection("journeys")
-		result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+		err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
 
-		if result != nil {
-			return nil, result
+		if err != nil {
+			return nil, err
 		}
 
 		for _, pathItem := range journey.Path {
@@ -341,7 +341,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
 		var expiry time.Time
 		if len(journey.Path) == 0 {
-			expiry = journeyDate.Add(32 * time.Hour)
+			expiry = journeyDate.Add(30 * time.Hour)
 		} else {
 			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(2 * time.Hour)
 		}
