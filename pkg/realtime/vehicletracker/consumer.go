@@ -368,6 +368,12 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		newRealtimeJourney = true
 	}
 
+	if realtimeJourney.Journey == nil {
+		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
+		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
+		return nil, nil
+	}
+
 	closestDistance := 999999999999.0
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem
 	var closestDistanceJourneyPathIndex int
