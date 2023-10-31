@@ -526,6 +526,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+		updateMap["expiry"] = realtimeJourney.Expiry
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 		updateMap["datasource"] = realtimeJourney.DataSource

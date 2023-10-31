@@ -421,6 +421,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		updateMap["vehicleref"] = realtimeJourney.VehicleRef
 
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+		updateMap["expiry"] = realtimeJourney.Expiry
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}
