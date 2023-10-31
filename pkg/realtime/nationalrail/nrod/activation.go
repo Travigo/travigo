@@ -89,6 +89,10 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
 		}
 
+		if expiry.Sub(now) < 4*time.Hour {
+			expiry = now.Add(4 * time.Hour)
+		}
+
 		// Construct the base realtime journey
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,

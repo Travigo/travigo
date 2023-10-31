@@ -343,7 +343,12 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		if len(journey.Path) == 0 {
 			expiry = journeyDate.Add(30 * time.Hour)
 		} else {
-			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(2 * time.Hour)
+			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(4 * time.Hour)
+		}
+
+		now := time.Now()
+		if expiry.Sub(now) < 4*time.Hour {
+			expiry = now.Add(4 * time.Hour)
 		}
 
 		realtimeJourney = &ctdf.RealtimeJourney{
