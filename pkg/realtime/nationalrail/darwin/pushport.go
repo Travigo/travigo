@@ -67,7 +67,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			var expiry time.Time
 			if len(journey.Path) == 0 {
-				expiry = journeyDate.Add(32 * time.Hour)
+				expiry = now.Add(4 * time.Hour) // if its nil path then we actually dont really care for it
 			} else {
 				expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
 			}
@@ -215,7 +215,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				var expiry time.Time
 				if len(journey.Path) == 0 {
-					expiry = journeyDate.Add(32 * time.Hour)
+					expiry = now.Add(4 * time.Hour) // if its nil path then we actually dont really care for it
 				} else {
 					expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
 				}
