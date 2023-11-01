@@ -421,12 +421,12 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		updateMap["vehicleref"] = realtimeJourney.VehicleRef
 
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-		updateMap["expiry"] = realtimeJourney.Expiry
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}
 	// TODO Temporary - need detection if journey has actually changed
 	updateMap["journey"] = realtimeJourney.Journey
+	updateMap["expiry"] = now.Add(1 * time.Hour)
 
 	updateMap["vehiclelocationdescription"] = realtimeJourney.VehicleLocationDescription
 
