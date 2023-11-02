@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -23,7 +22,7 @@ type RealtimeJourneysWatch struct {
 type realtimeJourneyUpdate struct {
 	OperationType     string `bson:"operationType"`
 	UpdateDescription struct {
-		UpdatedFields bson.M `bson:"updatedFields"`
+		UpdatedFields ctdf.RealtimeJourney `bson:"updatedFields"`
 	} `bson:"updateDescription"`
 	FullDocument             ctdf.RealtimeJourney `bson:"fullDocument"`
 	FullDocumentBeforeChange ctdf.RealtimeJourney `bson:"fullDocumentBeforeChange"`
@@ -77,8 +76,7 @@ func (w *RealtimeJourneysWatch) Run() {
 				w.EventQueue.PublishBytes(eventBytes)
 			} else if data.OperationType == "update" {
 				// Detect newly cancelled journeys
-				if data.UpdateDescription.UpdatedFields["cancelled"] == true && !data.FullDocumentBeforeChange.Cancelled {
-					pretty.Println(data.UpdateDescription.UpdatedFields["cancelled"])
+				if data.UpdateDescription.UpdatedFields.Cancelled == true && !data.FullDocumentBeforeChange.Cancelled {
 					log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourneys has been cancelled")
 
 					eventBytes, _ := json.Marshal(ctdf.Event{
@@ -91,17 +89,8 @@ func (w *RealtimeJourneysWatch) Run() {
 					return
 				}
 
-				// Other parse
-				var realtimeJourney *ctdf.RealtimeJourney
-				bsonBytes, _ := bson.Marshal(data.UpdateDescription.UpdatedFields)
-				err := bson.Unmarshal(bsonBytes, &realtimeJourney)
-
-				if err != nil || realtimeJourney == nil {
-					return
-				}
-
 				// Checks for set or changed platforms
-				for id, journeyStop := range realtimeJourney.Stops {
+				for id, journeyStop := range data.FullDocument.Stops {
 					newPlatform := journeyStop.Platform
 
 					oldJourneyPlatform := data.FullDocumentBeforeChange.Stops[id]
@@ -110,11 +99,38 @@ func (w *RealtimeJourneysWatch) Run() {
 					}
 					oldPlatform := oldJourneyPlatform.Platform
 
-					pretty.Println(newPlatform, oldPlatform)
 					if oldPlatform == "" && newPlatform != oldPlatform {
-						pretty.Println("THATS A SET PLATFORM")
+						log.Info().
+							Str("id", data.FullDocument.PrimaryIdentifier).
+							Str("platform", newPlatform).
+							Msg("RealtimeJourneys stop platform set")
+
+						eventBytes, _ := json.Marshal(ctdf.Event{
+							Type:      ctdf.EventTypeRealtimeJourneyPlatformSet,
+							Timestamp: time.Now(),
+							Body: map[string]interface{}{
+								"RealtimeJourney": data.FullDocument,
+								"Stop":            id,
+							},
+						})
+						w.EventQueue.PublishBytes(eventBytes)
 					} else if oldPlatform != "" && newPlatform != oldPlatform {
-						pretty.Println("THATS A CHANGED PLATFORM")
+						log.Info().
+							Str("id", data.FullDocument.PrimaryIdentifier).
+							Str("oldplatform", oldPlatform).
+							Str("newplatform", newPlatform).
+							Msg("RealtimeJourneys stop platform changed")
+
+						eventBytes, _ := json.Marshal(ctdf.Event{
+							Type:      ctdf.EventTypeRealtimeJourneyPlatformChanged,
+							Timestamp: time.Now(),
+							Body: map[string]interface{}{
+								"RealtimeJourney": data.FullDocument,
+								"Stop":            id,
+								"OldPlatform":     oldPlatform,
+							},
+						})
+						w.EventQueue.PublishBytes(eventBytes)
 					}
 				}
 			}
