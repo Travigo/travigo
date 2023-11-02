@@ -235,6 +235,11 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 				continue
 			}
 
+			// Ignore any closures between 1am-3am
+			if lineStatusUpdate.StatusSeverityDescription == "Service Closed" && (now.Hour() >= 1 && now.Hour() <= 3) {
+				continue
+			}
+
 			// Ignore the daily update about the service closing for the day
 			if lineStatusUpdate.StatusSeverityDescription == "Service Closed" &&
 				(strings.Contains(lineStatusUpdate.Reason, "Service will resume later this morning") ||
