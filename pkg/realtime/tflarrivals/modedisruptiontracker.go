@@ -82,13 +82,12 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 	json.Unmarshal(jsonBytes, &tflDisruptionsData)
 
 	serviceAlertsCollection := database.GetCollection("service_alerts")
-	//var realtimeJourneyUpdateOperations []mongo.WriteModel
 	serviceAlertsUpdateOperation := []mongo.WriteModel{}
 
 	for _, tflDisruption := range tflDisruptionsData {
 		primaryIdentifier := fmt.Sprintf(
 			"GB:TFLDISRUPTION:%s:%s:%s:%s:%s:%s",
-			d.Mode.ModeID, tflDisruption.Type, tflDisruption.Appearance, tflDisruption.ATCO, tflDisruption.FromDate, tflDisruption.ToDate,
+			d.Mode.ModeID, strings.ReplaceAll(tflDisruption.Type, " ", ""), tflDisruption.Appearance, tflDisruption.ATCO, tflDisruption.FromDate, tflDisruption.ToDate,
 		)
 
 		searchQuery := bson.M{"primaryidentifier": primaryIdentifier}

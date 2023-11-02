@@ -20,6 +20,15 @@ type RealtimeJourneysWatch struct {
 	EventQueue rmq.Queue
 }
 
+type realtimeJourneyUpdate struct {
+	OperationType     string `bson:"operationType"`
+	UpdateDescription struct {
+		UpdatedFields bson.M `bson:"updatedFields"`
+	} `bson:"updateDescription"`
+	FullDocument             ctdf.RealtimeJourney `bson:"fullDocument"`
+	FullDocumentBeforeChange ctdf.RealtimeJourney `bson:"fullDocumentBeforeChange"`
+}
+
 func NewRealtimeJourneysWatch() *RealtimeJourneysWatch {
 	eventQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
 	if err != nil {
@@ -44,47 +53,71 @@ func (w *RealtimeJourneysWatch) Run() {
 	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.Required)
 	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{matchPipeline}, opts)
 	if err != nil {
-		panic(err)
+		log.Fatal().Err(err).Msg("Failed to watch collection")
 	}
 
 	defer stream.Close(context.TODO())
 
 	for stream.Next(context.TODO()) {
-		var data struct {
-			OperationType     string `bson:"operationType"`
-			UpdateDescription struct {
-				UpdatedFields bson.M `bson:"updatedFields"`
-			} `bson:"updateDescription"`
-			FullDocument             ctdf.RealtimeJourney `bson:"fullDocument"`
-			FullDocumentBeforeChange ctdf.RealtimeJourney `bson:"fullDocumentBeforeChange"`
-		}
+		var data realtimeJourneyUpdate
 		if err := stream.Decode(&data); err != nil {
 			log.Error().Err(err).Msg("Failed to decode event")
 			continue
 		}
 
-		if data.OperationType == "insert" {
-			log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New RealtimeJourneys inserted")
-
-			eventBytes, _ := json.Marshal(ctdf.Event{
-				Type:      ctdf.EventTypeRealtimeJourneyCreated,
-				Timestamp: time.Now(),
-				Body:      data.FullDocument,
-			})
-			w.EventQueue.PublishBytes(eventBytes)
-		} else if data.OperationType == "update" {
-			// Detect newly cancelled journeys
-			if data.UpdateDescription.UpdatedFields["cancelled"] == true && !data.FullDocumentBeforeChange.Cancelled {
-				pretty.Println(data.UpdateDescription.UpdatedFields["cancelled"])
-				log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourneys has been cancelled")
+		go func(data *realtimeJourneyUpdate) {
+			if data.OperationType == "insert" {
+				log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New RealtimeJourneys inserted")
 
 				eventBytes, _ := json.Marshal(ctdf.Event{
-					Type:      ctdf.EventTypeRealtimeJourneyCancelled,
+					Type:      ctdf.EventTypeRealtimeJourneyCreated,
 					Timestamp: time.Now(),
 					Body:      data.FullDocument,
 				})
 				w.EventQueue.PublishBytes(eventBytes)
+			} else if data.OperationType == "update" {
+				// Detect newly cancelled journeys
+				if data.UpdateDescription.UpdatedFields["cancelled"] == true && !data.FullDocumentBeforeChange.Cancelled {
+					pretty.Println(data.UpdateDescription.UpdatedFields["cancelled"])
+					log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourneys has been cancelled")
+
+					eventBytes, _ := json.Marshal(ctdf.Event{
+						Type:      ctdf.EventTypeRealtimeJourneyCancelled,
+						Timestamp: time.Now(),
+						Body:      data.FullDocument,
+					})
+					w.EventQueue.PublishBytes(eventBytes)
+
+					return
+				}
+
+				// Other parse
+				var realtimeJourney *ctdf.RealtimeJourney
+				bsonBytes, _ := bson.Marshal(data.UpdateDescription.UpdatedFields)
+				err := bson.Unmarshal(bsonBytes, &realtimeJourney)
+
+				if err != nil || realtimeJourney == nil {
+					return
+				}
+
+				// Checks for set or changed platforms
+				for id, journeyStop := range realtimeJourney.Stops {
+					newPlatform := journeyStop.Platform
+
+					oldJourneyPlatform := data.FullDocumentBeforeChange.Stops[id]
+					if oldJourneyPlatform == nil {
+						continue
+					}
+					oldPlatform := oldJourneyPlatform.Platform
+
+					pretty.Println(newPlatform, oldPlatform)
+					if oldPlatform == "" && newPlatform != oldPlatform {
+						pretty.Println("THATS A SET PLATFORM")
+					} else if oldPlatform != "" && newPlatform != oldPlatform {
+						pretty.Println("THATS A CHANGED PLATFORM")
+					}
+				}
 			}
-		}
+		}(&data)
 	}
 }
