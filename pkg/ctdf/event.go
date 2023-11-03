@@ -3,6 +3,8 @@ package ctdf
 import (
 	"fmt"
 	"time"
+
+	"github.com/kr/pretty"
 )
 
 type Event struct {
@@ -49,7 +51,7 @@ func (e *Event) GetNotificationData() EventNotificationData {
 		if eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"] != nil {
 			eventNotificationData.Message = fmt.Sprintf("%s %s", eventNotificationData.Message, eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"])
 		}
-	case EventTypeRealtimeJourneyPlatformSet:
+	case EventTypeRealtimeJourneyPlatformSet, EventTypeRealtimeJourneyPlatformChanged:
 		eventNotificationData.Title = "Platform Update"
 
 		realtimeJourney := eventBody["RealtimeJourney"].(map[string]interface{})
@@ -62,8 +64,15 @@ func (e *Event) GetNotificationData() EventNotificationData {
 		originStop := originStopName
 		platform := realtimeJourneyStop["Platform"]
 
-		eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTime, destination, originStop, platform)
+		if e.Type == EventTypeRealtimeJourneyPlatformSet {
+			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTime, destination, originStop, platform)
+		} else if e.Type == EventTypeRealtimeJourneyPlatformChanged {
+			oldPlatform := eventBody["OldPlatform"]
+			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will now be departing from platform %s instead of %s", departureTime, destination, originStop, platform, oldPlatform)
+		}
 	}
+
+	pretty.Println(eventNotificationData)
 
 	return eventNotificationData
 }
