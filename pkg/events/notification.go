@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -45,9 +46,12 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		realtimeJourneyStop := realtimeJourney["Stops"].(map[string]interface{})[originStopID].(map[string]interface{})
 
 		var stop *ctdf.Stop
-		stop, _ = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
 			PrimaryIdentifier: originStopID,
 		})
+		if err != nil {
+			log.Error().Err(err).Str("stop", originStopID).Msg("Failed to lookup stop")
+		}
 
 		departureTime := "N/A"
 		destination := journey["DestinationDisplay"]
