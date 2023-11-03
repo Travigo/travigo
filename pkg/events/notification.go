@@ -51,7 +51,7 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 
 		departureTime := "N/A"
 		destination := journey["DestinationDisplay"]
-		originStop := "N/A"
+		originStop := originStopID
 		if stop != nil {
 			originStop = stop.PrimaryName
 		}
