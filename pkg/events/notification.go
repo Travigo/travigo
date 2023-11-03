@@ -53,7 +53,8 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 			log.Error().Err(err).Str("stop", originStopID).Msg("Failed to lookup stop")
 		}
 
-		departureTime := "N/A"
+		departureTime, _ := time.Parse(time.RFC3339, journey["DepartureTime"].(string))
+		departureTimeText := departureTime.Format("15:04")
 		destination := journey["DestinationDisplay"]
 		originStop := originStopID
 		if stop != nil {
@@ -62,10 +63,10 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		platform := realtimeJourneyStop["Platform"]
 
 		if e.Type == ctdf.EventTypeRealtimeJourneyPlatformSet {
-			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTime, destination, originStop, platform)
+			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTimeText, destination, originStop, platform)
 		} else if e.Type == ctdf.EventTypeRealtimeJourneyPlatformChanged {
 			oldPlatform := eventBody["OldPlatform"]
-			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will now be departing from platform %s instead of %s", departureTime, destination, originStop, platform, oldPlatform)
+			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will now be departing from platform %s instead of %s", departureTimeText, destination, originStop, platform, oldPlatform)
 		}
 	}
 
