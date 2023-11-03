@@ -1,13 +1,14 @@
 package routes
 
 import (
+	"sort"
+	"strconv"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"sort"
-	"strconv"
-	"time"
 )
 
 func PlannerRouter(router fiber.Router) {

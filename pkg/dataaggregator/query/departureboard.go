@@ -1,10 +1,10 @@
 package query
 
 import (
-	"go.mongodb.org/mongo-driver/bson"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type DepartureBoard struct {
