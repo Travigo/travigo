@@ -206,15 +206,7 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(48 * 3600), // Expire after 48 hours
-		},
-		{
-			Keys:    bson.D{{Key: "expiry", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(600), // Expire after 10 minutes
-		},
-		{
-			Keys:    bson.D{{Key: "creationdatetime", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(4 * 24 * 3600), // Expire after 4 days
+			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
 		},
 	}, options.CreateIndexes())
 	if err != nil {

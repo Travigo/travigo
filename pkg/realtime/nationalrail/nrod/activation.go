@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -82,17 +81,6 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			return
 		}
 
-		var expiry time.Time
-		if len(journey.Path) == 0 {
-			expiry = now.Add(4 * time.Hour) // if its nil path then we actually dont really care for it
-		} else {
-			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
-		}
-
-		if expiry.Sub(now) < 4*time.Hour {
-			expiry = now.Add(4 * time.Hour)
-		}
-
 		// Construct the base realtime journey
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,
@@ -109,7 +97,6 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 			Journey:        journey,
 			JourneyRunDate: journeyDate,
-			Expiry:         expiry,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
@@ -135,7 +122,6 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-		updateMap["expiry"] = realtimeJourney.Expiry
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}

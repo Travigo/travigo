@@ -20,8 +20,7 @@ type RealtimeJourney struct {
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
-	Expiry                 time.Time `groups:"internal"`
-	TimeoutDurationMinutes int       `groups:"internal"`
+	TimeoutDurationMinutes int `groups:"internal"`
 
 	DataSource *DataSource `groups:"internal"`
 

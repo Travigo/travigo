@@ -211,7 +211,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
 		journeyDate := time.Now() // TODO may not always be correct?
-		expiry := journeyDate.Add(3 * time.Hour)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyID,
@@ -233,7 +232,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				ServiceRef: l.Line.Service.PrimaryIdentifier,
 			},
 			JourneyRunDate: journeyDate,
-			Expiry:         expiry,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
@@ -426,7 +424,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 	// TODO Temporary - need detection if journey has actually changed
 	updateMap["journey"] = realtimeJourney.Journey
-	updateMap["expiry"] = now.Add(1 * time.Hour)
 
 	updateMap["vehiclelocationdescription"] = realtimeJourney.VehicleLocationDescription
 

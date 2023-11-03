@@ -66,7 +66,7 @@ func (w *RealtimeJourneysWatch) Run() {
 
 		go func(data *realtimeJourneyUpdate) {
 			if data.OperationType == "insert" {
-				log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New RealtimeJourneys inserted")
+				log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New RealtimeJourney inserted")
 
 				eventBytes, _ := json.Marshal(ctdf.Event{
 					Type:      ctdf.EventTypeRealtimeJourneyCreated,
@@ -77,7 +77,7 @@ func (w *RealtimeJourneysWatch) Run() {
 			} else if data.OperationType == "update" {
 				// Detect newly cancelled journeys
 				if data.UpdateDescription.UpdatedFields.Cancelled == true && !data.FullDocumentBeforeChange.Cancelled {
-					log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourneys has been cancelled")
+					log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourney has been cancelled")
 
 					eventBytes, _ := json.Marshal(ctdf.Event{
 						Type:      ctdf.EventTypeRealtimeJourneyCancelled,
@@ -91,6 +91,11 @@ func (w *RealtimeJourneysWatch) Run() {
 
 				// Checks for set or changed platforms
 				for id, journeyStop := range data.FullDocument.Stops {
+					// This shouldnt happen as why would a historical stop change platforms
+					if journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
+						continue
+					}
+
 					newPlatform := journeyStop.Platform
 
 					oldJourneyPlatform := data.FullDocumentBeforeChange.Stops[id]
@@ -103,7 +108,7 @@ func (w *RealtimeJourneysWatch) Run() {
 						log.Info().
 							Str("id", data.FullDocument.PrimaryIdentifier).
 							Str("platform", newPlatform).
-							Msg("RealtimeJourneys stop platform set")
+							Msg("RealtimeJourney stop platform set")
 
 						eventBytes, _ := json.Marshal(ctdf.Event{
 							Type:      ctdf.EventTypeRealtimeJourneyPlatformSet,
@@ -119,7 +124,7 @@ func (w *RealtimeJourneysWatch) Run() {
 							Str("id", data.FullDocument.PrimaryIdentifier).
 							Str("oldplatform", oldPlatform).
 							Str("newplatform", newPlatform).
-							Msg("RealtimeJourneys stop platform changed")
+							Msg("RealtimeJourney stop platform changed")
 
 						eventBytes, _ := json.Marshal(ctdf.Event{
 							Type:      ctdf.EventTypeRealtimeJourneyPlatformChanged,

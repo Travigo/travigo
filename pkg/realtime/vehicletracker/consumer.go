@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
-	"github.com/travigo/travigo/pkg/util"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -339,17 +338,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 
 		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
-		var expiry time.Time
-		if len(journey.Path) == 0 {
-			expiry = journeyDate.Add(30 * time.Hour)
-		} else {
-			expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(4 * time.Hour)
-		}
-
-		now := time.Now()
-		if expiry.Sub(now) < 4*time.Hour {
-			expiry = now.Add(4 * time.Hour)
-		}
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
@@ -357,7 +345,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			TimeoutDurationMinutes: 10,
 			Journey:                journey,
 			JourneyRunDate:         journeyDate,
-			Expiry:                 expiry,
 
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,
@@ -537,7 +524,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-		updateMap["expiry"] = realtimeJourney.Expiry
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 		updateMap["datasource"] = realtimeJourney.DataSource

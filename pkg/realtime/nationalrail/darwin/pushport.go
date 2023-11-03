@@ -9,7 +9,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
-	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -65,17 +64,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
-			var expiry time.Time
-			if len(journey.Path) == 0 {
-				expiry = now.Add(4 * time.Hour) // if its nil path then we actually dont really care for it
-			} else {
-				expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
-			}
-
-			if expiry.Sub(now) < 4*time.Hour {
-				expiry = now.Add(4 * time.Hour)
-			}
-
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
@@ -88,7 +76,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Journey:        journey,
 				JourneyRunDate: journeyDate,
-				Expiry:         expiry,
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
@@ -113,7 +100,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-			updateMap["expiry"] = realtimeJourney.Expiry
 		} else {
 			updateMap["datasource.identifier"] = datasource.Identifier
 		}
@@ -213,17 +199,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 					continue
 				}
 
-				var expiry time.Time
-				if len(journey.Path) == 0 {
-					expiry = now.Add(4 * time.Hour) // if its nil path then we actually dont really care for it
-				} else {
-					expiry = util.AddTimeToDate(journeyDate, journey.Path[len(journey.Path)-1].DestinationArrivalTime).Add(6 * time.Hour)
-				}
-
-				if expiry.Sub(now) < 4*time.Hour {
-					expiry = now.Add(4 * time.Hour)
-				}
-
 				// Construct the base realtime journey
 				realtimeJourney = &ctdf.RealtimeJourney{
 					PrimaryIdentifier:      realtimeJourneyID,
@@ -238,7 +213,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 					Journey:        journey,
 					JourneyRunDate: journeyDate,
-					Expiry:         expiry,
 
 					Stops: map[string]*ctdf.RealtimeJourneyStops{},
 				}
@@ -263,7 +237,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				updateMap["journey"] = realtimeJourney.Journey
 				updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-				updateMap["expiry"] = realtimeJourney.Expiry
 			} else {
 				updateMap["datasource.identifier"] = datasource.Identifier
 			}
