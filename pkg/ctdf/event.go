@@ -19,7 +19,7 @@ const (
 	EventTypeRealtimeJourneyCreated         = "RealtimeJourneyCreated"
 	EventTypeRealtimeJourneyPlatformSet     = "RealtimeJourneyPlatformSet"
 	EventTypeRealtimeJourneyPlatformChanged = "RealtimeJourneyPlatformChanged"
-	EventTypeRealtimeJourneyCancelled       = "RealtimeJourneyPlatformCancelled"
+	EventTypeRealtimeJourneyCancelled       = "RealtimeJourneyCancelled"
 )
 
 func (e *Event) GetNotificationData() EventNotificationData {
@@ -49,6 +49,20 @@ func (e *Event) GetNotificationData() EventNotificationData {
 		if eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"] != nil {
 			eventNotificationData.Message = fmt.Sprintf("%s %s", eventNotificationData.Message, eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"])
 		}
+	case EventTypeRealtimeJourneyPlatformSet:
+		eventNotificationData.Title = "Platform Update"
+
+		realtimeJourney := eventBody["RealtimeJourney"].(map[string]interface{})
+		journey := realtimeJourney["Journey"].(map[string]interface{})
+		originStopName := eventBody["Stop"].(string)
+		realtimeJourneyStop := realtimeJourney["Stops"].(map[string]interface{})[originStopName].(map[string]interface{})
+
+		departureTime := "N/A"
+		destination := journey["DestinationDisplay"]
+		originStop := originStopName
+		platform := realtimeJourneyStop["Platform"]
+
+		eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTime, destination, originStop, platform)
 	}
 
 	return eventNotificationData
