@@ -71,7 +71,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 // use admin
 // db.runCommand( {
 //    setClusterParameter:
-//       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 100 } } }
+//       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 30 } } }
 // } )
 
 func runCommands() {

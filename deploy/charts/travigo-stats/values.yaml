@@ -10,10 +10,6 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "travigo-elasticsearch-user"
 
-indexer:
-  schedule: "0 5 * * 1"
-  serviceAccountName: "stats-indexer-service-account"
-
 web_api:
   args: ["stats", "run", "--listen", ":80"]
 
