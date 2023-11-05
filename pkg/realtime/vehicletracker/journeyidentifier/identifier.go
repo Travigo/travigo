@@ -41,11 +41,15 @@ func (i *Identifier) getServices() []string {
 
 	servicesCollection := database.GetCollection("services")
 
-	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
+	cursor, err := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
 			bson.M{"operatorref": bson.M{"$in": i.Operator.OtherIdentifiers}},
 		},
 	})
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to perform query")
+	}
 
 	for cursor.Next(context.TODO()) {
 		var service *ctdf.Service
