@@ -15,10 +15,13 @@ type EventType string
 const (
 	EventTypeServiceAlertCreated EventType = "ServiceAlertCreated"
 
-	EventTypeRealtimeJourneyCreated         = "RealtimeJourneyCreated"
-	EventTypeRealtimeJourneyPlatformSet     = "RealtimeJourneyPlatformSet"
-	EventTypeRealtimeJourneyPlatformChanged = "RealtimeJourneyPlatformChanged"
-	EventTypeRealtimeJourneyCancelled       = "RealtimeJourneyCancelled"
+	EventTypeRealtimeJourneyCreated             = "RealtimeJourneyCreated"
+	EventTypeRealtimeJourneyActivelyTracked     = "RealtimeJourneyActivelyTracked"
+	EventTypeRealtimeJourneyPlatformSet         = "RealtimeJourneyPlatformSet"
+	EventTypeRealtimeJourneyPlatformChanged     = "RealtimeJourneyPlatformChanged"
+	EventTypeRealtimeJourneyCancelled           = "RealtimeJourneyCancelled"
+	EventTypeRealtimeJourneyLocationTextChanged = "RealtimeJourneyLocationTextChanged"
+	EventTypeRealtimeJourneyNextStopChanged     = "RealtimeJourneyNextStopChanged"
 )
 
 type EventNotificationData struct {
