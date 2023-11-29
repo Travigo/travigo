@@ -152,7 +152,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 		if trainStatus.LateReason != "" {
 			createServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAIL:DELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     time.Now(),
 				ModificationDateTime: time.Now(),
 
@@ -259,13 +259,13 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateMap["cancelled"] = true
 
 			createServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     time.Now(),
 				ModificationDateTime: time.Now(),
 
 				DataSource: &ctdf.DataSource{},
 
-				AlertType: ctdf.ServiceAlertTypeJourneyDelayed,
+				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
 
 				Text: railutils.CancelledReasons[schedule.CancelReason],
 
