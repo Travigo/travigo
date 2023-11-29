@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
@@ -17,7 +19,7 @@ func getMatchingIdentifierServiceAlerts(c *fiber.Ctx) error {
 
 	var serviceAlerts []*ctdf.ServiceAlert
 	serviceAlerts, err := dataaggregator.Lookup[[]*ctdf.ServiceAlert](query.ServiceAlertsForMatchingIdentifiers{
-		MatchingIdentifiers: []string{identifier},
+		MatchingIdentifiers: strings.Split(identifier, ","),
 	})
 
 	if err != nil {

@@ -222,6 +222,10 @@ func createJourneysIndexes() {
 		{
 			Keys: bson.D{{Key: "matchedidentifiers", Value: 1}},
 		},
+		{
+			Keys:    bson.D{{Key: "validuntil", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(32 * 3600), // Expire after 4 hours
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")

@@ -2,6 +2,7 @@ package nrod
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -44,6 +45,15 @@ func (r *TrustReinstatement) Process(stompClient *StompClient) {
 	updateModel.SetUpsert(true)
 
 	stompClient.Queue.Add(updateModel)
+
+	// Also delete the service alert for it
+	journeyRunDate := realtimeJourney.JourneyRunDate.Format("2006-01-02")
+	serviceAlertID := fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", journeyRunDate, realtimeJourney.Journey.PrimaryIdentifier)
+
+	serviceAlertCollection := database.GetCollection("service_alerts")
+
+	filter := bson.M{"primaryidentifier": serviceAlertID}
+	serviceAlertCollection.DeleteOne(context.TODO(), filter)
 
 	log.Info().
 		Str("trainid", r.TrainID).

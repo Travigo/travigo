@@ -165,7 +165,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
 
 				ValidFrom:  realtimeJourney.JourneyRunDate,
-				ValidUntil: realtimeJourney.JourneyRunDate.Add(32 * time.Hour),
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
 		}
 
@@ -257,8 +257,23 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			updateMap["cancelled"] = true
-			updateMap["annotations.CancelledReasonID"] = fmt.Sprintf("GB:RAILCANCELDELAY:%s", schedule.CancelReason)
-			updateMap["annotations.CancelledReasonText"] = railutils.CancelledReasons[schedule.CancelReason]
+
+			createServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     time.Now(),
+				ModificationDateTime: time.Now(),
+
+				DataSource: &ctdf.DataSource{},
+
+				AlertType: ctdf.ServiceAlertTypeJourneyDelayed,
+
+				Text: railutils.CancelledReasons[schedule.CancelReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
+			})
 
 			// Create update
 			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
