@@ -11,6 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PushPortData struct {
@@ -150,8 +151,22 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		if trainStatus.LateReason != "" {
-			updateMap["annotations.LateReasonID"] = fmt.Sprintf("GB:RAILCANCELDELAY:%s", trainStatus.LateReason)
-			updateMap["annotations.LateReasonText"] = railutils.LateReasons[trainStatus.LateReason]
+			createServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     time.Now(),
+				ModificationDateTime: time.Now(),
+
+				DataSource: &ctdf.DataSource{},
+
+				AlertType: ctdf.ServiceAlertTypeJourneyDelayed,
+
+				Text: railutils.LateReasons[trainStatus.LateReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(32 * time.Hour),
+			})
 		}
 
 		// Create update
@@ -260,4 +275,13 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Msg("Train cancelled")
 		}
 	}
+}
+
+func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
+	serviceAlertCollection := database.GetCollection("service_alerts")
+
+	filter := bson.M{"primaryidentifier": serviceAlert.PrimaryIdentifier}
+	update := bson.M{"$set": serviceAlert}
+	opts := options.Update().SetUpsert(true)
+	serviceAlertCollection.UpdateOne(context.TODO(), filter, update, opts)
 }

@@ -34,6 +34,8 @@ const (
 	ServiceAlertTypeDelays                                = "Delays"
 	ServiceAlertTypeMinorDelays                           = "MinorDelays"
 	ServiceAlertTypePlanned                               = "Planned"
+	ServiceAlertTypeJourneyDelayed                        = "JourneyDelayed"
+	ServiceAlertTypeJourneyCancelled                      = "JourneyCancelled"
 )
 
 func (a *ServiceAlert) IsValid(checkTime time.Time) bool {
