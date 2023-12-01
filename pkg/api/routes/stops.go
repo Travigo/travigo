@@ -16,6 +16,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func StopsRouter(router fiber.Router) {
@@ -51,7 +52,18 @@ func listStops(c *fiber.Ctx) error {
 		}
 	}
 
-	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery)
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "otheridentifiers", Value: 0},
+		bson.E{Key: "datasource", Value: 0},
+		bson.E{Key: "creationdatetime", Value: 0},
+		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "platforms", Value: 0},
+		bson.E{Key: "entrances", Value: 0},
+		bson.E{Key: "associations", Value: 0},
+	})
+
+	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery, opts)
 
 	for cursor.Next(context.TODO()) {
 		var stop *ctdf.Stop
@@ -60,9 +72,9 @@ func listStops(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-			Stop: stop,
-		})
+		// stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+		// 	Stop: stop,
+		// })
 
 		stops = append(stops, *stop)
 	}
