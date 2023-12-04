@@ -516,7 +516,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		"departedstopref":            closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":                closestDistanceJourneyPath.DestinationStopRef,
 		"offset":                     offset,
-		"vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStopRef),
+		"vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
