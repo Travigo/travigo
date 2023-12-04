@@ -509,13 +509,14 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	// Update database
 	updateMap := bson.M{
-		"reliability":          realtimeJourneyReliability,
-		"modificationdatetime": currentTime,
-		"vehiclelocation":      vehicleLocationEvent.VehicleLocation,
-		"vehiclebearing":       vehicleLocationEvent.VehicleBearing,
-		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
-		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
-		"offset":               offset,
+		"reliability":                realtimeJourneyReliability,
+		"modificationdatetime":       currentTime,
+		"vehiclelocation":            vehicleLocationEvent.VehicleLocation,
+		"vehiclebearing":             vehicleLocationEvent.VehicleBearing,
+		"departedstopref":            closestDistanceJourneyPath.OriginStopRef,
+		"nextstopref":                closestDistanceJourneyPath.DestinationStopRef,
+		"offset":                     offset,
+		"vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStopRef),
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
