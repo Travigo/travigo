@@ -107,7 +107,11 @@ func getOperator(c *fiber.Ctx) error {
 		})
 	} else {
 		operator.GetReferences()
-		return c.JSON(operator)
+
+		reducedOperator, _ := sheriff.Marshal(&sheriff.Options{
+			Groups: []string{"basic", "detailed"},
+		}, operator)
+		return c.JSON(reducedOperator)
 	}
 }
 

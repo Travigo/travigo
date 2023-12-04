@@ -26,12 +26,12 @@ type Operator struct {
 	PrimaryName string   `groups:"basic"`
 	OtherNames  []string `groups:"detailed"`
 
-	OperatorGroupRef string         `groups:"detailed"`
+	OperatorGroupRef string         `groups:"internal"`
 	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
 
 	TransportType []string `groups:"detailed"`
 
-	Licence string `groups:"detailed"`
+	Licence string `groups:"internal"`
 
 	Website     string            `groups:"detailed"`
 	Email       string            `groups:"detailed"`

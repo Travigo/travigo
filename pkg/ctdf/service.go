@@ -13,7 +13,7 @@ type Service struct {
 
 	ServiceName string `groups:"basic"`
 
-	OperatorRef string `groups:"internal"`
+	OperatorRef string `groups:"basic"`
 	// Operator *Operator
 
 	Routes []Route `groups:"detailed"`

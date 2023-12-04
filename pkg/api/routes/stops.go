@@ -103,7 +103,11 @@ func getStop(c *fiber.Ctx) error {
 
 		transforms.Transform(stop, 3)
 
-		return c.JSON(stop)
+		reducedStop, _ := sheriff.Marshal(&sheriff.Options{
+			Groups: []string{"basic", "detailed"},
+		}, stop)
+
+		return c.JSON(reducedStop)
 	}
 }
 
