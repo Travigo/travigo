@@ -6,6 +6,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/transforms"
 )
 
 func JourneysRouter(router fiber.Router) {
@@ -34,6 +35,8 @@ func getJourney(c *fiber.Ctx) error {
 			pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
 			pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
 		}
+
+		transforms.Transform(journey, 2)
 
 		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
 			Groups: []string{"basic", "detailed"},
