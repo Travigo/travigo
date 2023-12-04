@@ -2,6 +2,8 @@ package localdepartureboard
 
 import (
 	"context"
+	"time"
+
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -10,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"time"
 )
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {

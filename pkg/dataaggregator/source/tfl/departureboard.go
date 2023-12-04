@@ -3,14 +3,17 @@ package tfl
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
-	"time"
 )
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
@@ -19,9 +22,30 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		PrimaryName:       "Transport for London",
 	}
 
-	var departureBoard []*ctdf.DepartureBoard
 	now := time.Now()
 
+	isTFLStop := false
+	var services []*ctdf.Service
+	services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+		Stop: q.Stop,
+	})
+
+	for _, service := range services {
+		if service.OperatorRef == tflOperator.PrimaryIdentifier {
+			isTFLStop = true
+			break
+		}
+	}
+
+	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Check if TfL service")
+
+	if !isTFLStop {
+		return nil, source.UnsupportedSourceError
+	}
+
+	var departureBoard []*ctdf.DepartureBoard
+
+	now = time.Now()
 	latestDepartureTime := now
 
 	// Query for services from the realtime_journeys table
