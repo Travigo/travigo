@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -15,8 +16,9 @@ import (
 )
 
 type PushPortData struct {
-	TrainStatuses []TrainStatus
-	Schedules     []Schedule
+	TrainStatuses     []TrainStatus
+	Schedules         []Schedule
+	FormationLoadings []FormationLoading
 }
 
 func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
@@ -291,6 +293,9 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Msg("Train cancelled")
 		}
 	}
+
+	// Formation Loading
+	pretty.Println(p.FormationLoadings)
 }
 
 func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
