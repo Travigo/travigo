@@ -296,7 +296,18 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Formation Loading
 	for _, formationLoading := range p.FormationLoadings {
-		pretty.Println(formationLoading)
+		searchQuery := bson.M{"otheridentifiers.nationalrailrid": formationLoading.RID}
+
+		var realtimeJourney *ctdf.RealtimeJourney
+
+		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+		if realtimeJourney != nil {
+			log.Info().
+				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
+				Msg("Updated loading")
+			pretty.Println(formationLoading)
+		}
 	}
 }
 
