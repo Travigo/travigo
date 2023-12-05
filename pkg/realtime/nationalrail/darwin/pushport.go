@@ -295,7 +295,9 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	}
 
 	// Formation Loading
-	pretty.Println(p.FormationLoadings)
+	for _, formationLoading := range p.FormationLoadings {
+		pretty.Println(formationLoading)
+	}
 }
 
 func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
