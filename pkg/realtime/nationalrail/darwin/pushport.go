@@ -85,7 +85,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		updateMap := bson.M{
-			"modificationdatetime": now,
+			"modificationdatetime":             now,
+			"otheridentifiers.nationalrailrid": trainStatus.RID,
 		}
 
 		// Update database
