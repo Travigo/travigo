@@ -15,7 +15,7 @@ Match:
   ServiceName: "Bakerloo"
 Data:
   BrandColour: "#994f14"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -24,7 +24,7 @@ Match:
   ServiceName: "Central"
 Data:
   BrandColour: "#d42e12"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -33,7 +33,7 @@ Match:
   ServiceName: "Circle"
 Data:
   BrandColour: "#f7d117"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -42,7 +42,7 @@ Match:
   ServiceName: "District"
 Data:
   BrandColour: "#007336"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -51,7 +51,7 @@ Match:
   ServiceName: "Hammersmith & City"
 Data:
   BrandColour: "#eb9ca8"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -60,7 +60,7 @@ Match:
   ServiceName: "Jubilee"
 Data:
   BrandColour: "#8c8f91"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -69,7 +69,7 @@ Match:
   ServiceName: "Metropolitan"
 Data:
   BrandColour: "#8a004f"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -78,7 +78,7 @@ Match:
   ServiceName: "Northern"
 Data:
   BrandColour: "#332b24"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -87,7 +87,7 @@ Match:
   ServiceName: "Piccadilly"
 Data:
   BrandColour: "#2905a1"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -96,7 +96,7 @@ Match:
   ServiceName: "Victoria"
 Data:
   BrandColour: "#00a3e0"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 ---
 Type: ctdf.Service
@@ -105,7 +105,7 @@ Match:
   ServiceName: "Waterloo & City"
 Data:
   BrandColour: "#7dd1b8"
-  BrandIcon:   "/icons/tfl-roundel-underground-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-underground.svg"
   BrandDisplayMode: short
 # DLR
 ---
@@ -115,7 +115,7 @@ Match:
   ServiceName: "DLR"
 Data:
   BrandColour: "#00AFAD"
-  BrandIcon:   "/icons/tfl-roundel-dlr-64x52.png"
+  BrandIcon:   "/icons/tfl-roundel-dlr.svg"
   BrandDisplayMode: short
 # Bus
 ---
@@ -133,7 +133,7 @@ Match:
   ServiceName: "Tram"
 Data:
   BrandColour: "#5FB526"
-  BrandIcon:   "/icons/tfl-roundel-white-64x49.png"
+  BrandIcon:   "/icons/tfl-roundel-white.svg"
   BrandDisplayMode: short
 # Ferry
 ---
