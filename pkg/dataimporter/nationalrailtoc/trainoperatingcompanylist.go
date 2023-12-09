@@ -63,7 +63,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 			OperatorRef:          operatorRef,
 			TransportType:        ctdf.TransportTypeRail,
 
-			BrandIcon:        "/icons/national-rail.svg",
+			BrandIcon:        "/icons/national-rail-64x64.png",
 			BrandColour:      "#ffffff",
 			BrandDisplayMode: "short",
 		})
