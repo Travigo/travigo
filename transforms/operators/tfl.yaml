@@ -143,3 +143,12 @@ Match:
   TransportType: "Ferry"
 Data:
   BrandColour: "#039BE5"
+# Overground
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:LO"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#FFFFFF"
+  BrandIcon:   "/icons/tfl-roundel-overground.svg"
