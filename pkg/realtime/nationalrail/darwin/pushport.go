@@ -19,6 +19,7 @@ type PushPortData struct {
 	TrainStatuses     []TrainStatus
 	Schedules         []Schedule
 	FormationLoadings []FormationLoading
+	StationMessages   []StationMessage
 }
 
 func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
@@ -308,6 +309,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Msg("Updated loading")
 			pretty.Println(formationLoading)
 		}
+	}
+
+	// Station Messages
+	for _, stationMessage := range p.StationMessages {
+		pretty.Println(stationMessage)
 	}
 }
 
