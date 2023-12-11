@@ -6,9 +6,13 @@ type StationMessage struct {
 	Severity string `xml:"sev,attr"`
 
 	Stations []StationMessageStation `xml:"Station"`
-	Message  string                  `xml:"Msg,innerxml"`
+	Message  StationMessageMessage   `xml:"Msg"`
 }
 
 type StationMessageStation struct {
 	CRS string `xml:"crs,attr"`
+}
+
+type StationMessageMessage struct {
+	InnerXML string `xml:",innerxml"`
 }
