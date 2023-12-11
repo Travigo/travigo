@@ -34,6 +34,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
+	stopsCollection := database.GetCollection("stops")
 
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
@@ -314,7 +315,55 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Station Messages
 	for _, stationMessage := range p.StationMessages {
-		pretty.Println(stationMessage)
+		serviceAlertID := fmt.Sprintf("GB:NATIONALRAILSTATIONMESSAGE:%s", stationMessage.ID)
+
+		if len(stationMessage.Stations) == 0 {
+			log.Info().Str("servicealert", serviceAlertID).Msg("Removing Station Message Service Alert")
+
+			deleteServiceAlert(serviceAlertID)
+		} else {
+			var alertType ctdf.ServiceAlertType
+			switch stationMessage.Severity {
+			case "0", "1":
+				alertType = ctdf.ServiceAlertTypeInformation
+			case "2", "3":
+				alertType = ctdf.ServiceAlertTypeWarning
+			default:
+				alertType = ctdf.ServiceAlertTypeInformation
+			}
+
+			var matchedIdentifiers []string
+
+			for _, station := range stationMessage.Stations {
+				var stop *ctdf.Stop
+				stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Crs": station.CRS}).Decode(&stop)
+
+				if stop != nil {
+					matchedIdentifiers = append(matchedIdentifiers, stop.PrimaryIdentifier)
+				}
+			}
+
+			createServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    serviceAlertID,
+				CreationDateTime:     time.Now(),
+				ModificationDateTime: time.Now(),
+
+				DataSource: &ctdf.DataSource{
+					Provider: "National Rail",
+				},
+
+				AlertType: alertType,
+
+				Text: stationMessage.Message.InnerXML,
+
+				MatchedIdentifiers: matchedIdentifiers,
+
+				ValidFrom:  time.Now(),
+				ValidUntil: time.Now().Add(90 * 24 * time.Hour),
+			})
+
+			log.Info().Str("servicealert", serviceAlertID).Msg("Creating Station Message Service Alert")
+		}
 	}
 
 	// Train Alert
@@ -330,4 +379,11 @@ func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
 	update := bson.M{"$set": serviceAlert}
 	opts := options.Update().SetUpsert(true)
 	serviceAlertCollection.UpdateOne(context.TODO(), filter, update, opts)
+}
+
+func deleteServiceAlert(id string) {
+	serviceAlertCollection := database.GetCollection("service_alerts")
+	filter := bson.M{"primaryidentifier": id}
+
+	serviceAlertCollection.DeleteOne(context.Background(), filter)
 }
