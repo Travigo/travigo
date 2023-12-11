@@ -3,6 +3,7 @@ package darwin
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kr/pretty"
@@ -343,6 +344,9 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				}
 			}
 
+			alertText := strings.TrimSpace(stationMessage.Message.InnerXML)
+			alertText = strings.ReplaceAll(alertText, "&amp;", "&")
+
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    serviceAlertID,
 				CreationDateTime:     time.Now(),
@@ -354,7 +358,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				AlertType: alertType,
 
-				Text: stationMessage.Message.InnerXML,
+				Text: alertText,
 
 				MatchedIdentifiers: matchedIdentifiers,
 
