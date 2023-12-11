@@ -346,6 +346,10 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			alertText := strings.TrimSpace(stationMessage.Message.InnerXML)
 			alertText = strings.ReplaceAll(alertText, "&amp;", "&")
+			alertText = strings.ReplaceAll(alertText, "<ns7:p>", "<p>")
+			alertText = strings.ReplaceAll(alertText, "</ns7:p>", "</p>")
+			alertText = strings.ReplaceAll(alertText, "<ns7:a href=", "<a href=")
+			alertText = strings.ReplaceAll(alertText, "</ns7:a>", "</a>")
 
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    serviceAlertID,
