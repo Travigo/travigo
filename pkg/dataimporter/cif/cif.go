@@ -105,6 +105,7 @@ func ParseNationalRailCifBundle(source string, loadMCATimetable bool) (CommonInt
 
 func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	journeys := map[string]*ctdf.Journey{}
+	journeysTrainUIDOnly := map[string][]*ctdf.Journey{}
 
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Skip buses and ships
@@ -128,30 +129,30 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			continue
 		}
 
+		basicJourneyID := fmt.Sprintf("GB:RAIL:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom)
 		journeyID := fmt.Sprintf("GB:RAIL:%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
 
 		// Create whole new journeys
 		if trainDef.BasicSchedule.TransactionType == "N" && (trainDef.BasicSchedule.STPIndicator == "P" || trainDef.BasicSchedule.STPIndicator == "N") {
-			journeys[journeyID] = c.createJourneyFromTraindef(journeyID, trainDef)
+			journeys[basicJourneyID] = c.createJourneyFromTraindef(journeyID, trainDef)
+
+			journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] = append(journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID], journeys[basicJourneyID])
 		} else if trainDef.BasicSchedule.TransactionType == "N" && trainDef.BasicSchedule.STPIndicator == "C" {
 			// Handle a cancelation
-			journey := journeys[journeyID]
 
-			if journey == nil {
-				continue
+			for _, journey := range journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] {
+				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
+				dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
+
+				journey.Availability.Exclude = append(journey.Availability.Exclude, ctdf.AvailabilityRule{
+					Type:  ctdf.AvailabilityDateRange,
+					Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
+				})
 			}
-
-			dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
-			dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
-
-			journey.Availability.Exclude = append(journey.Availability.Exclude, ctdf.AvailabilityRule{
-				Type:  ctdf.AvailabilityDateRange,
-				Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
-			})
 		} else if trainDef.BasicSchedule.TransactionType == "N" && trainDef.BasicSchedule.STPIndicator == "O" {
 			// Handle an overlay
 			// Do this by excluding the date range on the original journey and then creating a new one with the overlay
-			originalJourney := journeys[journeyID]
+			originalJourney := journeys[basicJourneyID]
 
 			if originalJourney != nil {
 				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
@@ -165,6 +166,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			}
 
 			journeys[journeyID] = c.createJourneyFromTraindef(journeyID, trainDef)
+			journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] = append(journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID], journeys[journeyID])
 		} else {
 			log.Error().
 				Str("transactiontype", trainDef.BasicSchedule.TransactionType).
