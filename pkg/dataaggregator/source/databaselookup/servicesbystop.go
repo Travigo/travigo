@@ -7,6 +7,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
@@ -22,18 +23,52 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		},
 	}
 
-	results, _ := journeysCollection.Distinct(context.Background(), "serviceref", filter)
-	var services []*ctdf.Service
+	// now := time.Now()
 
-	// TODO: Can probably do this without the for loop
-	for _, serviceID := range results {
-		var service *ctdf.Service
-		servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceID}).Decode(&service)
+	// results, _ := journeysCollection.Distinct(context.Background(), "serviceref", filter)
+	// var services []*ctdf.Service
 
-		if service != nil {
-			services = append(services, service)
+	// // TODO: Can probably do this without the for loop
+	// for _, serviceID := range results {
+	// 	var service *ctdf.Service
+	// 	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceID}).Decode(&service)
+
+	// 	if service != nil {
+	// 		services = append(services, service)
+	// 	}
+	// }
+
+	// log.Info().Str("length", time.Now().Sub(now).String()).Msg("okayy")
+
+	// now = time.Now()
+
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "serviceref", Value: 1},
+	})
+
+	serviceFound := map[string]bool{}
+	var services2 []*ctdf.Service
+
+	cursor, _ := journeysCollection.Find(context.Background(), filter, opts)
+	for cursor.Next(context.TODO()) {
+		var journey struct {
+			ServiceRef string
+		}
+		cursor.Decode(&journey)
+
+		if !serviceFound[journey.ServiceRef] {
+			serviceFound[journey.ServiceRef] = true
+
+			var service *ctdf.Service
+			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.ServiceRef}).Decode(&service)
+
+			if service != nil {
+				services2 = append(services2, service)
+			}
 		}
 	}
 
-	return services, nil
+	// log.Info().Str("length", time.Now().Sub(now).String()).Msg("okayy2")
+
+	return services2, nil
 }
