@@ -66,6 +66,14 @@ spec:
                   name: {{ $.Values.elasticsearch.accountSecret }}
                   key: password
                   optional: false
+            - name: TRAVIGO_REDIS_ADDRESS
+              value: {{ $.Values.redis.address }}
+            - name: TRAVIGO_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.redis.passwordSecret }}
+                  key: password
+                  optional: false
             - name: TRAVIGO_LDBWS_GATEWAY_ENDPOINT
               value: "http://ldbws-gatewway-ldbws-gateway.default.svc.cluster.local:80"
             - name: TRAVIGO_TFL_API_KEY

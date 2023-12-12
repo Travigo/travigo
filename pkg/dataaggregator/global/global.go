@@ -17,10 +17,11 @@ func Setup() {
 	dataaggregator.GlobalAggregator.RegisterSource(tfl.Source{
 		AppKey: env["TRAVIGO_TFL_API_KEY"],
 	})
-	dataaggregator.GlobalAggregator.RegisterSource(databaselookup.Source{})
+
+	databaseLookupSource := databaselookup.Source{}
+	databaseLookupSource.Setup()
+	dataaggregator.GlobalAggregator.RegisterSource(databaseLookupSource)
+
 	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboard.Source{})
 	dataaggregator.GlobalAggregator.RegisterSource(journeyplanner.Source{})
-	//dataaggregator.GlobalAggregator.RegisterSource(nationalrail.Source{
-	//	GatewayEndpoint: env["TRAVIGO_LDBWS_GATEWAY_ENDPOINT"],
-	//})
 }

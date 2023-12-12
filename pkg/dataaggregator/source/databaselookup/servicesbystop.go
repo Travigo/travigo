@@ -2,6 +2,8 @@ package databaselookup
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -11,6 +13,21 @@ import (
 )
 
 func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
+	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
+	cachedObject, err := s.CachedResults.Cache.Get(context.Background(), cacheItemPath)
+
+	// Load from cache
+	if err == nil {
+		var services []*ctdf.Service
+		err := json.Unmarshal([]byte(cachedObject), &services)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return services, nil
+	}
+
 	servicesCollection := database.GetCollection("services")
 	journeysCollection := database.GetCollection("journeys")
 
@@ -23,31 +40,12 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		},
 	}
 
-	// now := time.Now()
-
-	// results, _ := journeysCollection.Distinct(context.Background(), "serviceref", filter)
-	// var services []*ctdf.Service
-
-	// // TODO: Can probably do this without the for loop
-	// for _, serviceID := range results {
-	// 	var service *ctdf.Service
-	// 	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceID}).Decode(&service)
-
-	// 	if service != nil {
-	// 		services = append(services, service)
-	// 	}
-	// }
-
-	// log.Info().Str("length", time.Now().Sub(now).String()).Msg("okayy")
-
-	// now = time.Now()
-
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "serviceref", Value: 1},
 	})
 
 	serviceFound := map[string]bool{}
-	var services2 []*ctdf.Service
+	var services []*ctdf.Service
 
 	cursor, _ := journeysCollection.Find(context.Background(), filter, opts)
 	for cursor.Next(context.TODO()) {
@@ -63,12 +61,14 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.ServiceRef}).Decode(&service)
 
 			if service != nil {
-				services2 = append(services2, service)
+				services = append(services, service)
 			}
 		}
 	}
 
-	// log.Info().Str("length", time.Now().Sub(now).String()).Msg("okayy2")
+	// Save into cache
+	servicesJson, _ := json.Marshal(services)
+	s.CachedResults.Cache.Set(context.Background(), cacheItemPath, string(servicesJson))
 
-	return services2, nil
+	return services, nil
 }
