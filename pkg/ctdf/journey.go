@@ -18,7 +18,7 @@ const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
 	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
@@ -31,7 +31,7 @@ type Journey struct {
 	OperatorRef string    `groups:"internal"`
 	Operator    *Operator `groups:"basic" json:",omitempty" bson:"-"`
 
-	Direction          string    `groups:"detailed"`
+	Direction          string    `groups:"detailed" json:",omitempty"`
 	DepartureTime      time.Time `groups:"basic"`
 	DestinationDisplay string    `groups:"basic"`
 
@@ -41,7 +41,7 @@ type Journey struct {
 
 	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
 
-	Annotations map[string]interface{} `groups:"basic"`
+	Annotations map[string]interface{} `groups:"basic" json:",omitempty" `
 }
 
 func (j *Journey) GetReferences() {

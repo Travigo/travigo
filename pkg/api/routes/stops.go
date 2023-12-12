@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
+	"github.com/sourcegraph/conc/iter"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -78,6 +79,12 @@ func listStops(c *fiber.Ctx) error {
 
 		stops = append(stops, *stop)
 	}
+
+	iter.ForEach(stops, func(stop *ctdf.Stop) {
+		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+			Stop: stop,
+		})
+	})
 
 	c.JSON(stops)
 	return nil

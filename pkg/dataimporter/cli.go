@@ -413,6 +413,23 @@ func RegisterCLI() *cli.Command {
 					}
 					ctdf.LoadSpecialDayCache()
 
+					// cif := cif.CommonInterfaceFormat{}
+					// file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/0000.cif")
+					// cif.ParseMCA(file)
+
+					// journeys := cif.ConvertToCTDF()
+					// for _, journey := range journeys {
+					// 	pretty.Println(journey.PrimaryIdentifier)
+
+					// 	for _, item := range journey.Path {
+					// 		pretty.Println(item.OriginArrivalTime, item.OriginDepartureTime, item.DestinationArrivalTime)
+					// 	}
+
+					// 	pretty.Println()
+					// }
+
+					// return nil
+
 					env := util.GetEnvironmentVariables()
 					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
 						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
