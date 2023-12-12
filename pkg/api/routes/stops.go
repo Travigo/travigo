@@ -5,12 +5,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
-	"github.com/sourcegraph/conc/iter"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -35,7 +35,7 @@ func listStops(c *fiber.Ctx) error {
 		})
 	}
 
-	var stops []ctdf.Stop
+	var stops []*ctdf.Stop
 
 	stopsCollection := database.GetCollection("stops")
 
@@ -75,21 +75,38 @@ func listStops(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		stops = append(stops, *stop)
+		stops = append(stops, stop)
 	}
 	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get stops")
 
 	now = time.Now()
-	iter.ForEach(stops, func(stop *ctdf.Stop) {
-		singleNow := time.Now()
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-			Stop: stop,
-		})
-		log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
-	})
+	// iter.ForEach(stops, func(stop *ctdf.Stop) {
+	// 	singleNow := time.Now()
+	// 	stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+	// 		Stop: stop,
+	// 	})
+	// 	log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
+	// })
+	wg := sync.WaitGroup{}
+	for _, stop := range stops {
+		wg.Add(1)
+		go func(stop *ctdf.Stop) {
+			singleNow := time.Now()
+			stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+				Stop: stop,
+			})
+			log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
+			wg.Done()
+		}(stop)
+	}
+	wg.Wait()
 	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get all stop services")
 
-	c.JSON(stops)
+	reducedStops, _ := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"basic"},
+	}, stops)
+
+	c.JSON(reducedStops)
 	return nil
 }
 

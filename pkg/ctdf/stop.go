@@ -19,9 +19,9 @@ type Stop struct {
 	OtherNames     map[string]string `groups:"basic"`
 	TransportTypes []TransportType   `groups:"detailed"`
 
-	Location *Location `groups:"detailed"`
+	Location *Location `groups:"basic"`
 
-	Services []*Service `bson:"-" groups:"detailed"`
+	Services []*Service `bson:"-" groups:"basic"`
 
 	Active bool `groups:"basic"`
 
