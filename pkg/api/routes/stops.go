@@ -62,8 +62,6 @@ func listStops(c *fiber.Ctx) error {
 		bson.E{Key: "associations", Value: 0},
 	})
 
-	now := time.Now()
-
 	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery, opts)
 
 	for cursor.Next(context.TODO()) {
@@ -75,17 +73,14 @@ func listStops(c *fiber.Ctx) error {
 
 		stops = append(stops, stop)
 	}
-	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get stops")
 
 	wg := sync.WaitGroup{}
 	for _, stop := range stops {
 		wg.Add(1)
 		go func(stop *ctdf.Stop) {
-			singleNow := time.Now()
 			stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 				Stop: stop,
 			})
-			log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
 			wg.Done()
 
 			transforms.Transform(stop.Services, 1)
