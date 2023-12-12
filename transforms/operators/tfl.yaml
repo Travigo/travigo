@@ -152,3 +152,12 @@ Match:
 Data:
   BrandColour: "#FFFFFF"
   BrandIcon:   "/icons/tfl-roundel-overground.svg"
+# Elizabeth Line
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:XR"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#FFFFFF"
+  BrandIcon:   "/icons/tfl-roundel-elizabeth-line.svg"
