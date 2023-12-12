@@ -59,8 +59,6 @@ func listStops(c *fiber.Ctx) error {
 		bson.E{Key: "datasource", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "platforms", Value: 0},
-		bson.E{Key: "entrances", Value: 0},
 		bson.E{Key: "associations", Value: 0},
 	})
 
