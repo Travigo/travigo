@@ -23,7 +23,7 @@ func createStopsIndexes() {
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "location", Value: "2dsphere"}},
+			Keys: bson.D{{Key: "location.coordinates", Value: "2d"}},
 		},
 		{
 			Keys: bson.D{{Key: "platforms.primaryidentifier", Value: 1}},

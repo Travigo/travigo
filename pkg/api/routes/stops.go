@@ -39,7 +39,7 @@ func listStops(c *fiber.Ctx) error {
 
 	stopsCollection := database.GetCollection("stops")
 
-	bsonQuery := bson.M{"location": boundsQuery}
+	bsonQuery := bson.M{"location.coordinates": boundsQuery}
 
 	transportTypeFilter := c.Query("transport_type")
 	if transportTypeFilter != "" {
@@ -48,7 +48,7 @@ func listStops(c *fiber.Ctx) error {
 		bsonQuery = bson.M{
 			"$and": bson.A{
 				bson.M{"transporttypes": bson.M{"$in": transportType}},
-				bson.M{"location": boundsQuery},
+				bson.M{"location.coordinates": boundsQuery},
 			},
 		}
 	}
@@ -64,6 +64,8 @@ func listStops(c *fiber.Ctx) error {
 		bson.E{Key: "associations", Value: 0},
 	})
 
+	now := time.Now()
+
 	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery, opts)
 
 	for cursor.Next(context.TODO()) {
@@ -73,18 +75,19 @@ func listStops(c *fiber.Ctx) error {
 			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
 
-		// stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-		// 	Stop: stop,
-		// })
-
 		stops = append(stops, *stop)
 	}
+	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get stops")
 
+	now = time.Now()
 	iter.ForEach(stops, func(stop *ctdf.Stop) {
+		singleNow := time.Now()
 		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
+		log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
 	})
+	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get all stop services")
 
 	c.JSON(stops)
 	return nil
