@@ -79,14 +79,6 @@ func listStops(c *fiber.Ctx) error {
 	}
 	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get stops")
 
-	now = time.Now()
-	// iter.ForEach(stops, func(stop *ctdf.Stop) {
-	// 	singleNow := time.Now()
-	// 	stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-	// 		Stop: stop,
-	// 	})
-	// 	log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
-	// })
 	wg := sync.WaitGroup{}
 	for _, stop := range stops {
 		wg.Add(1)
@@ -97,10 +89,11 @@ func listStops(c *fiber.Ctx) error {
 			})
 			log.Info().Str("stop", stop.PrimaryIdentifier).Str("processing", time.Now().Sub(singleNow).String()).Msg("get single stop services")
 			wg.Done()
+
+			transforms.Transform(stop.Services, 1)
 		}(stop)
 	}
 	wg.Wait()
-	log.Info().Str("processing", time.Now().Sub(now).String()).Msg("get all stop services")
 
 	reducedStops, _ := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"basic"},

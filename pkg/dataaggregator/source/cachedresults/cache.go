@@ -14,7 +14,7 @@ type Cache struct {
 }
 
 func (c *Cache) Setup() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(90*time.Minute))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(12*time.Hour))
 
 	c.Cache = cache.New[string](redisStore)
 }
