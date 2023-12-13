@@ -84,13 +84,13 @@ spec:
                   optional: false
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           args:
             - "web-api"
             - "run"
             - "--listen"
-            - ":80"
+            - ":8080"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
