@@ -39,9 +39,7 @@ func RegisterCLI() *cli.Command {
 
 					ctdf.LoadSpecialDayCache()
 
-					SetupServer(c.String("listen"))
-
-					return nil
+					return SetupServer(c.String("listen"))
 				},
 			},
 		},

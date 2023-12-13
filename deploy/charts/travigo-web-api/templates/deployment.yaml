@@ -91,14 +91,6 @@ spec:
             - "run"
             - "--listen"
             - ":80"
-{{/*          livenessProbe:*/}}
-{{/*            httpGet:*/}}
-{{/*              path: /core/version*/}}
-{{/*              port: http*/}}
-          readinessProbe:
-            httpGet:
-              path: /core/version
-              port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

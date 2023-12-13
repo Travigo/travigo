@@ -7,7 +7,7 @@ import (
 	"github.com/travigo/travigo/pkg/http_server"
 )
 
-func SetupServer(listen string) {
+func SetupServer(listen string) error {
 	go stats.UpdateRecordsStats()
 
 	webApp := fiber.New()
@@ -35,5 +35,5 @@ func SetupServer(listen string) {
 
 	group.Get("stats", routes.Stats)
 
-	webApp.Listen(listen)
+	return webApp.Listen(listen)
 }
