@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/eko/gocache/lib/v4/store"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
@@ -68,7 +70,7 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 
 	// Save into cache
 	servicesJson, _ := json.Marshal(services)
-	s.CachedResults.Cache.Set(context.Background(), cacheItemPath, string(servicesJson))
+	s.CachedResults.Cache.Set(context.Background(), cacheItemPath, string(servicesJson), store.WithExpiration(24*time.Hour))
 
 	return services, nil
 }
