@@ -2,34 +2,27 @@ package databaselookup
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/eko/gocache/lib/v4/store"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
-	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
-	cachedObject, err := s.CachedResults.Cache.Get(context.Background(), cacheItemPath)
-
+	var services []*ctdf.Service
 	// Load from cache
+	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
+	services, err := cachedresults.Get[[]*ctdf.Service](s.CachedResults, cacheItemPath)
 	if err == nil {
-		var services []*ctdf.Service
-		err := json.Unmarshal([]byte(cachedObject), &services)
-
-		if err != nil {
-			return nil, err
-		}
-
 		return services, nil
 	}
 
+	// If not in cache then fallback to lookup
 	servicesCollection := database.GetCollection("services")
 	journeysCollection := database.GetCollection("journeys")
 
@@ -47,7 +40,6 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 	})
 
 	serviceFound := map[string]bool{}
-	var services []*ctdf.Service
 
 	cursor, _ := journeysCollection.Find(context.Background(), filter, opts)
 	for cursor.Next(context.TODO()) {
@@ -69,8 +61,7 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 	}
 
 	// Save into cache
-	servicesJson, _ := json.Marshal(services)
-	s.CachedResults.Cache.Set(context.Background(), cacheItemPath, string(servicesJson), store.WithExpiration(24*time.Hour))
+	cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
 
 	return services, nil
 }
