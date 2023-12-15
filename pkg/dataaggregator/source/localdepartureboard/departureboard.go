@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -37,9 +38,14 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		bson.E{Key: "datasource", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "direction", Value: 0},
+		bson.E{Key: "annotations", Value: 0},
 		bson.E{Key: "path.track", Value: 0},
 		bson.E{Key: "path.originactivity", Value: 0},
 		bson.E{Key: "path.destinationactivity", Value: 0},
+		bson.E{Key: "path.distance", Value: 0},
+		bson.E{Key: "path.originstop", Value: 0},
+		bson.E{Key: "path.destinationstop", Value: 0},
 	})
 
 	// Contains the stops primary id and all platforms primary ids
@@ -55,16 +61,36 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		}
 	}
 
+	pretty.Println(journeyQuery)
+
 	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query Journeys")
 	}
 
-	if err := cursor.All(context.Background(), &journeys); err != nil {
-		log.Error().Err(err).Msg("Failed to decode Journeys")
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
+	currentTime = time.Now()
+
+	// if err := cursor.All(context.Background(), &journeys); err != nil {
+	// 	log.Error().Err(err).Msg("Failed to decode Journeys")
+	// }
+
+	// log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 1")
+	// currentTime = time.Now()
+
+	for cursor.Next(context.TODO()) {
+		var journey ctdf.Journey
+		err := cursor.Decode(&journey)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Journey")
+		}
+
+		if journey.Availability.MatchDate(q.StartDateTime) {
+			journeys = append(journeys, &journey)
+		}
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
 
 	currentTime = time.Now()
 	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, q.StartDateTime, true)

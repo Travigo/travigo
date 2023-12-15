@@ -54,52 +54,50 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			var destinationDisplay string
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
-			journey.GetRealtimeJourney()
+			if journey.Availability.MatchDate(dateTime) {
+				journey.GetRealtimeJourney()
 
-			for _, path := range journey.Path {
-				if slices.Contains(stopRefs, path.OriginStopRef) {
-					refTime := path.OriginDepartureTime
-					stopPlatform = path.OriginPlatform
-					stopPlatformType = "ESTIMATED"
+				for _, path := range journey.Path {
+					if slices.Contains(stopRefs, path.OriginStopRef) {
+						refTime := path.OriginDepartureTime
+						stopPlatform = path.OriginPlatform
+						stopPlatformType = "ESTIMATED"
 
-					// Use the realtime estimated stop time based if realtime is available
-					if journey.RealtimeJourney != nil {
-						if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+						// Use the realtime estimated stop time based if realtime is available
+						if journey.RealtimeJourney != nil {
+							if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+								if journey.RealtimeJourney.ActivelyTracked {
+									refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
+								}
+
+								if journey.RealtimeJourney.Stops[path.OriginStopRef].Platform != "" {
+									stopPlatform = journey.RealtimeJourney.Stops[path.OriginStopRef].Platform
+									stopPlatformType = "ACTUAL"
+								}
+							}
+
 							if journey.RealtimeJourney.ActivelyTracked {
-								refTime = journey.RealtimeJourney.Stops[path.OriginStopRef].DepartureTime
-							}
-
-							if journey.RealtimeJourney.Stops[path.OriginStopRef].Platform != "" {
-								stopPlatform = journey.RealtimeJourney.Stops[path.OriginStopRef].Platform
-								stopPlatformType = "ACTUAL"
+								departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
 							}
 						}
 
-						if journey.RealtimeJourney.ActivelyTracked {
-							departureBoardRecordType = DepartureBoardRecordTypeRealtimeTracked
+						if journey.RealtimeJourney != nil && journey.RealtimeJourney.Cancelled {
+							departureBoardRecordType = DepartureBoardRecordTypeCancelled
 						}
+
+						stopDeperatureTime = time.Date(
+							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
+						)
+
+						destinationDisplay = path.DestinationDisplay
+						break
 					}
-
-					if journey.RealtimeJourney != nil && journey.RealtimeJourney.Cancelled {
-						departureBoardRecordType = DepartureBoardRecordTypeCancelled
-					}
-
-					stopDeperatureTime = time.Date(
-						dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
-					)
-
-					destinationDisplay = path.DestinationDisplay
-					break
 				}
-			}
 
-			if stopDeperatureTime.Before(dateTime) {
-				return
-			}
+				if stopDeperatureTime.Before(dateTime) {
+					return
+				}
 
-			availability := journey.Availability
-
-			if availability.MatchDate(dateTime) {
 				journey.GetReferences()
 
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
