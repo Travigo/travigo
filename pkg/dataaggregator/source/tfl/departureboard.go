@@ -102,6 +102,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	if remainingCount > 0 {
 		localSource := localdepartureboard.Source{}
+		localSource.Setup() //TODO maybe not
 
 		q.StartDateTime = latestDepartureTime
 		q.Count = remainingCount
