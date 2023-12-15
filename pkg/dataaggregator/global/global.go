@@ -22,6 +22,9 @@ func Setup() {
 	databaseLookupSource.Setup()
 	dataaggregator.GlobalAggregator.RegisterSource(databaseLookupSource)
 
-	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboard.Source{})
+	localdepartureboardSource := localdepartureboard.Source{}
+	localdepartureboardSource.Setup()
+	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboardSource)
+
 	dataaggregator.GlobalAggregator.RegisterSource(journeyplanner.Source{})
 }

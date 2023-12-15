@@ -2,13 +2,14 @@ package localdepartureboard
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,74 +26,71 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		dayAfterDateTime.Year(), dayAfterDateTime.Month(), dayAfterDateTime.Day(), 0, 0, 0, 0, dayAfterDateTime.Location(),
 	)
 
-	var journeys []*ctdf.Journey
-
-	journeysCollection := database.GetCollection("journeys")
-	currentTime := time.Now()
-
-	// This projection excludes values we dont care about - the main ones being path.*
-	// Reduces memory usage and execution time
-	opts := options.Find().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
-		bson.E{Key: "datasource", Value: 0},
-		bson.E{Key: "creationdatetime", Value: 0},
-		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "direction", Value: 0},
-		bson.E{Key: "annotations", Value: 0},
-		bson.E{Key: "path.track", Value: 0},
-		bson.E{Key: "path.originactivity", Value: 0},
-		bson.E{Key: "path.destinationactivity", Value: 0},
-		bson.E{Key: "path.distance", Value: 0},
-		bson.E{Key: "path.originstop", Value: 0},
-		bson.E{Key: "path.destinationstop", Value: 0},
-	})
-
 	// Contains the stops primary id and all platforms primary ids
 	allStopIDs := q.Stop.GetAllStopIDs()
 
-	journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
-	if q.Filter != nil {
-		journeyQuery = bson.M{
-			"$and": bson.A{
-				bson.M{"path.originstopref": bson.M{"$in": allStopIDs}},
-				q.Filter,
-			},
-		}
-	}
+	var journeys []*ctdf.Journey
+	// Load from cache
+	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, q.StartDateTime.Format("2006-01-02"))
+	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
 
-	pretty.Println(journeyQuery)
-
-	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to query Journeys")
-	}
+		journeysCollection := database.GetCollection("journeys")
+		currentTime := time.Now()
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
-	currentTime = time.Now()
+		// This projection excludes values we dont care about - the main ones being path.*
+		// Reduces memory usage and execution time
+		opts := options.Find().SetProjection(bson.D{
+			bson.E{Key: "_id", Value: 0},
+			bson.E{Key: "otheridentifiers", Value: 0},
+			bson.E{Key: "datasource", Value: 0},
+			bson.E{Key: "creationdatetime", Value: 0},
+			bson.E{Key: "modificationdatetime", Value: 0},
+			bson.E{Key: "direction", Value: 0},
+			bson.E{Key: "annotations", Value: 0},
+			bson.E{Key: "path.track", Value: 0},
+			bson.E{Key: "path.originactivity", Value: 0},
+			bson.E{Key: "path.destinationactivity", Value: 0},
+			bson.E{Key: "path.distance", Value: 0},
+			bson.E{Key: "path.originstop", Value: 0},
+			bson.E{Key: "path.destinationstop", Value: 0},
+		})
 
-	// if err := cursor.All(context.Background(), &journeys); err != nil {
-	// 	log.Error().Err(err).Msg("Failed to decode Journeys")
-	// }
+		journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
+		if q.Filter != nil {
+			journeyQuery = bson.M{
+				"$and": bson.A{
+					bson.M{"path.originstopref": bson.M{"$in": allStopIDs}},
+					q.Filter,
+				},
+			}
+		}
 
-	// log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 1")
-	// currentTime = time.Now()
-
-	for cursor.Next(context.TODO()) {
-		var journey ctdf.Journey
-		err := cursor.Decode(&journey)
+		cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode Journey")
+			log.Error().Err(err).Msg("Failed to query Journeys")
 		}
 
-		if journey.Availability.MatchDate(q.StartDateTime) {
-			journeys = append(journeys, &journey)
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
+		currentTime = time.Now()
+
+		for cursor.Next(context.TODO()) {
+			var journey ctdf.Journey
+			err := cursor.Decode(&journey)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to decode Journey")
+			}
+
+			if journey.Availability.MatchDate(q.StartDateTime) {
+				journeys = append(journeys, &journey)
+			}
 		}
+
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
+		cachedresults.Set(s.CachedResults, cacheItemPath, journeys, 4*time.Hour)
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
-
-	currentTime = time.Now()
+	currentTime := time.Now()
 	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, q.StartDateTime, true)
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 

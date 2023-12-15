@@ -2,8 +2,10 @@ package cachedresults
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
-	"encoding/gob"
+	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
@@ -14,35 +16,49 @@ import (
 )
 
 type Cache struct {
-	Cache *cache.Cache[[]byte]
+	Cache *cache.Cache[string]
 }
 
 func (c *Cache) Setup() {
 	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(12*time.Hour))
 
-	c.Cache = cache.New[[]byte](redisStore)
+	c.Cache = cache.New[string](redisStore)
 }
 
 func Set(c *Cache, key string, object any, expiration time.Duration) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(object); err != nil {
-		log.Error().Err(err).Msg("marshall")
-	}
-	marshalledObject := buf.Bytes()
+	marshalledObject, _ := json.Marshal(object)
 
-	c.Cache.Set(context.Background(), key, marshalledObject, store.WithExpiration(expiration))
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := gz.Write(marshalledObject); err != nil {
+		log.Error().Err(err).Msg("Failed to write gzip")
+	}
+	if err := gz.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close gzip")
+	}
+
+	c.Cache.Set(context.Background(), key, string(b.Bytes()), store.WithExpiration(expiration))
 }
 
 func Get[T any](c *Cache, key string) (T, error) {
-	cachedObjectBytes, err := c.Cache.Get(context.Background(), key)
+	cachedObjecString, err := c.Cache.Get(context.Background(), key)
 	var cachedObject T
 
-	reader := bytes.NewReader(cachedObjectBytes)
-	dec := gob.NewDecoder(reader)
-	if err := dec.Decode(&cachedObject); err != nil {
+	if err != nil {
 		return cachedObject, err
 	}
+
+	compressedBytes := bytes.NewReader([]byte(cachedObjecString))
+	gzip, err := gzip.NewReader(compressedBytes)
+	if err != nil {
+		return cachedObject, err
+	}
+	uncompressedBytes, err := io.ReadAll(gzip)
+	if err != nil {
+		return cachedObject, err
+	}
+
+	err = json.Unmarshal(uncompressedBytes, &cachedObject)
 
 	return cachedObject, err
 }

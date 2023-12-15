@@ -1,13 +1,21 @@
 package localdepartureboard
 
 import (
+	"reflect"
+
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
-	"reflect"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 )
 
 type Source struct {
+	CachedResults *cachedresults.Cache
+}
+
+func (s *Source) Setup() {
+	s.CachedResults = &cachedresults.Cache{}
+	s.CachedResults.Setup()
 }
 
 func (s Source) GetName() string {
