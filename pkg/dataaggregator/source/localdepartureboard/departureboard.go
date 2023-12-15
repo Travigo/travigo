@@ -31,7 +31,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	var journeys []*ctdf.Journey
 	// Load from cache
-	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, q.StartDateTime.Format("2006-01-02"))
+	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s", q.Stop.PrimaryIdentifier)
 	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
 
 	if err != nil {
@@ -74,16 +74,9 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
 		currentTime = time.Now()
 
-		for cursor.Next(context.TODO()) {
-			var journey ctdf.Journey
-			err := cursor.Decode(&journey)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to decode Journey")
-			}
-
-			if journey.Availability.MatchDate(q.StartDateTime) {
-				journeys = append(journeys, &journey)
-			}
+		err = cursor.All(context.Background(), &journeys)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Journey")
 		}
 
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
