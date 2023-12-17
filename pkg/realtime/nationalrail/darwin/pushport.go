@@ -120,6 +120,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
+			if realtimeJourney.Journey == nil {
+				log.Error().Str("realtimejourney", realtimeJourney.PrimaryIdentifier).Msg("Realtime Journey missing Journey")
+				continue
+			}
+
 			journeyStop := realtimeJourney.Stops[stop.PrimaryIdentifier]
 			journeyStopUpdated := false
 
