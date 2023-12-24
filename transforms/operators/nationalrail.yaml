@@ -1,0 +1,50 @@
+# Lumo
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:LD"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#1825EE"
+# LNER
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:GR"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#ce0e2d"
+# Thameslink
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:TL"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#444e55"
+  SecondaryBrandColour: "#ea3b8b"
+# Grand Central
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:GC"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#333132"
+  SecondaryBrandColour: "#ea7400"
+# Great Northern
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:GN"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#43165c"
+# Hull Trains
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:HT"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#14336A"
