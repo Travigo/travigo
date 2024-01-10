@@ -1,7 +1,10 @@
 package routes
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,6 +26,9 @@ import (
 
 func StopsRouter(router fiber.Router) {
 	router.Get("/", listStops)
+
+	router.Get("/search", searchStops)
+
 	router.Get("/:identifier", getStop)
 	router.Get("/:identifier/departures", getStopDepartures)
 }
@@ -193,4 +200,65 @@ func getStopDepartures(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(departureBoardReduced)
+}
+
+func searchStops(c *fiber.Ctx) error {
+	primaryName := c.Query("name")
+
+	if primaryName == "" {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Missing `name` query parameter",
+		})
+	}
+
+	var queryBytes bytes.Buffer
+	searchQuery := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_phrase_prefix": map[string]interface{}{
+				"PrimaryName.search_as_you_type": primaryName,
+			},
+		},
+	}
+
+	json.NewEncoder(&queryBytes).Encode(searchQuery)
+	res, err := elastic_client.Client.Search(
+		elastic_client.Client.Search.WithContext(context.Background()),
+		elastic_client.Client.Search.WithIndex("travigo-stops-001"),
+		elastic_client.Client.Search.WithBody(&queryBytes),
+		elastic_client.Client.Search.WithPretty(),
+		elastic_client.Client.Search.WithSize(10),
+	)
+
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to query index")
+	}
+
+	responseBytes, _ := io.ReadAll(res.Body)
+
+	var responseStruct struct {
+		Took     int  `json:"took"`
+		TimedOut bool `json:"timed_out"`
+		Hits     struct {
+			MaxScore float64 `json:"max_score"`
+			Total    struct {
+				Value    string `json:"value"`
+				Relation string `json:"relation"`
+			} `json:"total"`
+			Hits []struct {
+				Index  string    `json:"_index"`
+				Source ctdf.Stop `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	json.Unmarshal(responseBytes, &responseStruct)
+
+	stops := []ctdf.Stop{}
+	for _, hit := range responseStruct.Hits.Hits {
+		stops = append(stops, hit.Source)
+	}
+
+	return c.JSON(fiber.Map{
+		"stops": stops,
+	})
 }

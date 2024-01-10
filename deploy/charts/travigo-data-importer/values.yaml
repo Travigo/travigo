@@ -63,6 +63,9 @@ cronjobs:
   - name: stagecoach-sheffield-supertram
     schedule: "20 2 * * 6"
     args: ["data-importer", "file", "--transport-type", "Tram", "transxchange", "https://opendata.stagecoachbus.com/stagecoach-tram-route-schedule-data-transxchange.zip"]
+  - name: temp-indexer-stops
+    schedule: "50 3 * * 6"
+    args: [ "indexer", "stops" ]
 
 deployments:
   - name: sirivm-all
