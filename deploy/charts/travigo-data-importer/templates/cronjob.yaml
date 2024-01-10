@@ -72,7 +72,7 @@ spec:
                       optional: false
                 - name: TRAVIGO_MONGODB_DATABASE
                   value: {{ $.Values.database.database }}
-                - name: TRAVIGO__ELASTICSEARCH_ADDRESS
+                - name: TRAVIGO_ELASTICSEARCH_ADDRESS
                   value: {{ $.Values.elasticsearch.address }}
                 - name: TRAVIGO_ELASTICSEARCH_USERNAME
                   valueFrom:
