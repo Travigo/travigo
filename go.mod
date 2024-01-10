@@ -12,7 +12,7 @@ require (
 require (
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/adjust/rmq/v5 v5.2.0
-	github.com/antonmedv/expr v1.15.5
+	github.com/expr-lang/expr v1.15.8
 	github.com/eko/gocache/lib/v4 v4.1.5
 	github.com/eko/gocache/store/redis/v4 v4.2.1
 	github.com/elastic/go-elasticsearch/v8 v8.11.1
