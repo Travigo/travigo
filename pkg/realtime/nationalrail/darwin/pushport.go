@@ -372,7 +372,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				MatchedIdentifiers: matchedIdentifiers,
 
 				ValidFrom:  time.Now(),
-				ValidUntil: time.Now().Add(90 * 24 * time.Hour),
+				ValidUntil: time.Now().Add(5 * 24 * time.Hour),
 			})
 
 			log.Info().Str("servicealert", serviceAlertID).Msg("Creating Station Message Service Alert")

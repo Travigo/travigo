@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,11 +20,15 @@ import (
 )
 
 func IndexStops() {
-	createStopIndex()
-	indexStopsFromMongo()
+	indexName := fmt.Sprintf("travigo-stops-%d", time.Now().Unix())
+
+	createStopIndex(indexName)
+	indexStopsFromMongo(indexName)
+
+	deleteOldIndexes("travigo-stops-*", indexName)
 }
 
-func createStopIndex() {
+func createStopIndex(indexName string) {
 	mapping := `{
 		"settings": {
 			"number_of_shards": 1,
@@ -435,7 +441,7 @@ func createStopIndex() {
 	}`
 
 	indexReq := esapi.IndicesCreateRequest{
-		Index: "travigo-stops-001",
+		Index: indexName,
 		Body:  strings.NewReader(string(mapping)),
 	}
 
@@ -448,10 +454,10 @@ func createStopIndex() {
 	pretty.Println(string(responseBytes))
 }
 
-func indexStopsFromMongo() {
-	stops_collection := database.GetCollection("stops")
+func indexStopsFromMongo(indexName string) {
+	stopsCollection := database.GetCollection("stops")
 
-	cursor, _ := stops_collection.Find(context.Background(), bson.M{})
+	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
 
 	for cursor.Next(context.TODO()) {
 		var stop ctdf.Stop
@@ -459,8 +465,39 @@ func indexStopsFromMongo() {
 
 		jsonStop, _ := json.Marshal(stop)
 
-		elastic_client.IndexRequest("travigo-stops-001", bytes.NewReader(jsonStop))
+		elastic_client.IndexRequest(indexName, bytes.NewReader(jsonStop))
 	}
 
 	log.Info().Msg("Sent all index requests to queue")
+}
+
+func deleteOldIndexes(indexWildcard string, indexName string) {
+	catReq := esapi.CatIndicesRequest{
+		Index:  []string{indexWildcard},
+		Format: "json",
+	}
+
+	resp, err := catReq.Do(context.Background(), elastic_client.Client)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to list index")
+	}
+
+	var indexes []struct {
+		Index string `json:"index"`
+	}
+
+	responseBytes, _ := io.ReadAll(resp.Body)
+	json.Unmarshal(responseBytes, &indexes)
+
+	for _, index := range indexes {
+		if index.Index != indexName {
+			deleteReq := esapi.IndicesDeleteRequest{
+				Index: []string{index.Index},
+			}
+
+			deleteReq.Do(context.Background(), elastic_client.Client)
+
+			log.Info().Str("index", index.Index).Msg("Delete old index")
+		}
+	}
 }
