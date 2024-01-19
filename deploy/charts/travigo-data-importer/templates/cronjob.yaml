@@ -86,6 +86,14 @@ spec:
                       name: {{ $.Values.elasticsearch.accountSecret }}
                       key: password
                       optional: false
+                - name: TRAVIGO_REDIS_ADDRESS
+                  value: {{ $.Values.redis.address }}
+                - name: TRAVIGO_REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.redis.passwordSecret }}
+                      key: password
+                      optional: false
               resources:
                 {{- toYaml $.Values.resources | nindent 16 }}
 {{- end }}
