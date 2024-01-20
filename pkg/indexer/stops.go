@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"io"
 	"strings"
 	"time"
@@ -36,168 +38,6 @@ func createStopIndex(indexName string) {
 		},
 		"mappings": {
 			"properties": {
-				"Active": {
-					"type": "boolean"
-				},
-				"Associations": {
-					"properties": {
-						"AssociatedIdentifier": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"Type": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						}
-					}
-				},
-				"CreationDatetime": {
-					"type": "date"
-				},
-				"Datasource": {
-					"properties": {
-						"Dataset": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"Identifier": {
-							"type": "date"
-						},
-						"OriginalFormat": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"Provider": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						}
-					}
-				},
-				"Entrances": {
-					"properties": {
-						"Location": {
-							"properties": {
-								"coordinates": {
-									"type": "float"
-								},
-								"type": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"OtherIdentifiers": {
-							"properties": {
-								"AtcoCode": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"NaptanCode": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"OtherNames": {
-							"properties": {
-								"Indicator": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"Landmark": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"ShortCommonName": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"Street": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"PrimaryIdentifier": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"PrimaryName": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						}
-					}
-				},
 				"Location": {
 					"properties": {
 						"coordinates": {
@@ -213,9 +53,6 @@ func createStopIndex(indexName string) {
 							}
 						}
 					}
-				},
-				"ModificationDatetime": {
-					"type": "date"
 				},
 				"OtherIdentifiers": {
 					"properties": {
@@ -306,106 +143,6 @@ func createStopIndex(indexName string) {
 						}
 					}
 				},
-				"Platforms": {
-					"properties": {
-						"Location": {
-							"properties": {
-								"coordinates": {
-									"type": "float"
-								},
-								"type": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"OtherIdentifiers": {
-							"properties": {
-								"AtcoCode": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"NaptanCode": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"OtherNames": {
-							"properties": {
-								"Indicator": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"Landmark": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"ShortCommonName": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								},
-								"Street": {
-									"type": "text",
-									"fields": {
-										"keyword": {
-											"type": "keyword",
-											"ignore_above": 256
-										}
-									}
-								}
-							}
-						},
-						"PrimaryIdentifier": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"PrimaryName": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						}
-					}
-				},
 				"PrimaryIdentifier": {
 					"type": "text",
 					"fields": {
@@ -454,16 +191,52 @@ func createStopIndex(indexName string) {
 	pretty.Println(string(responseBytes))
 }
 
+type basicService struct {
+	PrimaryIdentifier    string
+	ServiceName          string
+	OperatorRef          string
+	BrandColour          string
+	SecondaryBrandColour string
+	BrandIcon            string
+	TransportType        ctdf.TransportType
+}
+
 func indexStopsFromMongo(indexName string) {
 	stopsCollection := database.GetCollection("stops")
 
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
 
 	for cursor.Next(context.TODO()) {
-		var stop ctdf.Stop
+		var stop *ctdf.Stop
 		cursor.Decode(&stop)
 
-		jsonStop, _ := json.Marshal(stop)
+		var services []*ctdf.Service
+		var basicServices []*basicService
+		services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+			Stop: stop,
+		})
+
+		for _, service := range services {
+			basicServices = append(basicServices, &basicService{
+				PrimaryIdentifier:    service.PrimaryIdentifier,
+				ServiceName:          service.ServiceName,
+				OperatorRef:          service.OperatorRef,
+				BrandColour:          service.BrandColour,
+				SecondaryBrandColour: service.SecondaryBrandColour,
+				BrandIcon:            service.BrandIcon,
+				TransportType:        service.TransportType,
+			})
+		}
+
+		jsonStop, _ := json.Marshal(map[string]interface{}{
+			"PrimaryIdentifier": stop.PrimaryIdentifier,
+			"OtherIdentifiers":  stop.OtherIdentifiers,
+			"PrimaryName":       stop.PrimaryName,
+			"OtherNames":        stop.OtherNames,
+			"TransportTypes":    stop.TransportTypes,
+			"Location":          stop.Location,
+			"Services":          basicServices,
+		})
 
 		elastic_client.IndexRequest(indexName, bytes.NewReader(jsonStop))
 	}

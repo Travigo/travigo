@@ -31,7 +31,6 @@ func RegisterCLI() *cli.Command {
 					dataaggregator.Setup()
 
 					IndexStops()
-					IndexStopServices()
 
 					elastic_client.WaitUntilQueueEmpty()
 
