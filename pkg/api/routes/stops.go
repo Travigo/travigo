@@ -224,7 +224,7 @@ func searchStops(c *fiber.Ctx) error {
 	json.NewEncoder(&queryBytes).Encode(searchQuery)
 	res, err := elastic_client.Client.Search(
 		elastic_client.Client.Search.WithContext(context.Background()),
-		elastic_client.Client.Search.WithIndex("travigo-stops-001"),
+		elastic_client.Client.Search.WithIndex("travigo-stops-*"),
 		elastic_client.Client.Search.WithBody(&queryBytes),
 		elastic_client.Client.Search.WithPretty(),
 		elastic_client.Client.Search.WithSize(10),

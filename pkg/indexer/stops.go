@@ -210,6 +210,10 @@ func indexStopsFromMongo(indexName string) {
 		var stop *ctdf.Stop
 		cursor.Decode(&stop)
 
+		if !stop.Active {
+			continue
+		}
+
 		var services []*ctdf.Service
 		var basicServices []*basicService
 		services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
