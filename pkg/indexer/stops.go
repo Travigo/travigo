@@ -62,6 +62,9 @@ func createStopIndex(indexName string) {
 								"keyword": {
 									"type": "keyword",
 									"ignore_above": 256
+								},
+								"search_as_you_type": {
+									"type": "search_as_you_type"
 								}
 							}
 						},
@@ -71,6 +74,9 @@ func createStopIndex(indexName string) {
 								"keyword": {
 									"type": "keyword",
 									"ignore_above": 256
+								},
+								"search_as_you_type": {
+									"type": "search_as_you_type"
 								}
 							}
 						},
@@ -80,6 +86,9 @@ func createStopIndex(indexName string) {
 								"keyword": {
 									"type": "keyword",
 									"ignore_above": 256
+								},
+								"search_as_you_type": {
+									"type": "search_as_you_type"
 								}
 							}
 						},
@@ -89,6 +98,9 @@ func createStopIndex(indexName string) {
 								"keyword": {
 									"type": "keyword",
 									"ignore_above": 256
+								},
+								"search_as_you_type": {
+									"type": "search_as_you_type"
 								}
 							}
 						},
@@ -98,6 +110,9 @@ func createStopIndex(indexName string) {
 								"keyword": {
 									"type": "keyword",
 									"ignore_above": 256
+								},
+								"search_as_you_type": {
+									"type": "search_as_you_type"
 								}
 							}
 						}
