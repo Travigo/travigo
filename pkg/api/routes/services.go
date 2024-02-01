@@ -5,6 +5,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/transforms"
 )
 
 func ServicesRouter(router fiber.Router) {
@@ -25,6 +26,8 @@ func getService(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		transforms.Transform(service, 2)
+
 		return c.JSON(service)
 	}
 }
