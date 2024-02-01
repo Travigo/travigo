@@ -74,8 +74,6 @@ spec:
                   name: {{ $.Values.redis.passwordSecret }}
                   key: password
                   optional: false
-            - name: TRAVIGO_LDBWS_GATEWAY_ENDPOINT
-              value: "http://ldbws-gatewway-ldbws-gateway.default.svc.cluster.local:80"
             - name: TRAVIGO_TFL_API_KEY
               valueFrom:
                 secretKeyRef:
