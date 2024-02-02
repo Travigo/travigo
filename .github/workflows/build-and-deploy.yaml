@@ -10,6 +10,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  GKE_CLUSTER: travigo-gke
+  GCP_ZONE: europe-central2-a
 
 jobs:
   travigo-build:
@@ -97,14 +99,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -134,14 +138,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -172,14 +178,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -209,14 +217,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -246,14 +256,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -283,14 +295,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
@@ -319,14 +333,16 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Setup kubeconfig
-      run: |
-          mkdir ~/.kube/
-          echo "$KUBECONFIG" >> ~/.kube/config
-          chmod 600 ~/.kube/config
-      shell: bash
-      env:
-        KUBECONFIG: ${{secrets.BRITBUS_KUBECONFIG}}
+    - name: Get GCP Auth
+      uses: 'google-github-actions/auth@v2'
+      with:
+        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    - name: Get GKE Cluster
+      uses: 'google-github-actions/get-gke-credentials@v2'
+      with:
+        cluster_name: ${{ env.GKE_CLUSTER }}
+        location: ${{ env.GCP_ZONE }}
 
     - name: Helm upgrade
       run: |-
