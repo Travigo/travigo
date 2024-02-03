@@ -9,6 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -59,6 +60,8 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 			}
 		}
 	}
+
+	transforms.Transform(services, 2)
 
 	// Save into cache
 	cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
