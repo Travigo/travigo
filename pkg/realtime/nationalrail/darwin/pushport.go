@@ -17,11 +17,12 @@ import (
 )
 
 type PushPortData struct {
-	TrainStatuses     []TrainStatus
-	Schedules         []Schedule
-	FormationLoadings []FormationLoading
-	StationMessages   []StationMessage
-	TrainAlerts       []TrainAlert
+	TrainStatuses      []TrainStatus
+	Schedules          []Schedule
+	FormationLoadings  []FormationLoading
+	StationMessages    []StationMessage
+	TrainAlerts        []TrainAlert
+	ScheduleFormations []ScheduleFormations
 }
 
 func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
@@ -382,6 +383,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	// Train Alert
 	for _, trainAlert := range p.TrainAlerts {
 		pretty.Println(trainAlert)
+	}
+
+	// Schedule formation
+	for _, scheduleFormation := range p.ScheduleFormations {
+		pretty.Println(scheduleFormation)
 	}
 }
 
