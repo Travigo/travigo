@@ -163,6 +163,14 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				}
 			}
 
+			// Generate the routes
+			var routes []ctdf.Route
+			for _, txcRoute := range doc.Routes {
+				routes = append(routes, ctdf.Route{
+					Description: txcRoute.Description,
+				})
+			}
+
 			// Provided transport type is the default fallback one if none is specified in service
 			switch strings.ToLower(txcService.Mode) {
 			case "underground", "metro":
@@ -192,16 +200,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 
 				TransportType: transportType,
 
-				InboundDescription: &ctdf.ServiceDescription{
-					Origin:      txcLine.InboundOrigin,
-					Destination: txcLine.InboundDestination,
-					Description: txcLine.InboundDescription,
-				},
-				OutboundDescription: &ctdf.ServiceDescription{
-					Origin:      txcLine.OutboundOrigin,
-					Destination: txcLine.OutboundDestination,
-					Description: txcLine.OutboundDescription,
-				},
+				Routes: routes,
 
 				StopNameOverrides: stopNameOverrides,
 			}

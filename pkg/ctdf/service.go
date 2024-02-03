@@ -18,9 +18,6 @@ type Service struct {
 
 	Routes []Route `groups:"detailed"`
 
-	OutboundDescription *ServiceDescription `groups:"basic"`
-	InboundDescription  *ServiceDescription `groups:"basic"`
-
 	BrandColour          string `groups:"basic"`
 	SecondaryBrandColour string `groups:"basic"`
 	BrandIcon            string `groups:"basic"`
@@ -32,10 +29,6 @@ type Service struct {
 }
 
 type Route struct {
-	Description string
-}
-
-type ServiceDescription struct {
 	Origin      string `groups:"basic"`
 	Destination string `groups:"basic"`
 	Description string `groups:"basic"`
