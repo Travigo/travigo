@@ -18,7 +18,7 @@ type RealtimeJourney struct {
 	JourneyRunDate time.Time `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
-	ModificationDateTime time.Time `groups:"detailed"`
+	ModificationDateTime time.Time `groups:"basic"`
 
 	TimeoutDurationMinutes int `groups:"internal"`
 

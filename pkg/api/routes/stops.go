@@ -212,6 +212,13 @@ func searchStops(c *fiber.Ctx) error {
 		})
 	}
 
+	if elastic_client.Client == nil {
+		c.SendStatus(fiber.StatusServiceUnavailable)
+		return c.JSON(fiber.Map{
+			"error": "Search is currently unavailable",
+		})
+	}
+
 	var queryBytes bytes.Buffer
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{

@@ -15,6 +15,7 @@ func JourneysRouter(router fiber.Router) {
 
 func getJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
+	realtimeOnly := c.QueryBool("realtime_only", false)
 
 	var journey *ctdf.Journey
 	journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{
@@ -31,16 +32,24 @@ func getJourney(c *fiber.Ctx) error {
 		journey.GetDeepReferences()
 		journey.GetRealtimeJourney()
 
-		for _, pathItem := range journey.Path {
-			pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
-			pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+		var journeyReduced interface{}
+
+		if realtimeOnly {
+			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
+				Groups: []string{"basic"},
+			}, journey.RealtimeJourney)
+		} else {
+			for _, pathItem := range journey.Path {
+				pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
+				pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+			}
+
+			transforms.Transform(journey, 2)
+
+			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
+				Groups: []string{"basic", "detailed"},
+			}, journey)
 		}
-
-		transforms.Transform(journey, 2)
-
-		journeyReduced, err := sheriff.Marshal(&sheriff.Options{
-			Groups: []string{"basic", "detailed"},
-		}, journey)
 
 		if err != nil {
 			c.SendStatus(fiber.StatusInternalServerError)

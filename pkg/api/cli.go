@@ -28,7 +28,7 @@ func RegisterCLI() *cli.Command {
 					if err := database.Connect(); err != nil {
 						return err
 					}
-					if err := elastic_client.Connect(true); err != nil {
+					if err := elastic_client.Connect(false); err != nil {
 						return err
 					}
 					if err := redis_client.Connect(); err != nil {
