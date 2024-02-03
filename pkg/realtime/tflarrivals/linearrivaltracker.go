@@ -377,6 +377,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// We find the first stop with an estimate instead of historical value and then base the departed/origin stops
 	// on the journey path item right before that one
 	// Also set the stop arrival times to be the same as the estimates
+	realtimeJourney.DepartedStopRef = ""
 	for i, item := range vehicleJourneyPath {
 		realtimeStop := realtimeJourney.Stops[item.OriginStopRef]
 
