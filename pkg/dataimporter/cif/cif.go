@@ -7,10 +7,7 @@ import (
 	"math"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -28,7 +25,7 @@ var daysOfWeek = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
 var failedStops []string
 
 type CommonInterfaceFormat struct {
-	TrainDefinitionSets []TrainDefinitionSet
+	TrainDefinitionSets []*TrainDefinitionSet
 	Associations        []Association
 
 	PhysicalStations []PhysicalStation
@@ -201,13 +198,9 @@ func (c *CommonInterfaceFormat) ImportIntoMongoAsCTDF(datasource *ctdf.DataSourc
 	// Import journeys
 	log.Info().Msg("Importing CTDF Journeys into Mongo")
 	var operationInsert uint64
-	var operationUpdate uint64
 
-	maxBatchSize := int(math.Ceil(float64(len(journeys)) / float64(50*runtime.NumCPU())))
+	maxBatchSize := 200
 	numBatches := int(math.Ceil(float64(len(journeys)) / float64(maxBatchSize)))
-
-	processingGroup := sync.WaitGroup{}
-	processingGroup.Add(numBatches)
 
 	for i := 0; i < numBatches; i++ {
 		lower := maxBatchSize * i
@@ -219,65 +212,35 @@ func (c *CommonInterfaceFormat) ImportIntoMongoAsCTDF(datasource *ctdf.DataSourc
 
 		batchSlice := journeys[lower:upper]
 
-		go func(batch []*ctdf.Journey) {
-			var operations []mongo.WriteModel
-			var localOperationInsert uint64
-			var localOperationUpdate uint64
+		var operations []mongo.WriteModel
 
-			for _, journey := range batch {
-				var existingCtdfJourney *ctdf.Journey
-				journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.PrimaryIdentifier}).Decode(&existingCtdfJourney)
+		for _, journey := range batchSlice {
+			journey.CreationDateTime = time.Now()
+			journey.ModificationDateTime = time.Now()
+			journey.DataSource = datasource
 
-				if existingCtdfJourney == nil {
-					journey.CreationDateTime = time.Now()
-					journey.ModificationDateTime = time.Now()
-					journey.DataSource = datasource
+			insertModel := mongo.NewInsertOneModel()
 
-					insertModel := mongo.NewInsertOneModel()
+			bsonRep, _ := bson.Marshal(journey)
+			insertModel.SetDocument(bsonRep)
 
-					bsonRep, _ := bson.Marshal(journey)
-					insertModel.SetDocument(bsonRep)
+			operations = append(operations, insertModel)
+			operationInsert += 1
+		}
 
-					operations = append(operations, insertModel)
-					localOperationInsert += 1
-				} else if existingCtdfJourney.ModificationDateTime != journey.ModificationDateTime {
-					journey.CreationDateTime = existingCtdfJourney.CreationDateTime
-					journey.ModificationDateTime = time.Now()
-					journey.DataSource = datasource
-
-					updateModel := mongo.NewUpdateOneModel()
-					updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
-					updateModel.SetUpdate(bsonRep)
-
-					operations = append(operations, updateModel)
-					localOperationUpdate += 1
-				}
+		if len(operations) > 0 {
+			_, err := journeysCollection.BulkWrite(context.TODO(), operations, &options.BulkWriteOptions{})
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 			}
-
-			atomic.AddUint64(&operationInsert, localOperationInsert)
-			atomic.AddUint64(&operationUpdate, localOperationUpdate)
-
-			if len(operations) > 0 {
-				_, err := journeysCollection.BulkWrite(context.TODO(), operations, &options.BulkWriteOptions{})
-				if err != nil {
-					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
-				}
-			}
-
-			processingGroup.Done()
-		}(batchSlice)
+		}
 	}
-
-	processingGroup.Wait()
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operationInsert)
-	log.Info().Msgf(" - %d updates", operationUpdate)
 }
 
-func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trainDef TrainDefinitionSet) *ctdf.Journey {
+func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {
 	departureTime, _ := time.Parse("1504", trainDef.OriginLocation.PublicDepartureTime)
 
 	// List of passenger stops

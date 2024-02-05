@@ -413,23 +413,6 @@ func RegisterCLI() *cli.Command {
 					}
 					ctdf.LoadSpecialDayCache()
 
-					// cif := cif.CommonInterfaceFormat{}
-					// file, err := os.Open("/Users/aaronclaydon/projects/travigo/test-data/0000.cif")
-					// cif.ParseMCA(file)
-
-					// journeys := cif.ConvertToCTDF()
-					// for _, journey := range journeys {
-					// 	pretty.Println(journey.PrimaryIdentifier)
-
-					// 	for _, item := range journey.Path {
-					// 		pretty.Println(item.OriginArrivalTime, item.OriginDepartureTime, item.DestinationArrivalTime)
-					// 	}
-
-					// 	pretty.Println()
-					// }
-
-					// return nil
-
 					env := util.GetEnvironmentVariables()
 					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
 						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
@@ -475,9 +458,10 @@ func RegisterCLI() *cli.Command {
 					if err != nil {
 						log.Fatal().Err(err).Msg("cannot decode gzip stream")
 					}
-					defer nrbGzip.Close()
 					log.Info().Msgf("Network Rail Timetable import from %s", networkRailBundleSource)
 					cifBundle.ParseMCA(nrbGzip)
+					resp.Body.Close()
+					nrbGzip.Close()
 
 					// Cleanup right at the begining once, as we do it as 1 big import
 					datasource := &ctdf.DataSource{
