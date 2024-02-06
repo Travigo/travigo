@@ -387,7 +387,39 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Schedule formation
 	for _, scheduleFormation := range p.ScheduleFormations {
-		pretty.Println(scheduleFormation)
+		searchQuery := bson.M{"otheridentifiers.nationalrailrid": scheduleFormation.RID}
+
+		var realtimeJourney *ctdf.RealtimeJourney
+
+		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+		if realtimeJourney != nil {
+			log.Info().
+				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
+				Msg("Updated formation")
+
+			var realtimeCarriages []ctdf.RailCarriage
+
+			// TODO: only handing the 1 formation here :(
+			for _, carriage := range scheduleFormation.Formations[0].Coaches {
+				realtimeCarriages = append(realtimeCarriages, ctdf.RailCarriage{
+					ID:    carriage.Number,
+					Class: carriage.Class,
+				})
+			}
+			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
+
+			updateMap := bson.M{}
+			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(searchQuery)
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+
+			queue.Add(updateModel)
+		}
 	}
 }
 

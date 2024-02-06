@@ -46,7 +46,8 @@ type RealtimeJourney struct {
 
 	Cancelled bool `groups:"basic"`
 
-	// Annotations map[string]interface{} `groups:"basic"`
+	// Details realtime journey information
+	DetailedRailInformation RealtimeInformationDetailedRail `groups:"basic"`
 }
 
 type RealtimeJourneyReliabilityType string
