@@ -3,6 +3,7 @@ package darwin
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -304,22 +305,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 	}
 
-	// Formation Loading
-	for _, formationLoading := range p.FormationLoadings {
-		searchQuery := bson.M{"otheridentifiers.nationalrailrid": formationLoading.RID}
-
-		var realtimeJourney *ctdf.RealtimeJourney
-
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-
-		if realtimeJourney != nil {
-			log.Info().
-				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
-				Msg("Updated loading")
-			pretty.Println(formationLoading)
-		}
-	}
-
 	// Station Messages
 	for _, stationMessage := range p.StationMessages {
 		serviceAlertID := fmt.Sprintf("GB:NATIONALRAILSTATIONMESSAGE:%s", stationMessage.ID)
@@ -417,6 +402,41 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				})
 			}
 			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
+
+			updateMap := bson.M{}
+			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
+
+			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(searchQuery)
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+
+			queue.Add(updateModel)
+		}
+	}
+
+	// Formation Loading
+	for _, formationLoading := range p.FormationLoadings {
+		searchQuery := bson.M{"otheridentifiers.nationalrailrid": formationLoading.RID}
+
+		var realtimeJourney *ctdf.RealtimeJourney
+
+		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+
+		if realtimeJourney != nil {
+			log.Info().
+				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
+				Msg("Updated occupancy")
+
+			for _, loading := range formationLoading.Loading {
+				for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
+					if carriage.ID == loading.CoachNumber {
+						carriage.Occupancy, _ = strconv.Atoi(loading.LoadingPercentage)
+						break
+					}
+				}
+			}
 
 			updateMap := bson.M{}
 			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
