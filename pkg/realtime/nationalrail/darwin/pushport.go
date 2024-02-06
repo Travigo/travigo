@@ -402,9 +402,18 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			// TODO: only handing the 1 formation here :(
 			for _, carriage := range scheduleFormation.Formations[0].Coaches {
+				var toilets []ctdf.RailCarriageToilet
+
+				for _, toilet := range carriage.Toilets {
+					toilets = append(toilets, ctdf.RailCarriageToilet{
+						Type:   toilet.Type,
+						Status: toilet.Status,
+					})
+				}
 				realtimeCarriages = append(realtimeCarriages, ctdf.RailCarriage{
-					ID:    carriage.Number,
-					Class: carriage.Class,
+					ID:      carriage.Number,
+					Class:   carriage.Class,
+					Toilets: toilets,
 				})
 			}
 			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
