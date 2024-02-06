@@ -30,10 +30,10 @@ cronjobs:
   - name: travelinenoc
     schedule: "0 2 * * 0"
     args: ["data-importer", "file", "traveline-noc", "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"]
-  - name: nationarail-toc
+  - name: nationa;rail-toc
     schedule: "10 2 * * 0"
     args: ["data-importer", "nationalrail-toc"]
-  - name: nationarail-timetable
+  - name: nationalrail-timetable
     schedule: "15 2 * * 0"
     args: [ "data-importer", "nationalrail-timetable" ]
   - name: naptan
