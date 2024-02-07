@@ -1,18 +1,18 @@
 package ctdf
 
 type RealtimeInformationDetailedRail struct {
-	Carriages []RailCarriage
+	Carriages []RailCarriage `groups:"basic"`
 }
 
 type RailCarriage struct {
-	ID      string
-	Class   string
-	Toilets []RailCarriageToilet
+	ID      string               `groups:"basic"`
+	Class   string               `groups:"basic"`
+	Toilets []RailCarriageToilet `groups:"basic"`
 
-	Occupancy int
+	Occupancy int `groups:"basic"`
 }
 
 type RailCarriageToilet struct {
-	Type   string
-	Status string
+	Type   string `groups:"basic"`
+	Status string `groups:"basic"`
 }
