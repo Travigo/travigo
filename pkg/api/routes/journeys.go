@@ -36,7 +36,7 @@ func getJourney(c *fiber.Ctx) error {
 
 		if realtimeOnly {
 			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
-				Groups: []string{"basic"},
+				Groups: []string{"basic", "detailed"},
 			}, journey.RealtimeJourney)
 		} else {
 			for _, pathItem := range journey.Path {
