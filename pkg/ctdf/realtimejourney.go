@@ -47,7 +47,7 @@ type RealtimeJourney struct {
 	Cancelled bool `groups:"basic"`
 
 	// Details realtime journey information
-	DetailedRailInformation RealtimeInformationDetailedRail `groups:"basic"`
+	DetailedRailInformation RealtimeInformationDetailedRail `groups:"detailed"`
 }
 
 type RealtimeJourneyReliabilityType string
