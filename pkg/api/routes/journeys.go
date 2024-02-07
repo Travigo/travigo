@@ -35,9 +35,13 @@ func getJourney(c *fiber.Ctx) error {
 		var journeyReduced interface{}
 
 		if realtimeOnly {
-			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
-				Groups: []string{"basic", "detailed"},
-			}, journey.RealtimeJourney)
+			if journey.RealtimeJourney == nil {
+				journeyReduced = nil
+			} else {
+				journeyReduced, err = sheriff.Marshal(&sheriff.Options{
+					Groups: []string{"basic", "detailed"},
+				}, journey.RealtimeJourney)
+			}
 		} else {
 			for _, pathItem := range journey.Path {
 				pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
