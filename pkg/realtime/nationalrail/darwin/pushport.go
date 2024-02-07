@@ -430,11 +430,22 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Msg("Updated occupancy")
 
 			for _, loading := range formationLoading.Loading {
+				occupancy, _ := strconv.Atoi(loading.LoadingPercentage)
+				carriageFound := false
+
 				for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
 					if carriage.ID == loading.CoachNumber {
-						carriage.Occupancy, _ = strconv.Atoi(loading.LoadingPercentage)
+						carriage.Occupancy = occupancy
+						carriageFound = true
 						break
 					}
+				}
+
+				if !carriageFound {
+					realtimeJourney.DetailedRailInformation.Carriages = append(realtimeJourney.DetailedRailInformation.Carriages, ctdf.RailCarriage{
+						ID:        loading.CoachNumber,
+						Occupancy: occupancy,
+					})
 				}
 			}
 
