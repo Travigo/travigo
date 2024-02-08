@@ -507,6 +507,38 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 	}
 
+	// Calculate occupancy
+	if vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy != 0 {
+		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+			OccupancyAvailable: true,
+			ActualValues:       true,
+
+			SeatedInformation: true,
+			SeatedCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity,
+			SeatedOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy,
+
+			WheelchairInformation: true,
+			WheelchairCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity,
+			WheelchairOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy,
+
+			TotalPercentageOccupancy: (vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy) / (vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity),
+		}
+	} else if vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy != "" {
+		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+			OccupancyAvailable: true,
+			ActualValues:       false,
+		}
+
+		switch vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy {
+		case "full":
+			realtimeJourney.Occupancy.TotalPercentageOccupancy = 100
+		case "standingAvailable":
+			realtimeJourney.Occupancy.TotalPercentageOccupancy = 75
+		case "seatsAvailable":
+			realtimeJourney.Occupancy.TotalPercentageOccupancy = 40
+		}
+	}
+
 	// Update database
 	updateMap := bson.M{
 		"reliability":          realtimeJourneyReliability,
@@ -516,6 +548,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
 		"offset":               offset,
+		"occupancy":            realtimeJourney.Occupancy,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
 	if newRealtimeJourney {
