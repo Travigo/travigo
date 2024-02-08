@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 )
 
 type VehicleLocationEvent struct {
@@ -20,4 +21,6 @@ type VehicleLocationEvent struct {
 	VehicleLocation ctdf.Location `groups:"basic"`
 	VehicleBearing  float64
 	VehicleRef      string
+
+	SiriVMActivity *siri_vm.VehicleActivity
 }

@@ -212,8 +212,6 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				errorCode = "JOURNEYNARROW_MANY"
 			}
 
-			// pretty.Println(err.Error(), vehicle.MonitoredVehicleJourney)
-
 			// Record the failed identification event
 			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
 				Timestamp: time.Now(),
@@ -302,6 +300,8 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			},
 		},
 		VehicleBearing: vehicle.MonitoredVehicleJourney.Bearing,
+
+		SiriVMActivity: siriVMVehicleIdentificationEvent.VehicleActivity,
 	}
 
 	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {

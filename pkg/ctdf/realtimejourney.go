@@ -46,8 +46,28 @@ type RealtimeJourney struct {
 
 	Cancelled bool `groups:"basic"`
 
+	Occupancy RealtimeJourneyOccupancy `groups:"detailed"`
+
 	// Details realtime journey information
 	DetailedRailInformation RealtimeInformationDetailedRail `groups:"detailed"`
+}
+
+type RealtimeJourneyOccupancy struct {
+	OccupancyAvailable bool `groups:"basic"`
+
+	ActualValues          bool `groups:"basic"`
+	WheelchairInformation bool `groups:"basic"`
+	SeatedInformation     bool `groups:"basic"`
+
+	TotalPercentageOccupancy int `groups:"basic"`
+
+	Capacity           int `groups:"basic"`
+	SeatedCapacity     int `groups:"basic"`
+	WheelchairCapacity int `groups:"basic"`
+
+	Occupancy           int `groups:"basic"`
+	SeatedOccupancy     int `groups:"basic"`
+	WheelchairOccupancy int `groups:"basic"`
 }
 
 type RealtimeJourneyReliabilityType string
