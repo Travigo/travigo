@@ -164,7 +164,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 		}
 
-		if trainStatus.LateReason != "" {
+		if trainStatus.LateReason != "" && realtimeJourney.Journey != nil {
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("GB:RAIL:DELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     time.Now(),
