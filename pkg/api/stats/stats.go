@@ -33,6 +33,7 @@ type RecordsStatsActiveRealtimeJourneys struct {
 	NotActivelyTracked int64
 
 	TransportTypes map[ctdf.TransportType]int
+	Features       map[string]int
 }
 type recordStatsElasticEvent struct {
 	Stats *RecordsStats
@@ -54,6 +55,7 @@ func UpdateRecordsStats() {
 			ExternalProvided:     0,
 
 			TransportTypes: map[ctdf.TransportType]int{},
+			Features:       map[string]int{},
 		},
 	}
 
@@ -82,6 +84,7 @@ func UpdateRecordsStats() {
 		var numberActiveRealtimeJourneysExternal int64
 		var numberActiveRealtimeJourneysNotActivelyTracked int64
 		transportTypes := map[ctdf.TransportType]int{}
+		features := map[string]int{}
 
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 		startTime = time.Now()
@@ -153,6 +156,15 @@ func UpdateRecordsStats() {
 					if realtimeJourney.Journey.Service != nil {
 						transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
 					}
+
+					// Features
+					if realtimeJourney.Occupancy.OccupancyAvailable {
+						features["Occupancy"] += 1
+
+						if realtimeJourney.Occupancy.ActualValues {
+							features["OccupancyActualValues"] += 1
+						}
+					}
 				} else {
 					numberActiveRealtimeJourneysNotActivelyTracked += 1
 				}
@@ -165,6 +177,7 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.LocationWithoutTrack = numberActiveRealtimeJourneysWithoutTrack
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
+		CurrentRecordsStats.ActiveRealtimeJourneys.Features = features
 		CurrentRecordsStats.ActiveRealtimeJourneys.NotActivelyTracked = numberActiveRealtimeJourneysNotActivelyTracked
 
 		numberServiceAlerts := 0
