@@ -529,7 +529,7 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 		}
 
 		if totalCapacity > 0 && totalOccupancy > 0 {
-			realtimeJourney.Occupancy.TotalPercentageOccupancy = (totalOccupancy / totalCapacity) * 100
+			realtimeJourney.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
 		}
 	} else if vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy != "" {
 		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
