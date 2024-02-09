@@ -509,9 +509,15 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 
 	// Calculate occupancy
 	if vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy != 0 {
+		totalCapacity := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity
+		totalOccupancy := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy
+
 		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
 			OccupancyAvailable: true,
 			ActualValues:       true,
+
+			Capacity:  totalCapacity,
+			Occupancy: totalOccupancy,
 
 			SeatedInformation: true,
 			SeatedCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity,
@@ -521,9 +527,6 @@ func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.Wr
 			WheelchairCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity,
 			WheelchairOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy,
 		}
-
-		totalCapacity := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity
-		totalOccupancy := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy
 
 		if totalCapacity > 0 && totalOccupancy > 0 {
 			realtimeJourney.Occupancy.TotalPercentageOccupancy = (totalOccupancy / totalCapacity) * 100
