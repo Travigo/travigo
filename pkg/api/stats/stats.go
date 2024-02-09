@@ -127,6 +127,8 @@ func UpdateRecordsStats() {
 					bson.E{Key: "vehiclelocation", Value: 1},
 					bson.E{Key: "journey.path.destinationstopref", Value: 1},
 					bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
+					bson.E{Key: "occupancy.occupancyavailable", Value: 1},
+					bson.E{Key: "occupancy.actualvalues", Value: 1},
 				},
 			},
 		}
