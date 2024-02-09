@@ -449,7 +449,23 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				}
 			}
 
+			// Calculate the total train occupancy based on percentage of all carriages
+			totalOccupancy := 0
+			totalCapacity := 0
+
+			for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
+				totalCapacity += 100
+				totalOccupancy += carriage.Occupancy
+			}
+
+			realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+				OccupancyAvailable:       true,
+				ActualValues:             false,
+				TotalPercentageOccupancy: int((float64(totalOccupancy) / float64(totalCapacity)) * 100),
+			}
+
 			updateMap := bson.M{}
+			updateMap["occupancy"] = realtimeJourney.Occupancy
 			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
 
 			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
