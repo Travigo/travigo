@@ -378,7 +378,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
-		if realtimeJourney != nil {
+		if realtimeJourney == nil {
+			log.Error().
+				Str("rid", scheduleFormation.RID).
+				Msg("Unable to find realtime journey for formation")
+		} else {
 			log.Info().
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
 				Msg("Updated formation")
@@ -424,7 +428,13 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
 
-		if realtimeJourney != nil {
+		if realtimeJourney == nil {
+			log.Error().
+				Str("rid", formationLoading.RID).
+				Str("fid", formationLoading.FID).
+				Str("tpl", formationLoading.TPL).
+				Msg("Unable to find realtime journey for occupancy")
+		} else {
 			log.Info().
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
 				Msg("Updated occupancy")
