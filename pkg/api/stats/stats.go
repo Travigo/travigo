@@ -129,6 +129,7 @@ func UpdateRecordsStats() {
 					bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
 					bson.E{Key: "occupancy.occupancyavailable", Value: 1},
 					bson.E{Key: "occupancy.actualvalues", Value: 1},
+					bson.E{Key: "detailedrailinformation.carriages.id", Value: 1},
 				},
 			},
 		}
