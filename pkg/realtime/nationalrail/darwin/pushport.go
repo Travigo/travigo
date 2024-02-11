@@ -38,7 +38,24 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 	stopsCollection := database.GetCollection("stops")
-	retryRecords := database.GetCollection("retry_records")
+	retryRecordsCollection := database.GetCollection("retry_records")
+
+	// Load all the retry records into the system
+	var retryRecords []struct {
+		Type         string
+		CreationDate time.Time
+		Record       interface{}
+	}
+	cursor, err := retryRecordsCollection.Find(context.Background(), bson.M{"type": "realtimedarwin_formation"})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query Retry Records")
+	}
+	err = cursor.All(context.Background(), &retryRecords)
+	for _, retryRecord := range retryRecords {
+		retryFormation := retryRecord.Record.(ScheduleFormations)
+		p.ScheduleFormations = append(p.ScheduleFormations, retryFormation)
+		realtimeJourneysCollection.DeleteOne(context.Background(), bson.M{"record.rid": retryFormation.RID})
+	}
 
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
@@ -393,7 +410,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			insertMap["creationdatetime"] = now
 			insertMap["record"] = scheduleFormation
 
-			retryRecords.InsertOne(context.TODO(), insertMap)
+			retryRecordsCollection.InsertOne(context.TODO(), insertMap)
 		} else {
 			log.Info().
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
