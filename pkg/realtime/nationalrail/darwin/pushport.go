@@ -41,10 +41,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	retryRecordsCollection := database.GetCollection("retry_records")
 
 	// Load all the retry records into the system
+	// TODO this seems like an awful method of doing it though?
 	var retryRecords []struct {
 		Type         string
 		CreationDate time.Time
-		Record       interface{}
+		Record       ScheduleFormations
 	}
 	cursor, err := retryRecordsCollection.Find(context.Background(), bson.M{"type": "realtimedarwin_formation"})
 	if err != nil {
@@ -52,9 +53,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	}
 	err = cursor.All(context.Background(), &retryRecords)
 	for _, retryRecord := range retryRecords {
-		retryFormation := retryRecord.Record.(ScheduleFormations)
-		p.ScheduleFormations = append(p.ScheduleFormations, retryFormation)
-		realtimeJourneysCollection.DeleteOne(context.Background(), bson.M{"record.rid": retryFormation.RID})
+		p.ScheduleFormations = append(p.ScheduleFormations, retryRecord.Record)
+		realtimeJourneysCollection.DeleteOne(context.Background(), bson.M{"record.rid": retryRecord.Record.RID})
 	}
 
 	// Parse Train Statuses
