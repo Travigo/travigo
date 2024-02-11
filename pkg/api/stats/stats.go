@@ -167,6 +167,9 @@ func UpdateRecordsStats() {
 							features["OccupancyActualValues"] += 1
 						}
 					}
+					if len(realtimeJourney.DetailedRailInformation.Carriages) > 0 {
+						features["DetailedRailInformationCarriages"] += 1
+					}
 				} else {
 					numberActiveRealtimeJourneysNotActivelyTracked += 1
 				}
