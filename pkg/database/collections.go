@@ -213,6 +213,18 @@ func createJourneysIndexes() {
 		log.Error().Err(err).Msg("Creating Index")
 	}
 
+	// Retry Records
+	retryRecordsCollection := GetCollection("retry_records")
+	_, err = retryRecordsCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "creationdatetime", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(1800), // Expire after 30 minutes
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
+
 	// ServiceAlerts
 	serviceAlertsCollection := GetCollection("service_alerts")
 	_, err = serviceAlertsCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{

@@ -38,6 +38,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 	stopsCollection := database.GetCollection("stops")
+	retryRecords := database.GetCollection("retry_records")
 
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
@@ -167,8 +168,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		if trainStatus.LateReason != "" && realtimeJourney.Journey != nil {
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("GB:RAIL:DELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
-				CreationDateTime:     time.Now(),
-				ModificationDateTime: time.Now(),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
 
 				DataSource: &ctdf.DataSource{},
 
@@ -274,8 +275,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
-				CreationDateTime:     time.Now(),
-				ModificationDateTime: time.Now(),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
 
 				DataSource: &ctdf.DataSource{},
 
@@ -344,8 +345,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			createServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    serviceAlertID,
-				CreationDateTime:     time.Now(),
-				ModificationDateTime: time.Now(),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
 
 				DataSource: &ctdf.DataSource{
 					Provider: "National Rail",
@@ -357,8 +358,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				MatchedIdentifiers: matchedIdentifiers,
 
-				ValidFrom:  time.Now(),
-				ValidUntil: time.Now().Add(5 * 24 * time.Hour),
+				ValidFrom:  now,
+				ValidUntil: now.Add(5 * 24 * time.Hour),
 			})
 
 			log.Info().Str("servicealert", serviceAlertID).Msg("Creating Station Message Service Alert")
@@ -386,6 +387,13 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			log.Error().
 				Str("rid", scheduleFormation.RID).
 				Msg("Unable to find realtime journey for formation")
+
+			insertMap := bson.M{}
+			insertMap["type"] = "realtimedarwin_formation"
+			insertMap["creationdatetime"] = now
+			insertMap["record"] = scheduleFormation
+
+			retryRecords.InsertOne(context.TODO(), insertMap)
 		} else {
 			log.Info().
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
