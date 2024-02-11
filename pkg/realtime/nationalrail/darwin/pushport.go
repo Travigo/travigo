@@ -372,6 +372,10 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Schedule formation
 	for _, scheduleFormation := range p.ScheduleFormations {
+		if len(scheduleFormation.Formations) == 0 {
+			continue
+		}
+
 		searchQuery := bson.M{"otheridentifiers.nationalrailrid": scheduleFormation.RID}
 
 		var realtimeJourney *ctdf.RealtimeJourney
