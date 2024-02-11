@@ -40,23 +40,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	stopsCollection := database.GetCollection("stops")
 	retryRecordsCollection := database.GetCollection("retry_records")
 
-	// Load all the retry records into the system
-	// TODO this seems like an awful method of doing it though?
-	var retryRecords []struct {
-		Type         string
-		CreationDate time.Time
-		Record       ScheduleFormations
-	}
-	cursor, err := retryRecordsCollection.Find(context.Background(), bson.M{"type": "realtimedarwin_formation"})
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to query Retry Records")
-	}
-	err = cursor.All(context.Background(), &retryRecords)
-	for _, retryRecord := range retryRecords {
-		p.ScheduleFormations = append(p.ScheduleFormations, retryRecord.Record)
-		realtimeJourneysCollection.DeleteOne(context.Background(), bson.M{"record.rid": retryRecord.Record.RID})
-	}
-
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", trainStatus.SSD, trainStatus.UID)
