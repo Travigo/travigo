@@ -192,24 +192,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		updateModel.SetUpsert(true)
 
 		queue.Add(updateModel)
-
-		// Load all the retry records into the system
-		// TODO this seems like an awful method of doing it though?
-		var retryRecords []struct {
-			Type         string
-			CreationDate time.Time
-			Record       ScheduleFormations
-		}
-		cursor, err := retryRecordsCollection.Find(context.Background(), bson.M{"type": "realtimedarwin_formation", "record.rid": trainStatus.RID})
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to query Retry Records")
-		}
-		err = cursor.All(context.Background(), &retryRecords)
-		for _, retryRecord := range retryRecords {
-			p.ScheduleFormations = append(p.ScheduleFormations, retryRecord.Record)
-		}
-
-		realtimeJourneysCollection.DeleteMany(context.Background(), bson.M{"type": "realtimedarwin_formation", "record.rid": trainStatus.RID})
 	}
 
 	// Schedules
