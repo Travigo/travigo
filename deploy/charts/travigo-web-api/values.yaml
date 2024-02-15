@@ -28,6 +28,10 @@ bods:
 tfl:
   apiKeySecret: travigo-tfl-api-key
 
+auth:
+  domain: travigo.uk.auth0.com
+  audience: https://api.travigo.app
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

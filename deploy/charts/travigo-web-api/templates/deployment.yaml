@@ -80,6 +80,10 @@ spec:
                   name: {{ $.Values.tfl.apiKeySecret }}
                   key: api_key
                   optional: false
+            - name: AUTH0_DOMAIN
+              value: {{ $.Values.auth.domain }}
+            - name: AUTH0_AUDIENCE
+              value: {{ $.Values.auth.audience }}
           ports:
             - name: http
               containerPort: 8080
