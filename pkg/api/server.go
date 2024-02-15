@@ -33,6 +33,8 @@ func SetupServer(listen string) error {
 
 	routes.ServiceAlertRouter(group.Group("/service_alerts"))
 
+	routes.AccountRouter(group.Group("/account", EnsureValidToken()))
+
 	group.Get("stats", routes.Stats)
 
 	return webApp.Listen(listen)
