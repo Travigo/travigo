@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -58,7 +59,7 @@ func Connect() error {
 
 	createIndexes()
 
-	// runCommands()
+	runCommands()
 
 	return nil
 }
@@ -71,7 +72,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 // use admin
 // db.runCommand( {
 //    setClusterParameter:
-//       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 5 } } }
+//       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 15 } } }
 // } )
 
 func runCommands() {
@@ -82,6 +83,6 @@ func runCommands() {
 	}).Decode(&result)
 
 	if err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Run commands mongodb")
 	}
 }

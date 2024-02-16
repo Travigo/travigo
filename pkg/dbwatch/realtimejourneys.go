@@ -141,4 +141,8 @@ func (w *RealtimeJourneysWatch) Run() {
 			}
 		}(&data)
 	}
+
+	log.Error().Err(stream.Err()).Msg("realtime journey watch fell over")
+
+	w.Run() // TODO this is a hack and a half
 }
