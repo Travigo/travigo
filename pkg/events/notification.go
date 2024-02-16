@@ -27,12 +27,17 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 	case ctdf.EventTypeRealtimeJourneyCancelled:
 		eventNotificationData.Title = "Journey cancelled"
 
+		realtimeJourney := eventBody["RealtimeJourney"].(map[string]interface{})
 		journey := eventBody["Journey"].(map[string]interface{})
 
 		departureTime, _ := time.Parse(time.RFC3339, journey["DepartureTime"].(string))
 		departureTimeText := departureTime.Format("15:04")
+
+		journeyRunDate, _ := time.Parse(time.RFC3339, realtimeJourney["JourneyRunDate"].(string))
+		journeyRunDateText := journeyRunDate.Format("2006-02-01")
+
 		destination := journey["DestinationDisplay"]
-		eventNotificationData.Message = fmt.Sprintf("The %s to %s has been cancelled.", departureTimeText, destination)
+		eventNotificationData.Message = fmt.Sprintf("The %s %s to %s has been cancelled.", journeyRunDateText, departureTimeText, destination)
 
 		// TODO now we need to work out why it was cancelled again
 		// if eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"] != nil {
