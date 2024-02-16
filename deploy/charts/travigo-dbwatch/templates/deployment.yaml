@@ -40,6 +40,8 @@ spec:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            - name: GOMAXPROCS
+              value: 24         # TODO testing this probably isnt a good idea
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
             - name: TRAVIGO_MONGODB_CONNECTION
