@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -51,10 +50,23 @@ func (w *RealtimeJourneysWatch) Run() {
 						bson.D{{Key: "operationType", Value: "update"}}, //ignore inserts for now
 						bson.D{
 							{
-								Key:   "updateDescription.updatedFields.cancelled",
-								Value: bson.D{{Key: "$exists", Value: true}},
+								Key: "$or", Value: bson.A{
+									bson.D{
+										{
+											Key:   "updateDescription.updatedFields.cancelled",
+											Value: bson.D{{Key: "$exists", Value: true}},
+										},
+									},
+									// This is prob a bit hacky but it does work so who really cares?
+									bson.D{
+										{
+											Key:   "fullDocument.datasource.provider",
+											Value: "National-Rail",
+										},
+									},
+								},
 							},
-						}, //testicles
+						},
 					},
 				},
 			},
@@ -88,12 +100,11 @@ func (w *RealtimeJourneysWatch) Run() {
 
 	for stream.Next(context.Background()) {
 		var data realtimeJourneyUpdate
+
 		if err := stream.Decode(&data); err != nil {
 			log.Error().Err(err).Msg("Failed to decode event")
 			continue
 		}
-
-		pretty.Println("CUM")
 
 		go func(data *realtimeJourneyUpdate) {
 			if data.OperationType == "insert" {
