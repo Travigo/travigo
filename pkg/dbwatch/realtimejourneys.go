@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -49,15 +50,32 @@ func (w *RealtimeJourneysWatch) Run() {
 			},
 		},
 	}
-	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.Required)
-	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{matchPipeline}, opts)
+
+	projectPipeline := bson.D{
+		{
+			Key: "$project",
+			Value: bson.D{
+				bson.E{Key: "activelytracked", Value: 0},
+				bson.E{Key: "timeoutdurationminutes", Value: 0},
+				bson.E{Key: "creationdatetime", Value: 0},
+				// bson.E{Key: "modificationdatetime", Value: 0},
+				bson.E{Key: "reliability", Value: 0},
+				bson.E{Key: "offset", Value: 0},
+				bson.E{Key: "vehiclelocation", Value: 0},
+				bson.E{Key: "vehiclebearing", Value: 0},
+				bson.E{Key: "vehicleref", Value: 0},
+			},
+		},
+	}
+	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.UpdateLookup)
+	stream, err := collection.Watch(context.Background(), mongo.Pipeline{matchPipeline, projectPipeline}, opts)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to watch collection")
 	}
 
-	defer stream.Close(context.TODO())
+	defer stream.Close(context.Background())
 
-	for stream.Next(context.TODO()) {
+	for stream.Next(context.Background()) {
 		var data realtimeJourneyUpdate
 		if err := stream.Decode(&data); err != nil {
 			log.Error().Err(err).Msg("Failed to decode event")
@@ -75,6 +93,13 @@ func (w *RealtimeJourneysWatch) Run() {
 				})
 				w.EventQueue.PublishBytes(eventBytes)
 			} else if data.OperationType == "update" {
+				if data.FullDocument.PrimaryIdentifier == "" {
+					// log.Error().Str("old", data.FullDocumentBeforeChange.PrimaryIdentifier).Msg("uh oh?")
+					pretty.Println(data)
+					log.Fatal().Msg("bye?")
+					return
+				}
+
 				// Detect newly cancelled journeys
 				if data.UpdateDescription.UpdatedFields.Cancelled == true && !data.FullDocumentBeforeChange.Cancelled {
 					log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("RealtimeJourney has been cancelled")

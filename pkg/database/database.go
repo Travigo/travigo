@@ -35,12 +35,11 @@ func Connect() error {
 		dbName = env["TRAVIGO_MONGODB_DATABASE"]
 	}
 
-	client, err := mongo.NewClient(options.Client().ApplyURI(connectionString))
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err = client.Connect(ctx)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
+
 	database := client.Database(dbName)
 
 	if err != nil {
