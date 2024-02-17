@@ -134,6 +134,8 @@ type RealtimeJourneyStops struct {
 	DepartureTime time.Time `groups:"basic"`
 
 	TimeType RealtimeJourneyStopTimeType `groups:"basic"`
+
+	Cancelled bool `groups:"basic"`
 }
 
 type RealtimeJourneyStopTimeType string

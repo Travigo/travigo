@@ -48,7 +48,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		go func(journey *Journey) {
 			defer wg.Done()
 
-			var stopDeperatureTime time.Time
+			var stopDepartureTime time.Time
 			var stopPlatform string
 			var stopPlatformType string
 			var destinationDisplay string
@@ -85,7 +85,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 							departureBoardRecordType = DepartureBoardRecordTypeCancelled
 						}
 
-						stopDeperatureTime = time.Date(
+						stopDepartureTime = time.Date(
 							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 						)
 
@@ -94,7 +94,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
-				if stopDeperatureTime.Before(dateTime) {
+				if stopDepartureTime.Before(dateTime) {
 					return
 				}
 
@@ -102,10 +102,10 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
 				// We estimate the current vehicle realtime journey based on the Block Number
-				stopDeperatureTimeFromNow := stopDeperatureTime.Sub(dateTime).Minutes()
+				stopDepartureTimeFromNow := stopDepartureTime.Sub(dateTime).Minutes()
 				if doEstimates &&
 					departureBoardRecordType == DepartureBoardRecordTypeScheduled &&
-					stopDeperatureTimeFromNow <= 45 && stopDeperatureTimeFromNow >= 0 &&
+					stopDepartureTimeFromNow <= 45 && stopDepartureTimeFromNow >= 0 &&
 					journey.OtherIdentifiers["BlockNumber"] != "" {
 
 					var blockJourneys []string
@@ -136,7 +136,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					if blockRealtimeJourney != nil {
 						// Ignore negative offsets as we assume bus will right itself when turning over
 						if blockRealtimeJourney.Offset.Minutes() > 0 {
-							stopDeperatureTime = stopDeperatureTime.Add(blockRealtimeJourney.Offset)
+							stopDepartureTime = stopDepartureTime.Add(blockRealtimeJourney.Offset)
 						}
 						departureBoardRecordType = DepartureBoardRecordTypeEstimated
 					}
@@ -153,7 +153,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				departureBoardGenerationMutex.Lock()
 				departureBoard = append(departureBoard, &DepartureBoard{
 					Journey:            journey,
-					Time:               stopDeperatureTime,
+					Time:               stopDepartureTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
 					Platform:           stopPlatform,
