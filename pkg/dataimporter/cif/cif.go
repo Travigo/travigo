@@ -253,6 +253,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			ScheduledDepartureTime: trainDef.OriginLocation.ScheduledDepartureTime,
 			PublicDepartureTime:    trainDef.OriginLocation.PublicDepartureTime,
 			Platform:               trainDef.OriginLocation.Platform,
+			Activity:               trainDef.OriginLocation.Activity,
 		},
 	}
 
@@ -280,6 +281,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			PublicArrivalTime:    location.PublicArrivalTime,
 
 			Platform: location.Platform,
+			Activity: location.Activity,
 		})
 	}
 
@@ -294,6 +296,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		ScheduledArrivalTime: trainDef.TerminatingLocation.ScheduledArrivalTime,
 		PublicArrivalTime:    trainDef.TerminatingLocation.PublicArrivalTime,
 		Platform:             trainDef.TerminatingLocation.Platform,
+		Activity:             trainDef.TerminatingLocation.Activity,
 	})
 
 	// Generate a CTDF path from the passenger stops
@@ -333,6 +336,9 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 			DestinationStopRef:     destinationStop.PrimaryIdentifier,
 			DestinationArrivalTime: destinationArrivalTime,
 			DestinationPlatform:    strings.TrimSpace(destinationPassengerStop.Platform),
+
+			OriginActivity:      convertStopActivity(originPassengerStop.Activity),
+			DestinationActivity: convertStopActivity(destinationPassengerStop.Activity),
 		})
 	}
 
@@ -422,4 +428,28 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 	stopTIPLOCCache[tiploc] = stop
 
 	return stop
+}
+
+func convertStopActivity(activity string) []ctdf.JourneyPathItemActivity {
+	activityList := []ctdf.JourneyPathItemActivity{}
+	if strings.TrimSpace(activity) == "TB" {
+		activityList = []ctdf.JourneyPathItemActivity{
+			ctdf.JourneyPathItemActivityPickup,
+		}
+	} else if strings.TrimSpace(activity) == "TF" {
+		activityList = []ctdf.JourneyPathItemActivity{
+			ctdf.JourneyPathItemActivitySetdown,
+		}
+	} else if strings.TrimSpace(activity) == "T" {
+		activityList = []ctdf.JourneyPathItemActivity{
+			ctdf.JourneyPathItemActivityPickup,
+			ctdf.JourneyPathItemActivitySetdown,
+		}
+	} else if strings.TrimSpace(activity) == "D" {
+		activityList = []ctdf.JourneyPathItemActivity{
+			ctdf.JourneyPathItemActivitySetdown,
+		}
+	}
+
+	return activityList
 }

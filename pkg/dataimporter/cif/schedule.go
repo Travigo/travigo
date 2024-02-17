@@ -57,7 +57,7 @@ type OriginLocation struct {
 	// Line                   string
 	// EngineeringAllowance   string
 	// PathingAllowance       string
-	// Activity               string
+	Activity string
 	// PerformanceAllowance   string
 }
 
@@ -71,7 +71,7 @@ type IntermediateLocation struct {
 	Platform            string
 	// Line                string
 	// Path                string
-	// Activity string
+	Activity string
 	// EngineeringAllowance string
 	// PathingAllowance     string
 	// PerformanceAllowance string
@@ -119,6 +119,8 @@ type BasicLocation struct {
 	PublicDepartureTime    string
 
 	Platform string
+
+	Activity string
 }
 
 func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
@@ -203,7 +205,7 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 				// Line:                   line[22:25],
 				// EngineeringAllowance:   line[25:27],
 				// PathingAllowance:       line[27:29],
-				// Activity:               line[29:41],
+				Activity: line[29:41],
 				// PerformanceAllowance:   line[41:43],
 			}
 		case "LI":
@@ -217,7 +219,7 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 				Platform:            line[33:36],
 				// Line:                   line[36:39],
 				// Path:                   line[39:42],
-				// Activity:               line[42:54],
+				Activity: line[42:54],
 				// EngineeringAllowance:   line[54:56],
 				// PathingAllowance:       line[56:58],
 				// PerformanceAllowance:   line[58:60],
