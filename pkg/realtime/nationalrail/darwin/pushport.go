@@ -273,6 +273,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				pretty.Println(realtimeJourneyID, stop.PrimaryIdentifier)
 
 				cancelCount += 1
+			} else {
+				updateMap[fmt.Sprintf("stops.%s.cancelled", stop.PrimaryIdentifier)] = false
 			}
 		}
 
