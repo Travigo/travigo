@@ -11,6 +11,8 @@ type Schedule struct {
 	Origin       ScheduleStop   `xml:"OR"`
 	Intermediate []ScheduleStop `xml:"IP"`
 	Destination  ScheduleStop   `xml:"DT"`
+
+	InnerXML string `xml:",innerxml"`
 }
 
 type ScheduleStop struct {

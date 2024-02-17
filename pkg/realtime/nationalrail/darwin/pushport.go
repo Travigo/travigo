@@ -319,6 +319,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidFrom:  realtimeJourney.JourneyRunDate,
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
+
+			pretty.Println(schedule.InnerXML)
 		}
 
 		// Update database
