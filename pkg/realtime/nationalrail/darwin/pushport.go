@@ -197,6 +197,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	// Schedules
 	for _, schedule := range p.Schedules {
 		if schedule.CancelReason != "" {
+			pretty.Println(schedule)
+
 			realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", schedule.SSD, schedule.UID)
 			searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
