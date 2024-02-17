@@ -162,6 +162,7 @@ func (w *RealtimeJourneysWatch) Run() {
 							Body: map[string]interface{}{
 								"RealtimeJourney": data.FullDocument,
 								"Stop":            id,
+								"NewPlatform":     newPlatform,
 							},
 						})
 						w.EventQueue.PublishBytes(eventBytes)
@@ -179,6 +180,7 @@ func (w *RealtimeJourneysWatch) Run() {
 								"RealtimeJourney": data.FullDocument,
 								"Stop":            id,
 								"OldPlatform":     oldPlatform,
+								"NewPlatform":     newPlatform,
 							},
 						})
 						w.EventQueue.PublishBytes(eventBytes)

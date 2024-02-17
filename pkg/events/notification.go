@@ -50,7 +50,6 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		realtimeJourney := eventBody["RealtimeJourney"].(map[string]interface{})
 		journey := realtimeJourney["Journey"].(map[string]interface{})
 		originStopID := eventBody["Stop"].(string)
-		realtimeJourneyStop := realtimeJourney["Stops"].(map[string]interface{})[originStopID].(map[string]interface{})
 
 		var stop *ctdf.Stop
 		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
@@ -67,7 +66,7 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		if stop != nil {
 			originStop = stop.PrimaryName
 		}
-		platform := realtimeJourneyStop["Platform"]
+		platform := eventBody["NewPlatform"]
 
 		if e.Type == ctdf.EventTypeRealtimeJourneyPlatformSet {
 			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will depart from platform %s", departureTimeText, destination, originStop, platform)
