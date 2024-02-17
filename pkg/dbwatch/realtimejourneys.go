@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -45,7 +46,17 @@ func (w *RealtimeJourneysWatch) Run() {
 	matchPipeline := bson.D{
 		{
 			Key: "$match", Value: bson.D{
-				{Key: "operationType", Value: "update"}, //ignore inserts for now
+				{
+					Key: "$and", Value: bson.A{
+						bson.D{{Key: "operationType", Value: "update"}}, //ignore inserts for now
+						bson.D{
+							{
+								Key:   "updateDescription.updatedFields.cancelled",
+								Value: bson.D{{Key: "$exists", Value: true}},
+							},
+						}, //testicles
+					},
+				},
 			},
 		},
 	}
@@ -67,7 +78,7 @@ func (w *RealtimeJourneysWatch) Run() {
 			},
 		},
 	}
-	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.UpdateLookup)
+	opts := options.ChangeStream().SetFullDocumentBeforeChange(options.WhenAvailable).SetFullDocument(options.WhenAvailable)
 	stream, err := collection.Watch(context.Background(), mongo.Pipeline{matchPipeline, projectPipeline}, opts)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to watch collection")
@@ -81,6 +92,8 @@ func (w *RealtimeJourneysWatch) Run() {
 			log.Error().Err(err).Msg("Failed to decode event")
 			continue
 		}
+
+		pretty.Println("CUM")
 
 		go func(data *realtimeJourneyUpdate) {
 			if data.OperationType == "insert" {
