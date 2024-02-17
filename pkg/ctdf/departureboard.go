@@ -63,6 +63,11 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						stopPlatform = path.OriginPlatform
 						stopPlatformType = "ESTIMATED"
 
+						// Ignore drop off only stops from the departure board as no one should be getting onto the vehicle at this point
+						if len(path.OriginActivity) == 1 && path.OriginActivity[0] == JourneyPathItemActivitySetdown {
+							return
+						}
+
 						// Use the realtime estimated stop time based if realtime is available
 						if journey.RealtimeJourney != nil {
 							if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
