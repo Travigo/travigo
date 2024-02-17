@@ -294,6 +294,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
 
+			updateMap["cancelled"] = true
+
 			log.Info().
 				Str("realtimejourneyid", realtimeJourneyID).
 				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
