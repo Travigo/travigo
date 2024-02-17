@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -56,6 +55,7 @@ func (w *RealtimeJourneysWatch) Run() {
 			Key: "$project",
 			Value: bson.D{
 				bson.E{Key: "activelytracked", Value: 0},
+				bson.E{Key: "datasource", Value: 0},
 				bson.E{Key: "timeoutdurationminutes", Value: 0},
 				bson.E{Key: "creationdatetime", Value: 0},
 				// bson.E{Key: "modificationdatetime", Value: 0},
@@ -95,8 +95,8 @@ func (w *RealtimeJourneysWatch) Run() {
 			} else if data.OperationType == "update" {
 				if data.FullDocument.PrimaryIdentifier == "" {
 					// log.Error().Str("old", data.FullDocumentBeforeChange.PrimaryIdentifier).Msg("uh oh?")
-					pretty.Println(data)
-					log.Fatal().Msg("bye?")
+					// pretty.Println(data)
+					// log.Fatal().Msg("bye?")
 					return
 				}
 
