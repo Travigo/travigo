@@ -118,9 +118,6 @@ func (w *RealtimeJourneysWatch) Run() {
 				w.EventQueue.PublishBytes(eventBytes)
 			} else if data.OperationType == "update" {
 				if data.FullDocument.PrimaryIdentifier == "" {
-					// log.Error().Str("old", data.FullDocumentBeforeChange.PrimaryIdentifier).Msg("uh oh?")
-					// pretty.Println(data)
-					// log.Fatal().Msg("bye?")
 					return
 				}
 
