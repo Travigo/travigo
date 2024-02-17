@@ -258,6 +258,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		scheduleStops = append(scheduleStops, schedule.Intermediate...)
 		scheduleStops = append(scheduleStops, schedule.Destination)
 
+		cancelCount := 0
+
 		for _, scheduleStop := range scheduleStops {
 			stop := stopCache.Get("Tiploc", scheduleStop.Tiploc)
 
@@ -269,7 +271,33 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			if scheduleStop.Cancelled == "true" {
 				updateMap[fmt.Sprintf("stops.%s.cancelled", stop.PrimaryIdentifier)] = true
 				pretty.Println(realtimeJourneyID, stop.PrimaryIdentifier)
+
+				cancelCount += 1
 			}
+		}
+
+		if cancelCount > 0 && cancelCount == len(scheduleStops) {
+			createServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
+
+				DataSource: &ctdf.DataSource{},
+
+				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
+
+				Text: railutils.CancelledReasons[schedule.CancelReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
+			})
+
+			log.Info().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+				Msg("Train cancelled")
 		}
 
 		// Update database
