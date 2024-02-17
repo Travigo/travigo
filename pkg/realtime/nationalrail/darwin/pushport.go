@@ -300,6 +300,23 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Str("realtimejourneyid", realtimeJourneyID).
 				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
 				Msg("Train cancelled")
+		} else if cancelCount > 0 {
+			createServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
+
+				DataSource: &ctdf.DataSource{},
+
+				AlertType: ctdf.ServiceAlertTypeJourneyPartiallyCancelled,
+
+				Text: railutils.CancelledReasons[schedule.CancelReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
+			})
 		}
 
 		// Update database

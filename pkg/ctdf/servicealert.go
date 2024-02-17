@@ -25,17 +25,18 @@ type ServiceAlert struct {
 type ServiceAlertType string
 
 const (
-	ServiceAlertTypeInformation          ServiceAlertType = "Information"
-	ServiceAlertTypeWarning                               = "Warning"
-	ServiceAlertTypeStopClosed                            = "StopClosed"
-	ServiceAlertTypeServiceSuspended                      = "ServiceSuspended"
-	ServiceAlertTypeServicePartSuspended                  = "ServicePartSuspended"
-	ServiceAlertTypeSevereDelays                          = "SevereDelays"
-	ServiceAlertTypeDelays                                = "Delays"
-	ServiceAlertTypeMinorDelays                           = "MinorDelays"
-	ServiceAlertTypePlanned                               = "Planned"
-	ServiceAlertTypeJourneyDelayed                        = "JourneyDelayed"
-	ServiceAlertTypeJourneyCancelled                      = "JourneyCancelled"
+	ServiceAlertTypeInformation               ServiceAlertType = "Information"
+	ServiceAlertTypeWarning                                    = "Warning"
+	ServiceAlertTypeStopClosed                                 = "StopClosed"
+	ServiceAlertTypeServiceSuspended                           = "ServiceSuspended"
+	ServiceAlertTypeServicePartSuspended                       = "ServicePartSuspended"
+	ServiceAlertTypeSevereDelays                               = "SevereDelays"
+	ServiceAlertTypeDelays                                     = "Delays"
+	ServiceAlertTypeMinorDelays                                = "MinorDelays"
+	ServiceAlertTypePlanned                                    = "Planned"
+	ServiceAlertTypeJourneyDelayed                             = "JourneyDelayed"
+	ServiceAlertTypeJourneyPartiallyCancelled                  = "JourneyPartiallyCancelled"
+	ServiceAlertTypeJourneyCancelled                           = "JourneyCancelled"
 )
 
 func (a *ServiceAlert) IsValid(checkTime time.Time) bool {
