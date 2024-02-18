@@ -510,7 +510,6 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		DestinationDisplay: destinationDisplay,
 		Availability:       availability,
 		Path:               path,
-		Annotations:        annotations,
 
 		DetailedRailInformation: &detailedRailInformation,
 	}

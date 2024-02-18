@@ -41,8 +41,6 @@ type Journey struct {
 
 	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
 
-	Annotations map[string]interface{} `groups:"basic" json:",omitempty" `
-
 	// Detailed journey information
 	DetailedRailInformation *JourneyDetailedRail `groups:"detailed"`
 }
