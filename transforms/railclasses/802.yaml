@@ -1,0 +1,14 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:802"
+Data:
+  VehicleTypeName: Class 802
+  WiFi: true
+  AirConditioning: true
+  DisabledAccess: true
+  BicycleSpaces: true
+  Toilets: true
+  PowerPlugs: true
+  USBPlugs: false

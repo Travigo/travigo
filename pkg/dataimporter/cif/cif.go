@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -389,8 +388,6 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		ReservationBikeRequired: strings.Contains(trainDef.BasicSchedule.Reservations, "E"),
 		ReservationRecommended:  strings.Contains(trainDef.BasicSchedule.Reservations, "R"),
 	}
-
-	pretty.Println(trainDef.BasicSchedule)
 
 	// Seating type
 	if strings.TrimSpace(trainDef.BasicSchedule.SeatingClass) == "" || trainDef.BasicSchedule.SeatingClass == "B" {

@@ -1,0 +1,14 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:378"
+Data:
+  VehicleTypeName: Class 378
+  WiFi: false
+  AirConditioning: true
+  DisabledAccess: true
+  BicycleSpaces: true
+  Toilets: false
+  PowerPlugs: false
+  USBPlugs: false

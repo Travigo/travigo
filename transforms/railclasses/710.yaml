@@ -1,0 +1,14 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:710"
+Data:
+  VehicleTypeName: Class 710
+  WiFi: false
+  AirConditioning: true
+  DisabledAccess: true
+  BicycleSpaces: true
+  Toilets: false
+  PowerPlugs: false
+  USBPlugs: false

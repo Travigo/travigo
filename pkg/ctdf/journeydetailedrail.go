@@ -18,6 +18,7 @@ type JourneyDetailedRail struct {
 	WiFi           bool `groups:"detailed"`
 	Toilets        bool `groups:"detailed"`
 	PowerPlugs     bool `groups:"detailed"`
+	USBPlugs       bool `groups:"detailed"`
 	DisabledAccess bool `groups:"detailed"`
 	BicycleSpaces  bool `groups:"detailed"`
 

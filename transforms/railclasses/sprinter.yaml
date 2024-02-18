@@ -1,0 +1,15 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:150_153_155_156"
+Data:
+  VehicleTypeName: Sprinter
+  # Such a wide range of vehicle classes & operators we cant say any for certain
+  WiFi: false
+  AirConditioning: false
+  DisabledAccess: false
+  BicycleSpaces: false
+  Toilets: false
+  PowerPlugs: false
+  USBPlugs: false

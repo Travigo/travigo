@@ -1,0 +1,12 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:700"
+Data:
+  VehicleTypeName: Class 700
+  # WiFi: true                # not sure this is actually always true
+  AirConditioning: true
+  DisabledAccess: true
+  BicycleSpaces: true
+  Toilets: true

@@ -1,0 +1,14 @@
+
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:345"
+Data:
+  VehicleTypeName: Class 345
+  WiFi: true
+  AirConditioning: true
+  DisabledAccess: true
+  BicycleSpaces: true
+  Toilets: false
+  PowerPlugs: false
+  USBPlugs: true
