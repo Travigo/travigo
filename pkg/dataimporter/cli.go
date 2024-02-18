@@ -415,7 +415,7 @@ func RegisterCLI() *cli.Command {
 
 					// cifBundleTest := cif.CommonInterfaceFormat{}
 
-					// testFile, err := os.Open("/Users/aaronclaydon/Downloads/testoverlayagain.cif")
+					// testFile, err := os.Open("/Users/aaronclaydon/Downloads/changeofidentity.cif")
 
 					// cifBundleTest.ParseMCA(testFile)
 

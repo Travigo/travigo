@@ -45,7 +45,7 @@ func (s *StompClient) Run() {
 	}
 
 	go s.StartTrainMovementSubscription(conn)
-	//go s.StartVSTPSubscription(conn) // TODO NOT USED
+	go s.StartVSTPSubscription(conn)
 }
 
 func (s *StompClient) StartTrainMovementSubscription(conn *stomp.Conn) {

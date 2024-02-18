@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -389,6 +390,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		ReservationRecommended:  strings.Contains(trainDef.BasicSchedule.Reservations, "R"),
 	}
 
+	pretty.Println(trainDef.BasicSchedule)
+
 	// Seating type
 	if strings.TrimSpace(trainDef.BasicSchedule.SeatingClass) == "" || trainDef.BasicSchedule.SeatingClass == "B" {
 		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingFirstStandard
@@ -445,46 +448,59 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 
 	// Train class
 	trainClass := "unknown"
-	if trainDef.BasicSchedule.PowerType == "DMU" {
+	if trainDef.BasicSchedule.PowerType == "DMU" || trainDef.BasicSchedule.PowerType == "DEM" || trainDef.BasicSchedule.PowerType == "D  " {
+		detailedRailInformation.PowerType = "Diesel"
+
 		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
 		case "69":
 			trainClass = "172"
 		case "A":
-			trainClass = "141 to 144"
+			trainClass = "141_144"
 		case "E":
-			trainClass = "158, 168, 170 or 175"
+			trainClass = "158_168_170_175"
 		case "N":
-			trainClass = "165/0"
+			trainClass = "165"
 		case "S":
-			trainClass = "150, 153, 155 or 156"
+			trainClass = "150_153_155_156"
 		case "T":
-			trainClass = "165/1 or 166"
+			trainClass = "166"
 		case "V":
-			trainClass = "220 or 221"
+			trainClass = "220_221"
 		case "X":
 			trainClass = "159"
+		case "":
+			trainClass = strings.TrimSpace(trainDef.BasicSchedule.PowerType)
+		default:
+			trainClass = strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
 		}
-	} else if trainDef.BasicSchedule.PowerType == "EMU" {
+	} else if trainDef.BasicSchedule.PowerType == "EMU" || trainDef.BasicSchedule.PowerType == "E  " {
+		detailedRailInformation.PowerType = "Electric"
+
 		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
 		case "AT":
-			trainClass = "Accelerated Timings" // this shouldnt ever exist i believe
+			trainClass = "AT" // this shouldnt ever exist i believe
 		case "E":
 			trainClass = "458"
 		case "0":
 			trainClass = "380"
 		case "506":
 			trainClass = "350/1"
+		case "":
+			trainClass = strings.TrimSpace(trainDef.BasicSchedule.PowerType)
 		default:
 			trainClass = strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
 		}
+	} else if trainDef.BasicSchedule.PowerType == "HST" {
+		trainClass = "HST"
+		detailedRailInformation.PowerType = "Diesel"
 	}
 
-	detailedRailInformation.VehicleType = fmt.Sprintf("Class %s", trainClass)
+	detailedRailInformation.VehicleType = fmt.Sprintf("GB:RAILCLASS:%s", trainClass)
 
 	// Rail replacement bus
 	if trainDef.BasicSchedule.TrainCategory == "BR" {
 		detailedRailInformation.ReplacementBus = true
-		detailedRailInformation.VehicleType = "Rail Replacement Bus"
+		detailedRailInformation.VehicleType = "GB:RAILCLASS:REPLACEMENTBUS"
 	}
 
 	// Put it all together

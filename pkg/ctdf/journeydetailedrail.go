@@ -2,6 +2,7 @@ package ctdf
 
 type JourneyDetailedRail struct {
 	VehicleType string `groups:"detailed"`
+	PowerType   string `groups:"detailed"`
 
 	Seating JourneyDetailedRailSeating `groups:"detailed"`
 

@@ -107,6 +107,11 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					return
 				}
 
+				if journey.DetailedRailInformation != nil && journey.DetailedRailInformation.ReplacementBus {
+					stopPlatform = "BUS"
+					stopPlatformType = "ACTUAL"
+				}
+
 				journey.GetReferences()
 
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
