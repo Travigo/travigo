@@ -1,8 +1,9 @@
 package ctdf
 
 type JourneyDetailedRail struct {
-	VehicleType string `groups:"detailed"`
-	PowerType   string `groups:"detailed"`
+	VehicleType     string `groups:"detailed"`
+	VehicleTypeName string `groups:"detailed"`
+	PowerType       string `groups:"detailed"`
 
 	Seating JourneyDetailedRailSeating `groups:"detailed"`
 
@@ -13,6 +14,12 @@ type JourneyDetailedRail struct {
 
 	AirConditioning bool `groups:"detailed"`
 	Heating         bool `groups:"detailed"`
+
+	WiFi           bool `groups:"detailed"`
+	Toilets        bool `groups:"detailed"`
+	PowerPlugs     bool `groups:"detailed"`
+	DisabledAccess bool `groups:"detailed"`
+	BicycleSpaces  bool `groups:"detailed"`
 
 	DriverOnly    bool `groups:"detailed"`
 	GuardRequired bool `groups:"detailed"`

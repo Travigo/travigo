@@ -2,10 +2,11 @@ package transforms
 
 import (
 	"bytes"
-	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 var transforms []TransformDefinition
