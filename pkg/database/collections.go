@@ -218,7 +218,7 @@ func createJourneysIndexes() {
 	_, err = retryRecordsCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "creationdatetime", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(1800), // Expire after 30 minutes
+			Options: options.Index().SetExpireAfterSeconds(2 * 3600), // Expire after 2 hours
 		},
 	}, options.CreateIndexes())
 	if err != nil {

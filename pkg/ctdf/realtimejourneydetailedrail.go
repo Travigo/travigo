@@ -1,6 +1,6 @@
 package ctdf
 
-type RealtimeInformationDetailedRail struct {
+type RealtimeJourneyDetailedRail struct {
 	Carriages []RailCarriage `groups:"basic"`
 }
 

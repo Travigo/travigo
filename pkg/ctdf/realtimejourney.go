@@ -48,8 +48,8 @@ type RealtimeJourney struct {
 
 	Occupancy RealtimeJourneyOccupancy `groups:"detailed"`
 
-	// Details realtime journey information
-	DetailedRailInformation RealtimeInformationDetailedRail `groups:"detailed"`
+	// Detailed realtime journey information
+	DetailedRailInformation RealtimeJourneyDetailedRail `groups:"detailed"`
 }
 
 type RealtimeJourneyOccupancy struct {

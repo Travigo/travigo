@@ -7,6 +7,7 @@ import (
 	"math"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,6 +108,11 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Skip buses and ships
 		if trainDef.BasicSchedule.TrainCategory == "BS" || trainDef.BasicSchedule.TrainCategory == "SS" {
+			continue
+		}
+
+		// Skip empty non-passenger movements
+		if trainDef.BasicSchedule.TrainCategory == "EE" || trainDef.BasicSchedule.TrainCategory == "ES" {
 			continue
 		}
 
@@ -377,6 +383,110 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		annotations["transporttype.rail.replacementbus"] = true
 	}
 
+	////// Detailed rail information //////
+	detailedRailInformation := ctdf.JourneyDetailedRail{
+		AirConditioning: strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "R"),
+		Heating:         strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "S"),
+		DriverOnly:      strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "D"),
+		GuardRequired:   strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "G"),
+
+		ReservationRequired:     strings.Contains(trainDef.BasicSchedule.Reservations, "A"),
+		ReservationBikeRequired: strings.Contains(trainDef.BasicSchedule.Reservations, "E"),
+		ReservationRecommended:  strings.Contains(trainDef.BasicSchedule.Reservations, "R"),
+	}
+
+	// Seating type
+	if strings.TrimSpace(trainDef.BasicSchedule.SeatingClass) == "" || trainDef.BasicSchedule.SeatingClass == "B" {
+		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingFirstStandard
+	} else if trainDef.BasicSchedule.SeatingClass == "S" {
+		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingStandard
+	} else {
+		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingUnknown
+	}
+
+	// Sleepers
+	if trainDef.BasicSchedule.Sleepers == "B" {
+		detailedRailInformation.SleeperAvailable = true
+		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingFirstStandard
+	} else if trainDef.BasicSchedule.Sleepers == "F" {
+		detailedRailInformation.SleeperAvailable = true
+		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingFirst
+	} else if trainDef.BasicSchedule.Sleepers == "S" {
+		detailedRailInformation.SleeperAvailable = true
+		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingStandard
+	} else {
+		detailedRailInformation.SleeperAvailable = false
+	}
+
+	// Catering
+	cateringDescriptions := []string{}
+	if strings.Contains(trainDef.BasicSchedule.CateringCode, "C") {
+		cateringDescriptions = append(cateringDescriptions, "Buffet service")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "F") {
+		cateringDescriptions = append(cateringDescriptions, "Restaurant Car available for First Class passengers")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "H") {
+		cateringDescriptions = append(cateringDescriptions, "Hot food available")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "M") {
+		cateringDescriptions = append(cateringDescriptions, "Meal included for First Class passengers")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "P") {
+		cateringDescriptions = append(cateringDescriptions, "Wheelchair only reservations")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "R") {
+		cateringDescriptions = append(cateringDescriptions, "Restaurant")
+		detailedRailInformation.CateringAvailable = true
+	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "T") {
+		cateringDescriptions = append(cateringDescriptions, "Trolley service")
+		detailedRailInformation.CateringAvailable = true
+	}
+
+	detailedRailInformation.CateringDescription = strings.Join(cateringDescriptions, ". ")
+
+	// Speed
+	speedMPH, _ := strconv.Atoi(trainDef.BasicSchedule.Speed)
+	detailedRailInformation.SpeedKMH = int(float64(speedMPH) * 1.60934)
+
+	// Train class
+	trainClass := "unknown"
+	if trainDef.BasicSchedule.PowerType == "DMU" {
+		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
+		case "69":
+			trainClass = "172"
+		case "A":
+			trainClass = "141 to 144"
+		case "E":
+			trainClass = "158, 168, 170 or 175"
+		case "N":
+			trainClass = "165/0"
+		case "S":
+			trainClass = "150, 153, 155 or 156"
+		case "T":
+			trainClass = "165/1 or 166"
+		case "V":
+			trainClass = "220 or 221"
+		case "X":
+			trainClass = "159"
+		}
+	} else if trainDef.BasicSchedule.PowerType == "EMU" {
+		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
+		case "AT":
+			trainClass = "Accelerated Timings" // this shouldnt ever exist i believe
+		case "E":
+			trainClass = "458"
+		case "0":
+			trainClass = "380"
+		case "506":
+			trainClass = "350/1"
+		default:
+			trainClass = strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
+		}
+	}
+
+	detailedRailInformation.VehicleType = fmt.Sprintf("Class %s", trainClass)
+
 	// Put it all together
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: journeyID,
@@ -401,6 +511,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		Availability:       availability,
 		Path:               path,
 		Annotations:        annotations,
+
+		DetailedRailInformation: &detailedRailInformation,
 	}
 
 	return journey

@@ -28,15 +28,15 @@ type BasicSchedule struct {
 	// CourseIndicator    string
 	TrainServiceCode string
 	// PortionID          string
-	// PowerType          string
-	// TimingLoad               string
-	// Speed                    string
-	// OperatingCharacteristics string
-	// SeatingClass             string
-	// Sleepers                 string
-	// Reservations        string
-	ConnectionIndicator string
-	// CateringCode             string
+	PowerType                string
+	TimingLoad               string
+	Speed                    string
+	OperatingCharacteristics string
+	SeatingClass             string
+	Sleepers                 string
+	Reservations             string
+	ConnectionIndicator      string
+	CateringCode             string
 	// ServiceBranding string
 	// Spare           string
 	STPIndicator string
@@ -174,15 +174,15 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 				// CourseIndicator:    line[40:41],
 				TrainServiceCode: line[41:49],
 				// PortionID:          line[49:50],
-				// PowerType:          line[50:53],
-				// TimingLoad:               line[53:57],
-				// Speed:                    line[57:60],
-				// OperatingCharacteristics: line[60:66],
-				// SeatingClass:             line[66:67],
-				// Sleepers:                 line[67:68],
-				// Reservations:        line[68:69],
-				ConnectionIndicator: line[69:70],
-				// CateringCode:             line[70:74],
+				PowerType:                line[50:53],
+				TimingLoad:               line[53:57],
+				Speed:                    line[57:60],
+				OperatingCharacteristics: line[60:66],
+				SeatingClass:             line[66:67],
+				Sleepers:                 line[67:68],
+				Reservations:             line[68:69],
+				ConnectionIndicator:      line[69:70],
+				CateringCode:             line[70:74],
 				// ServiceBranding:          line[74:78],
 				// Spare:                    line[78:79],
 				STPIndicator: line[79:80],
