@@ -295,6 +295,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidFrom:  realtimeJourney.JourneyRunDate,
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
+			deleteServiceAlert(fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
 			updateMap["cancelled"] = true
 
@@ -320,7 +321,14 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
 
+			deleteServiceAlert(fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+
 			pretty.Println(schedule.InnerXML)
+		} else {
+			updateMap["cancelled"] = false
+
+			deleteServiceAlert(fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			deleteServiceAlert(fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		}
 
 		// Update database
