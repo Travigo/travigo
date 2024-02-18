@@ -22,6 +22,8 @@ type JourneyDetailedRail struct {
 
 	CateringAvailable   bool   `groups:"detailed"`
 	CateringDescription string `groups:"detailed"`
+
+	ReplacementBus bool `groups:"detailed"`
 }
 
 type JourneyDetailedRailSeating string

@@ -377,12 +377,6 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 
 	operatorRef := fmt.Sprintf(ctdf.OperatorTOCFormat, trainDef.BasicScheduleExtraDetails.ATOCCode)
 
-	// Calculate transport type (rail or replacement bus)
-	annotations := map[string]interface{}{}
-	if trainDef.BasicSchedule.TrainCategory == "BR" {
-		annotations["transporttype.rail.replacementbus"] = true
-	}
-
 	////// Detailed rail information //////
 	detailedRailInformation := ctdf.JourneyDetailedRail{
 		AirConditioning: strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "R"),
@@ -486,6 +480,12 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 	}
 
 	detailedRailInformation.VehicleType = fmt.Sprintf("Class %s", trainClass)
+
+	// Rail replacement bus
+	if trainDef.BasicSchedule.TrainCategory == "BR" {
+		detailedRailInformation.ReplacementBus = true
+		detailedRailInformation.VehicleType = "Rail Replacement Bus"
+	}
 
 	// Put it all together
 	journey := &ctdf.Journey{
