@@ -149,13 +149,11 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 		} else if trainDef.BasicSchedule.TransactionType == "N" && trainDef.BasicSchedule.STPIndicator == "O" {
 			// Handle an overlay
 			// Do this by excluding the date range on the original journey and then creating a new one with the overlay
-			originalJourney := journeys[basicJourneyID]
-
-			if originalJourney != nil {
+			for _, journey := range journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] {
 				dateRunsFrom, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsFrom)
 				dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
 
-				originalJourney.Availability.Exclude = append(originalJourney.Availability.Exclude, ctdf.AvailabilityRule{
+				journey.Availability.Exclude = append(journey.Availability.Exclude, ctdf.AvailabilityRule{
 					Type:        ctdf.AvailabilityDateRange,
 					Value:       fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
 					Description: fmt.Sprintf("Overlay with %s", journeyID),
