@@ -469,9 +469,10 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 					})
 				}
 				realtimeCarriages = append(realtimeCarriages, ctdf.RailCarriage{
-					ID:      carriage.Number,
-					Class:   carriage.Class,
-					Toilets: toilets,
+					ID:        carriage.Number,
+					Class:     carriage.Class,
+					Toilets:   toilets,
+					Occupancy: -1,
 				})
 			}
 			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
