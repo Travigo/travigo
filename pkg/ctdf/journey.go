@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -67,9 +68,17 @@ func (j *Journey) GetService() {
 	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.ServiceRef}).Decode(&j.Service)
 }
 func (j *Journey) GetDeepReferences() {
+	wg := sync.WaitGroup{}
 	for _, path := range j.Path {
-		path.GetReferences()
+		wg.Add(1)
+		go func(path *JourneyPathItem) {
+			path.GetReferences()
+
+			wg.Done()
+		}(path)
 	}
+
+	wg.Wait()
 }
 func (j *Journey) GetRealtimeJourney() {
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()

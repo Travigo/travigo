@@ -48,7 +48,8 @@ func getJourney(c *fiber.Ctx) error {
 				pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
 			}
 
-			transforms.Transform(journey, 2)
+			transforms.Transform(journey.Service, 1)
+			transforms.Transform(journey.DetailedRailInformation, 1)
 
 			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
 				Groups: []string{"basic", "detailed"},
