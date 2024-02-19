@@ -15,8 +15,8 @@ Data:
   - ID: "1"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
+    # Toilets:
+    # - Type: "Accessible"
   - ID: "2"
     Class: "Standard"
     Occupancy: -1
@@ -26,8 +26,8 @@ Data:
   - ID: "4"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Standard"
+    # Toilets:
+    # - Type: "Standard"
   - ID: "5"
     Class: "Standard"
     Occupancy: -1

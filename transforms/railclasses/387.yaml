@@ -19,13 +19,13 @@ Data:
   - ID: "2"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Standard"
+    # Toilets:
+    # - Type: "Standard"
   - ID: "3"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
+    # Toilets:
+    # - Type: "Accessible"
   - ID: "4"
     Class: "Standard"
     Occupancy: -1
