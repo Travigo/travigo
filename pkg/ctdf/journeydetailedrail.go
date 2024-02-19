@@ -5,6 +5,8 @@ type JourneyDetailedRail struct {
 	VehicleTypeName string `groups:"detailed"`
 	PowerType       string `groups:"detailed"`
 
+	Carriages []RailCarriage `groups:"detailed"`
+
 	Seating JourneyDetailedRailSeating `groups:"detailed"`
 
 	SleeperAvailable bool                       `groups:"detailed"`
@@ -42,3 +44,16 @@ const (
 	JourneyDetailedRailSeatingStandard                                 = "Standard"
 	JourneyDetailedRailSeatingUnknown                                  = "Unknown"
 )
+
+type RailCarriage struct {
+	ID      string               `groups:"basic"`
+	Class   string               `groups:"basic"`
+	Toilets []RailCarriageToilet `groups:"basic"`
+
+	Occupancy int `groups:"basic"`
+}
+
+type RailCarriageToilet struct {
+	Type   string `groups:"basic"`
+	Status string `groups:"basic"`
+}

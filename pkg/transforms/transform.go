@@ -42,7 +42,22 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 			for key, value := range t.Data {
 				field := inputValue.FieldByName(key)
 				if field.IsValid() {
-					field.Set(reflect.ValueOf(value))
+					valueOf := reflect.ValueOf(value)
+					if valueOf.Kind() == reflect.Slice {
+						for i := 0; i < valueOf.Len(); i++ {
+							item := valueOf.Index(i)
+							newSliceValue := reflect.New(field.Type().Elem()).Elem()
+
+							for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
+								itemField := newSliceValue.FieldByName(itemKey)
+								itemField.Set(reflect.ValueOf(itemValue))
+							}
+
+							field.Set(reflect.Append(field, newSliceValue))
+						}
+					} else {
+						field.Set(reflect.ValueOf(value))
+					}
 				}
 			}
 		}
