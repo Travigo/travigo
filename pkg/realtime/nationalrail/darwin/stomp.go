@@ -33,6 +33,8 @@ func (s *StompClient) Run() {
 	}
 	queue.Process()
 
+	go RetryRecords(queue)
+
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
 		stomp.ConnOpt.Login(s.Username, s.Password),

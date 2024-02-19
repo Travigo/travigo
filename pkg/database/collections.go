@@ -208,9 +208,6 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "otheridentifiers.nationalrailrid", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "otheridentifiers.TrainUID", Value: 1}},
-		},
-		{
 			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
 		},
