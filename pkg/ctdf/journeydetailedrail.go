@@ -13,7 +13,6 @@ type JourneyDetailedRail struct {
 	SpeedKMH int `groups:"detailed"`
 
 	AirConditioning bool `groups:"detailed"`
-	Heating         bool `groups:"detailed"`
 
 	WiFi           bool `groups:"detailed"`
 	Toilets        bool `groups:"detailed"`

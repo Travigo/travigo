@@ -380,7 +380,6 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 	////// Detailed rail information //////
 	detailedRailInformation := ctdf.JourneyDetailedRail{
 		AirConditioning: strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "R"),
-		Heating:         strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "S"),
 		DriverOnly:      strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "D"),
 		GuardRequired:   strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "G"),
 

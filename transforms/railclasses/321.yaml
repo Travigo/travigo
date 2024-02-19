@@ -1,0 +1,14 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "GB:RAILCLASS:321"
+Data:
+  # Unsure on this one
+  VehicleTypeName: Class 321
+  WiFi: false
+  AirConditioning: false
+  DisabledAccess: false
+  BicycleSpaces: false
+  Toilets: false
+  PowerPlugs: false
+  USBPlugs: false

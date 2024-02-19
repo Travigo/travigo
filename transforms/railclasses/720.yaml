@@ -1,13 +1,13 @@
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
-  VehicleType: "GB:RAILCLASS:802"
+  VehicleType: "GB:RAILCLASS:720"
 Data:
-  VehicleTypeName: Class 802
+  VehicleTypeName: Class 720
   WiFi: true
   AirConditioning: true
   DisabledAccess: true
-  BicycleSpaces: true
+  BicycleSpaces: false
   Toilets: true
   PowerPlugs: true
-  USBPlugs: false
+  USBPlugs: true
