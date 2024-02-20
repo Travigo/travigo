@@ -71,31 +71,36 @@ func handleSubDocument(inputValue reflect.Value, data map[string]interface{}) {
 		if field.IsValid() {
 			valueOf := reflect.ValueOf(value)
 			if valueOf.Kind() == reflect.Slice {
-				for i := 0; i < valueOf.Len(); i++ {
-					item := valueOf.Index(i)
-					newSliceValue := reflect.New(field.Type().Elem()).Elem()
-
-					for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
-						itemField := newSliceValue.FieldByName(itemKey)
-						itemValueOf := reflect.ValueOf(itemValue)
-
-						if itemValueOf.Kind() == reflect.Slice {
-							for i2 := 0; i2 < itemValueOf.Len(); i2++ {
-								itemStuckInALoopOfDoom := itemValueOf.Index(i2)
-								pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-								handleSubDocument(newSliceValue, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-							}
-						} else {
-							itemField.Set(itemValueOf)
-						}
-					}
-
-					field.Set(reflect.Append(field, newSliceValue))
-				}
+				handleSubDocument2(field, valueOf, data)
 			} else {
 				field.Set(reflect.ValueOf(value))
 			}
 		}
+	}
+}
+
+func handleSubDocument2(field reflect.Value, valueOf reflect.Value, data map[string]interface{}) {
+	for i := 0; i < valueOf.Len(); i++ {
+		item := valueOf.Index(i)
+		newSliceValue := reflect.New(field.Type().Elem()).Elem()
+
+		for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
+			itemField := newSliceValue.FieldByName(itemKey)
+			itemValueOf := reflect.ValueOf(itemValue)
+
+			if itemValueOf.Kind() == reflect.Slice {
+				for i2 := 0; i2 < itemValueOf.Len(); i2++ {
+					itemStuckInALoopOfDoom := itemValueOf.Index(i2)
+					pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+					pretty.Println(itemField.String(), newSliceValue.String(), itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+					handleSubDocument2(newSliceValue, itemField, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+				}
+			} else {
+				itemField.Set(itemValueOf)
+			}
+		}
+
+		field.Set(reflect.Append(field, newSliceValue))
 	}
 }
 
