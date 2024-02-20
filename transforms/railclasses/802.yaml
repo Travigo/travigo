@@ -10,4 +10,4 @@ Data:
   BicycleSpaces: true
   Toilets: true
   PowerPlugs: true
-  USBPlugs: false
+  # USBPlugs: false

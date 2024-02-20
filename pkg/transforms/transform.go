@@ -3,6 +3,8 @@ package transforms
 import (
 	"reflect"
 	"strings"
+
+	"github.com/kr/pretty"
 )
 
 type TransformDefinition struct {
@@ -39,27 +41,7 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 
 		// If we match then go over and update the values
 		if isMatch {
-			for key, value := range t.Data {
-				field := inputValue.FieldByName(key)
-				if field.IsValid() {
-					valueOf := reflect.ValueOf(value)
-					if valueOf.Kind() == reflect.Slice {
-						for i := 0; i < valueOf.Len(); i++ {
-							item := valueOf.Index(i)
-							newSliceValue := reflect.New(field.Type().Elem()).Elem()
-
-							for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
-								itemField := newSliceValue.FieldByName(itemKey)
-								itemField.Set(reflect.ValueOf(itemValue))
-							}
-
-							field.Set(reflect.Append(field, newSliceValue))
-						}
-					} else {
-						field.Set(reflect.ValueOf(value))
-					}
-				}
-			}
+			handleSubDocument(inputValue, t.Data)
 		}
 	}
 
@@ -79,6 +61,40 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 
 		if valueTypeKind == reflect.Slice || valueTypeKind == reflect.Struct {
 			Transform(valueField.Interface(), depth-1)
+		}
+	}
+}
+
+func handleSubDocument(inputValue reflect.Value, data map[string]interface{}) {
+	for key, value := range data {
+		field := inputValue.FieldByName(key)
+		if field.IsValid() {
+			valueOf := reflect.ValueOf(value)
+			if valueOf.Kind() == reflect.Slice {
+				for i := 0; i < valueOf.Len(); i++ {
+					item := valueOf.Index(i)
+					newSliceValue := reflect.New(field.Type().Elem()).Elem()
+
+					for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
+						itemField := newSliceValue.FieldByName(itemKey)
+						itemValueOf := reflect.ValueOf(itemValue)
+
+						if itemValueOf.Kind() == reflect.Slice {
+							for i2 := 0; i2 < itemValueOf.Len(); i2++ {
+								itemStuckInALoopOfDoom := itemValueOf.Index(i2)
+								pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+								handleSubDocument(newSliceValue, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+							}
+						} else {
+							itemField.Set(itemValueOf)
+						}
+					}
+
+					field.Set(reflect.Append(field, newSliceValue))
+				}
+			} else {
+				field.Set(reflect.ValueOf(value))
+			}
 		}
 	}
 }

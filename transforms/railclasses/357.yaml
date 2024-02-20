@@ -9,8 +9,8 @@ Data:
   DisabledAccess: true
   BicycleSpaces: true
   Toilets: true
-  PowerPlugs: false
-  USBPlugs: false
+  # PowerPlugs: false
+  # USBPlugs: false
   Carriages:
   - ID: "1"
     Class: "Standard"
@@ -18,13 +18,13 @@ Data:
   - ID: "2"
     Class: "Standard"
     Occupancy: -1
-    # Toilets:
-    # - Type: "Standard"
+    Toilets:
+    - Type: "Standard"
   - ID: "3"
     Class: "Standard"
     Occupancy: -1
-    # Toilets:
-    # - Type: "Accessible"
+    Toilets:
+    - Type: "Accessible"
   - ID: "4"
     Class: "Standard"
     Occupancy: -1

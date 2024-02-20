@@ -9,8 +9,8 @@ Data:
   AirConditioning: true
   DisabledAccess: true
   BicycleSpaces: true
-  Toilets: false
-  PowerPlugs: false
+  # Toilets: false
+  # PowerPlugs: false
   USBPlugs: true
   Carriages:
   - ID: "1"
