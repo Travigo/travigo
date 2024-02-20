@@ -3,8 +3,6 @@ package transforms
 import (
 	"reflect"
 	"strings"
-
-	"github.com/kr/pretty"
 )
 
 type TransformDefinition struct {
@@ -90,10 +88,10 @@ func handleSubDocument2(field reflect.Value, valueOf reflect.Value, data map[str
 
 			if itemValueOf.Kind() == reflect.Slice {
 				for i2 := 0; i2 < itemValueOf.Len(); i2++ {
-					itemStuckInALoopOfDoom := itemValueOf.Index(i2)
-					pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-					pretty.Println(itemField.String(), newSliceValue.String(), itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-					handleSubDocument2(newSliceValue, itemField, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+					// itemStuckInALoopOfDoom := itemValueOf.Index(i2)
+					// pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+					// pretty.Println(itemField.String(), newSliceValue.String(), itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+					// handleSubDocument2(newSliceValue, itemField, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
 				}
 			} else {
 				itemField.Set(itemValueOf)
