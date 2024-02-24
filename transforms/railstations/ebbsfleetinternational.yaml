@@ -1,0 +1,8 @@
+---
+Type: ctdf.Stop
+Match:
+  PrimaryIdentifier: "GB:ATCO:9100EBSFLTI"
+Data:
+  OtherIdentifiers:
+    Tiploc: "EBSFLTI"
+    STANOX: "89530"
