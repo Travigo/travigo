@@ -1,0 +1,25 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:BRUXMID"
+Data:
+  primaryidentifier: "GB:ATCO:BRUXMID"
+  otheridentifiers:
+    AtcoCode: 9100BRUXMID
+    Tiploc: BRUXMID
+    Crs: BXS
+    STANOX: "850"
+  primaryname: Brussels-South
+  othernames:
+    ShortCommonName: ""
+    Street: "-"
+    Indicator: "INTERNATIONAL"
+    Landmark: ""
+  transporttypes:
+  - Rail
+  location:
+    type: Point
+    coordinates:
+    - 4.335222
+    - 50.835161
+  active: true

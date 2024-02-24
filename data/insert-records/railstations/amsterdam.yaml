@@ -1,0 +1,25 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:AMSTDAM"
+Data:
+  primaryidentifier: "GB:ATCO:AMSTDAM"
+  otheridentifiers:
+    AtcoCode: 9100AMSTDAM
+    Tiploc: AMSTDAM
+    Crs: AMS
+    STANOX: "950"
+  primaryname: Amsterdam Central
+  othernames:
+    ShortCommonName: ""
+    Street: "-"
+    Indicator: "INTERNATIONAL"
+    Landmark: ""
+  transporttypes:
+  - Rail
+  location:
+    type: Point
+    coordinates:
+    - 4.9
+    - 52.378333
+  active: true

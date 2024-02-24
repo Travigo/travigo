@@ -1,0 +1,25 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:ROTTCS"
+Data:
+  primaryidentifier: "GB:ATCO:ROTTCS"
+  otheridentifiers:
+    AtcoCode: 9100ROTTCS
+    Tiploc: ROTTCS
+    Crs: ROT
+    STANOX: "918"
+  primaryname: Rotterdam Central
+  othernames:
+    ShortCommonName: ""
+    Street: "-"
+    Indicator: "INTERNATIONAL"
+    Landmark: ""
+  transporttypes:
+  - Rail
+  location:
+    type: Point
+    coordinates:
+    - 4.469444
+    - 51.924444
+  active: true
