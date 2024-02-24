@@ -26,6 +26,8 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	var operators []*ctdf.Operator
 	var services []*ctdf.Service
 
+	StopNameOverrides := generateRailStopNameOverrides()
+
 	now := time.Now()
 
 	for _, toc := range t.Companies {
@@ -66,6 +68,8 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 			BrandIcon:        "/icons/national-rail.svg",
 			BrandColour:      "#ffffff",
 			BrandDisplayMode: "short",
+
+			StopNameOverrides: StopNameOverrides,
 		})
 	}
 
@@ -238,4 +242,19 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", servicesOperationInsert)
 	log.Info().Msgf(" - %d updates", servicesOperationUpdate)
+}
+
+func generateRailStopNameOverrides() map[string]string {
+	stopNameOverrides := map[string]string{}
+
+	stopsCollection := database.GetCollection("stops")
+	var stops []ctdf.Stop
+	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers.Tiploc": bson.M{"$exists": true}})
+	cursor.All(context.Background(), &stops)
+
+	for _, stop := range stops {
+		stopNameOverrides[stop.PrimaryIdentifier] = strings.Replace(stop.PrimaryName, " Rail Station", "", 1)
+	}
+
+	return stopNameOverrides
 }
