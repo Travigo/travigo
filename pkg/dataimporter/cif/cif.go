@@ -177,6 +177,10 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	var journeysArray []*ctdf.Journey
 
 	for _, journey := range journeys {
+		// Skip zero path journeys
+		if len(journey.Path) == 0 {
+			continue
+		}
 		journeysArray = append(journeysArray, journey)
 	}
 
