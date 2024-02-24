@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install ca-certificates -y && update-ca-certificat
 WORKDIR /
 
 COPY ./travigo /travigo
-COPY ./transforms /transforms
+COPY ./data /data
 
 RUN chmod +x /travigo
 

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
+	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
 	"github.com/adjust/rmq/v5"
@@ -85,6 +86,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
 
 					if c.Args().Len() != 2 {
 						return errors.New("<data-format> and <source> must be provided")
@@ -192,6 +194,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
 
 					bodsDatasetIdentifier := "GB-DfT-BODS"
 
@@ -312,6 +315,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
 
 					source := c.String("url")
 
@@ -412,10 +416,11 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
 
 					// cifBundleTest := cif.CommonInterfaceFormat{}
 
-					// testFile, err := os.Open("/Users/aaronclaydon/Downloads/changeofidentity.cif")
+					// testFile, err := os.Open("/Users/aaronclaydon/Downloads/tynewear.cif")
 
 					// cifBundleTest.ParseMCA(testFile)
 
@@ -423,7 +428,7 @@ func RegisterCLI() *cli.Command {
 
 					// for _, journey := range journeys {
 					// 	pretty.Println(journey.PrimaryIdentifier)
-					// 	pretty.Println(journey.DetailedRailInformation)
+					// 	pretty.Println(len(journey.Path))
 					// }
 
 					// return nil
@@ -507,6 +512,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
 
 					source := c.String("url")
 
@@ -561,6 +567,7 @@ func RegisterCLI() *cli.Command {
 					if err := database.Connect(); err != nil {
 						return err
 					}
+					insertrecords.Insert()
 
 					env := util.GetEnvironmentVariables()
 					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {

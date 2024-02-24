@@ -1,0 +1,26 @@
+
+---
+Collection: operators
+Match:
+  primaryidentifier: "GB:TOC:TW"
+Data:
+  primaryidentifier: "GB:TOC:TW"
+  otheridentifiers:
+  - "GB:TOC:TW"
+  primaryname: "Tyne & Wear Metro"
+  othernames:
+  - "Nexus"
+  transporttype: Metro
+  website: "https://www.nexus.org.uk/metro"
+---
+Collection: services
+Match:
+  primaryidentifier: "GB:TOC:TW"
+Data:
+  primaryidentifier: "GB:TOC:TW"
+  servicename: Tyne & Wear Metro
+  operatorref: "GB:TOC:TW"
+  brandcolour: "#feb300"
+  brandicon: "/icons/tynewearmetro.svg"
+  branddisplaymode: short
+  transporttype: Metro
