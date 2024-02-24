@@ -1,0 +1,10 @@
+# Lumo
+---
+Type: ctdf.Service
+Match:
+  OperatorRef: "GB:TOC:ES"
+  TransportType: "Rail"
+Data:
+  BrandColour: "#00286A"
+  SecondaryBrandColour: "#FCF5D8"
+  BrandIcon: "/icons/eurostar.webp"
