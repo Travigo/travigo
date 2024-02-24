@@ -106,13 +106,12 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	journeysTrainUIDOnly := map[string][]*ctdf.Journey{}
 
 	for _, trainDef := range c.TrainDefinitionSets {
-		// Skip buses and ships
-		if trainDef.BasicSchedule.TrainCategory == "BS" || trainDef.BasicSchedule.TrainCategory == "SS" {
-			continue
-		}
-
-		// Skip empty non-passenger movements
-		if trainDef.BasicSchedule.TrainCategory == "EE" || trainDef.BasicSchedule.TrainCategory == "ES" {
+		// Only care about relevant passenger trains
+		if !util.ContainsString([]string{
+			"OO", "OW",
+			"XC", "XD", "XI", "XR", "XX", "XZ",
+			"BR",
+		}, trainDef.BasicSchedule.TrainCategory) {
 			continue
 		}
 
