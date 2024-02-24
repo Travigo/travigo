@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/travigo/travigo/pkg/util"
 	"math"
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/travigo/travigo/pkg/transforms"
+	"github.com/travigo/travigo/pkg/util"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -89,6 +91,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					stationStopGroups[ctdfStopGroup.PrimaryIdentifier] = true
 					stationStopGroupsMutex.Unlock()
 				}
+
+				transforms.Transform(ctdfStopGroup, 3)
 
 				var existingStopGroup *ctdf.StopGroup
 				stopGroupsCollection.FindOne(context.Background(), bson.M{"identifier": ctdfStopGroup.PrimaryIdentifier}).Decode(&existingStopGroup)
@@ -194,6 +198,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 					continue
 				}
 
+				transforms.Transform(ctdfStop, 3)
+
 				ctdfStop.DataSource = datasource
 				bsonRep, _ := bson.Marshal(ctdfStop)
 
@@ -284,6 +290,8 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 				}
 			}
 		}
+
+		transforms.Transform(stationStop, 2)
 
 		bsonRep, _ := bson.Marshal(stationStop)
 

@@ -126,12 +126,6 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			continue
 		}
 
-		// TODO Skip Nexus (Tyne & Wear Metro) records
-		// The naptan data puts the stops as bus/metro stops with no CRS/TIPLOC
-		if trainDef.BasicScheduleExtraDetails.ATOCCode == "TW" {
-			continue
-		}
-
 		basicJourneyID := fmt.Sprintf("GB:RAIL:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom)
 		journeyID := fmt.Sprintf("GB:RAIL:%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
 

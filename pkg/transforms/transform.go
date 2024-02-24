@@ -39,6 +39,7 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 
 		// If we match then go over and update the values
 		if isMatch {
+			// pretty.Println(inputValue, t.Data)
 			handleSubDocument(inputValue, t.Data)
 		}
 	}
@@ -70,10 +71,18 @@ func handleSubDocument(inputValue reflect.Value, data map[string]interface{}) {
 			valueOf := reflect.ValueOf(value)
 			if valueOf.Kind() == reflect.Slice {
 				handleSubDocument2(field, valueOf, data)
+			} else if valueOf.Kind() == reflect.Map {
+				handleMap(field, value.(map[string]interface{}))
 			} else {
 				field.Set(reflect.ValueOf(value))
 			}
 		}
+	}
+}
+
+func handleMap(field reflect.Value, data map[string]interface{}) {
+	for key, value := range data {
+		field.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(value))
 	}
 }
 
