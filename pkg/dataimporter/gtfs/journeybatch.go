@@ -10,18 +10,20 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func NewDatabaseBatchProcessingQueue(collection string, timeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
+func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Duration, emptyTimeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
 	return DatabaseBatchProcessingQueue{
 		Collection:        collection,
-		Timeout:           timeout,
+		BatchTimeout:      batchTimeout,
+		EmptyTimeout:      emptyTimeout,
 		items:             make(chan mongo.WriteModel, batchSize),
 		lastItemProcessed: time.Now(),
 	}
 }
 
 type DatabaseBatchProcessingQueue struct {
-	Collection string
-	Timeout    time.Duration
+	Collection   string
+	BatchTimeout time.Duration
+	EmptyTimeout time.Duration
 
 	items             chan (mongo.WriteModel)
 	lastItemProcessed time.Time
@@ -36,7 +38,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 	go func(b *DatabaseBatchProcessingQueue) {
 		realtimeJourneysCollection := database.GetCollection(b.Collection)
 
-		b.ticker = time.NewTicker(b.Timeout)
+		b.ticker = time.NewTicker(b.BatchTimeout)
 
 		for range b.ticker.C {
 			batchItems := []mongo.WriteModel{}
@@ -70,7 +72,7 @@ func (b *DatabaseBatchProcessingQueue) Wait() {
 	for waiting {
 		now := time.Now()
 
-		if now.Sub(b.lastItemProcessed) > 5*b.Timeout {
+		if now.Sub(b.lastItemProcessed) > b.EmptyTimeout {
 			log.Info().Str("collection", b.Collection).Msg("Nothing left to process in queue")
 			b.ticker.Stop()
 			return
