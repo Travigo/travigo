@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
+	"github.com/travigo/travigo/pkg/dataimporter/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
@@ -716,7 +717,7 @@ func importFile(dataFormat string, transportType ctdf.TransportType, source stri
 
 	// Check if its an XML file or ZIP file
 
-	if fileExtension == ".xml" || fileExtension == ".cif" || fileExtension == ".json" {
+	if fileExtension == ".xml" || fileExtension == ".cif" || fileExtension == ".json" || fileExtension == ".bundle" {
 		file, err := os.Open(source)
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to open file")
@@ -876,6 +877,15 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		corpus.ImportIntoMongoAsCTDF(&datasource)
+	case "gtfs":
+		log.Info().Msgf("GTFS file import from %s ", dataFile.Name)
+		gtfsFile, err := gtfs.ParseZip(dataFile.Name)
+
+		if err != nil {
+			return err
+		}
+
+		gtfsFile.ImportIntoMongoAsCTDF("gb-bods-gtfs")
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
