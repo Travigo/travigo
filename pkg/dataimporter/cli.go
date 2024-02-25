@@ -621,6 +621,51 @@ func RegisterCLI() *cli.Command {
 					return nil
 				},
 			},
+			{
+				Name:  "gtfs-timetable",
+				Usage: "Import a GTFS Timetable",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "url",
+						Usage:    "Path to the GTFS zip file",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "datasetid",
+						Usage:    "ID of the dataset",
+						Required: true,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
+
+					source := c.String("url")
+					datasetid := c.String("datasetid")
+
+					log.Info().Msgf("GTFS bundle import from %s", source)
+
+					if isValidUrl(source) {
+						tempFile, _ := tempDownloadFile(source)
+
+						source = tempFile.Name()
+						defer os.Remove(tempFile.Name())
+					}
+
+					gtfsFile, err := gtfs.ParseZip(source)
+
+					if err != nil {
+						return err
+					}
+
+					gtfsFile.ImportIntoMongoAsCTDF(datasetid)
+
+					return nil
+				},
+			},
 		},
 	}
 }
@@ -877,15 +922,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		corpus.ImportIntoMongoAsCTDF(&datasource)
-	case "gtfs":
-		log.Info().Msgf("GTFS file import from %s ", dataFile.Name)
-		gtfsFile, err := gtfs.ParseZip(dataFile.Name)
-
-		if err != nil {
-			return err
-		}
-
-		gtfsFile.ImportIntoMongoAsCTDF("gb-bods-gtfs")
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}

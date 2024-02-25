@@ -68,7 +68,7 @@ cronjobs:
     args: [ "indexer", "stops" ]
   - name: gtfs-bods
     schedule: "0 3 * * *"
-    args: ["data-importer", "file", "--file-format", "bundle", "gtfs", "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"]
+    args: ["data-importer", "gtfs-timetable", "--datasetid", "gb-bods-gtfs", "--url", "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"]
 
 deployments:
   - name: sirivm-all
