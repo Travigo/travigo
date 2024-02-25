@@ -2,7 +2,6 @@ package gtfs
 
 import (
 	"archive/zip"
-	"context"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -12,10 +11,8 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/exp/maps"
 )
 
@@ -86,8 +83,6 @@ func ParseZip(path string) (*GTFS, error) {
 }
 
 func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
-	servicesCollection := database.GetCollection("services_gtfs")
-
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
@@ -127,6 +122,9 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 	}
 
 	log.Info().Msg("Starting Services")
+	servicesQueue := NewDatabaseBatchProcessingQueue("services_gtfs", 1*time.Second, 500)
+	servicesQueue.Process()
+
 	ctdfServices := map[string]*ctdf.Service{}
 	for _, gtfsRoute := range g.Routes {
 		serviceID := fmt.Sprintf("%s-service-%s", datasetID, gtfsRoute.ID)
@@ -160,19 +158,21 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 		ctdfServices[gtfsRoute.ID] = ctdfService
 
 		// Insert
-		opts := options.Update().SetUpsert(true)
-		servicesCollection.UpdateOne(context.Background(), bson.M{"primaryidentifier": serviceID}, bson.M{"$set": ctdfService}, opts)
+		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfService})
+		updateModel := mongo.NewUpdateOneModel()
+		updateModel.SetFilter(bson.M{"primaryidentifier": serviceID})
+		updateModel.SetUpdate(bsonRep)
+		updateModel.SetUpsert(true)
+
+		servicesQueue.Add(updateModel)
 	}
 	log.Info().Msg("Finished Services")
+	servicesQueue.Wait()
 
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
-	journeysQueue := JourneysBatchProcessingQueue{
-		Timeout:           4 * time.Second,
-		Items:             make(chan mongo.WriteModel, 500),
-		LastItemProcessed: time.Now(),
-	}
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 500)
 	journeysQueue.Process()
 
 	log.Info().Msg("Starting Journeys")

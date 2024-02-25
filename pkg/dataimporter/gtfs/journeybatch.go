@@ -10,31 +10,42 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type JourneysBatchProcessingQueue struct {
-	Timeout time.Duration
-	Items   chan (mongo.WriteModel)
-
-	LastItemProcessed time.Time
+func NewDatabaseBatchProcessingQueue(collection string, timeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
+	return DatabaseBatchProcessingQueue{
+		Collection:        collection,
+		Timeout:           timeout,
+		items:             make(chan mongo.WriteModel, batchSize),
+		lastItemProcessed: time.Now(),
+	}
 }
 
-func (b *JourneysBatchProcessingQueue) Add(item mongo.WriteModel) {
-	b.Items <- item
+type DatabaseBatchProcessingQueue struct {
+	Collection string
+	Timeout    time.Duration
+
+	items             chan (mongo.WriteModel)
+	lastItemProcessed time.Time
+	ticker            *time.Ticker
 }
 
-func (b *JourneysBatchProcessingQueue) Process() {
-	go func(b *JourneysBatchProcessingQueue) {
-		realtimeJourneysCollection := database.GetCollection("journeys_gtfs")
+func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
+	b.items <- item
+}
 
-		ticker := time.NewTicker(b.Timeout)
+func (b *DatabaseBatchProcessingQueue) Process() {
+	go func(b *DatabaseBatchProcessingQueue) {
+		realtimeJourneysCollection := database.GetCollection(b.Collection)
 
-		for range ticker.C {
+		b.ticker = time.NewTicker(b.Timeout)
+
+		for range b.ticker.C {
 			batchItems := []mongo.WriteModel{}
 
 			running := true
 
 			for running {
 				select {
-				case i := <-b.Items:
+				case i := <-b.items:
 					batchItems = append(batchItems, i)
 				default: // Stop when no more values in chInternal
 					running = false
@@ -42,24 +53,26 @@ func (b *JourneysBatchProcessingQueue) Process() {
 			}
 
 			if len(batchItems) > 0 {
+				b.lastItemProcessed = time.Now()
 				log.Info().Int("Length", len(batchItems)).Msg("Bulk write")
 				_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), batchItems, &options.BulkWriteOptions{})
 				if err != nil {
-					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
+					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
 				}
 			}
 		}
 	}(b)
 }
 
-func (b *JourneysBatchProcessingQueue) Wait() {
+func (b *DatabaseBatchProcessingQueue) Wait() {
 	waiting := true
 
 	for waiting {
 		now := time.Now()
 
-		if now.Sub(b.LastItemProcessed) > 5*b.Timeout {
-			log.Info().Msg("Nothing left to process in queue")
+		if now.Sub(b.lastItemProcessed) > 5*b.Timeout {
+			log.Info().Str("collection", b.Collection).Msg("Nothing left to process in queue")
+			b.ticker.Stop()
 			return
 		}
 		time.Sleep(5 * time.Second)
