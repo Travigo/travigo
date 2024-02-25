@@ -108,7 +108,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Only care about relevant passenger trains
 		if !util.ContainsString([]string{
-			"OO", "OW", "OL",
+			"OO", "OW",
 			"XC", "XD", "XI", "XR", "XX", "XZ",
 			"BR",
 		}, trainDef.BasicSchedule.TrainCategory) {
