@@ -122,7 +122,7 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 	}
 
 	log.Info().Msg("Starting Services")
-	servicesQueue := NewDatabaseBatchProcessingQueue("services_gtfs", 1*time.Second, 500)
+	servicesQueue := NewDatabaseBatchProcessingQueue("services_gtfs", 1*time.Second, 10*time.Second, 500)
 	servicesQueue.Process()
 
 	ctdfServices := map[string]*ctdf.Service{}
@@ -172,7 +172,7 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 1000)
 	journeysQueue.Process()
 
 	log.Info().Msg("Starting Journeys")
@@ -216,10 +216,8 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 
 		// Put it all together again
 		ctdfJourneys[trip.ID] = &ctdf.Journey{
-			PrimaryIdentifier: journeyID,
-			OtherIdentifiers: map[string]string{
-				"BlockNumber": trip.BlockID,
-			},
+			PrimaryIdentifier:    journeyID,
+			OtherIdentifiers:     map[string]string{},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			ServiceRef:           serviceID,
@@ -228,6 +226,10 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 			DestinationDisplay:   trip.Headsign,
 			Availability:         availability,
 			Path:                 []*ctdf.JourneyPathItem{},
+		}
+
+		if trip.BlockID != "" {
+			ctdfJourneys[trip.ID].OtherIdentifiers["BlockNumber"] = trip.BlockID
 		}
 	}
 
