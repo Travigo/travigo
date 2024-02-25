@@ -14,6 +14,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/exp/maps"
 )
@@ -86,7 +87,6 @@ func ParseZip(path string) (*GTFS, error) {
 
 func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 	servicesCollection := database.GetCollection("services_gtfs")
-	journeysCollection := database.GetCollection("journeys_gtfs")
 
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
@@ -168,6 +168,13 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
+	journeysQueue := JourneysBatchProcessingQueue{
+		Timeout:           4 * time.Second,
+		Items:             make(chan mongo.WriteModel, 500),
+		LastItemProcessed: time.Now(),
+	}
+	journeysQueue.Process()
+
 	log.Info().Msg("Starting Journeys")
 	for _, trip := range g.Trips {
 		journeyID := fmt.Sprintf("%s-journey-%s", datasetID, trip.ID)
@@ -209,14 +216,15 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 
 		// Put it all together again
 		ctdfJourneys[trip.ID] = &ctdf.Journey{
-			PrimaryIdentifier:    journeyID,
-			OtherIdentifiers:     map[string]string{},
+			PrimaryIdentifier: journeyID,
+			OtherIdentifiers: map[string]string{
+				"BlockNumber": trip.BlockID,
+			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			ServiceRef:           serviceID,
 			OperatorRef:          ctdfServices[trip.RouteID].OperatorRef,
 			Direction:            trip.DirectionID,
-			DepartureTime:        time.Time{},
 			DestinationDisplay:   trip.Headsign,
 			Availability:         availability,
 			Path:                 []*ctdf.JourneyPathItem{},
@@ -274,13 +282,24 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 			}
 
 			ctdfJourneys[tripID].Path = append(ctdfJourneys[tripID].Path, journeyPathItem)
+
+			if index == 1 {
+				ctdfJourneys[tripID].DepartureTime = originDeparturelTime
+			}
 		}
 
 		// Insert
-		opts := options.Update().SetUpsert(true)
-		journeysCollection.UpdateOne(context.Background(), bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier}, bson.M{"$set": ctdfJourneys[tripID]}, opts)
+		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
+		updateModel := mongo.NewUpdateOneModel()
+		updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
+		updateModel.SetUpdate(bsonRep)
+		updateModel.SetUpsert(true)
+
+		journeysQueue.Add(updateModel)
 
 		ctdfJourneys[tripID] = nil
 	}
 	log.Info().Msg("Finished Journeys")
+
+	journeysQueue.Wait()
 }
