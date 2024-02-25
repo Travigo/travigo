@@ -41,11 +41,11 @@ func ParseZip(path string) (*GTFS, error) {
 	gtfs := &GTFS{}
 
 	fileMap := map[string]interface{}{
-		"agency.txt": &gtfs.Agencies,
-		"stops.txt":  &gtfs.Stops,
-		"routes.txt": &gtfs.Routes,
-		"trips.txt":  &gtfs.Trips,
-		// "stop_times.txt":     &gtfs.StopTimes,
+		"agency.txt":         &gtfs.Agencies,
+		"stops.txt":          &gtfs.Stops,
+		"routes.txt":         &gtfs.Routes,
+		"trips.txt":          &gtfs.Trips,
+		"stop_times.txt":     &gtfs.StopTimes,
 		"calendar.txt":       &gtfs.Calendars,
 		"calendar_dates.txt": &gtfs.CalendarDates,
 		// "frequencies.txt":    &gtfs.Frequencies,
