@@ -52,8 +52,6 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 
 	queue.PublishBytes(identificationEventJson)
 
-	// pretty.Println(identificationEvent.VehicleActivity.ItemIdentifier)
-
 	return true
 }
 

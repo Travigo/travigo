@@ -16,7 +16,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type GTFS struct {
+type Schedule struct {
 	Agencies      []Agency
 	Stops         []Stop
 	Routes        []Route
@@ -28,7 +28,7 @@ type GTFS struct {
 	Shapes        []Shape
 }
 
-func ParseZip(path string) (*GTFS, error) {
+func ParseScheduleZip(path string) (*Schedule, error) {
 	// Allow us to ignore those naughty records that have missing columns
 	gocsv.SetCSVReader(func(in io.Reader) gocsv.CSVReader {
 		r := csv.NewReader(in)
@@ -36,7 +36,7 @@ func ParseZip(path string) (*GTFS, error) {
 		return r
 	})
 
-	gtfs := &GTFS{}
+	gtfs := &Schedule{}
 
 	fileMap := map[string]interface{}{
 		"agency.txt":         &gtfs.Agencies,
@@ -82,7 +82,7 @@ func ParseZip(path string) (*GTFS, error) {
 	return gtfs, nil
 }
 
-func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
+func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
@@ -216,8 +216,10 @@ func (g *GTFS) ImportIntoMongoAsCTDF(datasetID string) {
 
 		// Put it all together again
 		ctdfJourneys[trip.ID] = &ctdf.Journey{
-			PrimaryIdentifier:    journeyID,
-			OtherIdentifiers:     map[string]string{},
+			PrimaryIdentifier: journeyID,
+			OtherIdentifiers: map[string]string{
+				"GTFS-ID": trip.ID,
+			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			ServiceRef:           serviceID,

@@ -112,7 +112,7 @@ func RegisterCLI() *cli.Command {
 					source := c.Args().Get(1)
 
 					// Some initial setup for Siri-VM
-					if dataFormat == "siri-vm" {
+					if dataFormat == "siri-vm" || dataFormat == "gtfs-rt" {
 						if err := redis_client.Connect(); err != nil {
 							log.Fatal().Err(err).Msg("Failed to connect to Redis")
 						}
@@ -126,7 +126,7 @@ func RegisterCLI() *cli.Command {
 						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL
 						env := util.GetEnvironmentVariables()
-						if env["TRAVIGO_BODS_API_KEY"] != "" {
+						if env["TRAVIGO_BODS_API_KEY"] != "" && isValidUrl(source) {
 							source += fmt.Sprintf("?api_key=%s", env["TRAVIGO_BODS_API_KEY"])
 						}
 					}
@@ -655,7 +655,7 @@ func RegisterCLI() *cli.Command {
 						defer os.Remove(tempFile.Name())
 					}
 
-					gtfsFile, err := gtfs.ParseZip(source)
+					gtfsFile, err := gtfs.ParseScheduleZip(source)
 
 					if err != nil {
 						return err
@@ -922,6 +922,20 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		}
 
 		corpus.ImportIntoMongoAsCTDF(&datasource)
+	case "gtfs-rt":
+		log.Info().Msgf("GTFS-RT file import from %s ", dataFile.Name)
+
+		// TODO Def not always true
+		datasource := &ctdf.DataSource{
+			Provider: "Department of Transport", // This may not always be true
+			Dataset:  dataFile.Name,
+		}
+
+		err := gtfs.ParseRealtime(dataFile.Reader, realtimeQueue, datasource)
+
+		if err != nil {
+			return err
+		}
 	default:
 		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
 	}
