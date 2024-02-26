@@ -18,7 +18,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/realtime/vehicletracker/journeyidentifier"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -124,7 +123,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	}
 }
 
-func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *VehicleLocationEvent {
+func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *IdentifiedVehicleLocationEvent {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
@@ -174,7 +173,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
 
 	if cachedJourneyMapping == "" {
-		journeyIdentifier := journeyidentifier.Identifier{
+		journeyIdentifier := JourneyIdentifier{
 			IdentifyingInformation: map[string]string{
 				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
@@ -282,7 +281,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 		timeframe = currentTime.Format("2006-01-02")
 	}
 
-	vehicleLocationEvent := VehicleLocationEvent{
+	vehicleLocationEvent := IdentifiedVehicleLocationEvent{
 		JourneyRef:  journeyID,
 		OperatorRef: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 		ServiceRef:  vehicle.MonitoredVehicleJourney.PublishedLineName,
@@ -311,7 +310,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	return &vehicleLocationEvent
 }
 
-func updateRealtimeJourney(vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
+func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent) (mongo.WriteModel, error) {
 	currentTime := vehicleLocationEvent.CreationDateTime
 
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)

@@ -7,7 +7,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 )
 
-type VehicleLocationEvent struct {
+type IdentifiedVehicleLocationEvent struct {
 	JourneyRef  string
 	ServiceRef  string
 	OperatorRef string

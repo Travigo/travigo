@@ -11,7 +11,6 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/realtime/vehicletracker/journeyidentifier"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 )
@@ -128,7 +127,7 @@ func RegisterCLI() *cli.Command {
 						vehicleJourneyRef = monitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
 					}
 
-					journeyIdentifier := journeyidentifier.Identifier{
+					journeyIdentifier := JourneyIdentifier{
 						IdentifyingInformation: map[string]string{
 							"ServiceNameRef":           monitoredVehicleJourney.LineRef,
 							"DirectionRef":             monitoredVehicleJourney.DirectionRef,

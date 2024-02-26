@@ -1,4 +1,4 @@
-package journeyidentifier
+package vehicletracker
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type Identifier struct {
+type JourneyIdentifier struct {
 	IdentifyingInformation map[string]string
 	Operator               *ctdf.Operator
 	PotentialServices      []string
 	CurrentTime            time.Time
 }
 
-func (i *Identifier) getOperator() *ctdf.Operator {
+func (i *JourneyIdentifier) getOperator() *ctdf.Operator {
 	var operator *ctdf.Operator
 	operatorRef := i.IdentifyingInformation["OperatorRef"]
 	operatorsCollection := database.GetCollection("operators")
@@ -31,7 +31,7 @@ func (i *Identifier) getOperator() *ctdf.Operator {
 	return operator
 }
 
-func (i *Identifier) getServices() []string {
+func (i *JourneyIdentifier) getServices() []string {
 	var services []string
 
 	serviceName := i.IdentifyingInformation["PublishedLineName"]
@@ -90,7 +90,7 @@ func (i *Identifier) getServices() []string {
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
 //
 //	currently no other kind so is fine for now (TODO)
-func (i *Identifier) IdentifyJourney() (string, error) {
+func (i *JourneyIdentifier) IdentifyJourney() (string, error) {
 	i.CurrentTime = time.Now()
 
 	// Get the directly referenced Operator
@@ -224,7 +224,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 	return journeys
 }
 
-func (i *Identifier) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
+func (i *JourneyIdentifier) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
 	journeys = ctdf.FilterIdenticalJourneys(journeys, includeAvailabilityCondition)
 
 	if len(journeys) == 0 {
