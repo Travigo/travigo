@@ -1,4 +1,4 @@
-package vehicletracker
+package identifiers
 
 import (
 	"context"
@@ -10,18 +10,16 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type JourneyIdentifier struct {
+type SiriVM struct {
 	IdentifyingInformation map[string]string
 	Operator               *ctdf.Operator
 	PotentialServices      []string
 	CurrentTime            time.Time
 }
 
-func (i *JourneyIdentifier) getOperator() *ctdf.Operator {
+func (i *SiriVM) getOperator() *ctdf.Operator {
 	var operator *ctdf.Operator
 	operatorRef := i.IdentifyingInformation["OperatorRef"]
 	operatorsCollection := database.GetCollection("operators")
@@ -31,7 +29,7 @@ func (i *JourneyIdentifier) getOperator() *ctdf.Operator {
 	return operator
 }
 
-func (i *JourneyIdentifier) getServices() []string {
+func (i *SiriVM) getServices() []string {
 	var services []string
 
 	serviceName := i.IdentifyingInformation["PublishedLineName"]
@@ -90,7 +88,7 @@ func (i *JourneyIdentifier) getServices() []string {
 // The CTDF abstraction fails here are we only use siri-vm identifyinginformation
 //
 //	currently no other kind so is fine for now (TODO)
-func (i *JourneyIdentifier) IdentifyJourney() (string, error) {
+func (i *SiriVM) IdentifyJourney() (string, error) {
 	i.CurrentTime = time.Now()
 
 	// Get the directly referenced Operator
@@ -192,39 +190,7 @@ func (i *JourneyIdentifier) IdentifyJourney() (string, error) {
 	}
 }
 
-func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
-	var journeys []*ctdf.Journey
-
-	opts := options.Find().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
-		bson.E{Key: "datasource", Value: 0},
-		bson.E{Key: "creationdatetime", Value: 0},
-		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "destinationdisplay", Value: 0},
-		bson.E{Key: "path.track", Value: 0},
-		bson.E{Key: "path.originactivity", Value: 0},
-		bson.E{Key: "path.destinationactivity", Value: 0},
-	})
-	cursor, _ := journeysCollection.Find(context.Background(), query, opts)
-
-	for cursor.Next(context.TODO()) {
-		var journey *ctdf.Journey
-		err := cursor.Decode(&journey)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode journey")
-		}
-
-		// if it has no availability then we'll just ignore it
-		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
-			journeys = append(journeys, journey)
-		}
-	}
-
-	return journeys
-}
-
-func (i *JourneyIdentifier) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
+func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
 	journeys = ctdf.FilterIdenticalJourneys(journeys, includeAvailabilityCondition)
 
 	if len(journeys) == 0 {

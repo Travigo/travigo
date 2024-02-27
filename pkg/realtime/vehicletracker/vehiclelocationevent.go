@@ -7,6 +7,8 @@ import (
 )
 
 type VehicleLocationEvent struct {
+	LocalID string
+
 	IdentifyingInformation map[string]string
 	SourceType             string
 

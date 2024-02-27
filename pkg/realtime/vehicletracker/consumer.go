@@ -16,6 +16,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -126,55 +127,22 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
 
-	// Temporary remap of known incorrect values
-	// TODO: A better way fof doing this should be done under https://github.com/travigo/travigo/issues/46
 	operatorRef := vehicleLocationEvent.IdentifyingInformation["OperatorRef"]
-
-	switch operatorRef {
-	case "SCSO":
-		// Stagecoach south (GB:NOCID:137728)
-		operatorRef = "SCCO"
-	case "CT4N":
-		// CT4n (GB:NOCID:137286)
-		operatorRef = "NOCT"
-	case "SCEM":
-		// Stagecoach East Midlands (GB:NOCID:136971)
-		operatorRef = "SCGR"
-	case "UNO":
-		// Uno (GB:NOCID:137967)
-		operatorRef = "UNOE"
-	case "SBS":
-		// Select Bus Services (GB:NOCID:135680)
-		operatorRef = "SLBS"
-	case "BC", "WA", "WB", "WN", "CV", "PB", "YW", "AG", "PN":
-		// National Express West Midlands (GB:NOCID:138032)
-		operatorRef = "TCVW"
-	}
-
-	localJourneyID := fmt.Sprintf(
-		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
-		fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-		vehicleLocationEvent.IdentifyingInformation["ServiceNameRef"],
-		fmt.Sprintf(ctdf.StopIDFormat, vehicleLocationEvent.IdentifyingInformation["OriginRef"]),
-		vehicleLocationEvent.IdentifyingInformation["VehicleJourneyRef"],
-	)
 
 	var journeyID string
 
-	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), localJourneyID)
+	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), vehicleLocationEvent.LocalID)
 
 	if cachedJourneyMapping == "" {
-		journeyIdentifier := JourneyIdentifier{
+		journeyIdentifier := identifiers.SiriVM{
 			IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
 		}
 
 		journey, err := journeyIdentifier.IdentifyJourney()
 
 		if err != nil {
-			// log.Error().Err(err).Str("localjourneyid", localJourneyID).Msgf("Could not find Journey")
-
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			identificationCache.Set(context.Background(), localJourneyID, "N/A")
+			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 
 			// Temporary https://github.com/travigo/travigo/issues/43
 			errorCode := "UNKNOWN"
@@ -198,7 +166,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 				Success:    false,
 				FailReason: errorCode,
 
-				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+				Operator: operatorRef,
 				Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 			})
 
@@ -213,7 +181,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 			LastUpdated: vehicleLocationEvent.RecordedAt,
 		})
 
-		identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
+		identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
 
 		// Record the successful identification event
 		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
@@ -221,7 +189,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 
 			Success: true,
 
-			Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+			Operator: operatorRef,
 			Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 		})
 
@@ -239,7 +207,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 
 			journeyMapJson, _ := json.Marshal(journeyMap)
 
-			identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
+			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
 		} else {
 			return ""
 		}
