@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
@@ -42,15 +44,53 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 		}
 	}
 
-	identificationEvent := &SiriVMVehicleIdentificationEvent{
-		VehicleActivity: vehicle,
-		ResponseTime:    recordedAtTime,
-		DataSource:      datasource,
+	operatorRef := vehicle.MonitoredVehicleJourney.OperatorRef
+	vehicleRef := ""
+	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {
+		vehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", operatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
 	}
 
-	identificationEventJson, _ := json.Marshal(identificationEvent)
+	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
+	if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
+		vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
+	}
 
-	queue.PublishBytes(identificationEventJson)
+	timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
+	if timeframe == "" {
+		timeframe = currentTime.Format("2006-01-02")
+	}
+
+	locationEvent := vehicletracker.VehicleLocationEvent{
+		IdentifyingInformation: map[string]string{
+			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+			"VehicleJourneyRef":        vehicleJourneyRef,
+			"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
+			"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
+			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+		},
+		SourceType: "siri-vm",
+		Location: ctdf.Location{
+			Type: "Point",
+			Coordinates: []float64{
+				vehicle.MonitoredVehicleJourney.VehicleLocation.Longitude,
+				vehicle.MonitoredVehicleJourney.VehicleLocation.Latitude,
+			},
+		},
+		Bearing:           vehicle.MonitoredVehicleJourney.Bearing,
+		VehicleIdentifier: vehicleRef,
+		Timeframe:         timeframe,
+		DataSource:        datasource,
+		RecordedAt:        recordedAtTime,
+	}
+
+	locationEventJson, _ := json.Marshal(locationEvent)
+
+	queue.PublishBytes(locationEventJson)
 
 	return true
 }

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
-
 	"github.com/adjust/rmq/v5"
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
@@ -31,7 +29,7 @@ const batchSize = 200
 
 type localJourneyIDMap struct {
 	JourneyID   string
-	LastUpdated string
+	LastUpdated time.Time
 }
 
 func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
@@ -84,8 +82,8 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	var locationEventOperations []mongo.WriteModel
 
 	for _, payload := range payloads {
-		var vehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent
-		if err := json.Unmarshal([]byte(payload), &vehicleIdentificationEvent); err != nil {
+		var vehicleLocationEvent *VehicleLocationEvent
+		if err := json.Unmarshal([]byte(payload), &vehicleLocationEvent); err != nil {
 			if batchErrors := batch.Reject(); err != nil {
 				for _, err := range batchErrors {
 					log.Error().Err(err).Msg("Failed to reject realtime event")
@@ -93,10 +91,10 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		vehicleLocationEvent := identifyVehicle(vehicleIdentificationEvent)
+		identifiedJourneyID := identifyVehicle(vehicleLocationEvent)
 
-		if vehicleLocationEvent != nil {
-			writeModel, _ := updateRealtimeJourney(vehicleLocationEvent)
+		if identifiedJourneyID != "" {
+			writeModel, _ := updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
 
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
@@ -123,21 +121,14 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	}
 }
 
-func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIdentificationEvent) *IdentifiedVehicleLocationEvent {
+func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
 
-	vehicle := siriVMVehicleIdentificationEvent.VehicleActivity
-	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
-
-	if vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef != "" {
-		vehicleJourneyRef = vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DatedVehicleJourneyRef
-	}
-
 	// Temporary remap of known incorrect values
 	// TODO: A better way fof doing this should be done under https://github.com/travigo/travigo/issues/46
-	operatorRef := vehicle.MonitoredVehicleJourney.OperatorRef
+	operatorRef := vehicleLocationEvent.IdentifyingInformation["OperatorRef"]
 
 	switch operatorRef {
 	case "SCSO":
@@ -163,9 +154,9 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 	localJourneyID := fmt.Sprintf(
 		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
 		fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-		vehicle.MonitoredVehicleJourney.LineRef,
-		fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-		vehicleJourneyRef,
+		vehicleLocationEvent.IdentifyingInformation["ServiceNameRef"],
+		fmt.Sprintf(ctdf.StopIDFormat, vehicleLocationEvent.IdentifyingInformation["OriginRef"]),
+		vehicleLocationEvent.IdentifyingInformation["VehicleJourneyRef"],
 	)
 
 	var journeyID string
@@ -174,18 +165,7 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 
 	if cachedJourneyMapping == "" {
 		journeyIdentifier := JourneyIdentifier{
-			IdentifyingInformation: map[string]string{
-				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
-				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
-				"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-				"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-				"VehicleJourneyRef":        vehicleJourneyRef,
-				"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
-				"OriginRef":                fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef),
-				"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
-				"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
-				"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
-			},
+			IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
 		}
 
 		journey, err := journeyIdentifier.IdentifyJourney()
@@ -219,18 +199,18 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 				FailReason: errorCode,
 
 				Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-				Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
+				Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 			})
 
 			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 
-			return nil
+			return ""
 		}
 		journeyID = journey
 
 		journeyMapJson, _ := json.Marshal(localJourneyIDMap{
 			JourneyID:   journeyID,
-			LastUpdated: vehicle.RecordedAtTime,
+			LastUpdated: vehicleLocationEvent.RecordedAt,
 		})
 
 		identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
@@ -242,78 +222,38 @@ func identifyVehicle(siriVMVehicleIdentificationEvent *siri_vm.SiriVMVehicleIden
 			Success: true,
 
 			Operator: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-			Service:  vehicle.MonitoredVehicleJourney.PublishedLineName,
+			Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 		})
 
 		elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 	} else if cachedJourneyMapping == "N/A" {
-		return nil
+		return ""
 	} else {
 		var journeyMap localJourneyIDMap
 		json.Unmarshal([]byte(cachedJourneyMapping), &journeyMap)
 
-		cachedLastUpdated, err := time.Parse(ctdf.XSDDateTimeFormat, journeyMap.LastUpdated)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse cached journeyMap.LastUpdated time")
-		}
-		vehicleLastUpdated, err := time.Parse(ctdf.XSDDateTimeFormat, vehicle.RecordedAtTime)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse vehicle.RecordedAtTime time")
-		}
-
 		// skip this journey if hasnt changed
-		if vehicleLastUpdated.After(cachedLastUpdated) {
+		if vehicleLocationEvent.RecordedAt.After(journeyMap.LastUpdated) {
 			// Update the last updated time
-			journeyMap.LastUpdated = vehicle.RecordedAtTime
+			journeyMap.LastUpdated = vehicleLocationEvent.RecordedAt
 
 			journeyMapJson, _ := json.Marshal(journeyMap)
 
 			identificationCache.Set(context.Background(), localJourneyID, string(journeyMapJson))
 		} else {
-			return nil
+			return ""
 		}
 
 		journeyID = journeyMap.JourneyID
 	}
 
-	timeframe := vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef
-	if timeframe == "" {
-		timeframe = currentTime.Format("2006-01-02")
-	}
-
-	vehicleLocationEvent := IdentifiedVehicleLocationEvent{
-		JourneyRef:  journeyID,
-		OperatorRef: fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-		ServiceRef:  vehicle.MonitoredVehicleJourney.PublishedLineName,
-
-		Timeframe:        timeframe,
-		CreationDateTime: siriVMVehicleIdentificationEvent.ResponseTime,
-
-		DataSource: siriVMVehicleIdentificationEvent.DataSource,
-
-		VehicleLocation: ctdf.Location{
-			Type: "Point",
-			Coordinates: []float64{
-				vehicle.MonitoredVehicleJourney.VehicleLocation.Longitude,
-				vehicle.MonitoredVehicleJourney.VehicleLocation.Latitude,
-			},
-		},
-		VehicleBearing: vehicle.MonitoredVehicleJourney.Bearing,
-
-		SiriVMActivity: siriVMVehicleIdentificationEvent.VehicleActivity,
-	}
-
-	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {
-		vehicleLocationEvent.VehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", operatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
-	}
-
-	return &vehicleLocationEvent
+	return journeyID
 }
 
-func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent) (mongo.WriteModel, error) {
-	currentTime := vehicleLocationEvent.CreationDateTime
+func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
+	currentTime := vehicleLocationEvent.RecordedAt
 
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, vehicleLocationEvent.JourneyRef)
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, journeyID)
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
 	var realtimeJourney *ctdf.RealtimeJourney
@@ -326,7 +266,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 	if realtimeJourney == nil {
 		var journey *ctdf.Journey
 		journeysCollection := database.GetCollection("journeys")
-		err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": vehicleLocationEvent.JourneyRef}).Decode(&journey)
+		err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}).Decode(&journey)
 
 		if err != nil {
 			return nil, err
@@ -348,7 +288,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 			CreationDateTime: currentTime,
 			DataSource:       vehicleLocationEvent.DataSource,
 
-			VehicleRef: vehicleLocationEvent.VehicleRef,
+			VehicleRef: vehicleLocationEvent.VehicleIdentifier,
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
 		}
 		newRealtimeJourney = true
@@ -373,7 +313,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 			a := journeyPathItem.Track[i]
 			b := journeyPathItem.Track[i+1]
 
-			distance := vehicleLocationEvent.VehicleLocation.DistanceFromLine(a, b)
+			distance := vehicleLocationEvent.Location.DistanceFromLine(a, b)
 
 			if distance < journeyPathClosestDistance {
 				journeyPathClosestDistance = distance
@@ -399,7 +339,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
 			}
 
-			distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
+			distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
 
 			if distance < closestDistance {
 				closestDistance = distance
@@ -418,7 +358,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
 			}
 
-			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.VehicleLocation)
+			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
 
 			closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
 		}
@@ -506,52 +446,53 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 		}
 	}
 
-	// Calculate occupancy
-	if vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy != 0 {
-		totalCapacity := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity
-		totalOccupancy := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy
+	// TODO add back occupancy
+	// // Calculate occupancy
+	// if vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy != 0 {
+	// 	totalCapacity := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity
+	// 	totalOccupancy := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy
 
-		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
-			OccupancyAvailable: true,
-			ActualValues:       true,
+	// 	realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+	// 		OccupancyAvailable: true,
+	// 		ActualValues:       true,
 
-			Capacity:  totalCapacity,
-			Occupancy: totalOccupancy,
+	// 		Capacity:  totalCapacity,
+	// 		Occupancy: totalOccupancy,
 
-			SeatedInformation: true,
-			SeatedCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity,
-			SeatedOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy,
+	// 		SeatedInformation: true,
+	// 		SeatedCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity,
+	// 		SeatedOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy,
 
-			WheelchairInformation: true,
-			WheelchairCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity,
-			WheelchairOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy,
-		}
+	// 		WheelchairInformation: true,
+	// 		WheelchairCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity,
+	// 		WheelchairOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy,
+	// 	}
 
-		if totalCapacity > 0 && totalOccupancy > 0 {
-			realtimeJourney.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
-		}
-	} else if vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy != "" {
-		realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
-			OccupancyAvailable: true,
-			ActualValues:       false,
-		}
+	// 	if totalCapacity > 0 && totalOccupancy > 0 {
+	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
+	// 	}
+	// } else if vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy != "" {
+	// 	realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+	// 		OccupancyAvailable: true,
+	// 		ActualValues:       false,
+	// 	}
 
-		switch vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy {
-		case "full":
-			realtimeJourney.Occupancy.TotalPercentageOccupancy = 100
-		case "standingAvailable":
-			realtimeJourney.Occupancy.TotalPercentageOccupancy = 75
-		case "seatsAvailable":
-			realtimeJourney.Occupancy.TotalPercentageOccupancy = 40
-		}
-	}
+	// 	switch vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy {
+	// 	case "full":
+	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 100
+	// 	case "standingAvailable":
+	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 75
+	// 	case "seatsAvailable":
+	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 40
+	// 	}
+	// }
 
 	// Update database
 	updateMap := bson.M{
 		"reliability":          realtimeJourneyReliability,
 		"modificationdatetime": currentTime,
-		"vehiclelocation":      vehicleLocationEvent.VehicleLocation,
-		"vehiclebearing":       vehicleLocationEvent.VehicleBearing,
+		"vehiclelocation":      vehicleLocationEvent.Location,
+		"vehiclebearing":       vehicleLocationEvent.Bearing,
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
 		"offset":               offset,
@@ -569,7 +510,7 @@ func updateRealtimeJourney(vehicleLocationEvent *IdentifiedVehicleLocationEvent)
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 		updateMap["datasource"] = realtimeJourney.DataSource
 
-		updateMap["vehicleref"] = vehicleLocationEvent.VehicleRef
+		updateMap["vehicleref"] = vehicleLocationEvent.VehicleIdentifier
 	}
 
 	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {

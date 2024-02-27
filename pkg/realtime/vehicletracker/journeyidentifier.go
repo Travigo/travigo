@@ -115,7 +115,7 @@ func (i *JourneyIdentifier) IdentifyJourney() (string, error) {
 		framedVehicleJourneyDate, _ = time.Parse(ctdf.YearMonthDayFormat, i.IdentifyingInformation["FramedVehicleJourneyDate"])
 
 		// Fallback for dodgy formatted frames
-		if framedVehicleJourneyDate.Year() < 2022 {
+		if framedVehicleJourneyDate.Year() < 2024 {
 			framedVehicleJourneyDate = time.Now()
 		}
 	}
