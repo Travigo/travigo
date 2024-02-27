@@ -172,7 +172,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 1000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 500)
 	journeysQueue.Process()
 
 	log.Info().Msg("Starting Journeys")
