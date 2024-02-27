@@ -187,6 +187,9 @@ func createJourneysIndexes() {
 		{
 			Keys: bson.D{{Key: "otheridentifiers.TrainUID", Value: 1}},
 		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers.GTFS-TripID", Value: 1}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")

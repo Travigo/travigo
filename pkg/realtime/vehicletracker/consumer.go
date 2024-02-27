@@ -134,11 +134,24 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), vehicleLocationEvent.LocalID)
 
 	if cachedJourneyMapping == "" {
-		journeyIdentifier := identifiers.SiriVM{
-			IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
-		}
+		var journey string
+		var err error
 
-		journey, err := journeyIdentifier.IdentifyJourney()
+		// TODO use an interface here to reduce duplication
+		if vehicleLocationEvent.SourceType == "siri-vm" {
+			journeyIdentifier := identifiers.SiriVM{
+				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
+			}
+			journey, err = journeyIdentifier.IdentifyJourney()
+		} else if vehicleLocationEvent.SourceType == "GTFS-RT" {
+			journeyIdentifier := identifiers.GTFSRT{
+				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
+			}
+			journey, err = journeyIdentifier.IdentifyJourney()
+		} else {
+			log.Error().Str("sourcetype", vehicleLocationEvent.SourceType).Msg("Unknown sourcetype")
+			return ""
+		}
 
 		if err != nil {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify

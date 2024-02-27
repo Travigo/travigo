@@ -218,7 +218,8 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 		ctdfJourneys[trip.ID] = &ctdf.Journey{
 			PrimaryIdentifier: journeyID,
 			OtherIdentifiers: map[string]string{
-				"GTFS-ID": trip.ID,
+				"GTFS-TripID":  trip.ID,
+				"GTFS-RouteID": trip.RouteID,
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
