@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gocarina/gocsv"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"go.mongodb.org/mongo-driver/bson"
@@ -177,6 +178,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 
 	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
 	for _, trip := range g.Trips {
+		pretty.Println(trip)
 		journeyID := fmt.Sprintf("%s-journey-%s", datasetID, trip.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", datasetID, trip.RouteID)
 
@@ -226,10 +228,10 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 			DataSource:           datasource,
 			ServiceRef:           serviceID,
 			OperatorRef:          ctdfServices[trip.RouteID].OperatorRef,
-			Direction:            trip.DirectionID,
-			DestinationDisplay:   trip.Headsign,
-			Availability:         availability,
-			Path:                 []*ctdf.JourneyPathItem{},
+			// Direction:            trip.DirectionID,
+			DestinationDisplay: trip.Headsign,
+			Availability:       availability,
+			Path:               []*ctdf.JourneyPathItem{},
 		}
 
 		if trip.BlockID != "" {
@@ -274,16 +276,16 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 				Track:                  []ctdf.Location{},
 			}
 
-			if previousStopTime.DropOffType == "0" || previousStopTime.DropOffType == "" {
+			if previousStopTime.DropOffType == 0 {
 				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
 			}
-			if previousStopTime.PickupType == "0" || previousStopTime.PickupType == "" {
+			if previousStopTime.PickupType == 0 {
 				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivityPickup)
 			}
-			if stopTime.DropOffType == "0" || stopTime.DropOffType == "" {
+			if stopTime.DropOffType == 0 {
 				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
 			}
-			if stopTime.PickupType == "0" || stopTime.PickupType == "" {
+			if stopTime.PickupType == 0 {
 				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
 			}
 

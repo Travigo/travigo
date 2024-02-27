@@ -36,14 +36,14 @@ type Route struct {
 	ShortName         string `csv:"route_short_name"`
 	LongName          string `csv:"route_long_name"`
 	Description       string `csv:"route_desc"`
-	Type              int    `csv:"route_type"`
 	URL               string `csv:"route_url"`
 	Colour            string `csv:"route_color"`
 	TextColour        string `csv:"route_text_color"`
-	SortOrder         string `csv:"route_sort_order"`
-	ContinuousPickup  string `csv:"continuous_pickup"`
-	ContinuousDropOff string `csv:"continuous_drop_off"`
 	NetworkID         string `csv:"network_id"`
+	Type              int    `csv:"route_type"`
+	SortOrder         int    `csv:"route_sort_order"`
+	ContinuousPickup  int    `csv:"continuous_pickup"`
+	ContinuousDropOff int    `csv:"continuous_drop_off"`
 }
 
 type Trip struct {
@@ -52,11 +52,11 @@ type Trip struct {
 	ID                   string `csv:"trip_id"`
 	Headsign             string `csv:"trip_headsign"`
 	Name                 string `csv:"trip_short_name"`
-	DirectionID          string `csv:"direction_id"`
 	BlockID              string `csv:"block_id"`
 	ShapeID              string `csv:"shape_id"`
-	WheelchairAccessible string `csv:"wheelchair_accessible"`
-	BikesAllowed         string `csv:"bikes_allowed"`
+	WheelchairAccessible int32  `csv:"wheelchair_accessible"`
+	BikesAllowed         int32  `csv:"bikes_allowed"`
+	DirectionID          bool   `csv:"direction_id"`
 }
 
 type StopTime struct {
@@ -64,10 +64,10 @@ type StopTime struct {
 	ArrivalTime   string `csv:"arrival_time"`
 	DepartureTime string `csv:"departure_time"`
 	StopID        string `csv:"stop_id"`
-	StopSequence  int    `csv:"stop_sequence"`
 	StopHeadsign  string `csv:"stop_headsign"`
-	PickupType    string `csv:"pickup_type"`
-	DropOffType   string `csv:"drop_off_type"`
+	StopSequence  int    `csv:"stop_sequence"`
+	PickupType    int    `csv:"pickup_type"`
+	DropOffType   int    `csv:"drop_off_type"`
 	// ContinuousPickup       string  `csv:"continuous_pickup"`
 	// ContinuousDropOff      string  `csv:"continuous_drop_off"`
 	// ShapeDistanceTravelled float64 `csv:"shape_dist_traveled"`
