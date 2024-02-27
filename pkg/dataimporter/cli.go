@@ -661,7 +661,17 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					gtfsFile.ImportIntoMongoAsCTDF(datasetid)
+					datasource := &ctdf.DataSource{
+						OriginalFormat: "GTFS-SCHEDULE",
+						Provider:       "Department of Transport (UK)",
+						Dataset:        datasetid,
+						Identifier:     fmt.Sprintf("%d", time.Now().Unix()),
+					}
+
+					gtfsFile.ImportIntoMongoAsCTDF(datasetid, datasource)
+
+					cleanupOldRecords("services_gtfs", datasource)
+					cleanupOldRecords("journeys_gtfs", datasource)
 
 					return nil
 				},

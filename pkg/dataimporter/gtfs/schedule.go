@@ -82,7 +82,7 @@ func ParseScheduleZip(path string) (*Schedule, error) {
 	return gtfs, nil
 }
 
-func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
+func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.DataSource) {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
@@ -121,7 +121,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 		200: ctdf.TransportTypeCoach,
 	}
 
-	log.Info().Msg("Starting Services")
+	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
 	servicesQueue := NewDatabaseBatchProcessingQueue("services_gtfs", 1*time.Second, 10*time.Second, 500)
 	servicesQueue.Process()
 
@@ -146,7 +146,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
-			DataSource:           &ctdf.DataSource{},
+			DataSource:           datasource,
 			ServiceName:          serviceName,
 			OperatorRef:          operatorRef,
 			Routes:               []ctdf.Route{},
@@ -172,10 +172,10 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 500)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 1000)
 	journeysQueue.Process()
 
-	log.Info().Msg("Starting Journeys")
+	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
 	for _, trip := range g.Trips {
 		journeyID := fmt.Sprintf("%s-journey-%s", datasetID, trip.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", datasetID, trip.RouteID)
@@ -223,6 +223,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string) {
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
+			DataSource:           datasource,
 			ServiceRef:           serviceID,
 			OperatorRef:          ctdfServices[trip.RouteID].OperatorRef,
 			Direction:            trip.DirectionID,
