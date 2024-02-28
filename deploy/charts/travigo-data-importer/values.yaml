@@ -42,9 +42,6 @@ cronjobs:
   - name: networkrail-corpus
     schedule: "30 3 * * 6"
     args: ["data-importer", "networkrail-corpus"]
-  - name: tfl
-    schedule: "0 3 * * *"
-    args: ["data-importer", "tfl"]
   - name: temp-indexer-stops
     schedule: "50 3 * * 6"
     args: [ "indexer", "stops" ]

@@ -297,18 +297,20 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 			}
 		}
 
-		transforms.Transform(ctdfJourneys[tripID], 1, "gb-bods-gtfs")
+		go func(journey *ctdf.Journey, queue *DatabaseBatchProcessingQueue) {
+			transforms.Transform(journey, 1, "gb-bods-gtfs")
 
-		// Insert
-		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
-		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
-		updateModel.SetUpdate(bsonRep)
-		updateModel.SetUpsert(true)
+			// Insert
+			bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
 
-		journeysQueue.Add(updateModel)
+			queue.Add(updateModel)
+		}(ctdfJourneys[tripID], &journeysQueue)
 
-		ctdfJourneys[tripID] = nil
+		// ctdfJourneys[tripID] = nil
 	}
 	log.Info().Msg("Finished Journeys")
 
