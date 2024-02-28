@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/transforms"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/maps"
@@ -297,20 +298,29 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 			}
 		}
 
-		go func(journey *ctdf.Journey, queue *DatabaseBatchProcessingQueue) {
-			transforms.Transform(journey, 1, "gb-bods-gtfs")
+		// TODO fix transforms here
+		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-bods-gtfs")
+		if util.ContainsString([]string{
+			"GB:NOC:LDLR", "GB:NOC:LULD", "GB:NOC:TRAM", "gb-bods-gtfs-operator-OPTEMP454",
+			"GB:NOC:ABLO", "gb-bods-gtfs-operator-OP12046", "GB:NOC:ALNO", "GB:NOC:ALSO", "gb-bods-gtfs-operator-OPTEMP450", "gb-bods-gtfs-operator-OP11684",
+			"GB:NOC:ELBG", "gb-bods-gtfs-operator-OPTEMP456", "gb-bods-gtfs-operator-OP3039", "GB:NOC:LSOV", "GB:NOC:LUTD", "gb-bods-gtfs-operator-OP2974",
+			"GB:NOC:MTLN", "GB:NOC:SULV",
+		}, ctdfJourneys[tripID].OperatorRef) || (ctdfJourneys[tripID].OperatorRef == "GB:NOC:UNIB" && util.ContainsString([]string{
+			"gb-bods-gtfs-service-14023", "gb-bods-gtfs-service-13950", "gb-bods-gtfs-service-14053", "gb-bods-gtfs-service-13966", "gb-bods-gtfs-service-13968", "gb-bods-gtfs-service-82178",
+		}, ctdfJourneys[tripID].ServiceRef)) {
+			ctdfJourneys[tripID].OperatorRef = "GB:NOC:TFLO"
+		}
 
-			// Insert
-			bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
+		// Insert
+		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
+		updateModel := mongo.NewUpdateOneModel()
+		updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
+		updateModel.SetUpdate(bsonRep)
+		updateModel.SetUpsert(true)
 
-			queue.Add(updateModel)
-		}(ctdfJourneys[tripID], &journeysQueue)
+		journeysQueue.Add(updateModel)
 
-		// ctdfJourneys[tripID] = nil
+		ctdfJourneys[tripID] = nil
 	}
 	log.Info().Msg("Finished Journeys")
 
