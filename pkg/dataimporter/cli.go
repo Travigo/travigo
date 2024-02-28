@@ -670,8 +670,8 @@ func RegisterCLI() *cli.Command {
 
 					gtfsFile.ImportIntoMongoAsCTDF(datasetid, datasource)
 
-					cleanupOldRecords("services_gtfs", datasource)
-					cleanupOldRecords("journeys_gtfs", datasource)
+					cleanupOldRecords("services", datasource)
+					cleanupOldRecords("journeys", datasource)
 
 					return nil
 				},

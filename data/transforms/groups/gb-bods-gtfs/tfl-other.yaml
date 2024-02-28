@@ -1,0 +1,60 @@
+# DLR
+---
+Type: ctdf.Service
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:LDLR"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:LDLR"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+# Underground
+---
+Type: ctdf.Service
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:LULD"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:LULD"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+# Tram
+---
+Type: ctdf.Service
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:TRAM"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "GB:NOC:TRAM"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+# River Bus
+---
+Type: ctdf.Service
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "gb-bods-gtfs-operator-OPTEMP454"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-bods-gtfs
+Match:
+  OperatorRef: "gb-bods-gtfs-operator-OPTEMP454"
+Data:
+  OperatorRef: "GB:NOC:TFLO"

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gocarina/gocsv"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/maps"
@@ -123,7 +123,7 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 	}
 
 	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
-	servicesQueue := NewDatabaseBatchProcessingQueue("services_gtfs", 1*time.Second, 10*time.Second, 500)
+	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 500)
 	servicesQueue.Process()
 
 	ctdfServices := map[string]*ctdf.Service{}
@@ -156,6 +156,8 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 			TransportType:        routeTypeMapping[gtfsRoute.Type],
 		}
 
+		transforms.Transform(ctdfService, 1, "gb-bods-gtfs")
+
 		ctdfServices[gtfsRoute.ID] = ctdfService
 
 		// Insert
@@ -173,12 +175,11 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys_gtfs", 1*time.Second, 1*time.Minute, 1000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
 	journeysQueue.Process()
 
 	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
 	for _, trip := range g.Trips {
-		pretty.Println(trip)
 		journeyID := fmt.Sprintf("%s-journey-%s", datasetID, trip.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", datasetID, trip.RouteID)
 
@@ -296,6 +297,8 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 			}
 		}
 
+		transforms.Transform(ctdfJourneys[tripID], 1, "gb-bods-gtfs")
+
 		// Insert
 		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
 		updateModel := mongo.NewUpdateOneModel()
@@ -311,3 +314,48 @@ func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.Data
 
 	journeysQueue.Wait()
 }
+
+/////// THE DEAD ZONE ////////
+// r := csv.NewReader(fileReader)
+// 				r.FieldsPerRecord = -1
+// 				if _, err := r.Read(); err != nil { //read header
+// 					log.Fatal().Err(err).Msg("csv header read")
+// 				}
+// 				for {
+// 					rec, err := r.Read()
+// 					if err != nil {
+// 						if err == io.EOF {
+// 							break
+// 						}
+// 						log.Fatal().Err(err).Msg("csv row read")
+
+// 					}
+
+// 					stopSequence, _ := strconv.Atoi(rec[4])
+
+// 					var stopHeadsign string
+// 					if len(rec) >= 6 {
+// 						stopHeadsign = rec[5]
+// 					}
+
+// 					var pickupType int
+// 					if len(rec) >= 7 {
+// 						pickupType, _ = strconv.Atoi(rec[6])
+// 					}
+// 					var dropOffType int
+// 					if len(rec) >= 8 {
+// 						dropOffType, _ = strconv.Atoi(rec[7])
+// 					}
+
+// 					gtfs.StopTimes = append(gtfs.StopTimes, &StopTime{
+// 						// trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint,stop_direction_name
+// 						TripID:        rec[0],
+// 						ArrivalTime:   rec[1],
+// 						DepartureTime: rec[2],
+// 						StopID:        rec[3],
+// 						StopSequence:  stopSequence,
+// 						StopHeadsign:  stopHeadsign,
+// 						PickupType:    pickupType,
+// 						DropOffType:   dropOffType,
+// 					})
+// 				}

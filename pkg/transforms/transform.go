@@ -7,6 +7,7 @@ import (
 
 type TransformDefinition struct {
 	Type  string                 `yaml:"Type"`
+	Group string                 `yaml:"Group"`
 	Match map[string]string      `yaml:"Match"`
 	Data  map[string]interface{} `yaml:"Data"`
 }
@@ -111,27 +112,35 @@ func handleSubDocument2(field reflect.Value, valueOf reflect.Value, data map[str
 	}
 }
 
-func Transform(input interface{}, depth int) {
+func Transform(input interface{}, depth int, groups ...string) {
 	inputTypeOf := reflect.TypeOf(input)
 	inputValueOf := reflect.ValueOf(input)
+
+	// TODO just supporting 1 group atm
+	group := ""
+	if len(groups) == 1 {
+		group = groups[0]
+	}
 
 	if inputTypeOf.Kind() == reflect.Slice {
 		for i := 0; i < inputValueOf.Len(); i++ {
 			indexInput := inputValueOf.Index(i).Interface()
-			transformValue(reflect.TypeOf(indexInput), reflect.ValueOf(indexInput), depth)
+			transformValue(reflect.TypeOf(indexInput), reflect.ValueOf(indexInput), depth, group)
 		}
 	} else {
-		transformValue(inputTypeOf, inputValueOf, depth)
+		transformValue(inputTypeOf, inputValueOf, depth, group)
 	}
 }
 
-func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value, depth int) {
+func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value, depth int, group string) {
 	var inputValue reflect.Value
 	if inputTypeOf.Kind() == reflect.Pointer {
 		inputValue = inputValueOf.Elem()
 	}
 
 	for _, transformDef := range transforms {
-		transformDef.Transform(inputTypeOf, inputValue, depth)
+		if transformDef.Group == group {
+			transformDef.Transform(inputTypeOf, inputValue, depth)
+		}
 	}
 }
