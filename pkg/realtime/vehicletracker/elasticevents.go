@@ -12,4 +12,5 @@ type RealtimeIdentifyFailureElasticEvent struct {
 
 	Operator string
 	Service  string
+	Trip     string
 }

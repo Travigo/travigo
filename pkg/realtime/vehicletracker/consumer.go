@@ -158,6 +158,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 
 			// Temporary https://github.com/travigo/travigo/issues/43
+			// TODO dont just compare the string value here!!
 			errorCode := "UNKNOWN"
 			switch err.Error() {
 			case "Could not find referenced Operator":
@@ -170,6 +171,8 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 				errorCode = "JOURNEYNARROW_ZERO"
 			case "Could not narrow down to single Journey by time. Still many remaining":
 				errorCode = "JOURNEYNARROW_MANY"
+			case "Could not find referenced trip":
+				errorCode = "NONREF_TRIP"
 			}
 
 			// Record the failed identification event
@@ -181,6 +184,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 
 				Operator: operatorRef,
 				Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
+				Trip:     vehicleLocationEvent.IdentifyingInformation["TripID"],
 			})
 
 			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
