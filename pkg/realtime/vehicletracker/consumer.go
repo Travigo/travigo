@@ -185,6 +185,8 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 				Operator: operatorRef,
 				Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 				Trip:     vehicleLocationEvent.IdentifyingInformation["TripID"],
+
+				SourceType: vehicleLocationEvent.SourceType,
 			})
 
 			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
