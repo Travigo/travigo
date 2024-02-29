@@ -46,12 +46,12 @@ cronjobs:
     schedule: "50 3 * * 6"
     args: [ "indexer", "stops" ]
   - name: gb-bods-gtfs-timetable
-    schedule: "0 3 * * *"
+    schedule: "20 6 * * *"
     args: ["data-importer", "gtfs-timetable", "--datasetid", "gb-bods-gtfs", "--url", "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"]
 
 deployments:
-  - name: gb-bods-sirivm-tfl
-    args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/sirivm_tfl"]
+  # - name: gb-bods-sirivm-tfl
+  #   args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/sirivm_tfl"]
   - name: gb-bods-gtfs-rt
     args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "gtfs-rt", "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"]
 
