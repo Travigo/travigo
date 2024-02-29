@@ -8,7 +8,7 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "travigo-realtime.selectorLabels" . | nindent 6 }}-cleaner
+      {{- include "travigo-realtime.selectorLabels" . | nindent 6 }}
       appModule: cleaner
   template:
     metadata:
@@ -17,7 +17,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "travigo-realtime.selectorLabels" . | nindent 8 }}-cleaner
+        {{- include "travigo-realtime.selectorLabels" . | nindent 8 }}
         appModule: cleaner
     spec:
       {{- with .Values.imagePullSecrets }}
