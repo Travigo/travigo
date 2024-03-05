@@ -48,6 +48,7 @@ cronjobs:
   - name: gb-bods-gtfs-timetable
     schedule: "20 6 * * *"
     args: ["data-importer", "gtfs-timetable", "--datasetid", "gb-bods-gtfs", "--url", "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"]
+    batchburst: true
 
 deployments:
   - name: sirivm-all
