@@ -3,7 +3,7 @@ package ctdf
 import "math"
 
 type Location struct {
-	Type        string    `json:"-" groups:"basic"`
+	Type        string    `json:"point" groups:"basic"`
 	Coordinates []float64 `json:"coordinates" groups:"basic"`
 }
 

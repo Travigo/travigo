@@ -72,6 +72,7 @@ func ParseRealtime(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSourc
 	}
 
 	pretty.Println(withTripID, len(feed.Entity))
+	log.Info().Int("withtrip", withTripID).Int("total", len(feed.Entity)).Msg("Submitted vehicle locations")
 
 	return nil
 }
