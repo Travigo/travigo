@@ -63,7 +63,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		journeyDate, _ := time.Parse("2006-01-02", a.TrainPlannedOriginTimestamp)
 		journeyPotentials := 0
 
-		for cursor.Next(context.TODO()) {
+		for cursor.Next(context.Background()) {
 			var potentialJourney *ctdf.Journey
 			err := cursor.Decode(&potentialJourney)
 			if err != nil {

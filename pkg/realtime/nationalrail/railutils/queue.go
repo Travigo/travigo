@@ -41,7 +41,7 @@ func (b *BatchProcessingQueue) Process() {
 
 			if len(batchItems) > 0 {
 				log.Info().Int("Length", len(batchItems)).Msg("Bulk write")
-				_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), batchItems, &options.BulkWriteOptions{})
+				_, err := realtimeJourneysCollection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 				}

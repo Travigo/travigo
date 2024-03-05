@@ -39,14 +39,14 @@ func (w *ServiceAlertsWatch) Run() {
 			},
 		},
 	}
-	stream, err := collection.Watch(context.TODO(), mongo.Pipeline{matchPipeline})
+	stream, err := collection.Watch(context.Background(), mongo.Pipeline{matchPipeline})
 	if err != nil {
 		panic(err)
 	}
 
-	defer stream.Close(context.TODO())
+	defer stream.Close(context.Background())
 
-	for stream.Next(context.TODO()) {
+	for stream.Next(context.Background()) {
 		var data struct {
 			OperationType string             `bson:"operationType"`
 			FullDocument  *ctdf.ServiceAlert `bson:"fullDocument"`

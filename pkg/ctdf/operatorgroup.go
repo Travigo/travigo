@@ -32,7 +32,7 @@ func (group *OperatorGroup) GetOperators() {
 	operatorsCollection := database.GetCollection("operators")
 	cursor, _ := operatorsCollection.Find(context.Background(), bson.M{"operatorgroupref": group.Identifier})
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var operator *Operator
 		err := cursor.Decode(&operator)
 		if err != nil {

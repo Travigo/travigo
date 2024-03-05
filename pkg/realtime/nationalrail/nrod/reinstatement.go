@@ -53,7 +53,7 @@ func (r *TrustReinstatement) Process(stompClient *StompClient) {
 	serviceAlertCollection := database.GetCollection("service_alerts")
 
 	filter := bson.M{"primaryidentifier": serviceAlertID}
-	serviceAlertCollection.DeleteOne(context.TODO(), filter)
+	serviceAlertCollection.DeleteOne(context.Background(), filter)
 
 	log.Info().
 		Str("trainid", r.TrainID).

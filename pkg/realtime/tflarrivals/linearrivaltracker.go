@@ -163,7 +163,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime = time.Now()
 
 	if len(realtimeJourneyUpdateOperations) > 0 {
-		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), realtimeJourneyUpdateOperations, &options.BulkWriteOptions{})
+		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), realtimeJourneyUpdateOperations, &options.BulkWriteOptions{})
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
@@ -423,7 +423,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	} else {
 		updateMap["datasource.identifier"] = datasource.Identifier
 	}
-	// TODO Temporary - need detection if journey has actually changed
 	updateMap["journey"] = realtimeJourney.Journey
 
 	updateMap["vehiclelocationdescription"] = realtimeJourney.VehicleLocationDescription

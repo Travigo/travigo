@@ -78,19 +78,19 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 	}
 
 	// Create reference map for JourneyPatternSections
-	journeyPatternSectionReferences := map[string]*JourneyPatternSection{} // TODO: all these should be pointers instead
+	journeyPatternSectionReferences := map[string]*JourneyPatternSection{}
 	for _, journeyPatternSection := range doc.JourneyPatternSections {
 		journeyPatternSectionReferences[journeyPatternSection.ID] = journeyPatternSection
 	}
 
 	// Create reference map for Routes
-	routeReferences := map[string]*Route{} // TODO: all these should be pointers instead
+	routeReferences := map[string]*Route{}
 	for _, route := range doc.Routes {
 		routeReferences[route.ID] = route
 	}
 
 	// Create reference map for Routes
-	routeSectionReferences := map[string]*RouteSection{} // TODO: all these should be pointers instead
+	routeSectionReferences := map[string]*RouteSection{}
 	for _, routeSection := range doc.RouteSections {
 		routeSectionReferences[routeSection.ID] = routeSection
 	}
@@ -101,7 +101,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 	var serviceOperationInsert uint64
 	var serviceOperationUpdate uint64
 
-	journeyPatternReferences := map[string]map[string]*JourneyPattern{} // TODO: all these should be pointers instead
+	journeyPatternReferences := map[string]map[string]*JourneyPattern{}
 	servicesReferences := map[string]*Service{}
 
 	ignoredServices := map[string]bool{}
@@ -246,7 +246,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 	}
 
 	if len(serviceOperations) > 0 {
-		_, err := servicesCollection.BulkWrite(context.TODO(), serviceOperations, &options.BulkWriteOptions{})
+		_, err := servicesCollection.BulkWrite(context.Background(), serviceOperations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Services")
 		}
@@ -312,7 +312,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				service := servicesReferences[serviceRef]
 
 				if service == nil {
-					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
+					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode)
 					continue
 				}
 
@@ -327,7 +327,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				} else if service.RegisteredOperatorRef != "" {
 					txcJourneyOperatorRef = service.RegisteredOperatorRef
 				} else {
-					log.Error().Msgf("Failed to find referenced operator in vehicle journey %s", txcJourney.VehicleJourneyCode) // TODO: maybe not a fail condition?
+					log.Error().Msgf("Failed to find referenced operator in vehicle journey %s", txcJourney.VehicleJourneyCode)
 					continue
 				}
 
@@ -657,7 +657,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 				}
 
 				if len(ctdfJourney.Path) == 0 {
-					log.Error().Msgf("Journey %s has a nil path", ctdfJourney.PrimaryIdentifier) //TODO: not an error condition?
+					log.Error().Msgf("Journey %s has a nil path", ctdfJourney.PrimaryIdentifier)
 				}
 
 				bsonRep, _ := bson.Marshal(ctdfJourney)
@@ -685,7 +685,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 			atomic.AddUint64(&journeyOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
-				_, err := journeysCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
+				_, err := journeysCollection.BulkWrite(context.Background(), stopOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 				}

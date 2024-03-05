@@ -65,7 +65,7 @@ func listOperators(c *fiber.Ctx) error {
 
 	operators, _ := operatorsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$in": operatorNamesArray}})
 
-	for operators.Next(context.TODO()) {
+	for operators.Next(context.Background()) {
 		var operator *ctdf.Operator
 		operators.Decode(&operator)
 
@@ -131,7 +131,7 @@ func getOperatorServices(c *fiber.Ctx) error {
 		servicesCollection := database.GetCollection("services")
 		cursor, _ := servicesCollection.Find(context.Background(), bson.M{"operatorref": bson.M{"$in": operator.OtherIdentifiers}})
 
-		for cursor.Next(context.TODO()) {
+		for cursor.Next(context.Background()) {
 			var service ctdf.Service
 			err := cursor.Decode(&service)
 			if err != nil {

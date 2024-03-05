@@ -31,7 +31,7 @@ func (stopGroup *StopGroup) GetStops() {
 	stopsCollection := database.GetCollection("stops")
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier})
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		//Create a value into which the single document can be decoded
 		var stop *Stop
 		err := cursor.Decode(&stop)

@@ -107,7 +107,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 		startTime := time.Now()
-		_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), locationEventOperations, &options.BulkWriteOptions{})
+		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), locationEventOperations, &options.BulkWriteOptions{})
 		log.Info().Int("Length", len(locationEventOperations)).Str("Time", time.Now().Sub(startTime).String()).Msg("Bulk write")
 
 		if err != nil {

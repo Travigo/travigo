@@ -123,7 +123,6 @@ func RegisterCLI() *cli.Command {
 							log.Fatal().Err(err).Msg("Failed to start siri-vm redis queue")
 						}
 
-						//TODO: TEMPORARY
 						// Get the API key from the environment variables and append to the source URL
 						env := util.GetEnvironmentVariables()
 						if env["TRAVIGO_BODS_API_KEY"] != "" && isValidUrl(source) {
@@ -374,7 +373,7 @@ func RegisterCLI() *cli.Command {
 						var transportType ctdf.TransportType
 						if tflBusesMatchRegex.MatchString(zipFile.Name) {
 							transportType = ctdf.TransportTypeBus
-						} else if tflOtherMatchRegex.MatchString(zipFile.Name) { // TODO: NOT TRUE
+						} else if tflOtherMatchRegex.MatchString(zipFile.Name) {
 							transportType = ctdf.TransportTypeMetro
 						}
 

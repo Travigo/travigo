@@ -27,7 +27,6 @@ func Connect(required bool) error {
 	}
 
 	// Naughty disable TLS verify on ES endpoint
-	// TODO: fix this at some point
 	tp := http.DefaultTransport.(*http.Transport).Clone()
 	tp.TLSClientConfig.InsecureSkipVerify = true
 

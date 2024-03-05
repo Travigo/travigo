@@ -149,7 +149,7 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
-				_, err := operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
+				_, err := operatorsCollection.BulkWrite(context.Background(), operatorOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Operators")
 				}
@@ -227,7 +227,7 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 			atomic.AddUint64(&servicesOperationUpdate, localServicesUpdate)
 
 			if len(servicesOperations) > 0 {
-				_, err := servicesCollection.BulkWrite(context.TODO(), servicesOperations, &options.BulkWriteOptions{})
+				_, err := servicesCollection.BulkWrite(context.Background(), servicesOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Services")
 				}

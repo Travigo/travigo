@@ -230,7 +230,7 @@ func (c *CommonInterfaceFormat) ImportIntoMongoAsCTDF(datasource *ctdf.DataSourc
 		}
 
 		if len(operations) > 0 {
-			_, err := journeysCollection.BulkWrite(context.TODO(), operations, &options.BulkWriteOptions{})
+			_, err := journeysCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 			}

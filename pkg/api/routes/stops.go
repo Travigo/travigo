@@ -71,7 +71,7 @@ func listStops(c *fiber.Ctx) error {
 
 	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery, opts)
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var stop *ctdf.Stop
 		err := cursor.Decode(&stop)
 		if err != nil {

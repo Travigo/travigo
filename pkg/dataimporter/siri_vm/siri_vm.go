@@ -69,29 +69,6 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 		vehicleJourneyRef,
 	)
 
-	// Temporary remap of known incorrect values
-	// TODO: A better way fof doing this should be done under https://github.com/travigo/travigo/issues/46
-	// switch operatorRef {
-	// case "SCSO":
-	// 	// Stagecoach south (GB:NOCID:137728)
-	// 	operatorRef = "SCCO"
-	// case "CT4N":
-	// 	// CT4n (GB:NOCID:137286)
-	// 	operatorRef = "NOCT"
-	// case "SCEM":
-	// 	// Stagecoach East Midlands (GB:NOCID:136971)
-	// 	operatorRef = "SCGR"
-	// case "UNO":
-	// 	// Uno (GB:NOCID:137967)
-	// 	operatorRef = "UNOE"
-	// case "SBS":
-	// 	// Select Bus Services (GB:NOCID:135680)
-	// 	operatorRef = "SLBS"
-	// case "BC", "WA", "WB", "WN", "CV", "PB", "YW", "AG", "PN":
-	// 	// National Express West Midlands (GB:NOCID:138032)
-	// 	operatorRef = "TCVW"
-	// }
-
 	locationEvent := vehicletracker.VehicleLocationEvent{
 		LocalID: localJourneyID,
 		IdentifyingInformation: map[string]string{

@@ -49,7 +49,7 @@ func (i *SiriVM) getServices() []string {
 		log.Fatal().Err(err).Msg("Failed to perform query")
 	}
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var service *ctdf.Service
 		err := cursor.Decode(&service)
 		if err != nil {
@@ -70,7 +70,7 @@ func (i *SiriVM) getServices() []string {
 				},
 			})
 
-			for cursor.Next(context.TODO()) {
+			for cursor.Next(context.Background()) {
 				var service *ctdf.Service
 				err := cursor.Decode(&service)
 				if err != nil {
@@ -85,9 +85,6 @@ func (i *SiriVM) getServices() []string {
 	return services
 }
 
-// The CTDF abstraction fails here are we only use siri-vm identifyinginformation
-//
-//	currently no other kind so is fine for now (TODO)
 func (i *SiriVM) IdentifyJourney() (string, error) {
 	i.CurrentTime = time.Now()
 

@@ -57,7 +57,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			journeyDate, _ := time.Parse("2006-01-02", trainStatus.SSD)
 
-			for cursor.Next(context.TODO()) {
+			for cursor.Next(context.Background()) {
 				var potentialJourney *ctdf.Journey
 				err := cursor.Decode(&potentialJourney)
 				if err != nil {
@@ -211,7 +211,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			journeyDate, _ := time.Parse("2006-01-02", schedule.SSD)
 
-			for cursor.Next(context.TODO()) {
+			for cursor.Next(context.Background()) {
 				var potentialJourney *ctdf.Journey
 				err := cursor.Decode(&potentialJourney)
 				if err != nil {
@@ -450,7 +450,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			insertMap["creationdatetime"] = now
 			insertMap["record"] = scheduleFormation
 
-			retryRecordsCollection.InsertOne(context.TODO(), insertMap)
+			retryRecordsCollection.InsertOne(context.Background(), insertMap)
 		} else {
 			log.Info().
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
@@ -565,7 +565,7 @@ func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
 	filter := bson.M{"primaryidentifier": serviceAlert.PrimaryIdentifier}
 	update := bson.M{"$set": serviceAlert}
 	opts := options.Update().SetUpsert(true)
-	serviceAlertCollection.UpdateOne(context.TODO(), filter, update, opts)
+	serviceAlertCollection.UpdateOne(context.Background(), filter, update, opts)
 }
 
 func deleteServiceAlert(id string) {

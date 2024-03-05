@@ -128,7 +128,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					})
 					cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]}, opts)
 
-					for cursor.Next(context.TODO()) {
+					for cursor.Next(context.Background()) {
 						var blockJourney Journey
 						err := cursor.Decode(&blockJourney)
 						if err != nil {

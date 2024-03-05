@@ -122,7 +122,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&stopGroupsOperationUpdate, localOperationUpdate)
 
 			if len(stopGroupOperations) > 0 {
-				_, err := stopGroupsCollection.BulkWrite(context.TODO(), stopGroupOperations, &options.BulkWriteOptions{})
+				_, err := stopGroupsCollection.BulkWrite(context.Background(), stopGroupOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write StopGroups")
 				}
@@ -226,7 +226,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
-				_, err := stopsCollection.BulkWrite(context.TODO(), stopOperations, &options.BulkWriteOptions{})
+				_, err := stopsCollection.BulkWrite(context.Background(), stopOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Stops")
 				}
@@ -315,7 +315,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	}
 
 	if len(stationStopOperations) > 0 {
-		_, err := stopsCollection.BulkWrite(context.TODO(), stationStopOperations, &options.BulkWriteOptions{})
+		_, err := stopsCollection.BulkWrite(context.Background(), stationStopOperations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write station Stops")
 		}

@@ -279,7 +279,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
-				_, err := operatorsCollection.BulkWrite(context.TODO(), operatorOperations, &options.BulkWriteOptions{})
+				_, err := operatorsCollection.BulkWrite(context.Background(), operatorOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write Operators")
 				}
@@ -357,7 +357,7 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			atomic.AddUint64(&operatorGroupOperationUpdate, localOperationUpdate)
 
 			if len(operatorGroupOperations) > 0 {
-				_, err := operatorGroupsCollection.BulkWrite(context.TODO(), operatorGroupOperations, &options.BulkWriteOptions{})
+				_, err := operatorGroupsCollection.BulkWrite(context.Background(), operatorGroupOperations, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Err(err).Msg("Failed to bulk write OperatorGroups")
 				}

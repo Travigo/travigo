@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/travigo/travigo/pkg/dataaggregator"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"io"
 	"strings"
 	"time"
+
+	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -221,7 +222,7 @@ func indexStopsFromMongo(indexName string) {
 
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var stop *ctdf.Stop
 		cursor.Decode(&stop)
 

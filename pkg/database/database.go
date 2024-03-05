@@ -51,7 +51,7 @@ func Connect() error {
 		Database: database,
 	}
 
-	err = client.Ping(context.TODO(), nil)
+	err = client.Ping(context.Background(), nil)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 
 func runCommands() {
 	var result bson.M
-	err := Instance.Database.RunCommand(context.TODO(), bson.D{
+	err := Instance.Database.RunCommand(context.Background(), bson.D{
 		{Key: "collMod", Value: "realtime_journeys"},
 		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
 	}).Decode(&result)

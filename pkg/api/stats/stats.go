@@ -133,7 +133,7 @@ func UpdateRecordsStats() {
 				},
 			},
 		}
-		activeRealtimeJourneys, _ := realtimeJourneysCollection.Aggregate(context.TODO(), mongo.Pipeline{matchStage, projectStage})
+		activeRealtimeJourneys, _ := realtimeJourneysCollection.Aggregate(context.Background(), mongo.Pipeline{matchStage, projectStage})
 		var realtimeJourneys []ctdf.RealtimeJourney
 		activeRealtimeJourneys.All(context.Background(), &realtimeJourneys)
 

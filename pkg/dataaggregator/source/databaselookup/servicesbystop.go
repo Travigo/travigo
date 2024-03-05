@@ -43,7 +43,7 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 	serviceFound := map[string]bool{}
 
 	cursor, _ := journeysCollection.Find(context.Background(), filter, opts)
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var journey struct {
 			ServiceRef string
 		}

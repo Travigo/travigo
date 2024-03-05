@@ -147,7 +147,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 	}
 
 	if len(serviceAlertsUpdateOperation) > 0 {
-		_, err := serviceAlertsCollection.BulkWrite(context.TODO(), serviceAlertsUpdateOperation, &options.BulkWriteOptions{})
+		_, err := serviceAlertsCollection.BulkWrite(context.Background(), serviceAlertsUpdateOperation, &options.BulkWriteOptions{})
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write ServiceAlerts")
@@ -326,7 +326,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 	}
 
 	if len(serviceAlertsUpdateOperation) > 0 {
-		_, err := serviceAlertsCollection.BulkWrite(context.TODO(), serviceAlertsUpdateOperation, &options.BulkWriteOptions{})
+		_, err := serviceAlertsCollection.BulkWrite(context.Background(), serviceAlertsUpdateOperation, &options.BulkWriteOptions{})
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write ServiceAlerts")

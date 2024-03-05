@@ -27,7 +27,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 	})
 	cursor, _ := journeysCollection.Find(context.Background(), query, opts)
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var journey *ctdf.Journey
 		err := cursor.Decode(&journey)
 		if err != nil {

@@ -54,7 +54,7 @@ func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 func (handler *HealthHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
-	testRedis := redis_client.Client.ClientID(context.TODO())
+	testRedis := redis_client.Client.ClientID(context.Background())
 	if testRedis.Err() != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(writer, testRedis.Err())
@@ -62,7 +62,7 @@ func (handler *HealthHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Requ
 		return
 	}
 
-	testMongo := database.Instance.Client.Ping(context.TODO(), nil)
+	testMongo := database.Instance.Client.Ping(context.Background(), nil)
 	if testMongo != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(writer, testMongo)

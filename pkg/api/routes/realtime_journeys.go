@@ -68,7 +68,7 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 		}}},
 	)
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(context.Background()) {
 		var realtimeJourney *ctdf.RealtimeJourney
 		err := cursor.Decode(&realtimeJourney)
 		if err != nil {

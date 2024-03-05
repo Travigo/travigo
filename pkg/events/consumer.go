@@ -48,7 +48,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 			"eventtype": event.Type,
 		})
 
-		for cursor.Next(context.TODO()) {
+		for cursor.Next(context.Background()) {
 			var userEventSubscription ctdf.UserEventSubscription
 			err := cursor.Decode(&userEventSubscription)
 			if err != nil {

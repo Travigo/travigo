@@ -57,7 +57,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 			if len(batchItems) > 0 {
 				b.lastItemProcessed = time.Now()
 				log.Info().Str("collection", b.Collection).Int("Length", len(batchItems)).Msg("Bulk write")
-				_, err := realtimeJourneysCollection.BulkWrite(context.TODO(), batchItems, &options.BulkWriteOptions{})
+				_, err := realtimeJourneysCollection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
 				if err != nil {
 					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
 				}
