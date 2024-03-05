@@ -23,12 +23,14 @@ spec:
           serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" $ }}
           restartPolicy: OnFailure
           {{- if .batchburst }}
+          nodeSelector:
+            cloud.google.com/gke-nodepool: travigo-gke-batch-burst-node-pool
           tolerations:
             - effect: NoSchedule
               key: BATCH_BURST
               operator: Equal
               value: "true"
-          {{- end -}}
+          {{- end }}
           containers:
             - name: {{ $.Chart.Name }}-{{ .name }}
               image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag | default $.Chart.AppVersion }}"
