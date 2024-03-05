@@ -967,7 +967,14 @@ func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
 		},
 	}
 
-	collection.DeleteMany(context.Background(), query)
+	result, _ := collection.DeleteMany(context.Background(), query)
+
+	if result != nil {
+		log.Info().
+			Str("collection", collectionName).
+			Int64("num", result.DeletedCount).
+			Msg("Cleaned up old records")
+	}
 }
 
 func isValidUrl(toTest string) bool {
