@@ -27,18 +27,18 @@ image:
   tag: main
 
 cronjobs:
-  - name: travelinenoc
-    schedule: "0 2 * * 0"
-    args: ["data-importer", "dataset", "--id", "gb-traveline-noc"]
+  # - name: travelinenoc      # TODO FIX CLEANUP MAKE IT AN UPSERT ONLYYYYY
+  #   schedule: "0 2 * * 0"
+  #   args: ["data-importer", "dataset", "--id", "gb-traveline-noc"]
   - name: nationalrail-toc
     schedule: "10 2 * * 0"
     args: ["data-importer", "nationalrail-toc"]
   - name: nationalrail-timetable
     schedule: "15 5 * * *"
     args: ["data-importer", "nationalrail-timetable"]
-  - name: naptan
-    schedule: "0 3 * * 6"
-    args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
+  # - name: naptan   # TODO FIX CLEANUP MAKE IT AN UPSERT ONLYYYYY
+  #   schedule: "0 3 * * 6"
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
   - name: networkrail-corpus
     schedule: "30 3 * * 6"
     args: ["data-importer", "networkrail-corpus"]
