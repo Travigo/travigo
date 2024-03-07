@@ -9,6 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 
@@ -46,8 +47,10 @@ func (naptanDoc *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
-	datasource.OriginalFormat = "naptan"
+func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.Stops || !supportedObjects.StopGroups {
+		return errors.New("This format requires stops & stopgroups to be enabled")
+	}
 
 	stopsCollection := database.GetCollection("stops")
 	stopGroupsCollection := database.GetCollection("stop_groups")
@@ -171,6 +174,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
+				ctdfStop.DataSource = datasource
 
 				for _, association := range ctdfStop.Associations {
 					if stationStopGroups[association.AssociatedIdentifier] {
@@ -250,6 +254,7 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 
 	for _, stationNaptanStop := range stationStops {
 		stationStop := stationNaptanStop.ToCTDF()
+		stationStop.DataSource = datasource
 
 		var stopGroupStops []*StopPoint
 		for _, area := range stationNaptanStop.StopAreas {
@@ -325,4 +330,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", stationStopOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
+
+	return nil
 }

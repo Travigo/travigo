@@ -8,10 +8,9 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
-	naptan := NaPTAN{}
-	naptan.StopPoints = []*StopPoint{}
-	naptan.StopAreas = []*StopArea{}
+func (n *NaPTAN) ParseFile(reader io.Reader) error {
+	n.StopPoints = []*StopPoint{}
+	n.StopAreas = []*StopArea{}
 
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel
@@ -22,7 +21,7 @@ func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return nil, err
+			return err
 		}
 
 		switch ty := tok.(type) {
@@ -33,17 +32,17 @@ func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 
 					switch attr.Name.Local {
 					case "CreationDateTime":
-						naptan.CreationDateTime = attr.Value
+						n.CreationDateTime = attr.Value
 					case "ModificationDateTime":
-						naptan.ModificationDateTime = attr.Value
+						n.ModificationDateTime = attr.Value
 					case "SchemaVersion":
-						naptan.SchemaVersion = attr.Value
+						n.SchemaVersion = attr.Value
 					}
 				}
 
-				validate := naptan.Validate()
+				validate := n.Validate()
 				if validate != nil {
-					return nil, validate
+					return validate
 				}
 			} else if ty.Name.Local == "StopPoint" {
 				var stopPoint StopPoint
@@ -52,7 +51,7 @@ func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					stopPoint.Location.UpdateCoordinates()
-					naptan.StopPoints = append(naptan.StopPoints, &stopPoint)
+					n.StopPoints = append(n.StopPoints, &stopPoint)
 				}
 			} else if ty.Name.Local == "StopArea" {
 				var stopArea StopArea
@@ -61,7 +60,7 @@ func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
 					stopArea.Location.UpdateCoordinates()
-					naptan.StopAreas = append(naptan.StopAreas, &stopArea)
+					n.StopAreas = append(n.StopAreas, &stopArea)
 				}
 			}
 		default:
@@ -69,9 +68,9 @@ func ParseXMLFile(reader io.Reader) (*NaPTAN, error) {
 	}
 
 	log.Info().Msgf("Successfully parsed document")
-	log.Info().Msgf(" - Last modified %s", naptan.ModificationDateTime)
-	log.Info().Msgf(" - Contains %d stops", len(naptan.StopPoints))
-	log.Info().Msgf(" - Contains %d stop areas", len(naptan.StopAreas))
+	log.Info().Msgf(" - Last modified %s", n.ModificationDateTime)
+	log.Info().Msgf(" - Contains %d stops", len(n.StopPoints))
+	log.Info().Msgf(" - Contains %d stop areas", len(n.StopAreas))
 
-	return &naptan, nil
+	return nil
 }

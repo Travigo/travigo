@@ -26,9 +26,7 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/dataimporter/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
-	"github.com/travigo/travigo/pkg/dataimporter/transxchange"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
@@ -133,15 +131,6 @@ func RegisterCLI() *cli.Command {
 						var datasource *ctdf.DataSource
 
 						switch dataFormat {
-						case "naptan":
-							datasource = &ctdf.DataSource{
-								OriginalFormat: "naptan",
-								DatasetID:      source,
-								Timestamp:      time.Now().Format(time.RFC3339),
-							}
-
-							cleanupOldRecords("stops", datasource)
-							cleanupOldRecords("stop_groups", datasource)
 						case "traveline-noc":
 							datasource = &ctdf.DataSource{
 								OriginalFormat: "traveline-noc",
@@ -628,42 +617,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 	var datasource ctdf.DataSource
 
 	switch dataFormat {
-	case "naptan":
-		log.Info().Msgf("NaPTAN file import from %s", dataFile.Name)
-		naptanDoc, err := naptan.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider:  "Department of Transport",
-				DatasetID: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		naptanDoc.ImportIntoMongoAsCTDF(&datasource)
-	case "transxchange":
-		log.Info().Msgf("TransXChange file import from %s ", dataFile.Name)
-		transXChangeDoc, err := transxchange.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider:  "Department of Transport", // This may not always be true
-				DatasetID: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		transXChangeDoc.ImportIntoMongoAsCTDF(&datasource, dataFile.TransportType, dataFile.Overrides)
 	case "siri-vm":
 		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
 

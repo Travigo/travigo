@@ -206,8 +206,8 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 }
 
 func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.Operators {
-		return errors.New("This format requires operators to be enabled")
+	if !supportedObjects.Operators || !supportedObjects.OperatorGroups {
+		return errors.New("This format requires operators & operatorgroups to be enabled")
 	}
 
 	log.Info().Msg("Converting to CTDF")

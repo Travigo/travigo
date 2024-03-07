@@ -15,7 +15,22 @@ func GetRegisteredDataSets() []DataSet {
 			Source:       "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
 			UnpackBundle: BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
-				Operators: true,
+				Operators:      true,
+				OperatorGroups: true,
+			},
+		},
+		{
+			Identifier: "gb-dft-naptan",
+			Format:     DataSetFormatNaPTAN,
+			Provider: Provider{
+				Name:    "Department for Transport",
+				Website: "https://www.gov.uk/government/organisations/department-for-transport",
+			},
+			Source:       "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml",
+			UnpackBundle: BundleFormatNone,
+			SupportedObjects: formats.SupportedObjects{
+				Stops:      true,
+				StopGroups: true,
 			},
 		},
 	}

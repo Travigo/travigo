@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,8 +14,11 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func GetDataset(identifier string) (DataSet, error) {
@@ -47,6 +51,8 @@ func ImportDataset(identifier string) error {
 	switch dataset.Format {
 	case DataSetFormatTravelineNOC:
 		format = &travelinenoc.TravelineData{}
+	case DataSetFormatNaPTAN:
+		format = &naptan.NaPTAN{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
@@ -70,17 +76,39 @@ func ImportDataset(identifier string) error {
 		return err
 	}
 
+	datasource := &ctdf.DataSource{
+		OriginalFormat: string(dataset.Format),
+		Provider:       dataset.Provider.Name,
+		DatasetID:      dataset.Identifier,
+		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
+	}
+
 	err = format.ImportIntoMongoAsCTDF(
 		dataset.Identifier,
 		dataset.SupportedObjects,
-		&ctdf.DataSource{
-			OriginalFormat: string(dataset.Format),
-			Provider:       dataset.Provider.Name,
-			DatasetID:      dataset.Identifier,
-			Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
-		})
+		datasource,
+	)
 	if err != nil {
 		return err
+	}
+
+	if dataset.SupportedObjects.Stops {
+		cleanupOldRecords("stops", datasource)
+	}
+	if dataset.SupportedObjects.StopGroups {
+		cleanupOldRecords("stop_groups", datasource)
+	}
+	if dataset.SupportedObjects.Operators {
+		cleanupOldRecords("operators", datasource)
+	}
+	if dataset.SupportedObjects.OperatorGroups {
+		cleanupOldRecords("operator_groups", datasource)
+	}
+	if dataset.SupportedObjects.Services {
+		cleanupOldRecords("services", datasource)
+	}
+	if dataset.SupportedObjects.Journeys {
+		cleanupOldRecords("journeys", datasource)
 	}
 
 	return nil
@@ -130,4 +158,28 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 	io.Copy(tmpFile, resp.Body)
 
 	return tmpFile, fileExtension
+}
+
+func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
+	collection := database.GetCollection(collectionName)
+
+	query := bson.M{
+		"$and": bson.A{
+			bson.M{"datasource.originalformat": datasource.OriginalFormat},
+			bson.M{"datasource.provider": datasource.Provider},
+			bson.M{"datasource.datasetid": datasource.DatasetID},
+			bson.M{"datasource.timestamp": bson.M{
+				"$ne": datasource.Timestamp,
+			}},
+		},
+	}
+
+	result, _ := collection.DeleteMany(context.Background(), query)
+
+	if result != nil {
+		log.Info().
+			Str("collection", collectionName).
+			Int64("num", result.DeletedCount).
+			Msg("Cleaned up old records")
+	}
 }
