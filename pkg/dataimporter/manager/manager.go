@@ -70,12 +70,15 @@ func ImportDataset(identifier string) error {
 		return err
 	}
 
-	err = format.ImportIntoMongoAsCTDF(dataset.SupportedObjects, &ctdf.DataSource{
-		OriginalFormat: string(dataset.Format),
-		Provider:       dataset.Provider.Name,
-		DatasetID:      dataset.Identifier,
-		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
-	})
+	err = format.ImportIntoMongoAsCTDF(
+		dataset.Identifier,
+		dataset.SupportedObjects,
+		&ctdf.DataSource{
+			OriginalFormat: string(dataset.Format),
+			Provider:       dataset.Provider.Name,
+			DatasetID:      dataset.Identifier,
+			Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
+		})
 	if err != nil {
 		return err
 	}

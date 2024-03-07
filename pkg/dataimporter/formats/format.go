@@ -8,5 +8,5 @@ import (
 
 type Format interface {
 	ParseFile(io.Reader) error
-	ImportIntoMongoAsCTDF(SupportedObjects, *ctdf.DataSource) error
+	ImportIntoMongoAsCTDF(string, SupportedObjects, *ctdf.DataSource) error
 }
