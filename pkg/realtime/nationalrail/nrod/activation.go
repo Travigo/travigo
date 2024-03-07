@@ -40,8 +40,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "TrainActivationJSON",
 		Provider:       "Network-Rail",
-		Dataset:        "TrinActivation",
-		Identifier:     now.String(),
+		DatasetID:      "TrinActivation",
+		Timestamp:      now.String(),
 	}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -123,7 +123,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 	} else {
-		updateMap["datasource.identifier"] = datasource.Identifier
+		updateMap["datasource.timestamp"] = datasource.Timestamp
 	}
 
 	// Create update

@@ -49,8 +49,8 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "JSON",
 		Provider:       "GB-TfL",
-		Dataset:        fmt.Sprintf("StopPoint/mode/%s/Disruption", d.Mode.ModeID),
-		Identifier:     fmt.Sprint(now.Unix()),
+		DatasetID:      fmt.Sprintf("StopPoint/mode/%s/Disruption", d.Mode.ModeID),
+		Timestamp:      fmt.Sprint(now.Unix()),
 	}
 
 	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/StopPoint/mode/%s/Disruption?app_key=%s", d.Mode.ModeID, TfLAppKey)
@@ -167,8 +167,8 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "JSON",
 		Provider:       "GB-TfL",
-		Dataset:        fmt.Sprintf("Line/Mode/%s/Status", d.Mode.ModeID),
-		Identifier:     fmt.Sprint(now.Unix()),
+		DatasetID:      fmt.Sprintf("Line/Mode/%s/Status", d.Mode.ModeID),
+		Timestamp:      fmt.Sprint(now.Unix()),
 	}
 
 	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/Line/Mode/%s/Status?app_key=%s", d.Mode.ModeID, TfLAppKey)
@@ -347,9 +347,9 @@ func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSou
 	// Remove any tfl service alerts that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
 	deleteQuery := bson.M{
-		"datasource.provider":   datasource.Provider,
-		"datasource.dataset":    datasource.Dataset,
-		"datasource.identifier": bson.M{"$ne": datasource.Identifier},
+		"datasource.provider":  datasource.Provider,
+		"datasource.datasetid": datasource.DatasetID,
+		"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
 	}
 
 	deleted, _ := serviceAlertsCollection.DeleteMany(context.Background(), deleteQuery)

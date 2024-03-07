@@ -234,7 +234,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 
 				serviceOperations = append(serviceOperations, insertModel)
 				serviceOperationInsert += 1
-			} else if existingCtdfService.ModificationDateTime.Before(ctdfService.ModificationDateTime) || existingCtdfService.ModificationDateTime.Year() == 0 || existingCtdfService.DataSource.Identifier != ctdfService.DataSource.Identifier {
+			} else if existingCtdfService.ModificationDateTime.Before(ctdfService.ModificationDateTime) || existingCtdfService.ModificationDateTime.Year() == 0 || existingCtdfService.DataSource.Timestamp != ctdfService.DataSource.Timestamp {
 				updateModel := mongo.NewReplaceOneModel()
 				updateModel.SetFilter(bson.M{"primaryidentifier": ctdfService.PrimaryIdentifier})
 				updateModel.SetReplacement(bsonRep)
@@ -671,7 +671,7 @@ func (doc *TransXChange) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource, tran
 
 					stopOperations = append(stopOperations, insertModel)
 					localOperationInsert += 1
-				} else if existingCtdfJourney.ModificationDateTime.Before(ctdfJourney.ModificationDateTime) || existingCtdfJourney.ModificationDateTime.Year() == 0 || existingCtdfJourney.DataSource.Identifier != ctdfJourney.DataSource.Identifier {
+				} else if existingCtdfJourney.ModificationDateTime.Before(ctdfJourney.ModificationDateTime) || existingCtdfJourney.ModificationDateTime.Year() == 0 || existingCtdfJourney.DataSource.Timestamp != ctdfJourney.DataSource.Timestamp {
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)

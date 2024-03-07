@@ -31,8 +31,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "DarwinPushPort",
 		Provider:       "National-Rail",
-		Dataset:        "DarwinPushPort",
-		Identifier:     now.String(),
+		DatasetID:      "DarwinPushPort",
+		Timestamp:      now.String(),
 	}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -112,7 +112,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 		} else {
-			updateMap["datasource.identifier"] = datasource.Identifier
+			updateMap["datasource.timestamp"] = datasource.Timestamp
 		}
 
 		for _, location := range trainStatus.Locations {
@@ -345,7 +345,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 		} else {
-			updateMap["datasource.identifier"] = datasource.Identifier
+			updateMap["datasource.timestamp"] = datasource.Timestamp
 		}
 
 		// Create update

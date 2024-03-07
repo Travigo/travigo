@@ -109,7 +109,7 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "datasource.dataset", Value: 1}},
+			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},
 		},
 		{
 			Options: &options.IndexOptions{
@@ -146,7 +146,7 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "path.destinationstopref", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "datasource.dataset", Value: 1}},
+			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},
 		},
 		{
 			Options: &options.IndexOptions{
@@ -216,8 +216,8 @@ func createJourneysIndexes() {
 		{
 			Keys: bson.D{
 				{Key: "datasource.provider", Value: 1},
-				{Key: "datasource.dataset", Value: 1},
-				{Key: "datasource.identifier", Value: 1},
+				{Key: "datasource.datasetid", Value: 1},
+				{Key: "datasource.timestamp", Value: 1},
 			},
 		},
 		{

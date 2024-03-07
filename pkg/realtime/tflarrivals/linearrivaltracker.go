@@ -124,8 +124,8 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "tfl-json",
 		Provider:       "GB-TfL",
-		Dataset:        fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
-		Identifier:     fmt.Sprint(startTime.Unix()),
+		DatasetID:      fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
+		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -180,9 +180,9 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	// Remove any tfl realtime journey that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
 	deleteQuery := bson.M{
-		"datasource.provider":   datasource.Provider,
-		"datasource.dataset":    datasource.Dataset,
-		"datasource.identifier": bson.M{"$ne": datasource.Identifier},
+		"datasource.provider":  datasource.Provider,
+		"datasource.datasetid": datasource.DatasetID,
+		"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
 	}
 
 	d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
@@ -421,7 +421,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 	} else {
-		updateMap["datasource.identifier"] = datasource.Identifier
+		updateMap["datasource.timestamp"] = datasource.Timestamp
 	}
 	updateMap["journey"] = realtimeJourney.Journey
 

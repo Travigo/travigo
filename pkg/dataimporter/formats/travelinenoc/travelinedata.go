@@ -203,7 +203,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	return operators, operatorGroups
 }
 
-func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) error {
 	datasource.OriginalFormat = "traveline-noc"
 
 	log.Info().Msg("Converting to CTDF")
@@ -374,4 +374,6 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
+
+	return nil
 }

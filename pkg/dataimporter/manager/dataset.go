@@ -1,4 +1,4 @@
-package dataimporter
+package manager
 
 type DataSet struct {
 	Identifier string
@@ -9,6 +9,8 @@ type DataSet struct {
 	Source string
 
 	UnpackBundle BundleFormat
+
+	SupportedObjects SupportedObjects
 }
 
 type DataSetFormat string
@@ -37,3 +39,13 @@ const (
 	BundleFormatZIP                = "zip"
 	BundleFormatTarGZ              = "tar.gz"
 )
+
+type SupportedObjects struct {
+	Operators bool
+	Stops     bool
+	Services  bool
+	Journeys  bool
+
+	RealtimeJourneys bool
+	ServiceAlerts    bool
+}

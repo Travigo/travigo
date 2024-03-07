@@ -9,9 +9,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
-	travelineData := TravelineData{}
-
+func (t *TravelineData) ParseFile(reader io.Reader) error {
 	d := xml.NewDecoder(util.NewValidUTF8Reader(reader))
 	d.CharsetReader = charset.NewReaderLabel
 	for {
@@ -21,7 +19,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return nil, err
+			return err
 		}
 
 		switch ty := tok.(type) {
@@ -32,7 +30,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 
 					switch attr.Name.Local {
 					case "generationDate":
-						travelineData.GenerationDate = attr.Value
+						t.GenerationDate = attr.Value
 					}
 				}
 			} else if ty.Name.Local == "NOCLinesRecord" {
@@ -41,7 +39,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&NOCLinesRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.NOCLinesRecords = append(travelineData.NOCLinesRecords, NOCLinesRecord)
+					t.NOCLinesRecords = append(t.NOCLinesRecords, NOCLinesRecord)
 				}
 			} else if ty.Name.Local == "NOCTableRecord" {
 				var NOCTableRecord NOCTableRecord
@@ -49,7 +47,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&NOCTableRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.NOCTableRecords = append(travelineData.NOCTableRecords, NOCTableRecord)
+					t.NOCTableRecords = append(t.NOCTableRecords, NOCTableRecord)
 				}
 			} else if ty.Name.Local == "OperatorsRecord" {
 				var operatorRecord OperatorsRecord
@@ -57,7 +55,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&operatorRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.OperatorsRecords = append(travelineData.OperatorsRecords, operatorRecord)
+					t.OperatorsRecords = append(t.OperatorsRecords, operatorRecord)
 				}
 			} else if ty.Name.Local == "GroupsRecord" {
 				var groupRecord GroupsRecord
@@ -65,7 +63,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&groupRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.GroupsRecords = append(travelineData.GroupsRecords, groupRecord)
+					t.GroupsRecords = append(t.GroupsRecords, groupRecord)
 				}
 			} else if ty.Name.Local == "ManagementDivisionsRecord" {
 				var managementRecord ManagementDivisionsRecord
@@ -73,7 +71,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&managementRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.ManagementDivisionsRecords = append(travelineData.ManagementDivisionsRecords, managementRecord)
+					t.ManagementDivisionsRecords = append(t.ManagementDivisionsRecords, managementRecord)
 				}
 			} else if ty.Name.Local == "PublicNameRecord" {
 				var publicNameRecord PublicNameRecord
@@ -81,7 +79,7 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 				if err = d.DecodeElement(&publicNameRecord, &ty); err != nil {
 					log.Fatal().Msgf("Error decoding item: %s", err)
 				} else {
-					travelineData.PublicNameRecords = append(travelineData.PublicNameRecords, publicNameRecord)
+					t.PublicNameRecords = append(t.PublicNameRecords, publicNameRecord)
 				}
 			}
 		default:
@@ -89,12 +87,12 @@ func ParseXMLFile(reader io.Reader) (*TravelineData, error) {
 	}
 
 	log.Info().Msgf("Successfully parsed document")
-	log.Info().Msgf(" - Contains %d NOCLinesRecords", len(travelineData.NOCLinesRecords))
-	log.Info().Msgf(" - Contains %d NOCTableRecords", len(travelineData.NOCTableRecords))
-	log.Info().Msgf(" - Contains %d OperatorRecords", len(travelineData.OperatorsRecords))
-	log.Info().Msgf(" - Contains %d GroupsRecords", len(travelineData.GroupsRecords))
-	log.Info().Msgf(" - Contains %d ManagementDivisionsRecords", len(travelineData.ManagementDivisionsRecords))
-	log.Info().Msgf(" - Contains %d PublicNameRecords", len(travelineData.PublicNameRecords))
+	log.Info().Msgf(" - Contains %d NOCLinesRecords", len(t.NOCLinesRecords))
+	log.Info().Msgf(" - Contains %d NOCTableRecords", len(t.NOCTableRecords))
+	log.Info().Msgf(" - Contains %d OperatorRecords", len(t.OperatorsRecords))
+	log.Info().Msgf(" - Contains %d GroupsRecords", len(t.GroupsRecords))
+	log.Info().Msgf(" - Contains %d ManagementDivisionsRecords", len(t.ManagementDivisionsRecords))
+	log.Info().Msgf(" - Contains %d PublicNameRecords", len(t.PublicNameRecords))
 
-	return &travelineData, nil
+	return nil
 }

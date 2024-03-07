@@ -510,8 +510,8 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		DataSource: &ctdf.DataSource{
 			OriginalFormat: "CIF",
 			Provider:       "GB-NationalRail",
-			Dataset:        "timetable",
-			Identifier:     "",
+			DatasetID:      "timetable",
+			Timestamp:      "",
 		},
 		ServiceRef:         operatorRef,
 		OperatorRef:        operatorRef,

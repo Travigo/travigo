@@ -20,6 +20,8 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
 	"github.com/travigo/travigo/pkg/dataimporter/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
+	"github.com/travigo/travigo/pkg/dataimporter/manager"
+	"github.com/travigo/travigo/pkg/dataimporter/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
 	"github.com/adjust/rmq/v5"
@@ -27,10 +29,8 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/bods"
 	"github.com/travigo/travigo/pkg/dataimporter/naptan"
-	"github.com/travigo/travigo/pkg/dataimporter/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/transxchange"
-	"github.com/travigo/travigo/pkg/dataimporter/travelinenoc"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
@@ -139,8 +139,8 @@ func RegisterCLI() *cli.Command {
 						case "naptan":
 							datasource = &ctdf.DataSource{
 								OriginalFormat: "naptan",
-								Dataset:        source,
-								Identifier:     time.Now().Format(time.RFC3339),
+								DatasetID:      source,
+								Timestamp:      time.Now().Format(time.RFC3339),
 							}
 
 							cleanupOldRecords("stops", datasource)
@@ -148,8 +148,8 @@ func RegisterCLI() *cli.Command {
 						case "traveline-noc":
 							datasource = &ctdf.DataSource{
 								OriginalFormat: "traveline-noc",
-								Dataset:        source,
-								Identifier:     time.Now().Format(time.RFC3339),
+								DatasetID:      source,
+								Timestamp:      time.Now().Format(time.RFC3339),
 							}
 
 							cleanupOldRecords("operators", datasource)
@@ -241,8 +241,8 @@ func RegisterCLI() *cli.Command {
 							datasource := &ctdf.DataSource{
 								OriginalFormat: "transxchange",
 								Provider:       bodsDatasetIdentifier,
-								Dataset:        fmt.Sprint(dataset.ID),
-								Identifier:     dataset.Modified,
+								DatasetID:      fmt.Sprint(dataset.ID),
+								Timestamp:      dataset.Modified,
 							}
 
 							// Cleanup per file if it changes
@@ -288,7 +288,7 @@ func RegisterCLI() *cli.Command {
 								"$and": bson.A{
 									bson.M{"datasource.originalformat": "transxchange"},
 									bson.M{"datasource.provider": bodsDatasetIdentifier},
-									bson.M{"datasource.dataset": datasetIdentifier.(string)},
+									bson.M{"datasource.datasetid": datasetIdentifier.(string)},
 								},
 							}
 
@@ -348,8 +348,8 @@ func RegisterCLI() *cli.Command {
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "transxchange",
 						Provider:       "GB-TfL-Transxchange",
-						Dataset:        "ALL",
-						Identifier:     currentTime,
+						DatasetID:      "ALL",
+						Timestamp:      currentTime,
 					}
 					cleanupOldRecords("services", datasource)
 					cleanupOldRecords("journeys", datasource)
@@ -487,8 +487,8 @@ func RegisterCLI() *cli.Command {
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "CIF",
 						Provider:       "GB-NationalRail",
-						Dataset:        "timetable",
-						Identifier:     time.Now().Format(time.RFC3339),
+						DatasetID:      "timetable",
+						Timestamp:      time.Now().Format(time.RFC3339),
 					}
 					cleanupOldRecords("journeys", datasource)
 
@@ -529,8 +529,8 @@ func RegisterCLI() *cli.Command {
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "nationalrail-toc",
 						Provider:       "GB-NationalRail",
-						Dataset:        "TOC",
-						Identifier:     currentTime,
+						DatasetID:      "TOC",
+						Timestamp:      currentTime,
 					}
 					cleanupOldRecords("operators", datasource)
 					cleanupOldRecords("operator_groups", datasource)
@@ -611,8 +611,8 @@ func RegisterCLI() *cli.Command {
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "JSON-CORPUS",
 						Provider:       "GB-NetworkRail",
-						Dataset:        source,
-						Identifier:     "",
+						DatasetID:      source,
+						Timestamp:      "",
 					}
 
 					corpus.ImportIntoMongoAsCTDF(datasource)
@@ -663,8 +663,8 @@ func RegisterCLI() *cli.Command {
 					datasource := &ctdf.DataSource{
 						OriginalFormat: "GTFS-SCHEDULE",
 						Provider:       "Department of Transport (UK)",
-						Dataset:        datasetid,
-						Identifier:     fmt.Sprintf("%d", time.Now().Unix()),
+						DatasetID:      datasetid,
+						Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
 					}
 
 					gtfsFile.ImportIntoMongoAsCTDF(datasetid, datasource)
@@ -673,6 +673,30 @@ func RegisterCLI() *cli.Command {
 					cleanupOldRecords("journeys", datasource)
 
 					return nil
+				},
+			},
+			{
+				Name:  "dataset",
+				Usage: "Import a dataset",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "id",
+						Usage:    "ID of the dataset",
+						Required: true,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					ctdf.LoadSpecialDayCache()
+					insertrecords.Insert()
+
+					datasetid := c.String("id")
+
+					err := manager.ImportDataset(datasetid)
+
+					return err
 				},
 			},
 		},
@@ -834,31 +858,14 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 
 		if sourceDatasource == nil {
 			datasource = ctdf.DataSource{
-				Provider: "Department of Transport",
-				Dataset:  dataFile.Name,
+				Provider:  "Department of Transport",
+				DatasetID: dataFile.Name,
 			}
 		} else {
 			datasource = *sourceDatasource
 		}
 
 		naptanDoc.ImportIntoMongoAsCTDF(&datasource)
-	case "traveline-noc":
-		log.Info().Msgf("Traveline NOC file import from %s", dataFile.Name)
-		travelineData, err := travelinenoc.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Dataset: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		travelineData.ImportIntoMongoAsCTDF(&datasource)
 	case "transxchange":
 		log.Info().Msgf("TransXChange file import from %s ", dataFile.Name)
 		transXChangeDoc, err := transxchange.ParseXMLFile(dataFile.Reader)
@@ -869,8 +876,8 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 
 		if sourceDatasource == nil {
 			datasource = ctdf.DataSource{
-				Provider: "Department of Transport", // This may not always be true
-				Dataset:  dataFile.Name,
+				Provider:  "Department of Transport", // This may not always be true
+				DatasetID: dataFile.Name,
 			}
 		} else {
 			datasource = *sourceDatasource
@@ -882,8 +889,8 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 
 		if sourceDatasource == nil {
 			datasource = ctdf.DataSource{
-				Provider: "Department of Transport", // This may not always be true
-				Dataset:  dataFile.Name,
+				Provider:  "Department of Transport", // This may not always be true
+				DatasetID: dataFile.Name,
 			}
 		} else {
 			datasource = *sourceDatasource
@@ -904,8 +911,8 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 
 		if sourceDatasource == nil {
 			datasource = ctdf.DataSource{
-				Provider: "National Rail", // This may not always be true
-				Dataset:  dataFile.Name,
+				Provider:  "National Rail", // This may not always be true
+				DatasetID: dataFile.Name,
 			}
 		} else {
 			datasource = *sourceDatasource
@@ -924,7 +931,7 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 			datasource = ctdf.DataSource{
 				OriginalFormat: "JSON-CORPUS",
 				Provider:       "GB-NetworkRail",
-				Dataset:        dataFile.Name,
+				DatasetID:      dataFile.Name,
 			}
 		} else {
 			datasource = *sourceDatasource
@@ -936,8 +943,8 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 
 		// TODO Def not always true
 		datasource := &ctdf.DataSource{
-			Provider: "Department of Transport", // This may not always be true
-			Dataset:  dataFile.Name,
+			Provider:  "Department of Transport", // This may not always be true
+			DatasetID: dataFile.Name,
 		}
 
 		err := gtfs.ParseRealtime(dataFile.Reader, realtimeQueue, datasource)
@@ -959,9 +966,9 @@ func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
 		"$and": bson.A{
 			bson.M{"datasource.originalformat": datasource.OriginalFormat},
 			bson.M{"datasource.provider": datasource.Provider},
-			bson.M{"datasource.dataset": datasource.Dataset},
-			bson.M{"datasource.identifier": bson.M{
-				"$ne": datasource.Identifier,
+			bson.M{"datasource.datasetid": datasource.DatasetID},
+			bson.M{"datasource.timestamp": bson.M{
+				"$ne": datasource.Timestamp,
 			}},
 		},
 	}
