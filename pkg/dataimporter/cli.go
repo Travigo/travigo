@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/dataimporter/bods"
 	"github.com/travigo/travigo/pkg/dataimporter/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/transxchange"
@@ -36,7 +34,6 @@ import (
 	"github.com/travigo/travigo/pkg/util"
 	"github.com/urfave/cli/v2"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/rs/zerolog/log"
 
@@ -175,223 +172,6 @@ func RegisterCLI() *cli.Command {
 							time.Sleep(waitTime)
 						}
 					}
-
-					return nil
-				},
-			},
-			{
-				Name:  "bods-timetable",
-				Usage: "Import TransXChange Timetable datasets from BODS into Travigo",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "url",
-						Usage:    "Overwrite URL for the BODS Timetable API",
-						Required: false,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					ctdf.LoadSpecialDayCache()
-					insertrecords.Insert()
-
-					bodsDatasetIdentifier := "GB-DfT-BODS"
-
-					source := c.String("url")
-
-					// Default source of all published buses
-					if source == "" {
-						source = "https://data.bus-data.dft.gov.uk/api/v1/dataset/?limit=25&offset=0&status=published"
-					}
-
-					// First get the unique set of datasets that we have previously imported
-					// This will be used later to see if any are no longer active in the dataset, and should be removed
-					datasetVersionsCollection := database.GetCollection("dataset_versions")
-					datasetVersionsIdentifiers, _ := datasetVersionsCollection.Distinct(context.Background(), "identifier", bson.M{"dataset": bodsDatasetIdentifier})
-					datasetIdentifiersSeen := map[string]bool{}
-
-					log.Info().Msgf("Bus Open Data Service Timetable API import from %s ", source)
-
-					// Get the API key from the environment variables and append to the source URL
-					env := util.GetEnvironmentVariables()
-					if env["TRAVIGO_BODS_API_KEY"] != "" {
-						source += fmt.Sprintf("&api_key=%s", env["TRAVIGO_BODS_API_KEY"])
-					}
-
-					timeTableDataset, err := bods.GetTimetableDataset(source)
-					log.Info().Msgf(" - %d datasets", len(timeTableDataset))
-
-					if err != nil {
-						return err
-					}
-
-					for _, dataset := range timeTableDataset {
-						datasetIdentifiersSeen[fmt.Sprint(dataset.ID)] = true
-
-						var datasetVersion *ctdf.DatasetVersion
-
-						query := bson.M{"$and": bson.A{
-							bson.M{"dataset": bodsDatasetIdentifier},
-							bson.M{"identifier": fmt.Sprintf("%d", dataset.ID)},
-						}}
-						datasetVersionsCollection.FindOne(context.Background(), query).Decode(&datasetVersion)
-
-						if datasetVersion == nil || datasetVersion.LastModified != dataset.Modified {
-							datasource := &ctdf.DataSource{
-								OriginalFormat: "transxchange",
-								Provider:       bodsDatasetIdentifier,
-								DatasetID:      fmt.Sprint(dataset.ID),
-								Timestamp:      dataset.Modified,
-							}
-
-							// Cleanup per file if it changes
-							cleanupOldRecords("services", datasource)
-							cleanupOldRecords("journeys", datasource)
-
-							err = importFile("transxchange", ctdf.TransportTypeBus, dataset.URL, "", datasource, map[string]string{})
-
-							if err != nil {
-								log.Error().Err(err).Msgf("Failed to import file %s (%s)", dataset.Name, dataset.URL)
-								continue
-							}
-
-							if datasetVersion == nil {
-								datasetVersion = &ctdf.DatasetVersion{
-									Dataset:    bodsDatasetIdentifier,
-									Identifier: fmt.Sprintf("%d", dataset.ID),
-								}
-							}
-							datasetVersion.LastModified = dataset.Modified
-
-							opts := options.Update().SetUpsert(true)
-							datasetVersionsCollection.UpdateOne(context.Background(), query, bson.M{"$set": datasetVersion}, opts)
-						} else {
-							log.Info().Int("id", dataset.ID).Msg("Dataset not changed")
-						}
-					}
-
-					// Now check if this new results has any datasets removed
-					for _, datasetIdentifier := range datasetVersionsIdentifiers {
-						if !datasetIdentifiersSeen[datasetIdentifier.(string)] {
-							log.Info().Str("id", datasetIdentifier.(string)).Msg("Deleted removed dataset")
-
-							datasetVersionsCollection.DeleteMany(context.Background(), bson.M{"$and": bson.A{
-								bson.M{"dataset": bodsDatasetIdentifier},
-								bson.M{"identifier": datasetIdentifier.(string)},
-							}})
-
-							journeysCollection := database.GetCollection("journeys")
-							servicesCollection := database.GetCollection("services")
-
-							query := bson.M{
-								"$and": bson.A{
-									bson.M{"datasource.originalformat": "transxchange"},
-									bson.M{"datasource.provider": bodsDatasetIdentifier},
-									bson.M{"datasource.datasetid": datasetIdentifier.(string)},
-								},
-							}
-
-							journeysCollection.DeleteMany(context.Background(), query)
-							servicesCollection.DeleteMany(context.Background(), query)
-						}
-					}
-
-					return nil
-				},
-			},
-			{
-				Name:  "tfl",
-				Usage: "Import Transport for London (TfL) datasets from their API into Travigo",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "url",
-						Usage:    "Overwrite URL for the TfL TransXChange file",
-						Required: false,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					ctdf.LoadSpecialDayCache()
-					insertrecords.Insert()
-
-					source := c.String("url")
-
-					// Default source of all published buses
-					if source == "" {
-						source = "https://tfl.gov.uk/tfl/syndication/feeds/journey-planner-timetables.zip"
-					}
-
-					currentTime := time.Now().Format(time.RFC3339)
-
-					log.Info().Msgf("TfL TransXChange bundle import from %s", source)
-
-					if isValidUrl(source) {
-						tempFile, _ := tempDownloadFile(source)
-
-						source = tempFile.Name()
-						defer os.Remove(tempFile.Name())
-					}
-
-					archive, err := zip.OpenReader(source)
-					if err != nil {
-						log.Fatal().Str("source", source).Err(err).Msg("Could not open zip file")
-					}
-					defer archive.Close()
-
-					tflBusesMatchRegex, _ := regexp.Compile("(?i)BUSES PART.+.zip")
-					tflOtherMatchRegex, _ := regexp.Compile("(?i)LULDLRTRAMRIVERCABLE.*\\.zip")
-
-					// Cleanup right at the begining once, as we do it as 1 big import
-					datasource := &ctdf.DataSource{
-						OriginalFormat: "transxchange",
-						Provider:       "GB-TfL-Transxchange",
-						DatasetID:      "ALL",
-						Timestamp:      currentTime,
-					}
-					cleanupOldRecords("services", datasource)
-					cleanupOldRecords("journeys", datasource)
-
-					for _, zipFile := range archive.File {
-
-						file, err := zipFile.Open()
-						if err != nil {
-							log.Fatal().Err(err).Msg("Failed to open file")
-						}
-						defer file.Close()
-
-						tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-tfl-innerzip-")
-						if err != nil {
-							log.Fatal().Err(err).Msg("Cannot create temporary file")
-						}
-						defer os.Remove(tmpFile.Name())
-
-						io.Copy(tmpFile, file)
-
-						var transportType ctdf.TransportType
-						if tflBusesMatchRegex.MatchString(zipFile.Name) {
-							transportType = ctdf.TransportTypeBus
-						} else if tflOtherMatchRegex.MatchString(zipFile.Name) {
-							transportType = ctdf.TransportTypeMetro
-						}
-
-						if transportType != "" {
-							err = importFile("transxchange", transportType, tmpFile.Name(), "zip", datasource, map[string]string{
-								"OperatorRef": "GB:NOC:TFLO",
-							})
-							if err != nil {
-								log.Fatal().Err(err).Msg("Cannot import TfL inner zip")
-							}
-						}
-					}
-
-					// TfL love to split out services over many files with different IDs
-					// Use the squash function to turn them into 1
-					squashIdenticalServices(bson.M{
-						"operatorref": "GB:NOC:TFLO",
-					})
 
 					return nil
 				},
