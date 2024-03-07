@@ -2,6 +2,7 @@ package travelinenoc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -203,8 +205,10 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	return operators, operatorGroups
 }
 
-func (t *TravelineData) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) error {
-	datasource.OriginalFormat = "traveline-noc"
+func (t *TravelineData) ImportIntoMongoAsCTDF(supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.Operators {
+		return errors.New("This format requires operators to be enabled")
+	}
 
 	log.Info().Msg("Converting to CTDF")
 	operators, operatorGroups := t.convertToCTDF()

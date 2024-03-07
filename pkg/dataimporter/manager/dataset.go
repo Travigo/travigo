@@ -1,5 +1,7 @@
 package manager
 
+import "github.com/travigo/travigo/pkg/dataimporter/formats"
+
 type DataSet struct {
 	Identifier string
 	Format     DataSetFormat
@@ -10,7 +12,7 @@ type DataSet struct {
 
 	UnpackBundle BundleFormat
 
-	SupportedObjects SupportedObjects
+	SupportedObjects formats.SupportedObjects
 }
 
 type DataSetFormat string
@@ -39,13 +41,3 @@ const (
 	BundleFormatZIP                = "zip"
 	BundleFormatTarGZ              = "tar.gz"
 )
-
-type SupportedObjects struct {
-	Operators bool
-	Stops     bool
-	Services  bool
-	Journeys  bool
-
-	RealtimeJourneys bool
-	ServiceAlerts    bool
-}

@@ -1,5 +1,7 @@
 package manager
 
+import "github.com/travigo/travigo/pkg/dataimporter/formats"
+
 // Just a static list for now
 func GetRegisteredDataSets() []DataSet {
 	return []DataSet{
@@ -12,7 +14,7 @@ func GetRegisteredDataSets() []DataSet {
 			},
 			Source:       "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
 			UnpackBundle: BundleFormatNone,
-			SupportedObjects: SupportedObjects{
+			SupportedObjects: formats.SupportedObjects{
 				Operators: true,
 			},
 		},

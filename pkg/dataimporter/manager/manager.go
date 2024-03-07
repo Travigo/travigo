@@ -70,7 +70,7 @@ func ImportDataset(identifier string) error {
 		return err
 	}
 
-	err = format.ImportIntoMongoAsCTDF(&ctdf.DataSource{
+	err = format.ImportIntoMongoAsCTDF(dataset.SupportedObjects, &ctdf.DataSource{
 		OriginalFormat: string(dataset.Format),
 		Provider:       dataset.Provider.Name,
 		DatasetID:      dataset.Identifier,
