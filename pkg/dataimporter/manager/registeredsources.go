@@ -1,6 +1,16 @@
 package manager
 
-import "github.com/travigo/travigo/pkg/dataimporter/formats"
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+
+	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/util"
+)
 
 // Just a static list for now
 func GetRegisteredDataSets() []DataSet {
@@ -33,5 +43,65 @@ func GetRegisteredDataSets() []DataSet {
 				StopGroups: true,
 			},
 		},
+		{
+			Identifier: "gb-nationalrail-toc",
+			Format:     DataSetFormatNationalRailTOC,
+			Provider: Provider{
+				Name:    "National Rail",
+				Website: "https://nationalrail.co.uk",
+			},
+			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs",
+			UnpackBundle: BundleFormatNone,
+			SupportedObjects: formats.SupportedObjects{
+				Operators: true,
+				Services:  true,
+			},
+
+			DownloadHandler: func(r *http.Request) {
+				token := nationalRailLogin()
+				r.Header.Set("X-Auth-Token", token)
+			},
+		},
 	}
+}
+
+func nationalRailLogin() string {
+	env := util.GetEnvironmentVariables()
+	if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
+		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
+	}
+	if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
+		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
+	}
+
+	formData := url.Values{
+		"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
+		"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
+	}
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
+	}
+
+	var loginResponse struct {
+		Token string `json:"token"`
+	}
+	json.Unmarshal(body, &loginResponse)
+
+	return loginResponse.Token
 }

@@ -1,6 +1,10 @@
 package manager
 
-import "github.com/travigo/travigo/pkg/dataimporter/formats"
+import (
+	"net/http"
+
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
+)
 
 type DataSet struct {
 	Identifier string
@@ -13,6 +17,8 @@ type DataSet struct {
 	UnpackBundle BundleFormat
 
 	SupportedObjects formats.SupportedObjects
+
+	DownloadHandler func(*http.Request)
 }
 
 type DataSetFormat string

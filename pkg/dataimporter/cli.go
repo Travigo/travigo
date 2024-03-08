@@ -20,7 +20,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
-	"github.com/travigo/travigo/pkg/dataimporter/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
 	"github.com/adjust/rmq/v5"
@@ -634,24 +633,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		if err != nil {
 			return err
 		}
-	case "nationalrail-toc":
-		log.Info().Msgf("National Rail TOC file import from %s ", dataFile.Name)
-		nationalRailTOCDoc, err := nationalrailtoc.ParseXMLFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider:  "National Rail", // This may not always be true
-				DatasetID: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		nationalRailTOCDoc.ImportIntoMongoAsCTDF(&datasource)
 	case "networkrail-corpus":
 		log.Info().Msgf("Network Rail Corpus file import from %s ", dataFile.Name)
 		corpus, err := networkrailcorpus.ParseJSONFile(dataFile.Reader)

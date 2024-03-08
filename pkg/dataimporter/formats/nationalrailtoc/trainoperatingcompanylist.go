@@ -2,6 +2,7 @@ package nationalrailtoc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -76,7 +78,11 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	return operators, services
 }
 
-func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.Operators || !supportedObjects.Services {
+		return errors.New("This format requires operators & services to be enabled")
+	}
+
 	operators, services := t.convertToCTDF()
 
 	log.Info().Msg("Converting to CTDF")
@@ -90,7 +96,6 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
 	var operatorOperationInsert uint64
-	var operatorOperationUpdate uint64
 
 	maxBatchSize := int(math.Ceil(float64(len(operators)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
@@ -111,42 +116,23 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 		go func(operatorsBatch []*ctdf.Operator) {
 			var operatorOperations []mongo.WriteModel
 			var localOperationInsert uint64
-			var localOperationUpdate uint64
 
 			for _, operator := range operatorsBatch {
-				var existingCtdfOperator *ctdf.Operator
-				operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
+				operator.CreationDateTime = time.Now()
+				operator.ModificationDateTime = time.Now()
+				operator.DataSource = datasource
 
-				if existingCtdfOperator == nil {
-					operator.CreationDateTime = time.Now()
-					operator.ModificationDateTime = time.Now()
-					operator.DataSource = datasource
+				bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-					insertModel := mongo.NewInsertOneModel()
-
-					bsonRep, _ := bson.Marshal(operator)
-					insertModel.SetDocument(bsonRep)
-
-					operatorOperations = append(operatorOperations, insertModel)
-					localOperationInsert += 1
-				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
-					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
-					operator.ModificationDateTime = time.Now()
-					operator.DataSource = datasource
-
-					updateModel := mongo.NewUpdateOneModel()
-					updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
-					updateModel.SetUpdate(bsonRep)
-
-					operatorOperations = append(operatorOperations, updateModel)
-					localOperationUpdate += 1
-				}
+				operatorOperations = append(operatorOperations, updateModel)
+				localOperationInsert += 1
 			}
 
 			atomic.AddUint64(&operatorOperationInsert, localOperationInsert)
-			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
 				_, err := operatorsCollection.BulkWrite(context.Background(), operatorOperations, &options.BulkWriteOptions{})
@@ -163,12 +149,10 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
-	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
 
 	// Import services
 	log.Info().Msg("Importing CTDF Services into Mongo")
 	var servicesOperationInsert uint64
-	var servicesOperationUpdate uint64
 
 	maxBatchSize = int(math.Ceil(float64(len(services)) / float64(runtime.NumCPU())))
 	numBatches = int(math.Ceil(float64(len(services)) / float64(maxBatchSize)))
@@ -189,42 +173,24 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 		go func(servicesBatch []*ctdf.Service) {
 			var servicesOperations []mongo.WriteModel
 			var localServicesInsert uint64
-			var localServicesUpdate uint64
 
 			for _, service := range servicesBatch {
-				var existingCtdfService *ctdf.Service
-				servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": service.PrimaryIdentifier}).Decode(&existingCtdfService)
+				service.CreationDateTime = time.Now()
+				service.ModificationDateTime = time.Now()
+				service.DataSource = datasource
 
-				if existingCtdfService == nil {
-					service.CreationDateTime = time.Now()
-					service.ModificationDateTime = time.Now()
-					service.DataSource = datasource
+				bsonRep, _ := bson.Marshal(bson.M{"$set": service})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": service.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-					insertModel := mongo.NewInsertOneModel()
+				servicesOperations = append(servicesOperations, updateModel)
+				localServicesInsert += 1
 
-					bsonRep, _ := bson.Marshal(service)
-					insertModel.SetDocument(bsonRep)
-
-					servicesOperations = append(servicesOperations, insertModel)
-					localServicesInsert += 1
-				} else if existingCtdfService.ModificationDateTime != service.ModificationDateTime {
-					service.CreationDateTime = existingCtdfService.CreationDateTime
-					service.ModificationDateTime = time.Now()
-					service.DataSource = datasource
-
-					updateModel := mongo.NewUpdateOneModel()
-					updateModel.SetFilter(bson.M{"primaryidentifier": service.PrimaryIdentifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": service})
-					updateModel.SetUpdate(bsonRep)
-
-					servicesOperations = append(servicesOperations, updateModel)
-					localServicesUpdate += 1
-				}
 			}
 
 			atomic.AddUint64(&servicesOperationInsert, localServicesInsert)
-			atomic.AddUint64(&servicesOperationUpdate, localServicesUpdate)
 
 			if len(servicesOperations) > 0 {
 				_, err := servicesCollection.BulkWrite(context.Background(), servicesOperations, &options.BulkWriteOptions{})
@@ -241,7 +207,8 @@ func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasource *ctdf.DataS
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", servicesOperationInsert)
-	log.Info().Msgf(" - %d updates", servicesOperationUpdate)
+
+	return nil
 }
 
 func generateRailStopNameOverrides() map[string]string {

@@ -17,6 +17,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -40,7 +41,12 @@ func ImportDataset(identifier string) error {
 		return err
 	}
 
-	log.Info().Interface("dataset", dataset).Msg("Found dataset")
+	log.Info().
+		Str("identifier", dataset.Identifier).
+		Str("format", string(dataset.Format)).
+		Str("provider", dataset.Provider.Name).
+		Interface("supports", dataset.SupportedObjects).
+		Msg("Found dataset")
 
 	if dataset.UnpackBundle != BundleFormatNone {
 		return errors.New("Cannot handle bundled type yet")
@@ -53,6 +59,8 @@ func ImportDataset(identifier string) error {
 		format = &travelinenoc.TravelineData{}
 	case DataSetFormatNaPTAN:
 		format = &naptan.NaPTAN{}
+	case DataSetFormatNationalRailTOC:
+		format = &nationalrailtoc.TrainOperatingCompanyList{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
@@ -60,7 +68,7 @@ func ImportDataset(identifier string) error {
 	source := dataset.Source
 	if isValidUrl(dataset.Source) {
 		var tempFile *os.File
-		tempFile, _ = tempDownloadFile(dataset.Source)
+		tempFile, _ = tempDownloadFile(dataset)
 
 		source = tempFile.Name()
 		defer os.Remove(tempFile.Name())
@@ -128,12 +136,12 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
-	req, _ := http.NewRequest("GET", source, nil)
-	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
+func tempDownloadFile(dataset DataSet) (*os.File, string) {
+	req, _ := http.NewRequest("GET", dataset.Source, nil)
+	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
 
-	for _, header := range headers {
-		req.Header[header[0]] = []string{header[1]}
+	if dataset.DownloadHandler != nil {
+		dataset.DownloadHandler(req)
 	}
 
 	client := &http.Client{}
@@ -145,7 +153,7 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 	defer resp.Body.Close()
 
 	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	fileExtension := filepath.Ext(source)
+	fileExtension := filepath.Ext(dataset.Source)
 	if err == nil {
 		fileExtension = filepath.Ext(params["filename"])
 	}
