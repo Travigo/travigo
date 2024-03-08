@@ -62,6 +62,32 @@ func GetRegisteredDataSets() []DataSet {
 				r.Header.Set("X-Auth-Token", token)
 			},
 		},
+		{
+			// Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset
+			Identifier: "gb-networkrail-corpus",
+			Format:     DataSetFormatNetworkRailCorpus,
+			Provider: Provider{
+				Name:    "Network Rail",
+				Website: "https://networkrail.co.uk",
+			},
+			Source:       "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS",
+			UnpackBundle: BundleFormatGZ,
+			SupportedObjects: formats.SupportedObjects{
+				Stops: true,
+			},
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
+					log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
+				}
+				if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
+					log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
+				}
+
+				r.SetBasicAuth(env["TRAVIGO_NETWORKRAIL_USERNAME"], env["TRAVIGO_NETWORKRAIL_PASSWORD"])
+			},
+		},
 	}
 }
 

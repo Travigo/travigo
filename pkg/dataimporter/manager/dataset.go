@@ -45,5 +45,6 @@ type BundleFormat string
 const (
 	BundleFormatNone  BundleFormat = "none"
 	BundleFormatZIP                = "zip"
+	BundleFormatGZ                 = "gz"
 	BundleFormatTarGZ              = "tar.gz"
 )

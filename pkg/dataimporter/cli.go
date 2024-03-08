@@ -20,7 +20,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
-	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/networkrail-corpus"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -128,18 +127,6 @@ func RegisterCLI() *cli.Command {
 						startTime := time.Now()
 
 						var datasource *ctdf.DataSource
-
-						switch dataFormat {
-						case "traveline-noc":
-							datasource = &ctdf.DataSource{
-								OriginalFormat: "traveline-noc",
-								DatasetID:      source,
-								Timestamp:      time.Now().Format(time.RFC3339),
-							}
-
-							cleanupOldRecords("operators", datasource)
-							cleanupOldRecords("operator_groups", datasource)
-						}
 
 						err := importFile(dataFormat, ctdf.TransportType(transportType), source, fileFormat, datasource, map[string]string{})
 
@@ -261,129 +248,6 @@ func RegisterCLI() *cli.Command {
 					cleanupOldRecords("journeys", datasource)
 
 					cifBundle.ImportIntoMongoAsCTDF(datasource)
-
-					return nil
-				},
-			},
-			{
-				Name:  "nationalrail-toc",
-				Usage: "Import Train Operating Companies from the National Rail Open Data API",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "url",
-						Usage:    "Overwrite URL",
-						Required: false,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					ctdf.LoadSpecialDayCache()
-					insertrecords.Insert()
-
-					source := c.String("url")
-
-					// Default source of all published buses
-					if source == "" {
-						source = "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs"
-					}
-
-					currentTime := time.Now().Format(time.RFC3339)
-
-					log.Info().Msgf("National Rail TOC import from %s", source)
-
-					// Cleanup right at the begining once, as we do it as 1 big import
-					datasource := &ctdf.DataSource{
-						OriginalFormat: "nationalrail-toc",
-						Provider:       "GB-NationalRail",
-						DatasetID:      "TOC",
-						Timestamp:      currentTime,
-					}
-					cleanupOldRecords("operators", datasource)
-					cleanupOldRecords("operator_groups", datasource)
-
-					if isValidUrl(source) {
-						token := nationalRailLogin()
-						tempFile, _ := tempDownloadFile(source, []string{
-							"X-Auth-Token", token,
-						})
-
-						source = tempFile.Name()
-						defer os.Remove(tempFile.Name())
-					}
-
-					err := importFile("nationalrail-toc", ctdf.TransportTypeRail, source, "xml", datasource, map[string]string{})
-					if err != nil {
-						log.Fatal().Err(err).Msg("Cannot import National Rail TOC document")
-					}
-
-					return nil
-				},
-			},
-			{
-				Name:  "networkrail-corpus",
-				Usage: "Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "url",
-						Usage:    "Overwrite URL",
-						Required: false,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					insertrecords.Insert()
-
-					env := util.GetEnvironmentVariables()
-					if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
-						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
-					}
-					if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
-						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
-					}
-
-					source := c.String("url")
-					if source == "" {
-						source = "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS"
-					}
-
-					log.Info().Msgf("Network Rail CORPUS import from %s", source)
-
-					req, _ := http.NewRequest("GET", source, nil)
-					req.SetBasicAuth(env["TRAVIGO_NETWORKRAIL_USERNAME"], env["TRAVIGO_NETWORKRAIL_PASSWORD"])
-
-					client := &http.Client{}
-					resp, err := client.Do(req)
-
-					gzipDecoder, err := gzip.NewReader(resp.Body)
-					if err != nil {
-						log.Fatal().Err(err).Msg("cannot decode gzip stream")
-					}
-					defer gzipDecoder.Close()
-
-					if err != nil {
-						log.Fatal().Err(err).Msg("Download file")
-					}
-					defer resp.Body.Close()
-
-					corpus, err := networkrailcorpus.ParseJSONFile(gzipDecoder)
-
-					if err != nil {
-						return err
-					}
-
-					// Cleanup right at the begining once, as we do it as 1 big import
-					datasource := &ctdf.DataSource{
-						OriginalFormat: "JSON-CORPUS",
-						Provider:       "GB-NetworkRail",
-						DatasetID:      source,
-						Timestamp:      "",
-					}
-
-					corpus.ImportIntoMongoAsCTDF(datasource)
 
 					return nil
 				},
@@ -633,25 +497,6 @@ func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf
 		if err != nil {
 			return err
 		}
-	case "networkrail-corpus":
-		log.Info().Msgf("Network Rail Corpus file import from %s ", dataFile.Name)
-		corpus, err := networkrailcorpus.ParseJSONFile(dataFile.Reader)
-
-		if err != nil {
-			return err
-		}
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				OriginalFormat: "JSON-CORPUS",
-				Provider:       "GB-NetworkRail",
-				DatasetID:      dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		corpus.ImportIntoMongoAsCTDF(&datasource)
 	case "gtfs-rt":
 		log.Info().Msgf("GTFS-RT file import from %s ", dataFile.Name)
 

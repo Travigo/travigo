@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
+	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -48,10 +50,6 @@ func ImportDataset(identifier string) error {
 		Interface("supports", dataset.SupportedObjects).
 		Msg("Found dataset")
 
-	if dataset.UnpackBundle != BundleFormatNone {
-		return errors.New("Cannot handle bundled type yet")
-	}
-
 	var format formats.Format
 
 	switch dataset.Format {
@@ -61,6 +59,8 @@ func ImportDataset(identifier string) error {
 		format = &naptan.NaPTAN{}
 	case DataSetFormatNationalRailTOC:
 		format = &nationalrailtoc.TrainOperatingCompanyList{}
+	case DataSetFormatNetworkRailCorpus:
+		format = &networkrailcorpus.Corpus{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
@@ -74,12 +74,29 @@ func ImportDataset(identifier string) error {
 		defer os.Remove(tempFile.Name())
 	}
 
+	var sourceFileReader io.Reader
+
 	file, err := os.Open(source)
 	if err != nil {
 		return err
 	}
 
-	err = format.ParseFile(file)
+	switch dataset.UnpackBundle {
+	case BundleFormatNone:
+		sourceFileReader = file
+	case BundleFormatGZ:
+		gzipDecoder, err := gzip.NewReader(file)
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot decode gzip stream")
+		}
+		defer gzipDecoder.Close()
+
+		sourceFileReader = gzipDecoder
+	default:
+		return errors.New(fmt.Sprintf("Cannot handle bundle format %s", dataset.UnpackBundle))
+	}
+
+	err = format.ParseFile(sourceFileReader)
 	if err != nil {
 		return err
 	}

@@ -2,11 +2,13 @@ package networkrailcorpus
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -26,7 +28,11 @@ type TiplocData struct {
 	NLCDESC16  string
 }
 
-func (c *Corpus) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+func (c *Corpus) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.Stops {
+		return errors.New("This format requires stops to be enabled")
+	}
+
 	stopsCollection := database.GetCollection("stops")
 
 	var updateOperations []mongo.WriteModel
@@ -66,4 +72,6 @@ func (c *Corpus) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
 			log.Fatal().Err(err).Msg("Failed to bulk write Stops")
 		}
 	}
+
+	return nil
 }
