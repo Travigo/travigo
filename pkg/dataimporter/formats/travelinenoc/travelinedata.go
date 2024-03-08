@@ -224,7 +224,6 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")
 	var operatorOperationInsert uint64
-	var operatorOperationUpdate uint64
 
 	maxBatchSize := int(math.Ceil(float64(len(operators)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
@@ -245,42 +244,23 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects
 		go func(operatorsBatch []*ctdf.Operator) {
 			var operatorOperations []mongo.WriteModel
 			var localOperationInsert uint64
-			var localOperationUpdate uint64
 
 			for _, operator := range operatorsBatch {
-				var existingCtdfOperator *ctdf.Operator
-				operatorsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": operator.PrimaryIdentifier}).Decode(&existingCtdfOperator)
+				operator.CreationDateTime = time.Now()
+				operator.ModificationDateTime = time.Now()
+				operator.DataSource = datasource
 
-				if existingCtdfOperator == nil {
-					operator.CreationDateTime = time.Now()
-					operator.ModificationDateTime = time.Now()
-					operator.DataSource = datasource
+				bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-					insertModel := mongo.NewInsertOneModel()
-
-					bsonRep, _ := bson.Marshal(operator)
-					insertModel.SetDocument(bsonRep)
-
-					operatorOperations = append(operatorOperations, insertModel)
-					localOperationInsert += 1
-				} else if existingCtdfOperator.UniqueHash() != operator.UniqueHash() {
-					operator.CreationDateTime = existingCtdfOperator.CreationDateTime
-					operator.ModificationDateTime = time.Now()
-					operator.DataSource = datasource
-
-					updateModel := mongo.NewUpdateOneModel()
-					updateModel.SetFilter(bson.M{"primaryidentifier": operator.PrimaryIdentifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": operator})
-					updateModel.SetUpdate(bsonRep)
-
-					operatorOperations = append(operatorOperations, updateModel)
-					localOperationUpdate += 1
-				}
+				operatorOperations = append(operatorOperations, updateModel)
+				localOperationInsert += 1
 			}
 
 			atomic.AddUint64(&operatorOperationInsert, localOperationInsert)
-			atomic.AddUint64(&operatorOperationUpdate, localOperationUpdate)
 
 			if len(operatorOperations) > 0 {
 				_, err := operatorsCollection.BulkWrite(context.Background(), operatorOperations, &options.BulkWriteOptions{})
@@ -297,12 +277,10 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
-	log.Info().Msgf(" - %d updates", operatorOperationUpdate)
 
 	// Import operator groups
 	log.Info().Msg("Importing CTDF OperatorGroups into Mongo")
 	var operatorGroupOperationInsert uint64
-	var operatorGroupOperationUpdate uint64
 
 	maxBatchSize = int(math.Ceil(float64(len(operatorGroups)) / float64(runtime.NumCPU())))
 	numBatches = int(math.Ceil(float64(len(operatorGroups)) / float64(maxBatchSize)))
@@ -323,42 +301,23 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects
 		go func(operatorGroupsBatch []*ctdf.OperatorGroup) {
 			var operatorGroupOperations []mongo.WriteModel
 			var localOperationInsert uint64
-			var localOperationUpdate uint64
 
 			for _, operatorGroup := range operatorGroupsBatch {
-				var existingCtdfOperatorGroup *ctdf.OperatorGroup
-				operatorGroupsCollection.FindOne(context.Background(), bson.M{"identifier": operatorGroup.Identifier}).Decode(&existingCtdfOperatorGroup)
+				operatorGroup.CreationDateTime = time.Now()
+				operatorGroup.ModificationDateTime = time.Now()
+				operatorGroup.DataSource = datasource
 
-				if existingCtdfOperatorGroup == nil {
-					operatorGroup.CreationDateTime = time.Now()
-					operatorGroup.ModificationDateTime = time.Now()
-					operatorGroup.DataSource = datasource
+				bsonRep, _ := bson.Marshal(bson.M{"$set": operatorGroup})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-					insertModel := mongo.NewInsertOneModel()
-
-					bsonRep, _ := bson.Marshal(operatorGroup)
-					insertModel.SetDocument(bsonRep)
-
-					operatorGroupOperations = append(operatorGroupOperations, insertModel)
-					localOperationInsert += 1
-				} else if existingCtdfOperatorGroup.UniqueHash() != operatorGroup.UniqueHash() {
-					operatorGroup.CreationDateTime = existingCtdfOperatorGroup.CreationDateTime
-					operatorGroup.ModificationDateTime = time.Now()
-					operatorGroup.DataSource = datasource
-
-					updateModel := mongo.NewUpdateOneModel()
-					updateModel.SetFilter(bson.M{"identifier": operatorGroup.Identifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": operatorGroup})
-					updateModel.SetUpdate(bsonRep)
-
-					operatorGroupOperations = append(operatorGroupOperations, updateModel)
-					localOperationUpdate += 1
-				}
+				operatorGroupOperations = append(operatorGroupOperations, updateModel)
+				localOperationInsert += 1
 			}
 
 			atomic.AddUint64(&operatorGroupOperationInsert, localOperationInsert)
-			atomic.AddUint64(&operatorGroupOperationUpdate, localOperationUpdate)
 
 			if len(operatorGroupOperations) > 0 {
 				_, err := operatorGroupsCollection.BulkWrite(context.Background(), operatorGroupOperations, &options.BulkWriteOptions{})
@@ -375,7 +334,6 @@ func (t *TravelineData) ImportIntoMongoAsCTDF(datasetid string, supportedObjects
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
-	log.Info().Msgf(" - %d updates", operatorGroupOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
 

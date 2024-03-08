@@ -58,7 +58,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 	// StopAreas
 	log.Info().Msg("Converting & Importing CTDF StopGroups into Mongo")
 	var stopGroupsOperationInsert uint64
-	var stopGroupsOperationUpdate uint64
 
 	maxBatchSize := int(math.Ceil(float64(len(naptanDoc.StopAreas)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(naptanDoc.StopAreas)) / float64(maxBatchSize)))
@@ -82,7 +81,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 		go func(stopAreas []*StopArea) {
 			var stopGroupOperations []mongo.WriteModel
 			var localOperationInsert uint64
-			var localOperationUpdate uint64
 
 			for _, naptanStopArea := range stopAreas {
 				ctdfStopGroup := naptanStopArea.ToCTDF()
@@ -97,32 +95,17 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 
 				transforms.Transform(ctdfStopGroup, 3)
 
-				var existingStopGroup *ctdf.StopGroup
-				stopGroupsCollection.FindOne(context.Background(), bson.M{"identifier": ctdfStopGroup.PrimaryIdentifier}).Decode(&existingStopGroup)
+				bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStopGroup})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStopGroup.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-				if existingStopGroup == nil {
-					insertModel := mongo.NewInsertOneModel()
-
-					bsonRep, _ := bson.Marshal(ctdfStopGroup)
-					insertModel.SetDocument(bsonRep)
-
-					stopGroupOperations = append(stopGroupOperations, insertModel)
-					localOperationInsert += 1
-				} else if existingStopGroup.ModificationDateTime.Before(ctdfStopGroup.ModificationDateTime) || existingStopGroup.ModificationDateTime.Year() == 0 {
-					updateModel := mongo.NewUpdateOneModel()
-
-					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStopGroup.PrimaryIdentifier})
-
-					bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStopGroup})
-					updateModel.SetUpdate(bsonRep)
-
-					stopGroupOperations = append(stopGroupOperations, updateModel)
-					localOperationUpdate += 1
-				}
+				stopGroupOperations = append(stopGroupOperations, updateModel)
+				localOperationInsert += 1
 			}
 
 			atomic.AddUint64(&stopGroupsOperationInsert, localOperationInsert)
-			atomic.AddUint64(&stopGroupsOperationUpdate, localOperationUpdate)
 
 			if len(stopGroupOperations) > 0 {
 				_, err := stopGroupsCollection.BulkWrite(context.Background(), stopGroupOperations, &options.BulkWriteOptions{})
@@ -139,12 +122,10 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stopGroupsOperationInsert)
-	log.Info().Msgf(" - %d updates", stopGroupsOperationUpdate)
 
 	// StopPoints
 	log.Info().Msg("Converting & Importing CTDF Stops into Mongo")
 	var stopOperationInsert uint64
-	var stopOperationUpdate uint64
 
 	maxBatchSize = int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(runtime.NumCPU()*10)))
 	numBatches = int(math.Ceil(float64(len(naptanDoc.StopPoints)) / float64(maxBatchSize)))
@@ -170,7 +151,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 		go func(stopPoints []*StopPoint) {
 			var stopOperations []mongo.WriteModel
 			var localOperationInsert uint64
-			var localOperationUpdate uint64
 
 			for _, naptanStopPoint := range stopPoints {
 				ctdfStop := naptanStopPoint.ToCTDF()
@@ -205,29 +185,18 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 				transforms.Transform(ctdfStop, 3)
 
 				ctdfStop.DataSource = datasource
-				bsonRep, _ := bson.Marshal(ctdfStop)
 
-				var existingCtdfStop *ctdf.Stop
-				stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier}).Decode(&existingCtdfStop)
+				bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStop})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
 
-				if existingCtdfStop == nil {
-					insertModel := mongo.NewInsertOneModel()
-					insertModel.SetDocument(bsonRep)
-
-					stopOperations = append(stopOperations, insertModel)
-					localOperationInsert += 1
-				} else if existingCtdfStop.ModificationDateTime.Before(ctdfStop.ModificationDateTime) || existingCtdfStop.ModificationDateTime.Year() == 0 {
-					updateModel := mongo.NewReplaceOneModel()
-					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier})
-					updateModel.SetReplacement(bsonRep)
-
-					stopOperations = append(stopOperations, updateModel)
-					localOperationUpdate += 1
-				}
+				stopOperations = append(stopOperations, updateModel)
+				localOperationInsert += 1
 			}
 
 			atomic.AddUint64(&stopOperationInsert, localOperationInsert)
-			atomic.AddUint64(&stopOperationUpdate, localOperationUpdate)
 
 			if len(stopOperations) > 0 {
 				_, err := stopsCollection.BulkWrite(context.Background(), stopOperations, &options.BulkWriteOptions{})
@@ -244,13 +213,11 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stopOperationInsert)
-	log.Info().Msgf(" - %d updates", stopOperationUpdate)
 
 	// Specially handle generating new station stops
 	log.Info().Msg("Converting & Importing CTDF station Stops into Mongo")
 	var stationStopOperations []mongo.WriteModel
 	var stationStopOperationInsert int
-	var stationStopOperationUpdate int
 
 	for _, stationNaptanStop := range stationStops {
 		stationStop := stationNaptanStop.ToCTDF()
@@ -298,25 +265,14 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 
 		transforms.Transform(stationStop, 2)
 
-		bsonRep, _ := bson.Marshal(stationStop)
+		bsonRep, _ := bson.Marshal(bson.M{"$set": stationStop})
+		updateModel := mongo.NewUpdateOneModel()
+		updateModel.SetFilter(bson.M{"primaryidentifier": stationStop.PrimaryIdentifier})
+		updateModel.SetUpdate(bsonRep)
+		updateModel.SetUpsert(true)
 
-		var existingCtdfStop *ctdf.Stop
-		stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": stationStop.PrimaryIdentifier}).Decode(&existingCtdfStop)
-
-		if existingCtdfStop == nil {
-			insertModel := mongo.NewInsertOneModel()
-			insertModel.SetDocument(bsonRep)
-
-			stationStopOperations = append(stationStopOperations, insertModel)
-			stationStopOperationInsert += 1
-		} else if existingCtdfStop.ModificationDateTime.Before(stationStop.ModificationDateTime) || existingCtdfStop.ModificationDateTime.Year() == 0 {
-			updateModel := mongo.NewReplaceOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": stationStop.PrimaryIdentifier})
-			updateModel.SetReplacement(bsonRep)
-
-			stationStopOperations = append(stationStopOperations, updateModel)
-			stationStopOperationUpdate += 1
-		}
+		stationStopOperations = append(stationStopOperations, updateModel)
+		stationStopOperationInsert += 1
 	}
 
 	if len(stationStopOperations) > 0 {
@@ -327,7 +283,6 @@ func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObject
 	}
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", stationStopOperationInsert)
-	log.Info().Msgf(" - %d updates", stationStopOperationUpdate)
 
 	log.Info().Msgf("Successfully imported into MongoDB")
 
