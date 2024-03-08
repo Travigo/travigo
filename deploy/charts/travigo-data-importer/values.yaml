@@ -44,7 +44,7 @@ cronjobs:
     args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
   - name: gb-bods-gtfs-timetable
     schedule: "20 6 * * *"
-    args: ["data-importer", "gtfs-timetable", "--datasetid", "gb-bods-gtfs", "--url", "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"]
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-schedule"]
     batchburst: true
   - name: temp-indexer-stops
     schedule: "50 3 * * 6"
@@ -56,7 +56,7 @@ deployments:
   # - name: gb-bods-sirivm-tfl
   #   args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/sirivm_tfl"]
   - name: gb-bods-gtfs-rt
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-rt", "--repeat-every", "10s"]
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
 
 resources: {}
 podAnnotations: {}

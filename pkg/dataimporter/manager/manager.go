@@ -61,6 +61,8 @@ func (dataset *DataSet) ImportDataset() error {
 		format = &networkrailcorpus.Corpus{}
 	case DataSetFormatSiriVM:
 		format = &siri_vm.SiriVM{}
+	case DataSetFormatGTFSSchedule:
+		format = &gtfs.Schedule{}
 	case DataSetFormatGTFSRealtime:
 		format = &gtfs.Realtime{}
 	default:

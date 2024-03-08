@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -15,11 +14,9 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
-	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 
-	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
@@ -31,16 +28,6 @@ import (
 
 	_ "time/tzdata"
 )
-
-var realtimeQueue rmq.Queue
-
-type DataFile struct {
-	Name      string
-	Reader    io.Reader
-	Overrides map[string]string
-
-	TransportType ctdf.TransportType
-}
 
 func RegisterCLI() *cli.Command {
 	return &cli.Command{
@@ -144,61 +131,6 @@ func RegisterCLI() *cli.Command {
 					cleanupOldRecords("journeys", datasource)
 
 					cifBundle.Import(datasource)
-
-					return nil
-				},
-			},
-			{
-				Name:  "gtfs-timetable",
-				Usage: "Import a GTFS Timetable",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "url",
-						Usage:    "Path to the GTFS zip file",
-						Required: true,
-					},
-					&cli.StringFlag{
-						Name:     "datasetid",
-						Usage:    "ID of the dataset",
-						Required: true,
-					},
-				},
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					ctdf.LoadSpecialDayCache()
-					insertrecords.Insert()
-
-					source := c.String("url")
-					datasetid := c.String("datasetid")
-
-					log.Info().Msgf("GTFS bundle import from %s", source)
-
-					if isValidUrl(source) {
-						tempFile, _ := tempDownloadFile(source)
-
-						source = tempFile.Name()
-						defer os.Remove(tempFile.Name())
-					}
-
-					gtfsFile, err := gtfs.ParseScheduleZip(source)
-
-					if err != nil {
-						return err
-					}
-
-					datasource := &ctdf.DataSource{
-						OriginalFormat: "GTFS-SCHEDULE",
-						Provider:       "Department of Transport (UK)",
-						DatasetID:      datasetid,
-						Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
-					}
-
-					gtfsFile.Import(datasetid, datasource)
-
-					cleanupOldRecords("services", datasource)
-					cleanupOldRecords("journeys", datasource)
 
 					return nil
 				},

@@ -2,6 +2,7 @@ package gtfs
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,15 +32,13 @@ type Schedule struct {
 	Shapes        []Shape
 }
 
-func ParseScheduleZip(path string) (*Schedule, error) {
+func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	// Allow us to ignore those naughty records that have missing columns
 	gocsv.SetCSVReader(func(in io.Reader) gocsv.CSVReader {
 		r := csv.NewReader(in)
 		r.FieldsPerRecord = -1
 		return r
 	})
-
-	gtfs := &Schedule{}
 
 	fileMap := map[string]interface{}{
 		"agency.txt":         &gtfs.Agencies,
@@ -52,11 +52,16 @@ func ParseScheduleZip(path string) (*Schedule, error) {
 		// "shapes.txt":         &gtfs.Shapes,
 	}
 
-	archive, err := zip.OpenReader(path)
+	// TODO this uses a load of ram :(
+	body, err := io.ReadAll(reader)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	defer archive.Close()
+
+	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return err
+	}
 
 	for _, zipFile := range archive.File {
 		file, err := zipFile.Open()
@@ -74,17 +79,18 @@ func ParseScheduleZip(path string) (*Schedule, error) {
 
 			err = gocsv.Unmarshal(fileReader, destination)
 			if err != nil {
-				log.Fatal().Str("file", fileName).Err(err).Msg("Failed to parse csv file")
+				log.Error().Str("file", fileName).Err(err).Msg("Failed to parse csv file")
+				return err
 			}
 		} else {
 			log.Error().Str("file", fileName).Msg("Unknown gtfs file")
 		}
 	}
 
-	return gtfs, nil
+	return nil
 }
 
-func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
+func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
@@ -125,11 +131,14 @@ func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
 
 	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
 	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 500)
-	servicesQueue.Process()
+
+	if supportedObjects.Services {
+		servicesQueue.Process()
+	}
 
 	ctdfServices := map[string]*ctdf.Service{}
 	for _, gtfsRoute := range g.Routes {
-		serviceID := fmt.Sprintf("%s-service-%s", datasetID, gtfsRoute.ID)
+		serviceID := fmt.Sprintf("%s-service-%s", datasetid, gtfsRoute.ID)
 
 		serviceName := gtfsRoute.LongName
 		if serviceName == "" {
@@ -138,7 +147,7 @@ func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
 
 		operatorRef := agencyNOCMapping[gtfsRoute.AgencyID]
 		if operatorRef == "" {
-			operatorRef = fmt.Sprintf("%s-operator-%s", datasetID, gtfsRoute.AgencyID)
+			operatorRef = fmt.Sprintf("%s-operator-%s", datasetid, gtfsRoute.AgencyID)
 		}
 
 		ctdfService := &ctdf.Service{
@@ -161,28 +170,33 @@ func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
 
 		ctdfServices[gtfsRoute.ID] = ctdfService
 
-		// Insert
-		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfService})
-		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(bson.M{"primaryidentifier": serviceID})
-		updateModel.SetUpdate(bsonRep)
-		updateModel.SetUpsert(true)
-
-		servicesQueue.Add(updateModel)
+		if supportedObjects.Services {
+			// Insert
+			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfService})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": serviceID})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+			servicesQueue.Add(updateModel)
+		}
 	}
 	log.Info().Msg("Finished Services")
-	servicesQueue.Wait()
+	if supportedObjects.Services {
+		servicesQueue.Wait()
+	}
 
 	ctdfJourneys := map[string]*ctdf.Journey{}
 
 	// Journeys
 	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
-	journeysQueue.Process()
+	if supportedObjects.Journeys {
+		journeysQueue.Process()
+	}
 
 	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
 	for _, trip := range g.Trips {
-		journeyID := fmt.Sprintf("%s-journey-%s", datasetID, trip.ID)
-		serviceID := fmt.Sprintf("%s-service-%s", datasetID, trip.RouteID)
+		journeyID := fmt.Sprintf("%s-journey-%s", datasetid, trip.ID)
+		serviceID := fmt.Sprintf("%s-service-%s", datasetid, trip.RouteID)
 
 		availability := &ctdf.Availability{}
 		// Calendar availability
@@ -312,19 +326,25 @@ func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
 		}
 
 		// Insert
-		bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
-		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
-		updateModel.SetUpdate(bsonRep)
-		updateModel.SetUpsert(true)
+		if supportedObjects.Journeys {
+			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
 
-		journeysQueue.Add(updateModel)
+			journeysQueue.Add(updateModel)
+		}
 
 		ctdfJourneys[tripID] = nil
 	}
 	log.Info().Msg("Finished Journeys")
 
-	journeysQueue.Wait()
+	if supportedObjects.Journeys {
+		journeysQueue.Wait()
+	}
+
+	return nil
 }
 
 /////// THE DEAD ZONE ////////

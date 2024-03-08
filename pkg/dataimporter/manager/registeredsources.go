@@ -112,7 +112,7 @@ func GetRegisteredDataSets() []DataSet {
 			},
 		},
 		{
-			Identifier: "gb-dft-bods-gtfs-rt",
+			Identifier: "gb-dft-bods-gtfs-realtime",
 			Format:     DataSetFormatGTFSRealtime,
 			Provider: Provider{
 				Name:    "Department for Transport",
@@ -124,6 +124,29 @@ func GetRegisteredDataSets() []DataSet {
 				RealtimeJourneys: true,
 			},
 			ImportDestination: ImportDestinationRealtimeQueue,
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_BODS_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
+				}
+
+				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+			},
+		},
+		{
+			Identifier: "gb-dft-bods-gtfs-schedule",
+			Format:     DataSetFormatGTFSSchedule,
+			Provider: Provider{
+				Name:    "Department for Transport",
+				Website: "https://www.gov.uk/government/organisations/department-for-transport",
+			},
+			Source:       "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/",
+			UnpackBundle: BundleFormatNone,
+			SupportedObjects: formats.SupportedObjects{
+				Services: true,
+				Journeys: true,
+			},
 
 			DownloadHandler: func(r *http.Request) {
 				env := util.GetEnvironmentVariables()
