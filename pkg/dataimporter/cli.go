@@ -24,7 +24,6 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/dataimporter/siri_vm"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
@@ -247,7 +246,7 @@ func RegisterCLI() *cli.Command {
 					}
 					cleanupOldRecords("journeys", datasource)
 
-					cifBundle.ImportIntoMongoAsCTDF(datasource)
+					cifBundle.Import(datasource)
 
 					return nil
 				},
@@ -299,7 +298,7 @@ func RegisterCLI() *cli.Command {
 						Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
 					}
 
-					gtfsFile.ImportIntoMongoAsCTDF(datasetid, datasource)
+					gtfsFile.Import(datasetid, datasource)
 
 					cleanupOldRecords("services", datasource)
 					cleanupOldRecords("journeys", datasource)
@@ -316,19 +315,64 @@ func RegisterCLI() *cli.Command {
 						Usage:    "ID of the dataset",
 						Required: true,
 					},
+					&cli.StringFlag{
+						Name:     "repeat-every",
+						Usage:    "Repeat this file import every X seconds",
+						Required: false,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
 						return err
+					}
+					if err := redis_client.Connect(); err != nil {
+						log.Fatal().Err(err).Msg("Failed to connect to Redis")
 					}
 					ctdf.LoadSpecialDayCache()
 					insertrecords.Insert()
 
 					datasetid := c.String("id")
 
-					err := manager.ImportDataset(datasetid)
+					repeatEvery := c.String("repeat-every")
+					repeat := repeatEvery != ""
+					var repeatDuration time.Duration
+					if repeat {
+						var err error
+						repeatDuration, err = time.ParseDuration(repeatEvery)
 
-					return err
+						if err != nil {
+							return err
+						}
+					}
+
+					dataset, err := manager.GetDataset(datasetid)
+					if err != nil {
+						return err
+					}
+
+					for {
+						startTime := time.Now()
+
+						err := dataset.ImportDataset()
+
+						if err != nil {
+							return err
+						}
+						if !repeat {
+							break
+						}
+
+						executionDuration := time.Since(startTime)
+						log.Info().Msgf("Operation took %s", executionDuration.String())
+
+						waitTime := repeatDuration - executionDuration
+
+						if waitTime.Seconds() > 0 {
+							time.Sleep(waitTime)
+						}
+					}
+
+					return nil
 				},
 			},
 		},
@@ -477,26 +521,7 @@ func importFile(dataFormat string, transportType ctdf.TransportType, source stri
 }
 
 func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf.DataSource) error {
-	var datasource ctdf.DataSource
-
 	switch dataFormat {
-	case "siri-vm":
-		log.Info().Msgf("Siri-VM file import from %s ", dataFile.Name)
-
-		if sourceDatasource == nil {
-			datasource = ctdf.DataSource{
-				Provider:  "Department of Transport", // This may not always be true
-				DatasetID: dataFile.Name,
-			}
-		} else {
-			datasource = *sourceDatasource
-		}
-
-		err := siri_vm.ParseXMLFile(dataFile.Reader, realtimeQueue, &datasource)
-
-		if err != nil {
-			return err
-		}
 	case "gtfs-rt":
 		log.Info().Msgf("GTFS-RT file import from %s ", dataFile.Name)
 

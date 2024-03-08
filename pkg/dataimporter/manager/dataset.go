@@ -3,6 +3,7 @@ package manager
 import (
 	"net/http"
 
+	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 )
 
@@ -14,11 +15,14 @@ type DataSet struct {
 
 	Source string
 
-	UnpackBundle BundleFormat
-
-	SupportedObjects formats.SupportedObjects
+	UnpackBundle      BundleFormat
+	SupportedObjects  formats.SupportedObjects
+	ImportDestination ImportDestination
 
 	DownloadHandler func(*http.Request)
+
+	// Internal only
+	queue *rmq.Queue
 }
 
 type DataSetFormat string
@@ -47,4 +51,11 @@ const (
 	BundleFormatZIP                = "zip"
 	BundleFormatGZ                 = "gz"
 	BundleFormatTarGZ              = "tar.gz"
+)
+
+type ImportDestination string
+
+const (
+	ImportDestinationDatabase      ImportDestination = "database"
+	ImportDestinationRealtimeQueue                   = "realtime-queue"
 )

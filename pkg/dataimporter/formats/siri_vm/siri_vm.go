@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,11 +12,17 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
+
+type SiriVM struct {
+	reader io.Reader
+	queue  rmq.Queue
+}
 
 type SiriVMVehicleIdentificationEvent struct {
 	VehicleActivity *VehicleActivity
@@ -105,11 +112,25 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 	return true
 }
 
-func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource) error {
+func (s *SiriVM) SetupRealtimeQueue(queue rmq.Queue) {
+	s.queue = queue
+}
+
+func (s *SiriVM) ParseFile(reader io.Reader) error {
+	s.reader = reader
+
+	return nil
+}
+
+func (s *SiriVM) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.RealtimeJourneys {
+		return errors.New("This format requires realtimejourneys to be enabled")
+	}
+
 	var retrievedRecords int64
 	var submittedRecords int64
 
-	d := xml.NewDecoder(reader)
+	d := xml.NewDecoder(s.reader)
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
@@ -131,7 +152,7 @@ func ParseXMLFile(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource
 				} else {
 					retrievedRecords += 1
 
-					successfullyPublished := SubmitToProcessQueue(queue, &vehicleActivity, datasource)
+					successfullyPublished := SubmitToProcessQueue(s.queue, &vehicleActivity, datasource)
 
 					if successfullyPublished {
 						submittedRecords += 1

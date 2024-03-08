@@ -186,7 +186,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	return journeysArray
 }
 
-func (c *CommonInterfaceFormat) ImportIntoMongoAsCTDF(datasource *ctdf.DataSource) {
+func (c *CommonInterfaceFormat) Import(datasource *ctdf.DataSource) {
 	log.Info().Msg("Converting to CTDF")
 
 	journeys := c.ConvertToCTDF()

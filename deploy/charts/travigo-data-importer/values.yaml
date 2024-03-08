@@ -52,7 +52,7 @@ cronjobs:
 
 deployments:
   - name: sirivm-all
-    args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"]
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "10s"]
   # - name: gb-bods-sirivm-tfl
   #   args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/sirivm_tfl"]
   - name: gb-bods-gtfs-rt

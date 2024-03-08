@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -20,7 +21,9 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -29,6 +32,13 @@ func GetDataset(identifier string) (DataSet, error) {
 
 	for _, dataset := range registered {
 		if dataset.Identifier == identifier {
+			log.Info().
+				Str("identifier", dataset.Identifier).
+				Str("format", string(dataset.Format)).
+				Str("provider", dataset.Provider.Name).
+				Interface("supports", dataset.SupportedObjects).
+				Msg("Found dataset")
+
 			return dataset, nil
 		}
 	}
@@ -36,20 +46,7 @@ func GetDataset(identifier string) (DataSet, error) {
 	return DataSet{}, errors.New("Dataset could not be found")
 }
 
-func ImportDataset(identifier string) error {
-	dataset, err := GetDataset(identifier)
-
-	if err != nil {
-		return err
-	}
-
-	log.Info().
-		Str("identifier", dataset.Identifier).
-		Str("format", string(dataset.Format)).
-		Str("provider", dataset.Provider.Name).
-		Interface("supports", dataset.SupportedObjects).
-		Msg("Found dataset")
-
+func (dataset *DataSet) ImportDataset() error {
 	var format formats.Format
 
 	switch dataset.Format {
@@ -61,8 +58,32 @@ func ImportDataset(identifier string) error {
 		format = &nationalrailtoc.TrainOperatingCompanyList{}
 	case DataSetFormatNetworkRailCorpus:
 		format = &networkrailcorpus.Corpus{}
+	case DataSetFormatSiriVM:
+		format = &siri_vm.SiriVM{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
+	}
+
+	if dataset.ImportDestination == ImportDestinationRealtimeQueue {
+		if dataset.queue == nil {
+			realtimeQueue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to start redis realtime-queue")
+			}
+			dataset.queue = &realtimeQueue
+		}
+
+		var realtimeQueueFormat formats.RealtimeQueueFormat
+		realtimeQueueFormat = format.(formats.RealtimeQueueFormat)
+
+		realtimeQueueFormat.SetupRealtimeQueue(*dataset.queue)
+	}
+
+	datasource := &ctdf.DataSource{
+		OriginalFormat: string(dataset.Format),
+		Provider:       dataset.Provider.Name,
+		DatasetID:      dataset.Identifier,
+		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
 	}
 
 	source := dataset.Source
@@ -74,7 +95,7 @@ func ImportDataset(identifier string) error {
 		defer os.Remove(tempFile.Name())
 	}
 
-	var sourceFileReader io.Reader
+	sourceFileReaders := []io.Reader{}
 
 	file, err := os.Open(source)
 	if err != nil {
@@ -83,7 +104,7 @@ func ImportDataset(identifier string) error {
 
 	switch dataset.UnpackBundle {
 	case BundleFormatNone:
-		sourceFileReader = file
+		sourceFileReaders = append(sourceFileReaders, file)
 	case BundleFormatGZ:
 		gzipDecoder, err := gzip.NewReader(file)
 		if err != nil {
@@ -91,30 +112,41 @@ func ImportDataset(identifier string) error {
 		}
 		defer gzipDecoder.Close()
 
-		sourceFileReader = gzipDecoder
+		sourceFileReaders = append(sourceFileReaders, gzipDecoder)
+	case BundleFormatZIP:
+		archive, err := zip.OpenReader(source)
+		if err != nil {
+			panic(err)
+		}
+		defer archive.Close()
+
+		for _, zipFile := range archive.File {
+			zipFileOpen, err := zipFile.Open()
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to open file")
+			}
+			defer zipFileOpen.Close()
+
+			sourceFileReaders = append(sourceFileReaders, zipFileOpen)
+		}
 	default:
 		return errors.New(fmt.Sprintf("Cannot handle bundle format %s", dataset.UnpackBundle))
 	}
 
-	err = format.ParseFile(sourceFileReader)
-	if err != nil {
-		return err
-	}
+	for _, sourceFileReader := range sourceFileReaders {
+		err = format.ParseFile(sourceFileReader)
+		if err != nil {
+			return err
+		}
 
-	datasource := &ctdf.DataSource{
-		OriginalFormat: string(dataset.Format),
-		Provider:       dataset.Provider.Name,
-		DatasetID:      dataset.Identifier,
-		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
-	}
-
-	err = format.ImportIntoMongoAsCTDF(
-		dataset.Identifier,
-		dataset.SupportedObjects,
-		datasource,
-	)
-	if err != nil {
-		return err
+		err = format.Import(
+			dataset.Identifier,
+			dataset.SupportedObjects,
+			datasource,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	if dataset.SupportedObjects.Stops {
@@ -153,7 +185,7 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func tempDownloadFile(dataset DataSet) (*os.File, string) {
+func tempDownloadFile(dataset *DataSet) (*os.File, string) {
 	req, _ := http.NewRequest("GET", dataset.Source, nil)
 	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
 

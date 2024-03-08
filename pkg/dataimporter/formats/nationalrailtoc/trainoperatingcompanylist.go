@@ -78,7 +78,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	return operators, services
 }
 
-func (t *TrainOperatingCompanyList) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+func (t *TrainOperatingCompanyList) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
 	if !supportedObjects.Operators || !supportedObjects.Services {
 		return errors.New("This format requires operators & services to be enabled")
 	}

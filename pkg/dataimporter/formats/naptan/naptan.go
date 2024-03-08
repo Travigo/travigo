@@ -47,7 +47,7 @@ func (naptanDoc *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+func (naptanDoc *NaPTAN) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
 	if !supportedObjects.Stops || !supportedObjects.StopGroups {
 		return errors.New("This format requires stops & stopgroups to be enabled")
 	}

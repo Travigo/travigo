@@ -84,7 +84,7 @@ func ParseScheduleZip(path string) (*Schedule, error) {
 	return gtfs, nil
 }
 
-func (g *Schedule) ImportIntoMongoAsCTDF(datasetID string, datasource *ctdf.DataSource) {
+func (g *Schedule) Import(datasetID string, datasource *ctdf.DataSource) {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators

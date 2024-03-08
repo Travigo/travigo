@@ -28,7 +28,7 @@ type TiplocData struct {
 	NLCDESC16  string
 }
 
-func (c *Corpus) ImportIntoMongoAsCTDF(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+func (c *Corpus) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
 	if !supportedObjects.Stops {
 		return errors.New("This format requires stops to be enabled")
 	}
