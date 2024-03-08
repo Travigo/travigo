@@ -1,11 +1,9 @@
 package dataimporter
 
 import (
-	"archive/zip"
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -17,14 +15,13 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataimporter/cif"
-	"github.com/travigo/travigo/pkg/dataimporter/gtfs"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
 	"github.com/urfave/cli/v2"
@@ -50,106 +47,6 @@ func RegisterCLI() *cli.Command {
 		Name:  "data-importer",
 		Usage: "Download & convert third party datasets into CTDF",
 		Subcommands: []*cli.Command{
-			{
-				Name:  "file",
-				Usage: "Import a dataset into Travigo",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "repeat-every",
-						Usage:    "Repeat this file import every X seconds",
-						Required: false,
-					},
-					&cli.StringFlag{
-						Name:     "file-format",
-						Usage:    "Overwrite the file format (eg. zip or xml)",
-						Required: false,
-					},
-					&cli.StringFlag{
-						Name:     "transport-type",
-						Usage:    "Set the transport type for this file",
-						Required: false,
-					},
-				},
-				ArgsUsage: "<data-format> <source>",
-				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
-						return err
-					}
-					if err := elastic_client.Connect(false); err != nil {
-						return err
-					}
-					ctdf.LoadSpecialDayCache()
-					insertrecords.Insert()
-
-					if c.Args().Len() != 2 {
-						return errors.New("<data-format> and <source> must be provided")
-					}
-
-					fileFormat := c.String("file-format")
-					transportType := c.String("transport-type")
-
-					repeatEvery := c.String("repeat-every")
-					repeat := repeatEvery != ""
-					var repeatDuration time.Duration
-					if repeat {
-						var err error
-						repeatDuration, err = time.ParseDuration(repeatEvery)
-
-						if err != nil {
-							return err
-						}
-					}
-
-					dataFormat := c.Args().Get(0)
-					source := c.Args().Get(1)
-
-					// Some initial setup for Siri-VM
-					if dataFormat == "siri-vm" || dataFormat == "gtfs-rt" {
-						if err := redis_client.Connect(); err != nil {
-							log.Fatal().Err(err).Msg("Failed to connect to Redis")
-						}
-
-						var err error
-						realtimeQueue, err = redis_client.QueueConnection.OpenQueue("realtime-queue")
-						if err != nil {
-							log.Fatal().Err(err).Msg("Failed to start siri-vm redis queue")
-						}
-
-						// Get the API key from the environment variables and append to the source URL
-						env := util.GetEnvironmentVariables()
-						if env["TRAVIGO_BODS_API_KEY"] != "" && isValidUrl(source) {
-							source += fmt.Sprintf("?api_key=%s", env["TRAVIGO_BODS_API_KEY"])
-						}
-					}
-
-					for {
-						startTime := time.Now()
-
-						var datasource *ctdf.DataSource
-
-						err := importFile(dataFormat, ctdf.TransportType(transportType), source, fileFormat, datasource, map[string]string{})
-
-						if err != nil {
-							return err
-						}
-
-						if !repeat {
-							break
-						}
-
-						executionDuration := time.Since(startTime)
-						log.Info().Msgf("Operation took %s", executionDuration.String())
-
-						waitTime := repeatDuration - executionDuration
-
-						if waitTime.Seconds() > 0 {
-							time.Sleep(waitTime)
-						}
-					}
-
-					return nil
-				},
-			},
 			{
 				Name:  "nationalrail-timetable",
 				Usage: "Import Train Operating Companies from the National Rail Open Data API",
@@ -450,97 +347,6 @@ func tempDownloadFile(source string, headers ...[]string) (*os.File, string) {
 	io.Copy(tmpFile, resp.Body)
 
 	return tmpFile, fileExtension
-}
-
-func importFile(dataFormat string, transportType ctdf.TransportType, source string, fileFormat string, sourceDatasource *ctdf.DataSource, overrides map[string]string) error {
-	var dataFiles []DataFile
-	fileExtension := filepath.Ext(source)
-
-	// Check if the source is a URL and load the http client stream if it is
-	if isValidUrl(source) {
-		var tempFile *os.File
-		tempFile, fileExtension = tempDownloadFile(source)
-
-		source = tempFile.Name()
-		defer os.Remove(tempFile.Name())
-	}
-
-	if fileFormat != "" {
-		fileExtension = fmt.Sprintf(".%s", fileFormat)
-	}
-
-	// Check if its an XML file or ZIP file
-
-	if fileExtension == ".xml" || fileExtension == ".cif" || fileExtension == ".json" || fileExtension == ".bundle" {
-		file, err := os.Open(source)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to open file")
-		}
-		defer file.Close()
-
-		dataFiles = append(dataFiles, DataFile{
-			Name:          source,
-			Reader:        file,
-			Overrides:     overrides,
-			TransportType: transportType,
-		})
-	} else if fileExtension == ".zip" {
-		archive, err := zip.OpenReader(source)
-		if err != nil {
-			panic(err)
-		}
-		defer archive.Close()
-
-		for _, zipFile := range archive.File {
-			file, err := zipFile.Open()
-			if err != nil {
-				log.Fatal().Err(err).Msg("Failed to open file")
-			}
-			defer file.Close()
-
-			dataFiles = append(dataFiles, DataFile{
-				Name:          fmt.Sprintf("%s:%s", source, zipFile.Name),
-				Reader:        file,
-				Overrides:     overrides,
-				TransportType: transportType,
-			})
-		}
-	} else {
-		return errors.New(fmt.Sprintf("Unsupported file extension %s", fileExtension))
-	}
-
-	for _, dataFile := range dataFiles {
-		err := parseDataFile(dataFormat, &dataFile, sourceDatasource)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func parseDataFile(dataFormat string, dataFile *DataFile, sourceDatasource *ctdf.DataSource) error {
-	switch dataFormat {
-	case "gtfs-rt":
-		log.Info().Msgf("GTFS-RT file import from %s ", dataFile.Name)
-
-		// TODO Def not always true
-		datasource := &ctdf.DataSource{
-			Provider:  "Department of Transport", // This may not always be true
-			DatasetID: dataFile.Name,
-		}
-
-		err := gtfs.ParseRealtime(dataFile.Reader, realtimeQueue, datasource)
-
-		if err != nil {
-			return err
-		}
-	default:
-		return errors.New(fmt.Sprintf("Unsupported data-format %s", dataFormat))
-	}
-
-	return nil
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {

@@ -18,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
@@ -60,6 +61,8 @@ func (dataset *DataSet) ImportDataset() error {
 		format = &networkrailcorpus.Corpus{}
 	case DataSetFormatSiriVM:
 		format = &siri_vm.SiriVM{}
+	case DataSetFormatGTFSRealtime:
+		format = &gtfs.Realtime{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}

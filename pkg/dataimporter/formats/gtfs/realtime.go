@@ -2,6 +2,7 @@ package gtfs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -11,12 +12,32 @@ import (
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"google.golang.org/protobuf/proto"
 )
 
-func ParseRealtime(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSource) error {
-	body, err := io.ReadAll(reader)
+type Realtime struct {
+	reader io.Reader
+	queue  rmq.Queue
+}
+
+func (r *Realtime) SetupRealtimeQueue(queue rmq.Queue) {
+	r.queue = queue
+}
+
+func (r *Realtime) ParseFile(reader io.Reader) error {
+	r.reader = reader
+
+	return nil
+}
+
+func (r *Realtime) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.RealtimeJourneys {
+		return errors.New("This format requires realtimejourneys to be enabled")
+	}
+
+	body, err := io.ReadAll(r.reader)
 	if err != nil {
 		return err
 	}
@@ -66,7 +87,7 @@ func ParseRealtime(reader io.Reader, queue rmq.Queue, datasource *ctdf.DataSourc
 
 			locationEventJson, _ := json.Marshal(locationEvent)
 
-			queue.PublishBytes(locationEventJson)
+			r.queue.PublishBytes(locationEventJson)
 
 		}
 	}

@@ -89,7 +89,6 @@ func GetRegisteredDataSets() []DataSet {
 			},
 		},
 		{
-			// Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset
 			Identifier: "gb-dft-bods-sirivm-all",
 			Format:     DataSetFormatSiriVM,
 			Provider: Provider{
@@ -97,6 +96,29 @@ func GetRegisteredDataSets() []DataSet {
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive",
+			UnpackBundle: BundleFormatZIP,
+			SupportedObjects: formats.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: ImportDestinationRealtimeQueue,
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_BODS_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
+				}
+
+				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+			},
+		},
+		{
+			Identifier: "gb-dft-bods-gtfs-rt",
+			Format:     DataSetFormatGTFSRealtime,
+			Provider: Provider{
+				Name:    "Department for Transport",
+				Website: "https://www.gov.uk/government/organisations/department-for-transport",
+			},
+			Source:       "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt",
 			UnpackBundle: BundleFormatZIP,
 			SupportedObjects: formats.SupportedObjects{
 				RealtimeJourneys: true,
