@@ -1,7 +1,6 @@
 package siri_vm
 
 import (
-	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
@@ -13,9 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
-	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
-	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
 
@@ -164,30 +161,5 @@ func (s *SiriVM) Import(datasetid string, supportedObjects formats.SupportedObje
 
 	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
 
-	// Wait for queue to empty
-	startTime := time.Now()
-	checkQueueSize()
-	executionDuration := time.Since(startTime)
-	log.Info().Msgf("Queue took %s to empty", executionDuration.String())
-
-	// Publish stats to Elasticsearch
-	elasticEvent, _ := json.Marshal(&queueEmptyElasticEvent{
-		Duration:  int(executionDuration.Seconds()),
-		Timestamp: time.Now(),
-	})
-
-	elastic_client.IndexRequest("sirivm-queue-empty-1", bytes.NewReader(elasticEvent))
-
 	return nil
-}
-
-func checkQueueSize() {
-	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
-	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
-
-	if inQueue != 0 {
-		time.Sleep(1 * time.Second)
-
-		checkQueueSize()
-	}
 }
