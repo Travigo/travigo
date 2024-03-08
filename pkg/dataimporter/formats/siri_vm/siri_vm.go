@@ -13,6 +13,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
 
@@ -161,5 +162,20 @@ func (s *SiriVM) Import(datasetid string, supportedObjects formats.SupportedObje
 
 	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
 
+	// Wait for queue to empty
+	checkQueueSize()
+
 	return nil
+}
+
+func checkQueueSize() {
+	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
+	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
+
+	if inQueue >= 75000 {
+		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
+		time.Sleep(30 * time.Second)
+
+		checkQueueSize()
+	}
 }
