@@ -18,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/cif"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
@@ -65,6 +66,8 @@ func (dataset *DataSet) ImportDataset() error {
 		format = &gtfs.Schedule{}
 	case DataSetFormatGTFSRealtime:
 		format = &gtfs.Realtime{}
+	case DataSetFormatCIF:
+		format = &cif.CommonInterfaceFormat{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}

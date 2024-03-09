@@ -2,8 +2,11 @@ package cif
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"math"
 	"path/filepath"
 	"regexp"
@@ -14,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -52,14 +56,17 @@ type Association struct {
 	STPIndicator        string
 }
 
-func ParseNationalRailCifBundle(source string, loadMCATimetable bool) (CommonInterfaceFormat, error) {
-	cifBundle := CommonInterfaceFormat{}
-
-	archive, err := zip.OpenReader(source)
+func (c *CommonInterfaceFormat) ParseFile(reader io.Reader) error {
+	// TODO this uses a load of ram :(
+	body, err := io.ReadAll(reader)
 	if err != nil {
-		log.Fatal().Str("source", source).Err(err).Msg("Could not open zip file")
+		return err
 	}
-	defer archive.Close()
+
+	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		return err
+	}
 
 	for _, zipFile := range archive.File {
 
@@ -73,32 +80,28 @@ func ParseNationalRailCifBundle(source string, loadMCATimetable bool) (CommonInt
 
 		switch fileExtension {
 		case ".MCA":
-			if loadMCATimetable {
-				log.Info().Str("file", zipFile.Name).Msgf("Parsing Full Basic Timetable Detail")
-				cifBundle.ParseMCA(file)
-				log.Info().
-					Int("schedules", len(cifBundle.TrainDefinitionSets)).
-					Int("associations", len(cifBundle.Associations)).
-					Msgf("Parsed Full Basic Timetable Detail")
-			} else {
-				log.Info().Str("file", zipFile.Name).Msgf("Skipping parse Full Basic Timetable Detail")
-			}
+			log.Info().Str("file", zipFile.Name).Msgf("Parsing Full Basic Timetable Detail")
+			c.ParseMCA(file)
+			log.Info().
+				Int("schedules", len(c.TrainDefinitionSets)).
+				Int("associations", len(c.Associations)).
+				Msgf("Parsed Full Basic Timetable Detail")
 		case ".MSN":
 			log.Info().Str("file", zipFile.Name).Msgf("Parsing Master Station Names")
-			cifBundle.ParseMSN(file)
+			c.ParseMSN(file)
 			log.Info().
-				Int("stations", len(cifBundle.PhysicalStations)).
-				Int("aliases", len(cifBundle.StationAliases)).
+				Int("stations", len(c.PhysicalStations)).
+				Int("aliases", len(c.StationAliases)).
 				Msgf("Parsed Master Station Names")
 		}
 	}
 
-	cifBundle.TIPLOCToCrsMap = map[string]string{}
-	for _, station := range cifBundle.PhysicalStations {
-		cifBundle.TIPLOCToCrsMap[station.TIPLOCCode] = station.CRSCode
+	c.TIPLOCToCrsMap = map[string]string{}
+	for _, station := range c.PhysicalStations {
+		c.TIPLOCToCrsMap[station.TIPLOCCode] = station.CRSCode
 	}
 
-	return cifBundle, nil
+	return nil
 }
 
 func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
@@ -186,7 +189,10 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	return journeysArray
 }
 
-func (c *CommonInterfaceFormat) Import(datasource *ctdf.DataSource) {
+func (c *CommonInterfaceFormat) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+	if !supportedObjects.Journeys || !supportedObjects.Services {
+		return errors.New("This format requires services & journeys to be enabled")
+	}
 	log.Info().Msg("Converting to CTDF")
 
 	journeys := c.ConvertToCTDF()
@@ -239,6 +245,8 @@ func (c *CommonInterfaceFormat) Import(datasource *ctdf.DataSource) {
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operationInsert)
+
+	return nil
 }
 
 func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {

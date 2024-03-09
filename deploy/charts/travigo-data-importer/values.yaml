@@ -35,7 +35,7 @@ cronjobs:
     args: ["data-importer", "dataset", "--id", "gb-nationalrail-toc"]
   - name: nationalrail-timetable
     schedule: "15 5 * * *"
-    args: ["data-importer", "nationalrail-timetable"]
+    args: ["data-importer", "dataset", "--id", "gb-nationalrail-timetable"]
   - name: naptan
     schedule: "0 3 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
@@ -51,6 +51,7 @@ cronjobs:
     args: [ "indexer", "stops" ]
 
 deployments:
+  # TODO make sirivm ignore if its handled by gtfs / make gtfs the priority - then go back to 10s
   - name: sirivm-all
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
   # - name: gb-bods-sirivm-tfl

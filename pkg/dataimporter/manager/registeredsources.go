@@ -157,6 +157,25 @@ func GetRegisteredDataSets() []DataSet {
 				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
 			},
 		},
+		{
+			Identifier: "gb-nationalrail-timetable",
+			Format:     DataSetFormatCIF,
+			Provider: Provider{
+				Name:    "National Rail",
+				Website: "https://nationalrail.co.uk",
+			},
+			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable",
+			UnpackBundle: BundleFormatNone,
+			SupportedObjects: formats.SupportedObjects{
+				Services: true,
+				Journeys: true,
+			},
+
+			DownloadHandler: func(r *http.Request) {
+				token := nationalRailLogin()
+				r.Header.Set("X-Auth-Token", token)
+			},
+		},
 	}
 }
 
