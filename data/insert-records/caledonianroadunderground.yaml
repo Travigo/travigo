@@ -1,0 +1,24 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:9400ZZLUCAR"
+Data:
+  platforms:
+  - primaryidentifier: "GB:ATCO:9400ZZLUCAR1"
+    otheridentifiers:
+      AtcoCode: "9400ZZLUCAR1"
+    primaryname: "Caledonian Road Underground Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.11861346129
+      - 51.54875428024
+  - primaryidentifier: "GB:ATCO:9400ZZLUCAR2"
+    otheridentifiers:
+      AtcoCode: "9400ZZLUCAR2"
+    primaryname: "Caledonian Road Underground Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.11861346129
+      - 51.54875428024

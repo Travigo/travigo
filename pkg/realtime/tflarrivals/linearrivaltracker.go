@@ -311,7 +311,12 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		// Reduce the route naptan ids so that it only contains the same stops in the predictions
 		var reducedRouteOrderedNaptanIDs []string
 		for _, naptanID := range routeOrderedNaptanIDs {
-			tflFormattedNaptanID := getStopFromTfLStop(naptanID).PrimaryIdentifier
+			stop := getStopFromTfLStop(naptanID)
+			if stop == nil {
+				log.Error().Str("naptanid", naptanID).Msg("Could not find stop for tfl stop")
+				continue
+			}
+			tflFormattedNaptanID := stop.PrimaryIdentifier
 			if slices.Contains[[]string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
 				reducedRouteOrderedNaptanIDs = append(reducedRouteOrderedNaptanIDs, tflFormattedNaptanID)
 			}
@@ -451,14 +456,26 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	}
 
 	stopGroupCollection := database.GetCollection("stop_groups")
+	stopCollection := database.GetCollection("stops")
+
 	var stopGroup *ctdf.StopGroup
 	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers.AtcoCode": tflStopID}).Decode(&stopGroup)
 
 	if stopGroup == nil {
-		return nil
+		var stop *ctdf.Stop
+		stopCollection.FindOne(context.Background(), bson.M{"platforms.primaryidentifier": fmt.Sprintf("GB:ATCO:%s", tflStopID)}).Decode(&stop)
+
+		if stop == nil {
+			return nil
+		}
+
+		stopTflStopCacheMutex.Lock()
+		stopTflStopCache[tflStopID] = stop
+		stopTflStopCacheMutex.Unlock()
+
+		return stop
 	}
 
-	stopCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
 
