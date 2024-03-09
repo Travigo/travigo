@@ -31,8 +31,6 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					ctdf.LoadSpecialDayCache()
-
 					pushManager := &PushManager{}
 					err := pushManager.Setup()
 					if err != nil {

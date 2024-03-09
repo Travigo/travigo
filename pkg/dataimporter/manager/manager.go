@@ -231,7 +231,6 @@ func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
 	query := bson.M{
 		"$and": bson.A{
 			bson.M{"datasource.originalformat": datasource.OriginalFormat},
-			bson.M{"datasource.provider": datasource.Provider},
 			bson.M{"datasource.datasetid": datasource.DatasetID},
 			bson.M{"datasource.timestamp": bson.M{
 				"$ne": datasource.Timestamp,

@@ -34,8 +34,6 @@ func RegisterCLI() *cli.Command {
 
 					dataaggregator.Setup()
 
-					ctdf.LoadSpecialDayCache()
-
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "events-queue",
 						NumberConsumers: 5,

@@ -5,7 +5,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
@@ -30,8 +29,6 @@ func RegisterCLI() *cli.Command {
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}
-
-					ctdf.LoadSpecialDayCache()
 
 					StartConsumers()
 

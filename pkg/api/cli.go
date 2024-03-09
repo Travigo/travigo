@@ -1,7 +1,6 @@
 package api
 
 import (
-	"github.com/travigo/travigo/pkg/ctdf"
 	dataaggregator "github.com/travigo/travigo/pkg/dataaggregator/global"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
@@ -36,8 +35,6 @@ func RegisterCLI() *cli.Command {
 					}
 
 					dataaggregator.Setup()
-
-					ctdf.LoadSpecialDayCache()
 
 					return SetupServer(c.String("listen"))
 				},
