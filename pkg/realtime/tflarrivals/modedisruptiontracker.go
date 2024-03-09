@@ -124,8 +124,8 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 				Text:      alertText,
 
 				MatchedIdentifiers: []string{
-					fmt.Sprintf(ctdf.StopIDFormat, tflDisruption.ATCO),
-					fmt.Sprintf(ctdf.StopIDFormat, tflDisruption.StationATCO),
+					fmt.Sprintf(ctdf.GBStopIDFormat, tflDisruption.ATCO),
+					fmt.Sprintf(ctdf.GBStopIDFormat, tflDisruption.StationATCO),
 				},
 			}
 		} else {

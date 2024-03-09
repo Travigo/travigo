@@ -65,7 +65,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 		timeframe = currentTime.Format("2006-01-02")
 	}
 
-	originRef := fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef)
+	originRef := fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef)
 	localJourneyID := fmt.Sprintf(
 		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
 		fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
@@ -84,7 +84,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 			"VehicleJourneyRef":        vehicleJourneyRef,
 			"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
 			"OriginRef":                originRef,
-			"DestinationRef":           fmt.Sprintf(ctdf.StopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+			"DestinationRef":           fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
 			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
 			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
 		},

@@ -159,7 +159,7 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 			stopNameOverrides := map[string]string{}
 			for _, stopPoint := range doc.StopPoints {
 				if stopPoint.CommonName != "" {
-					stopNameOverrides[fmt.Sprintf(ctdf.StopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
+					stopNameOverrides[fmt.Sprintf(ctdf.GBStopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
 				}
 			}
 
@@ -635,8 +635,8 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 					}
 
 					pathItem := ctdf.JourneyPathItem{
-						OriginStopRef:      fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.From.StopPointRef),
-						DestinationStopRef: fmt.Sprintf(ctdf.StopIDFormat, journeyPatternTimingLink.To.StopPointRef),
+						OriginStopRef:      fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.From.StopPointRef),
+						DestinationStopRef: fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.To.StopPointRef),
 
 						Distance: routeLink.Distance,
 
