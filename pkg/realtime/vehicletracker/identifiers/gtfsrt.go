@@ -18,12 +18,12 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 
 	tripID := r.IdentifyingInformation["TripID"]
 	if tripID == "" {
-		return "", errors.New("Could not find referenced trip")
+		return "", errors.New("Missing field tripid")
 	}
 
 	linkedDataset := r.IdentifyingInformation["LinkedDataset"]
 	if linkedDataset == "" {
-		return "", errors.New("Could not find referenced linkedDataset")
+		return "", errors.New("Missing field linkedDataset")
 	}
 
 	var potentialJourneys []ctdf.Journey
@@ -36,10 +36,10 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 	cursor.All(context.Background(), &potentialJourneys)
 
 	if len(potentialJourneys) == 0 {
-		return "", errors.New("Could not find related Journeys")
+		return "", errors.New("Could not find referenced trip")
 	} else if len(potentialJourneys) == 1 {
 		return potentialJourneys[0].PrimaryIdentifier, nil
 	} else {
-		return "", errors.New("Could not narrow down to single Journey by time. Still many remaining")
+		return "", errors.New("Could not find referenced trip")
 	}
 }
