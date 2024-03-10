@@ -28,7 +28,6 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 
 	var potentialJourneys []ctdf.Journey
 
-	// TODO change this query to look at otheridentifiers
 	cursor, _ := journeysCollection.Find(context.Background(), bson.M{
 		"otheridentifiers.GTFS-TripID": tripID,
 		"datasource.datasetid":         linkedDataset,

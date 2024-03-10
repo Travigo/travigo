@@ -46,6 +46,10 @@ cronjobs:
     schedule: "20 6 * * *"
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-schedule"]
     batchburst: true
+  - name: gb-bods-gtfs-timetable
+    schedule: "50 6 * * *"
+    args: ["data-importer", "dataset", "--id", "ie-gtfs-schedule"]
+    batchburst: true
   - name: temp-indexer-stops
     schedule: "50 3 * * 6"
     args: [ "indexer", "stops" ]
