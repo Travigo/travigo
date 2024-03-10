@@ -12,7 +12,7 @@ import (
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,8 +32,8 @@ func (r *Realtime) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (r *Realtime) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.RealtimeJourneys {
+func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+	if !dataset.SupportedObjects.RealtimeJourneys {
 		return errors.New("This format requires realtimejourneys to be enabled")
 	}
 
@@ -64,10 +64,11 @@ func (r *Realtime) Import(datasetid string, supportedObjects formats.SupportedOb
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
 			locationEvent := vehicletracker.VehicleLocationEvent{
-				LocalID: fmt.Sprintf("%s-realtime-%s-%s", datasetid, timeframe, tripID),
+				LocalID: fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
 				IdentifyingInformation: map[string]string{
-					"TripID":  tripID,
-					"RouteID": trip.GetRouteId(),
+					"TripID":        tripID,
+					"RouteID":       trip.GetRouteId(),
+					"LinkedDataset": dataset.LinkedDataset,
 				},
 				SourceType: "GTFS-RT",
 				Location: ctdf.Location{

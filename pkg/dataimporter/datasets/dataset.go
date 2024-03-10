@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
 )
 
 type DataSet struct {
@@ -16,7 +15,7 @@ type DataSet struct {
 	Source string
 
 	UnpackBundle      BundleFormat
-	SupportedObjects  formats.SupportedObjects
+	SupportedObjects  SupportedObjects
 	ImportDestination ImportDestination
 
 	LinkedDataset string

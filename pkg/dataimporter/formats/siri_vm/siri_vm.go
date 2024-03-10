@@ -11,7 +11,7 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
@@ -120,8 +120,8 @@ func (s *SiriVM) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (s *SiriVM) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.RealtimeJourneys {
+func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+	if !dataset.SupportedObjects.RealtimeJourneys {
 		return errors.New("This format requires realtimejourneys to be enabled")
 	}
 

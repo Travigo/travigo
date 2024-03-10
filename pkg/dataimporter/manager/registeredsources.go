@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/util"
 )
 
@@ -25,7 +24,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Operators:      true,
 				OperatorGroups: true,
 			},
@@ -39,7 +38,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Stops:      true,
 				StopGroups: true,
 			},
@@ -53,7 +52,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Operators: true,
 				Services:  true,
 			},
@@ -73,7 +72,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS",
 			UnpackBundle: datasets.BundleFormatGZ,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Stops: true,
 			},
 
@@ -98,7 +97,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive",
 			UnpackBundle: datasets.BundleFormatZIP,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				RealtimeJourneys: true,
 			},
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
@@ -121,7 +120,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt",
 			UnpackBundle: datasets.BundleFormatZIP,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				RealtimeJourneys: true,
 			},
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
@@ -146,7 +145,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Services: true,
 				Journeys: true,
 			},
@@ -169,7 +168,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Services: true,
 				Journeys: true,
 			},
@@ -189,7 +188,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			// Source:       "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
 			Source:       "/Users/aaronclaydon/Downloads/GTFS_Realtime.zip",
 			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: formats.SupportedObjects{
+			SupportedObjects: datasets.SupportedObjects{
 				Operators: true,
 				Stops:     true,
 				Services:  true,

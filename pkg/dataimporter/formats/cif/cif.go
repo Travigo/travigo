@@ -17,7 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -189,8 +189,8 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	return journeysArray
 }
 
-func (c *CommonInterfaceFormat) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.Journeys || !supportedObjects.Services {
+func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+	if !dataset.SupportedObjects.Journeys || !dataset.SupportedObjects.Services {
 		return errors.New("This format requires services & journeys to be enabled")
 	}
 	log.Info().Msg("Converting to CTDF")

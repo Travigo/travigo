@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -78,8 +78,8 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	return operators, services
 }
 
-func (t *TrainOperatingCompanyList) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.Operators || !supportedObjects.Services {
+func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+	if !dataset.SupportedObjects.Operators || !dataset.SupportedObjects.Services {
 		return errors.New("This format requires operators & services to be enabled")
 	}
 

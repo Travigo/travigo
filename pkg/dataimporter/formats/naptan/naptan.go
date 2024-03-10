@@ -9,7 +9,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 
@@ -47,8 +47,8 @@ func (naptanDoc *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
-	if !supportedObjects.Stops || !supportedObjects.StopGroups {
+func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+	if !dataset.SupportedObjects.Stops || !dataset.SupportedObjects.StopGroups {
 		return errors.New("This format requires stops & stopgroups to be enabled")
 	}
 

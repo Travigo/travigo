@@ -12,7 +12,7 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataimporter/formats"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -90,7 +90,7 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedObjects, datasource *ctdf.DataSource) error {
+func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
@@ -107,11 +107,11 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 	log.Info().Int("length", len(g.Agencies)).Msg("Starting Operators")
 	agenciesQueue := NewDatabaseBatchProcessingQueue("operators", 1*time.Second, 10*time.Second, 500)
 
-	if supportedObjects.Operators {
+	if dataset.SupportedObjects.Operators {
 		agenciesQueue.Process()
 	}
 	for _, gtfsAgency := range g.Agencies {
-		operatorID := fmt.Sprintf("%s-operator-%s", datasetid, gtfsAgency.ID)
+		operatorID := fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsAgency.ID)
 		ctdfOperator := &ctdf.Operator{
 			PrimaryIdentifier:    operatorID,
 			CreationDateTime:     time.Now(),
@@ -121,7 +121,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 			Website:              gtfsAgency.URL,
 		}
 
-		if supportedObjects.Operators {
+		if dataset.SupportedObjects.Operators {
 			// Insert
 			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfOperator})
 			updateModel := mongo.NewUpdateOneModel()
@@ -132,7 +132,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		}
 	}
 	log.Info().Msg("Finished Operators")
-	if supportedObjects.Operators {
+	if dataset.SupportedObjects.Operators {
 		agenciesQueue.Wait()
 	}
 
@@ -140,11 +140,11 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 	log.Info().Int("length", len(g.Stops)).Msg("Starting Stops")
 	stopsQueue := NewDatabaseBatchProcessingQueue("stops", 1*time.Second, 10*time.Second, 500)
 
-	if supportedObjects.Stops {
+	if dataset.SupportedObjects.Stops {
 		stopsQueue.Process()
 	}
 	for _, gtfsStop := range g.Stops {
-		stopID := fmt.Sprintf("%s-stop-%s", datasetid, gtfsStop.ID)
+		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, gtfsStop.ID)
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier: stopID,
 			OtherIdentifiers: map[string]string{
@@ -162,7 +162,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 			Active: true,
 		}
 
-		if supportedObjects.Stops {
+		if dataset.SupportedObjects.Stops {
 			// Insert
 			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStop})
 			updateModel := mongo.NewUpdateOneModel()
@@ -173,7 +173,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		}
 	}
 	log.Info().Msg("Finished Stops")
-	if supportedObjects.Stops {
+	if dataset.SupportedObjects.Stops {
 		stopsQueue.Wait()
 	}
 
@@ -205,13 +205,13 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
 	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 500)
 
-	if supportedObjects.Services {
+	if dataset.SupportedObjects.Services {
 		servicesQueue.Process()
 	}
 
 	ctdfServices := map[string]*ctdf.Service{}
 	for _, gtfsRoute := range g.Routes {
-		serviceID := fmt.Sprintf("%s-service-%s", datasetid, gtfsRoute.ID)
+		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, gtfsRoute.ID)
 
 		serviceName := gtfsRoute.LongName
 		if serviceName == "" {
@@ -220,7 +220,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 
 		operatorRef := agencyNOCMapping[gtfsRoute.AgencyID]
 		if operatorRef == "" {
-			operatorRef = fmt.Sprintf("%s-operator-%s", datasetid, gtfsRoute.AgencyID)
+			operatorRef = fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsRoute.AgencyID)
 		}
 
 		ctdfService := &ctdf.Service{
@@ -243,7 +243,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 
 		ctdfServices[gtfsRoute.ID] = ctdfService
 
-		if supportedObjects.Services {
+		if dataset.SupportedObjects.Services {
 			// Insert
 			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfService})
 			updateModel := mongo.NewUpdateOneModel()
@@ -254,7 +254,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		}
 	}
 	log.Info().Msg("Finished Services")
-	if supportedObjects.Services {
+	if dataset.SupportedObjects.Services {
 		servicesQueue.Wait()
 	}
 
@@ -262,14 +262,14 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 
 	// Journeys
 	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
-	if supportedObjects.Journeys {
+	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
 
 	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
 	for _, trip := range g.Trips {
-		journeyID := fmt.Sprintf("%s-journey-%s", datasetid, trip.ID)
-		serviceID := fmt.Sprintf("%s-service-%s", datasetid, trip.RouteID)
+		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, trip.ID)
+		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, trip.RouteID)
 
 		availability := &ctdf.Availability{}
 		// Calendar availability
@@ -357,12 +357,12 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 			var destinationStopRef string
 
 			// TODO no hardocded nonsense!!
-			if datasetid == "gb-dft-bods-gtfs-schedule" {
+			if dataset.Identifier == "gb-dft-bods-gtfs-schedule" {
 				originStopRef = fmt.Sprintf("GB:ATCO:%s", previousStopTime.StopID)
 				destinationStopRef = fmt.Sprintf("GB:ATCO:%s", stopTime.StopID)
 			} else {
-				originStopRef = fmt.Sprintf("%s-stop-%s", datasetid, previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("%s-stop-%s", datasetid, stopTime.StopID)
+				originStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, previousStopTime.StopID)
+				destinationStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, stopTime.StopID)
 			}
 
 			journeyPathItem := &ctdf.JourneyPathItem{
@@ -411,7 +411,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		}
 
 		// Insert
-		if supportedObjects.Journeys {
+		if dataset.SupportedObjects.Journeys {
 			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
 			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
@@ -425,7 +425,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 	}
 	log.Info().Msg("Finished Journeys")
 
-	if supportedObjects.Journeys {
+	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Wait()
 	}
 

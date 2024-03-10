@@ -1,4 +1,4 @@
-package formats
+package datasets
 
 type SupportedObjects struct {
 	Operators      bool

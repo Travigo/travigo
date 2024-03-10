@@ -5,11 +5,12 @@ import (
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 )
 
 type Format interface {
 	ParseFile(io.Reader) error
-	Import(string, SupportedObjects, *ctdf.DataSource) error
+	Import(datasets.DataSet, *ctdf.DataSource) error
 }
 
 type RealtimeQueueFormat interface {

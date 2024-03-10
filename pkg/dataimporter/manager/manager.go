@@ -148,11 +148,7 @@ func ImportDataset(dataset *datasets.DataSet) error {
 			return err
 		}
 
-		err = format.Import(
-			dataset.Identifier,
-			dataset.SupportedObjects,
-			datasource,
-		)
+		err = format.Import(*dataset, datasource)
 		if err != nil {
 			return err
 		}
