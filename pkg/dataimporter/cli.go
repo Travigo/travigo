@@ -66,7 +66,7 @@ func RegisterCLI() *cli.Command {
 					for {
 						startTime := time.Now()
 
-						err := dataset.ImportDataset()
+						err := manager.ImportDataset(&dataset)
 
 						if err != nil {
 							return err

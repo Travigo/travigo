@@ -1,14 +1,14 @@
 # DLR
 ---
 Type: ctdf.Service
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:LDLR"
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---
 Type: ctdf.Journey
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:LDLR"
 Data:
@@ -16,14 +16,14 @@ Data:
 # Underground
 ---
 Type: ctdf.Service
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:LULD"
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---
 Type: ctdf.Journey
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:LULD"
 Data:
@@ -31,14 +31,14 @@ Data:
 # Tram
 ---
 Type: ctdf.Service
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:TRAM"
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---
 Type: ctdf.Journey
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "GB:NOC:TRAM"
 Data:
@@ -46,15 +46,15 @@ Data:
 # River Bus
 ---
 Type: ctdf.Service
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-bods-gtfs-operator-OPTEMP454"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---
 Type: ctdf.Journey
-Group: gb-bods-gtfs
+Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-bods-gtfs-operator-OPTEMP454"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
 Data:
   OperatorRef: "GB:NOC:TFLO"

@@ -104,6 +104,79 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		agencyNOCMapping[agency.ID] = fmt.Sprintf("GB:NOC:%s", agency.NOC)
 	}
 
+	log.Info().Int("length", len(g.Agencies)).Msg("Starting Operators")
+	agenciesQueue := NewDatabaseBatchProcessingQueue("operators", 1*time.Second, 10*time.Second, 500)
+
+	if supportedObjects.Operators {
+		agenciesQueue.Process()
+	}
+	for _, gtfsAgency := range g.Agencies {
+		operatorID := fmt.Sprintf("%s-operator-%s", datasetid, gtfsAgency.ID)
+		ctdfOperator := &ctdf.Operator{
+			PrimaryIdentifier:    operatorID,
+			CreationDateTime:     time.Now(),
+			ModificationDateTime: time.Now(),
+			DataSource:           datasource,
+			PrimaryName:          gtfsAgency.Name,
+			Website:              gtfsAgency.URL,
+		}
+
+		if supportedObjects.Operators {
+			// Insert
+			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfOperator})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": operatorID})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+			agenciesQueue.Add(updateModel)
+		}
+	}
+	log.Info().Msg("Finished Operators")
+	if supportedObjects.Operators {
+		agenciesQueue.Wait()
+	}
+
+	// Stops
+	log.Info().Int("length", len(g.Stops)).Msg("Starting Stops")
+	stopsQueue := NewDatabaseBatchProcessingQueue("stops", 1*time.Second, 10*time.Second, 500)
+
+	if supportedObjects.Stops {
+		stopsQueue.Process()
+	}
+	for _, gtfsStop := range g.Stops {
+		stopID := fmt.Sprintf("%s-stop-%s", datasetid, gtfsStop.ID)
+		ctdfStop := &ctdf.Stop{
+			PrimaryIdentifier: stopID,
+			OtherIdentifiers: map[string]string{
+				"GTFS-ID": gtfsStop.ID,
+			},
+			CreationDateTime:     time.Now(),
+			ModificationDateTime: time.Now(),
+			DataSource:           datasource,
+			PrimaryName:          gtfsStop.Name,
+			OtherNames:           map[string]string{},
+			Location: &ctdf.Location{
+				Type:        "Point",
+				Coordinates: []float64{gtfsStop.Longitude, gtfsStop.Latitude},
+			},
+			Active: true,
+		}
+
+		if supportedObjects.Stops {
+			// Insert
+			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStop})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": stopID})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+			stopsQueue.Add(updateModel)
+		}
+	}
+	log.Info().Msg("Finished Stops")
+	if supportedObjects.Stops {
+		stopsQueue.Wait()
+	}
+
 	// Calendars
 	calendarMapping := map[string]*Calendar{}
 	calendarDateMapping := map[string][]*CalendarDate{}
@@ -166,7 +239,7 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 			TransportType:        routeTypeMapping[gtfsRoute.Type],
 		}
 
-		transforms.Transform(ctdfService, 1, "gb-bods-gtfs")
+		transforms.Transform(ctdfService, 1, "gb-dft-bods-gtfs-schedule")
 
 		ctdfServices[gtfsRoute.ID] = ctdfService
 
@@ -280,9 +353,21 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 			originDeparturelTime, _ := time.Parse("15:04:05", previousStopTime.DepartureTime)
 			destinationArrivalTime, _ := time.Parse("15:04:05", stopTime.ArrivalTime)
 
+			var originStopRef string
+			var destinationStopRef string
+
+			// TODO no hardocded nonsense!!
+			if datasetid == "gb-dft-bods-gtfs-schedule" {
+				originStopRef = fmt.Sprintf("GB:ATCO:%s", previousStopTime.StopID)
+				destinationStopRef = fmt.Sprintf("GB:ATCO:%s", stopTime.StopID)
+			} else {
+				originStopRef = fmt.Sprintf("%s-stop-%s", datasetid, previousStopTime.StopID)
+				destinationStopRef = fmt.Sprintf("%s-stop-%s", datasetid, stopTime.StopID)
+			}
+
 			journeyPathItem := &ctdf.JourneyPathItem{
-				OriginStopRef:          fmt.Sprintf("GB:ATCO:%s", previousStopTime.StopID),
-				DestinationStopRef:     fmt.Sprintf("GB:ATCO:%s", stopTime.StopID),
+				OriginStopRef:          originStopRef,
+				DestinationStopRef:     destinationStopRef,
 				OriginArrivalTime:      originArrivalTime,
 				DestinationArrivalTime: destinationArrivalTime,
 				OriginDepartureTime:    originDeparturelTime,
@@ -313,14 +398,14 @@ func (g *Schedule) Import(datasetid string, supportedObjects formats.SupportedOb
 		}
 
 		// TODO fix transforms here
-		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-bods-gtfs")
+		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
 		if util.ContainsString([]string{
-			"GB:NOC:LDLR", "GB:NOC:LULD", "GB:NOC:TRAM", "gb-bods-gtfs-operator-OPTEMP454",
-			"GB:NOC:ABLO", "gb-bods-gtfs-operator-OP12046", "GB:NOC:ALNO", "GB:NOC:ALSO", "gb-bods-gtfs-operator-OPTEMP450", "gb-bods-gtfs-operator-OP11684",
-			"GB:NOC:ELBG", "gb-bods-gtfs-operator-OPTEMP456", "gb-bods-gtfs-operator-OP3039", "GB:NOC:LSOV", "GB:NOC:LUTD", "gb-bods-gtfs-operator-OP2974",
+			"GB:NOC:LDLR", "GB:NOC:LULD", "GB:NOC:TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
+			"GB:NOC:ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "GB:NOC:ALNO", "GB:NOC:ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
+			"GB:NOC:ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "GB:NOC:LSOV", "GB:NOC:LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
 			"GB:NOC:MTLN", "GB:NOC:SULV",
 		}, ctdfJourneys[tripID].OperatorRef) || (ctdfJourneys[tripID].OperatorRef == "GB:NOC:UNIB" && util.ContainsString([]string{
-			"gb-bods-gtfs-service-14023", "gb-bods-gtfs-service-13950", "gb-bods-gtfs-service-14053", "gb-bods-gtfs-service-13966", "gb-bods-gtfs-service-13968", "gb-bods-gtfs-service-82178",
+			"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
 		}, ctdfJourneys[tripID].ServiceRef)) {
 			ctdfJourneys[tripID].OperatorRef = "GB:NOC:TFLO"
 		}

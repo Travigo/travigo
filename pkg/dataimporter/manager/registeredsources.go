@@ -8,22 +8,23 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/util"
 )
 
 // Just a static list for now
-func GetRegisteredDataSets() []DataSet {
-	return []DataSet{
+func GetRegisteredDataSets() []datasets.DataSet {
+	return []datasets.DataSet{
 		{
 			Identifier: "gb-traveline-noc",
-			Format:     DataSetFormatTravelineNOC,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatTravelineNOC,
+			Provider: datasets.Provider{
 				Name:    "Traveline",
 				Website: "https://www.travelinedata.org.uk/",
 			},
 			Source:       "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
-			UnpackBundle: BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
 				Operators:      true,
 				OperatorGroups: true,
@@ -31,13 +32,13 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-dft-naptan",
-			Format:     DataSetFormatNaPTAN,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatNaPTAN,
+			Provider: datasets.Provider{
 				Name:    "Department for Transport",
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml",
-			UnpackBundle: BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
 				Stops:      true,
 				StopGroups: true,
@@ -45,13 +46,13 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-nationalrail-toc",
-			Format:     DataSetFormatNationalRailTOC,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatNationalRailTOC,
+			Provider: datasets.Provider{
 				Name:    "National Rail",
 				Website: "https://nationalrail.co.uk",
 			},
 			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs",
-			UnpackBundle: BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
 				Operators: true,
 				Services:  true,
@@ -65,13 +66,13 @@ func GetRegisteredDataSets() []DataSet {
 		{
 			// Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset
 			Identifier: "gb-networkrail-corpus",
-			Format:     DataSetFormatNetworkRailCorpus,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatNetworkRailCorpus,
+			Provider: datasets.Provider{
 				Name:    "Network Rail",
 				Website: "https://networkrail.co.uk",
 			},
 			Source:       "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS",
-			UnpackBundle: BundleFormatGZ,
+			UnpackBundle: datasets.BundleFormatGZ,
 			SupportedObjects: formats.SupportedObjects{
 				Stops: true,
 			},
@@ -90,17 +91,17 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-dft-bods-sirivm-all",
-			Format:     DataSetFormatSiriVM,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatSiriVM,
+			Provider: datasets.Provider{
 				Name:    "Department for Transport",
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive",
-			UnpackBundle: BundleFormatZIP,
+			UnpackBundle: datasets.BundleFormatZIP,
 			SupportedObjects: formats.SupportedObjects{
 				RealtimeJourneys: true,
 			},
-			ImportDestination: ImportDestinationRealtimeQueue,
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
 
 			DownloadHandler: func(r *http.Request) {
 				env := util.GetEnvironmentVariables()
@@ -113,17 +114,19 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-dft-bods-gtfs-realtime",
-			Format:     DataSetFormatGTFSRealtime,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
 				Name:    "Department for Transport",
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt",
-			UnpackBundle: BundleFormatZIP,
+			UnpackBundle: datasets.BundleFormatZIP,
 			SupportedObjects: formats.SupportedObjects{
 				RealtimeJourneys: true,
 			},
-			ImportDestination: ImportDestinationRealtimeQueue,
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+
+			LinkedDataset: "gb-dft-bods-gtfs-schedule",
 
 			DownloadHandler: func(r *http.Request) {
 				env := util.GetEnvironmentVariables()
@@ -136,13 +139,13 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-dft-bods-gtfs-schedule",
-			Format:     DataSetFormatGTFSSchedule,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
 				Name:    "Department for Transport",
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/",
-			UnpackBundle: BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
 				Services: true,
 				Journeys: true,
@@ -159,13 +162,13 @@ func GetRegisteredDataSets() []DataSet {
 		},
 		{
 			Identifier: "gb-nationalrail-timetable",
-			Format:     DataSetFormatCIF,
-			Provider: Provider{
+			Format:     datasets.DataSetFormatCIF,
+			Provider: datasets.Provider{
 				Name:    "National Rail",
 				Website: "https://nationalrail.co.uk",
 			},
 			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable",
-			UnpackBundle: BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: formats.SupportedObjects{
 				Services: true,
 				Journeys: true,
@@ -174,6 +177,23 @@ func GetRegisteredDataSets() []DataSet {
 			DownloadHandler: func(r *http.Request) {
 				token := nationalRailLogin()
 				r.Header.Set("X-Auth-Token", token)
+			},
+		},
+		{
+			Identifier: "ie-gtfs-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "Transport for Ireland",
+				Website: "https://www.transportforireland.ie",
+			},
+			// Source:       "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
+			Source:       "/Users/aaronclaydon/Downloads/GTFS_Realtime.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: formats.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
 			},
 		},
 	}

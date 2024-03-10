@@ -3,7 +3,6 @@ package identifiers
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -22,10 +21,18 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		return "", errors.New("Could not find referenced trip")
 	}
 
+	linkedDataset := r.IdentifyingInformation["LinkedDataset"]
+	if linkedDataset == "" {
+		return "", errors.New("Could not find referenced linkedDataset")
+	}
+
 	var potentialJourneys []ctdf.Journey
 
 	// TODO change this query to look at otheridentifiers
-	cursor, _ := journeysCollection.Find(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("%s-journey-%s", "gb-bods-gtfs", tripID)})
+	cursor, _ := journeysCollection.Find(context.Background(), bson.M{
+		"otheridentifiers.GTFS-TripID": tripID,
+		"datasource.datasetid":         linkedDataset,
+	})
 	cursor.All(context.Background(), &potentialJourneys)
 
 	if len(potentialJourneys) == 0 {

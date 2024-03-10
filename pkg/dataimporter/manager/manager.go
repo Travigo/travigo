@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/formats"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/cif"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs"
@@ -29,7 +30,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func GetDataset(identifier string) (DataSet, error) {
+func GetDataset(identifier string) (datasets.DataSet, error) {
 	registered := GetRegisteredDataSets()
 
 	for _, dataset := range registered {
@@ -45,46 +46,46 @@ func GetDataset(identifier string) (DataSet, error) {
 		}
 	}
 
-	return DataSet{}, errors.New("Dataset could not be found")
+	return datasets.DataSet{}, errors.New("Dataset could not be found")
 }
 
-func (dataset *DataSet) ImportDataset() error {
+func ImportDataset(dataset *datasets.DataSet) error {
 	var format formats.Format
 
 	switch dataset.Format {
-	case DataSetFormatTravelineNOC:
+	case datasets.DataSetFormatTravelineNOC:
 		format = &travelinenoc.TravelineData{}
-	case DataSetFormatNaPTAN:
+	case datasets.DataSetFormatNaPTAN:
 		format = &naptan.NaPTAN{}
-	case DataSetFormatNationalRailTOC:
+	case datasets.DataSetFormatNationalRailTOC:
 		format = &nationalrailtoc.TrainOperatingCompanyList{}
-	case DataSetFormatNetworkRailCorpus:
+	case datasets.DataSetFormatNetworkRailCorpus:
 		format = &networkrailcorpus.Corpus{}
-	case DataSetFormatSiriVM:
+	case datasets.DataSetFormatSiriVM:
 		format = &siri_vm.SiriVM{}
-	case DataSetFormatGTFSSchedule:
+	case datasets.DataSetFormatGTFSSchedule:
 		format = &gtfs.Schedule{}
-	case DataSetFormatGTFSRealtime:
+	case datasets.DataSetFormatGTFSRealtime:
 		format = &gtfs.Realtime{}
-	case DataSetFormatCIF:
+	case datasets.DataSetFormatCIF:
 		format = &cif.CommonInterfaceFormat{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
 
-	if dataset.ImportDestination == ImportDestinationRealtimeQueue {
-		if dataset.queue == nil {
+	if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
+		if dataset.Queue == nil {
 			realtimeQueue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to start redis realtime-queue")
 			}
-			dataset.queue = &realtimeQueue
+			dataset.Queue = &realtimeQueue
 		}
 
 		var realtimeQueueFormat formats.RealtimeQueueFormat
 		realtimeQueueFormat = format.(formats.RealtimeQueueFormat)
 
-		realtimeQueueFormat.SetupRealtimeQueue(*dataset.queue)
+		realtimeQueueFormat.SetupRealtimeQueue(*dataset.Queue)
 	}
 
 	datasource := &ctdf.DataSource{
@@ -111,9 +112,9 @@ func (dataset *DataSet) ImportDataset() error {
 	}
 
 	switch dataset.UnpackBundle {
-	case BundleFormatNone:
+	case datasets.BundleFormatNone:
 		sourceFileReaders = append(sourceFileReaders, file)
-	case BundleFormatGZ:
+	case datasets.BundleFormatGZ:
 		gzipDecoder, err := gzip.NewReader(file)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot decode gzip stream")
@@ -121,7 +122,7 @@ func (dataset *DataSet) ImportDataset() error {
 		defer gzipDecoder.Close()
 
 		sourceFileReaders = append(sourceFileReaders, gzipDecoder)
-	case BundleFormatZIP:
+	case datasets.BundleFormatZIP:
 		archive, err := zip.OpenReader(source)
 		if err != nil {
 			panic(err)
@@ -193,7 +194,7 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func tempDownloadFile(dataset *DataSet) (*os.File, string) {
+func tempDownloadFile(dataset *datasets.DataSet) (*os.File, string) {
 	req, _ := http.NewRequest("GET", dataset.Source, nil)
 	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
 

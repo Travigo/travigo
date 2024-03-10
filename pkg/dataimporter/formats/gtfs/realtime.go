@@ -64,8 +64,7 @@ func (r *Realtime) Import(datasetid string, supportedObjects formats.SupportedOb
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
 			locationEvent := vehicletracker.VehicleLocationEvent{
-				// TODO obv needs to not be hardcoded here
-				LocalID: fmt.Sprintf("%s-realtime-%s-%s", "gb-bods-gtfs", timeframe, tripID),
+				LocalID: fmt.Sprintf("%s-realtime-%s-%s", datasetid, timeframe, tripID),
 				IdentifyingInformation: map[string]string{
 					"TripID":  tripID,
 					"RouteID": trip.GetRouteId(),

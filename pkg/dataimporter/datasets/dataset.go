@@ -1,4 +1,4 @@
-package manager
+package datasets
 
 import (
 	"net/http"
@@ -19,10 +19,12 @@ type DataSet struct {
 	SupportedObjects  formats.SupportedObjects
 	ImportDestination ImportDestination
 
+	LinkedDataset string
+
 	DownloadHandler func(*http.Request)
 
 	// Internal only
-	queue *rmq.Queue
+	Queue *rmq.Queue
 }
 
 type DataSetFormat string
