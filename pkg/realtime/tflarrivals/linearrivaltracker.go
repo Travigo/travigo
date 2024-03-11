@@ -124,7 +124,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "tfl-json",
 		Provider:       "GB-TfL",
-		DatasetID:      fmt.Sprintf("line/%s/arrivals", l.Line.LineID),
+		DatasetID:      fmt.Sprintf("gb-tfl-line/%s/arrivals", l.Line.LineID),
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
 

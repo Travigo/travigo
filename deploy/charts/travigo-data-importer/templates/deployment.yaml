@@ -35,6 +35,12 @@ spec:
                   name: {{ $.Values.bods.apiKeySecret }}
                   key: api_key
                   optional: false
+            - name: TRAVIGO_IE_NATIONALTRANSPORT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.ie_nationaltransport.apiKeySecret }}
+                  key: api_key
+                  optional: false
             - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:
