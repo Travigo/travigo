@@ -195,6 +195,31 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Journeys:  true,
 			},
 		},
+		{
+			Identifier: "ie-gtfs-realtime",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Transport for Ireland",
+				Website: "https://www.transportforireland.ie",
+			},
+			Source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr",
+			// Source:       "/Users/aaronclaydon/Downloads/GTFS_Realtime.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "ie-gtfs-schedule",
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_IE_NATIONALTRANSPORT_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_IE_NATIONALTRANSPORT_API_KEY must be set")
+				}
+
+				r.Header.Set("x-api-key", env["TRAVIGO_IE_NATIONALTRANSPORT_API_KEY"])
+			},
+		},
 	}
 }
 

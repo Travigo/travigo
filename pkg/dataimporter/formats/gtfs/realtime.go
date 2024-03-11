@@ -9,7 +9,6 @@ import (
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
@@ -49,13 +48,27 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	withTripID := 0
+	withLocation := 0
+	withTripUpdate := 0
 
 	for _, entity := range feed.Entity {
 		vehiclePosition := entity.GetVehicle()
-		trip := vehiclePosition.GetTrip()
-		tripID := trip.GetTripId()
+		tripUpdate := entity.GetTripUpdate()
 
-		recordedAtTime := time.Unix(int64(*vehiclePosition.Timestamp), 0)
+		var trip *gtfs.TripDescriptor
+		var recordedAtTime time.Time
+
+		if vehiclePosition != nil {
+			trip = vehiclePosition.GetTrip()
+			recordedAtTime = time.Unix(int64(*vehiclePosition.Timestamp), 0)
+		} else {
+			recordedAtTime = time.Now()
+		}
+		if tripUpdate != nil {
+			trip = tripUpdate.GetTrip()
+		}
+
+		tripID := trip.GetTripId()
 
 		if tripID != "" {
 			withTripID += 1
@@ -71,18 +84,37 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					"LinkedDataset": dataset.LinkedDataset,
 				},
 				SourceType: "GTFS-RT",
-				Location: ctdf.Location{
+				Timeframe:  timeframe,
+				DataSource: datasource,
+				RecordedAt: recordedAtTime,
+			}
+
+			if vehiclePosition != nil {
+				locationEvent.Location = ctdf.Location{
 					Type: "Point",
 					Coordinates: []float64{
 						float64(vehiclePosition.Position.GetLongitude()),
 						float64(vehiclePosition.Position.GetLatitude()),
 					},
-				},
-				Bearing:           float64(vehiclePosition.Position.GetBearing()),
-				VehicleIdentifier: vehiclePosition.Vehicle.GetId(),
-				Timeframe:         timeframe,
-				DataSource:        datasource,
-				RecordedAt:        recordedAtTime,
+				}
+
+				locationEvent.Bearing = float64(vehiclePosition.Position.GetBearing())
+				locationEvent.VehicleIdentifier = vehiclePosition.Vehicle.GetId()
+
+				withLocation += 1
+			}
+
+			if tripUpdate != nil {
+				for _, stopTimeUpdate := range tripUpdate.GetStopTimeUpdate() {
+					locationEvent.StopUpdates = append(locationEvent.StopUpdates, vehicletracker.VehicleLocationEventStopUpdate{
+						StopID:        stopTimeUpdate.GetStopId(),
+						ArrivalTime:   time.Unix(stopTimeUpdate.GetArrival().GetTime(), 0),
+						DepartureTime: time.Unix(stopTimeUpdate.GetDeparture().GetTime(), 0),
+						Offset:        0, // TODO fill in
+					})
+				}
+
+				withTripUpdate += 1
 			}
 
 			locationEventJson, _ := json.Marshal(locationEvent)
@@ -92,8 +124,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		}
 	}
 
-	pretty.Println(withTripID, len(feed.Entity))
-	log.Info().Int("withtrip", withTripID).Int("total", len(feed.Entity)).Msg("Submitted vehicle locations")
+	log.Info().
+		Int("withtrip", withTripID).
+		Int("withlocation", withLocation).
+		Int("withtripupdate", withTripUpdate).
+		Int("total", len(feed.Entity)).
+		Msg("Submitted vehicle updates")
 
 	return nil
 }
