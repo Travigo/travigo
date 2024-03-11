@@ -276,7 +276,6 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			JourneyRunDate:         journeyDate,
 
 			CreationDateTime: currentTime,
-			DataSource:       vehicleLocationEvent.DataSource,
 
 			VehicleRef: vehicleLocationEvent.VehicleIdentifier,
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
@@ -556,6 +555,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
 		"offset":               offset,
 		"occupancy":            realtimeJourney.Occupancy,
+		"datasource":           vehicleLocationEvent.DataSource,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
 	if newRealtimeJourney {
@@ -567,7 +567,6 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-		updateMap["datasource"] = realtimeJourney.DataSource
 
 		updateMap["vehicleref"] = vehicleLocationEvent.VehicleIdentifier
 	}

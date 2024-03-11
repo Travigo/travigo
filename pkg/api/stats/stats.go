@@ -34,6 +34,7 @@ type RecordsStatsActiveRealtimeJourneys struct {
 
 	TransportTypes map[ctdf.TransportType]int
 	Features       map[string]int
+	Datasources    map[string]int
 }
 type recordStatsElasticEvent struct {
 	Stats *RecordsStats
@@ -85,6 +86,7 @@ func UpdateRecordsStats() {
 		var numberActiveRealtimeJourneysNotActivelyTracked int64
 		transportTypes := map[ctdf.TransportType]int{}
 		features := map[string]int{}
+		datasources := map[string]int{}
 
 		realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 		startTime = time.Now()
@@ -123,8 +125,9 @@ func UpdateRecordsStats() {
 					bson.E{Key: "timeoutdurationminutes", Value: 1},
 					bson.E{Key: "modificationdatetime", Value: 1},
 					bson.E{Key: "reliability", Value: 1},
+					bson.E{Key: "datasource.datasetid", Value: 1},
 					bson.E{Key: "journey.serviceref", Value: 1},
-					bson.E{Key: "vehiclelocation", Value: 1},
+					// bson.E{Key: "vehiclelocation", Value: 1},
 					bson.E{Key: "journey.path.destinationstopref", Value: 1},
 					bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
 					bson.E{Key: "occupancy.occupancyavailable", Value: 1},
@@ -160,6 +163,8 @@ func UpdateRecordsStats() {
 						transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
 					}
 
+					datasources[realtimeJourney.DataSource.DatasetID] += 1
+
 					// Features
 					if realtimeJourney.Occupancy.OccupancyAvailable {
 						features["Occupancy"] += 1
@@ -184,6 +189,7 @@ func UpdateRecordsStats() {
 		CurrentRecordsStats.ActiveRealtimeJourneys.ExternalProvided = numberActiveRealtimeJourneysExternal
 		CurrentRecordsStats.ActiveRealtimeJourneys.TransportTypes = transportTypes
 		CurrentRecordsStats.ActiveRealtimeJourneys.Features = features
+		CurrentRecordsStats.ActiveRealtimeJourneys.Datasources = datasources
 		CurrentRecordsStats.ActiveRealtimeJourneys.NotActivelyTracked = numberActiveRealtimeJourneysNotActivelyTracked
 
 		numberServiceAlerts := 0
