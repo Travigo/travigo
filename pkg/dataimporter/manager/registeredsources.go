@@ -220,6 +220,46 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				r.Header.Set("x-api-key", env["TRAVIGO_IE_NATIONALTRANSPORT_API_KEY"])
 			},
 		},
+		{
+			Identifier: "us-nyc-subway-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "Metropolitan Transportation Authority",
+				Website: "https://mta.info",
+			},
+			Source:       "http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+		},
+		{
+			Identifier: "us-nyc-subway-relatime-1-2-3-4-5-6-7",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Metropolitan Transportation Authority",
+				Website: "https://mta.info",
+			},
+			Source:       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct/gtfs",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "us-nyc-subway-schedule",
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_US_NYC_MTA_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_US_NYC_MTA_API_KEY must be set")
+				}
+
+				r.Header.Set("x-api-key", env["TRAVIGO_US_NYC_MTA_API_KEY"])
+			},
+		},
 	}
 }
 
