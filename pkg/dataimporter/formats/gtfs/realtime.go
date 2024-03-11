@@ -107,12 +107,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			if tripUpdate != nil {
 				for _, stopTimeUpdate := range tripUpdate.GetStopTimeUpdate() {
 					locationEvent.StopUpdates = append(locationEvent.StopUpdates, vehicletracker.VehicleLocationEventStopUpdate{
-						StopID:        stopTimeUpdate.GetStopId(),
-						ArrivalTime:   time.Unix(stopTimeUpdate.GetArrival().GetTime(), 0),
-						DepartureTime: time.Unix(stopTimeUpdate.GetDeparture().GetTime(), 0),
-						Offset:        0, // TODO fill in
+						StopID:          fmt.Sprintf("%s-stop-%s", dataset.LinkedDataset, stopTimeUpdate.GetStopId()),
+						ArrivalTime:     time.Unix(stopTimeUpdate.GetArrival().GetTime(), 0),
+						DepartureTime:   time.Unix(stopTimeUpdate.GetDeparture().GetTime(), 0),
+						ArrivalOffset:   int(stopTimeUpdate.GetArrival().GetDelay()),
+						DepartureOffset: int(stopTimeUpdate.GetDeparture().GetDelay()),
 					})
 				}
+
+				locationEvent.VehicleIdentifier = tripUpdate.Vehicle.GetId()
 
 				withTripUpdate += 1
 			}

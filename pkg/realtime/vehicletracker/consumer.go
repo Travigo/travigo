@@ -290,149 +290,214 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		return nil, nil
 	}
 
-	closestDistance := 999999999999.0
-	var closestDistanceJourneyPath *ctdf.JourneyPathItem
-	var closestDistanceJourneyPathIndex int
-	var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
+	var offset time.Duration
+	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
+	var closestDistanceJourneyPath *ctdf.JourneyPathItem // TODO maybe not here?
 
-	// Attempt to calculate using closest journey track
-	for i, journeyPathItem := range realtimeJourney.Journey.Path {
-		journeyPathClosestDistance := 99999999999999.0 // TODO do this better
+	// Calculate everything based on location if we aren't provided with updates
+	if len(vehicleLocationEvent.StopUpdates) == 0 && vehicleLocationEvent.Location.Type == "Point" {
+		closestDistance := 999999999999.0
+		var closestDistanceJourneyPathIndex int
+		var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
 
-		for i := 0; i < len(journeyPathItem.Track)-1; i++ {
-			a := journeyPathItem.Track[i]
-			b := journeyPathItem.Track[i+1]
-
-			distance := vehicleLocationEvent.Location.DistanceFromLine(a, b)
-
-			if distance < journeyPathClosestDistance {
-				journeyPathClosestDistance = distance
-			}
-		}
-
-		if journeyPathClosestDistance < closestDistance {
-			closestDistance = journeyPathClosestDistance
-			closestDistanceJourneyPath = journeyPathItem
-			closestDistanceJourneyPathIndex = i
-
-			// TODO: this is a hack, replace with actual distance
-			// this is a rough estimation based on what part of path item track we are on
-			closestDistanceJourneyPathPercentComplete = float64(i) / float64(len(journeyPathItem.Track))
-		}
-	}
-
-	// If we fail to identify closest journey path item using track use fallback stop location method
-	if closestDistanceJourneyPath == nil {
-		closestDistance = 999999999999.0
+		// Attempt to calculate using closest journey track
 		for i, journeyPathItem := range realtimeJourney.Journey.Path {
-			if journeyPathItem.DestinationStop == nil {
-				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
+			journeyPathClosestDistance := 99999999999999.0 // TODO do this better
+
+			for i := 0; i < len(journeyPathItem.Track)-1; i++ {
+				a := journeyPathItem.Track[i]
+				b := journeyPathItem.Track[i+1]
+
+				distance := vehicleLocationEvent.Location.DistanceFromLine(a, b)
+
+				if distance < journeyPathClosestDistance {
+					journeyPathClosestDistance = distance
+				}
 			}
 
-			distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
-
-			if distance < closestDistance {
-				closestDistance = distance
+			if journeyPathClosestDistance < closestDistance {
+				closestDistance = journeyPathClosestDistance
 				closestDistanceJourneyPath = journeyPathItem
 				closestDistanceJourneyPathIndex = i
+
+				// TODO: this is a hack, replace with actual distance
+				// this is a rough estimation based on what part of path item track we are on
+				closestDistanceJourneyPathPercentComplete = float64(i) / float64(len(journeyPathItem.Track))
 			}
 		}
 
-		if closestDistanceJourneyPathIndex == 0 {
-			// TODO this seems a bit hacky but I dont think we care much if we're on the first item
-			closestDistanceJourneyPathPercentComplete = 0.5
-		} else {
-			previousJourneyPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
+		// If we fail to identify closest journey path item using track use fallback stop location method
+		if closestDistanceJourneyPath == nil {
+			closestDistance = 999999999999.0
+			for i, journeyPathItem := range realtimeJourney.Journey.Path {
+				if journeyPathItem.DestinationStop == nil {
+					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
+				}
 
-			if previousJourneyPath.DestinationStop == nil {
-				return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
+				distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
+
+				if distance < closestDistance {
+					closestDistance = distance
+					closestDistanceJourneyPath = journeyPathItem
+					closestDistanceJourneyPathIndex = i
+				}
 			}
 
-			previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
-
-			closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
-		}
-
-		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
-	} else {
-		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
-	}
-
-	// Calculate new stop arrival times
-	realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to parse realtime time frame")
-	}
-
-	if closestDistanceJourneyPath == nil {
-		return nil, errors.New("nil closestdistancejourneypath")
-	}
-
-	// Get the arrival & departure times with date of the journey
-	destinationArrivalTimeWithDate := time.Date(
-		realtimeTimeframe.Year(),
-		realtimeTimeframe.Month(),
-		realtimeTimeframe.Day(),
-		closestDistanceJourneyPath.DestinationArrivalTime.Hour(),
-		closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
-		closestDistanceJourneyPath.DestinationArrivalTime.Second(),
-		closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
-		time.Local,
-	)
-	originDepartureTimeWithDate := time.Date(
-		realtimeTimeframe.Year(),
-		realtimeTimeframe.Month(),
-		realtimeTimeframe.Day(),
-		closestDistanceJourneyPath.OriginDepartureTime.Hour(),
-		closestDistanceJourneyPath.OriginDepartureTime.Minute(),
-		closestDistanceJourneyPath.OriginDepartureTime.Second(),
-		closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
-		time.Local,
-	)
-
-	// How long it take to travel between origin & destination
-	currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
-
-	// How far we are between origin & departure (% of journey path, NOT time or metres)
-	// TODO: this is a hack, replace with actual distance
-	currentPathPercentageComplete := closestDistanceJourneyPathPercentComplete
-
-	// Calculate what the expected time of the current position of the vehicle should be
-	currentPathPositionExpectedTime := originDepartureTimeWithDate.Add(
-		time.Duration(int(currentPathPercentageComplete * float64(currentPathTraversalTime.Nanoseconds()))))
-
-	// Offset is how far behind or ahead the vehicle is from its positions expected time
-	offset := currentTime.Sub(currentPathPositionExpectedTime)
-
-	// If the offset is too small then just turn it to zero so we can mark buses as on time
-	if offset.Seconds() <= 45 {
-		offset = time.Duration(0)
-	}
-
-	// Calculate all the estimated stop arrival & departure times
-	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
-	for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
-		path := realtimeJourney.Journey.Path[i]
-
-		arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
-		var departureTime time.Time
-
-		if i < len(realtimeJourney.Journey.Path)-1 {
-			nextPath := realtimeJourney.Journey.Path[i+1]
-
-			if arrivalTime.Before(nextPath.OriginDepartureTime) {
-				departureTime = nextPath.OriginDepartureTime
+			if closestDistanceJourneyPathIndex == 0 {
+				// TODO this seems a bit hacky but I dont think we care much if we're on the first item
+				closestDistanceJourneyPathPercentComplete = 0.5
 			} else {
-				departureTime = arrivalTime
+				previousJourneyPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
+
+				if previousJourneyPath.DestinationStop == nil {
+					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
+				}
+
+				previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
+
+				closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
+			}
+
+			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
+		} else {
+			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
+		}
+
+		// Calculate new stop arrival times
+		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to parse realtime time frame")
+		}
+
+		if closestDistanceJourneyPath == nil {
+			return nil, errors.New("nil closestdistancejourneypath")
+		}
+
+		// Get the arrival & departure times with date of the journey
+		destinationArrivalTimeWithDate := time.Date(
+			realtimeTimeframe.Year(),
+			realtimeTimeframe.Month(),
+			realtimeTimeframe.Day(),
+			closestDistanceJourneyPath.DestinationArrivalTime.Hour(),
+			closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
+			closestDistanceJourneyPath.DestinationArrivalTime.Second(),
+			closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
+			time.Local,
+		)
+		originDepartureTimeWithDate := time.Date(
+			realtimeTimeframe.Year(),
+			realtimeTimeframe.Month(),
+			realtimeTimeframe.Day(),
+			closestDistanceJourneyPath.OriginDepartureTime.Hour(),
+			closestDistanceJourneyPath.OriginDepartureTime.Minute(),
+			closestDistanceJourneyPath.OriginDepartureTime.Second(),
+			closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
+			time.Local,
+		)
+
+		// How long it take to travel between origin & destination
+		currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
+
+		// How far we are between origin & departure (% of journey path, NOT time or metres)
+		// TODO: this is a hack, replace with actual distance
+		currentPathPercentageComplete := closestDistanceJourneyPathPercentComplete
+
+		// Calculate what the expected time of the current position of the vehicle should be
+		currentPathPositionExpectedTime := originDepartureTimeWithDate.Add(
+			time.Duration(int(currentPathPercentageComplete * float64(currentPathTraversalTime.Nanoseconds()))))
+
+		// Offset is how far behind or ahead the vehicle is from its positions expected time
+		offset = currentTime.Sub(currentPathPositionExpectedTime)
+
+		// If the offset is too small then just turn it to zero so we can mark buses as on time
+		if offset.Seconds() <= 45 {
+			offset = time.Duration(0)
+		}
+
+		// Calculate all the estimated stop arrival & departure times
+		for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
+			path := realtimeJourney.Journey.Path[i]
+
+			arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
+			var departureTime time.Time
+
+			if i < len(realtimeJourney.Journey.Path)-1 {
+				nextPath := realtimeJourney.Journey.Path[i+1]
+
+				if arrivalTime.Before(nextPath.OriginDepartureTime) {
+					departureTime = nextPath.OriginDepartureTime
+				} else {
+					departureTime = arrivalTime
+				}
+			}
+
+			journeyStopUpdates[path.DestinationStopRef] = &ctdf.RealtimeJourneyStops{
+				StopRef:  path.DestinationStopRef,
+				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+
+				ArrivalTime:   arrivalTime,
+				DepartureTime: departureTime,
+			}
+		}
+	} else {
+		for _, stopUpdate := range vehicleLocationEvent.StopUpdates {
+			arrivalTime := stopUpdate.ArrivalTime
+			departureTime := stopUpdate.DepartureTime
+
+			if arrivalTime.Year() == 1970 {
+				for _, path := range realtimeJourney.Journey.Path {
+					if path.OriginStopRef == stopUpdate.StopID {
+						arrivalTime = path.OriginArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
+						break
+					}
+				}
+			}
+			if departureTime.Year() == 1970 {
+				for _, path := range realtimeJourney.Journey.Path {
+					if path.OriginStopRef == stopUpdate.StopID {
+						departureTime = path.OriginDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
+						break
+					}
+				}
+			}
+
+			journeyStopUpdates[stopUpdate.StopID] = &ctdf.RealtimeJourneyStops{
+				StopRef:  stopUpdate.StopID,
+				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+
+				ArrivalTime:   arrivalTime,
+				DepartureTime: departureTime,
 			}
 		}
 
-		journeyStopUpdates[path.DestinationStopRef] = &ctdf.RealtimeJourneyStops{
-			StopRef:  path.DestinationStopRef,
-			TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+		closestPathTime := 9999999 * time.Minute
+		now := time.Now()
+		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to parse realtime time frame")
+		}
+		for _, path := range realtimeJourney.Journey.Path {
+			refTime := time.Date(
+				realtimeTimeframe.Year(),
+				realtimeTimeframe.Month(),
+				realtimeTimeframe.Day(),
+				path.OriginArrivalTime.Hour(),
+				path.OriginArrivalTime.Minute(),
+				path.OriginArrivalTime.Second(),
+				path.OriginArrivalTime.Nanosecond(),
+				time.Local,
+			)
 
-			ArrivalTime:   arrivalTime,
-			DepartureTime: departureTime,
+			if journeyStopUpdates[path.OriginStopRef] != nil {
+				refTime = journeyStopUpdates[path.OriginStopRef].ArrivalTime
+			}
+
+			// pretty.Println(refTime)
+			if refTime.Before(now) && now.Sub(refTime) < closestPathTime {
+				closestDistanceJourneyPath = path
+
+				closestPathTime = now.Sub(refTime)
+			}
 		}
 	}
 
@@ -476,6 +541,10 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 40
 	// 	}
 	// }
+
+	if closestDistanceJourneyPath == nil {
+		return nil, nil
+	}
 
 	// Update database
 	updateMap := bson.M{

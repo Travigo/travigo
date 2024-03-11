@@ -30,5 +30,6 @@ type VehicleLocationEventStopUpdate struct {
 	ArrivalTime   time.Time
 	DepartureTime time.Time
 
-	Offset int
+	ArrivalOffset   int
+	DepartureOffset int
 }

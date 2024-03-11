@@ -213,9 +213,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	for _, gtfsRoute := range g.Routes {
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, gtfsRoute.ID)
 
-		serviceName := gtfsRoute.LongName
+		serviceName := gtfsRoute.ShortName
 		if serviceName == "" {
-			serviceName = gtfsRoute.ShortName
+			serviceName = gtfsRoute.LongName
 		}
 
 		operatorRef := agencyNOCMapping[gtfsRoute.AgencyID]

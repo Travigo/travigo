@@ -17,6 +17,9 @@ elasticsearch:
 bods:
   apiKeySecret: travigo-bods-api
 
+ie_nationaltransport:
+  apiKeySecret: travigo-ie-nationaltransport-api
+
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials
@@ -62,6 +65,8 @@ deployments:
   #   args: ["data-importer", "file", "--repeat-every", "10s", "--file-format", "zip", "siri-vm", "https://data.bus-data.dft.gov.uk/avl/download/sirivm_tfl"]
   - name: gb-bods-gtfs-rt
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
+  - name: ie-gtfs-realtime
+    args: ["data-importer", "dataset", "--id", "ie-gtfs-realtime", "--repeat-every", "60s"]
 
 resources: {}
 podAnnotations: {}
