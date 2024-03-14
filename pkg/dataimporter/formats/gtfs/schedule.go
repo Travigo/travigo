@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gocarina/gocsv"
@@ -349,9 +351,18 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			previousSequenceID := sequenceIDs[index-1]
 			previousStopTime := tripSequencyMap[previousSequenceID]
 
-			originArrivalTime, _ := time.Parse("15:04:05", previousStopTime.ArrivalTime)
-			originDeparturelTime, _ := time.Parse("15:04:05", previousStopTime.DepartureTime)
-			destinationArrivalTime, _ := time.Parse("15:04:05", stopTime.ArrivalTime)
+			originArrivalTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.ArrivalTime))
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to parse previousStopTime.ArrivalTime")
+			}
+			originDeparturelTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.DepartureTime))
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to parse previousStopTime.DepartureTime")
+			}
+			destinationArrivalTime, err := time.Parse("15:04:05", fixTimestamp(stopTime.ArrivalTime))
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to parse stopTime.ArrivalTime")
+			}
 
 			var originStopRef string
 			var destinationStopRef string
@@ -430,6 +441,27 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	return nil
+}
+
+func fixTimestamp(timestamp string) string {
+	splitTimestamp := strings.Split(timestamp, ":")
+
+	if len(splitTimestamp) != 3 {
+		return timestamp
+	}
+
+	hour, err := strconv.Atoi(splitTimestamp[0])
+	if err != nil {
+		return timestamp
+	}
+
+	if hour >= 24 {
+		splitTimestamp[0] = fmt.Sprintf("%d", hour%24)
+
+		return strings.Join(splitTimestamp, ":")
+	} else {
+		return timestamp
+	}
 }
 
 /////// THE DEAD ZONE ////////

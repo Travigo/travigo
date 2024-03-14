@@ -57,6 +57,10 @@ cronjobs:
     schedule: "0 8 * * *"
     args: ["data-importer", "dataset", "--id", "us-nyc-subway-schedule"]
     batchburst: true
+  - name: fr-ilevia-lille-gtfs-schedule
+    schedule: "0 8 * * *"
+    args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-schedule"]
+    batchburst: true
   - name: temp-indexer-stops
     schedule: "50 3 * * 6"
     args: [ "indexer", "stops" ]
@@ -69,6 +73,8 @@ deployments:
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
   - name: ie-gtfs-realtime
     args: ["data-importer", "dataset", "--id", "ie-gtfs-realtime", "--repeat-every", "60s"]
+  - name: ie-gtfs-realtime
+    args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "60s"]
   # - name: us-nyc-subway-realtime-numbers
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-relatime-1-2-3-4-5-6-7", "--repeat-every", "60s"]
 

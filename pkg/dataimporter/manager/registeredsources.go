@@ -236,29 +236,107 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Journeys:  true,
 			},
 		},
+		// {
+		// 	Identifier: "us-nyc-subway-relatime-1-2-3-4-5-6-7",
+		// 	Format:     datasets.DataSetFormatGTFSRealtime,
+		// 	Provider: datasets.Provider{
+		// 		Name:    "Metropolitan Transportation Authority",
+		// 		Website: "https://mta.info",
+		// 	},
+		// 	Source:       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
+		// 	UnpackBundle: datasets.BundleFormatNone,
+		// 	SupportedObjects: datasets.SupportedObjects{
+		// 		RealtimeJourneys: true,
+		// 	},
+		// 	ImportDestination: datasets.ImportDestinationRealtimeQueue,
+		// 	LinkedDataset:     "us-nyc-subway-schedule",
+
+		// 	DownloadHandler: func(r *http.Request) {
+		// 		env := util.GetEnvironmentVariables()
+		// 		if env["TRAVIGO_US_NYC_MTA_API_KEY"] == "" {
+		// 			log.Fatal().Msg("TRAVIGO_US_NYC_MTA_API_KEY must be set")
+		// 		}
+
+		// 		r.Header.Set("x-api-key", env["TRAVIGO_US_NYC_MTA_API_KEY"])
+		// 	},
+		// },
 		{
-			Identifier: "us-nyc-subway-relatime-1-2-3-4-5-6-7",
+			Identifier: "eu-flixbus-gtfs-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "FlixBus",
+				Website: "https://global.flixbus.com",
+			},
+			Source:       "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+		},
+		{
+			Identifier: "us-bart-gtfs-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "BART",
+				Website: "http://www.bart.gov",
+			},
+			Source:       "https://www.bart.gov/dev/schedules/google_transit.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+		},
+		{
+			Identifier: "us-bart-gtfs-realtime",
 			Format:     datasets.DataSetFormatGTFSRealtime,
 			Provider: datasets.Provider{
-				Name:    "Metropolitan Transportation Authority",
-				Website: "https://mta.info",
+				Name:    "BART",
+				Website: "http://www.bart.gov",
 			},
-			Source:       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct/gtfs",
+			Source:       "https://api.bart.gov/gtfsrt/tripupdate.aspx", // https://api.bart.gov/gtfsrt/alerts.aspx
 			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: datasets.SupportedObjects{
 				RealtimeJourneys: true,
 			},
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "us-nyc-subway-schedule",
-
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_US_NYC_MTA_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_US_NYC_MTA_API_KEY must be set")
-				}
-
-				r.Header.Set("x-api-key", env["TRAVIGO_US_NYC_MTA_API_KEY"])
+			LinkedDataset:     "us-bart-gtfs-schedule",
+		},
+		{
+			Identifier: "fr-ilevia-lille-gtfs-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "Ilévia",
+				Website: "http://www.ilevia.fr",
 			},
+			Source:       "https://opendata.lillemetropole.fr/api/datasets/1.0/transport_arret_transpole-point/alternative_exports/gtfszip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+		},
+		{
+			Identifier: "fr-ilevia-lille-gtfs-realtime",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Ilévia",
+				Website: "http://www.ilevia.fr",
+			},
+			Source:       "https://proxy.transport.data.gouv.fr/resource/ilevia-lille-gtfs-rt",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "fr-ilevia-lille-gtfs-schedule",
 		},
 	}
 }

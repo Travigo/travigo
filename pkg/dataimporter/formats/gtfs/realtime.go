@@ -70,10 +70,22 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		tripID := trip.GetTripId()
 
+		// pretty.Println(entity)
+
 		if tripID != "" {
 			withTripID += 1
 
-			timeFrameDateTime, _ := time.Parse("20060102", *trip.StartDate)
+			var timeFrameDateTime time.Time
+
+			if trip.StartDate == nil {
+				timeFrameDateTime = time.Now()
+			} else {
+				timeFrameDateTime, err = time.Parse("20060102", *trip.StartDate)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to parse start date")
+				}
+			}
+
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
 			locationEvent := vehicletracker.VehicleLocationEvent{
