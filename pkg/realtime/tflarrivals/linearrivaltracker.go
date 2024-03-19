@@ -350,9 +350,17 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		for i := 1; i < len(potentialOrderLineRouteMatches[0].NaptanIDs); i++ {
 			originTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i-1]
 			originStop := getStopFromTfLStop(originTfLID)
+			if originStop == nil {
+				log.Error().Str("naptanid", originTfLID).Msg("Could not find stop for tfl stop")
+				continue
+			}
 
 			destinationTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i]
 			destinationStop := getStopFromTfLStop(destinationTfLID)
+			if destinationStop == nil {
+				log.Error().Str("naptanid", destinationTfLID).Msg("Could not find stop for tfl stop")
+				continue
+			}
 
 			vehicleJourneyPath = append(vehicleJourneyPath, &ctdf.JourneyPathItem{
 				OriginStop:    originStop,
