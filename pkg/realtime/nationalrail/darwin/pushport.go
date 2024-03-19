@@ -247,6 +247,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			newRealtimeJourney = true
 		}
 
+		if realtimeJourney.Journey == nil {
+			log.Error().Str("id", realtimeJourney.PrimaryIdentifier).Msg("Realtime journey without journey - this should never happen :(")
+			continue
+		}
+
 		updateMap := bson.M{
 			"modificationdatetime": now,
 		}
