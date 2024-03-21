@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -28,6 +30,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func GetDataset(identifier string) (datasets.DataSet, error) {
@@ -49,7 +52,9 @@ func GetDataset(identifier string) (datasets.DataSet, error) {
 	return datasets.DataSet{}, errors.New("Dataset could not be found")
 }
 
-func ImportDataset(dataset *datasets.DataSet) error {
+func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
+	datasetVersionCollection := database.GetCollection("dataset_versions")
+
 	var format formats.Format
 
 	switch dataset.Format {
@@ -104,6 +109,26 @@ func ImportDataset(dataset *datasets.DataSet) error {
 		defer os.Remove(tempFile.Name())
 	}
 
+	// Calculate the hash of the file
+	f, err := os.Open(source)
+	defer f.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		log.Error().Err(err).Msg("Calculating hash")
+	}
+	sourceFileHash := hex.EncodeToString(hash.Sum(nil))
+
+	// Check if the file hasn't changed
+	var existingDatasetVersion *ctdf.DatasetVersion
+	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
+
+	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport {
+		log.Info().Str("dataset", dataset.Identifier).Msg("File is not new, skipping processing")
+		return nil
+	}
+
+	// Parse the file
 	sourceFileReaders := []io.Reader{}
 
 	file, err := os.Open(source)
@@ -171,6 +196,18 @@ func ImportDataset(dataset *datasets.DataSet) error {
 	}
 	if dataset.SupportedObjects.Journeys {
 		cleanupOldRecords("journeys", datasource)
+	}
+
+	// Update dataset version
+	if dataset.ImportDestination != datasets.ImportDestinationRealtimeQueue {
+		datasetVersion := ctdf.DatasetVersion{
+			Dataset:      dataset.Identifier,
+			Hash:         sourceFileHash,
+			LastModified: time.Now(),
+		}
+
+		opts := options.Update().SetUpsert(true)
+		_, err = datasetVersionCollection.UpdateOne(context.Background(), bson.M{"dataset": datasetVersion.Dataset}, bson.M{"$set": datasetVersion}, opts)
 	}
 
 	return nil

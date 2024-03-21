@@ -34,6 +34,10 @@ func RegisterCLI() *cli.Command {
 						Usage:    "Repeat this file import every X seconds",
 						Required: false,
 					},
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "Force the import of the dataset",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -45,6 +49,7 @@ func RegisterCLI() *cli.Command {
 					insertrecords.Insert()
 
 					datasetid := c.String("id")
+					forceImport := c.Bool("force")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
@@ -66,7 +71,7 @@ func RegisterCLI() *cli.Command {
 					for {
 						startTime := time.Now()
 
-						err := manager.ImportDataset(&dataset)
+						err := manager.ImportDataset(&dataset, forceImport)
 
 						if err != nil {
 							return err

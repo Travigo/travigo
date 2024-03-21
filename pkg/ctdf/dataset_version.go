@@ -1,7 +1,9 @@
 package ctdf
 
+import "time"
+
 type DatasetVersion struct {
 	Dataset      string
-	Identifier   string
-	LastModified string
+	Hash         string
+	LastModified time.Time
 }
