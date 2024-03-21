@@ -73,6 +73,7 @@ func (s *StompClient) Run() {
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
+			gzipDecoder.Close()
 
 			go pushPortData.UpdateRealtimeJourneys(queue)
 		}

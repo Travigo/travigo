@@ -34,9 +34,6 @@ type RealtimeJourney struct {
 	NextStopRef string `groups:"basic"`
 	NextStop    *Stop  `groups:"basic" bson:"-"`
 
-	NextStopArrival   time.Time `groups:"basic"`
-	NextStopDeparture time.Time `groups:"basic"`
-
 	Stops  map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 	Offset time.Duration                    `groups:"internal"`
 
