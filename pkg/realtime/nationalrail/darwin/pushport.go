@@ -78,7 +78,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
 				ActivelyTracked:        false,
-				TimeoutDurationMinutes: 90,
+				TimeoutDurationMinutes: 121,
 				CreationDateTime:       now,
 				Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
 
