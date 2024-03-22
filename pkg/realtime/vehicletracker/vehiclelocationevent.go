@@ -18,6 +18,8 @@ type VehicleLocationEvent struct {
 
 	StopUpdates []VehicleLocationEventStopUpdate
 
+	Occupancy ctdf.RealtimeJourneyOccupancy
+
 	VehicleIdentifier string
 
 	DataSource *ctdf.DataSource

@@ -500,47 +500,6 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		}
 	}
 
-	// TODO add back occupancy
-	// // Calculate occupancy
-	// if vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy != 0 {
-	// 	totalCapacity := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity
-	// 	totalOccupancy := vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy + vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy
-
-	// 	realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
-	// 		OccupancyAvailable: true,
-	// 		ActualValues:       true,
-
-	// 		Capacity:  totalCapacity,
-	// 		Occupancy: totalOccupancy,
-
-	// 		SeatedInformation: true,
-	// 		SeatedCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedCapacity,
-	// 		SeatedOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.SeatedOccupancy,
-
-	// 		WheelchairInformation: true,
-	// 		WheelchairCapacity:    vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairCapacity,
-	// 		WheelchairOccupancy:   vehicleLocationEvent.SiriVMActivity.Extensions.VehicleJourney.WheelchairOccupancy,
-	// 	}
-
-	// 	if totalCapacity > 0 && totalOccupancy > 0 {
-	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
-	// 	}
-	// } else if vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy != "" {
-	// 	realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
-	// 		OccupancyAvailable: true,
-	// 		ActualValues:       false,
-	// 	}
-
-	// 	switch vehicleLocationEvent.SiriVMActivity.MonitoredVehicleJourney.Occupancy {
-	// 	case "full":
-	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 100
-	// 	case "standingAvailable":
-	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 75
-	// 	case "seatsAvailable":
-	// 		realtimeJourney.Occupancy.TotalPercentageOccupancy = 40
-	// 	}
-	// }
-
 	if closestDistanceJourneyPath == nil {
 		return nil, nil
 	}
@@ -554,7 +513,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
 		"offset":               offset,
-		"occupancy":            realtimeJourney.Occupancy,
+		"occupancy":            vehicleLocationEvent.Occupancy,
 		"datasource":           vehicleLocationEvent.DataSource,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}

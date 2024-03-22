@@ -103,6 +103,46 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 		RecordedAt:        recordedAtTime,
 	}
 
+	// Calculate occupancy
+	if vehicle.Extensions.VehicleJourney.SeatedOccupancy != 0 {
+		totalCapacity := vehicle.Extensions.VehicleJourney.SeatedCapacity + vehicle.Extensions.VehicleJourney.WheelchairCapacity
+		totalOccupancy := vehicle.Extensions.VehicleJourney.SeatedOccupancy + vehicle.Extensions.VehicleJourney.WheelchairOccupancy
+
+		locationEvent.Occupancy = ctdf.RealtimeJourneyOccupancy{
+			OccupancyAvailable: true,
+			ActualValues:       true,
+
+			Capacity:  totalCapacity,
+			Occupancy: totalOccupancy,
+
+			SeatedInformation: true,
+			SeatedCapacity:    vehicle.Extensions.VehicleJourney.SeatedCapacity,
+			SeatedOccupancy:   vehicle.Extensions.VehicleJourney.SeatedOccupancy,
+
+			WheelchairInformation: true,
+			WheelchairCapacity:    vehicle.Extensions.VehicleJourney.WheelchairCapacity,
+			WheelchairOccupancy:   vehicle.Extensions.VehicleJourney.WheelchairOccupancy,
+		}
+
+		if totalCapacity > 0 && totalOccupancy > 0 {
+			locationEvent.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
+		}
+	} else if vehicle.MonitoredVehicleJourney.Occupancy != "" {
+		locationEvent.Occupancy = ctdf.RealtimeJourneyOccupancy{
+			OccupancyAvailable: true,
+			ActualValues:       false,
+		}
+
+		switch vehicle.MonitoredVehicleJourney.Occupancy {
+		case "full":
+			locationEvent.Occupancy.TotalPercentageOccupancy = 100
+		case "standingAvailable":
+			locationEvent.Occupancy.TotalPercentageOccupancy = 75
+		case "seatsAvailable":
+			locationEvent.Occupancy.TotalPercentageOccupancy = 40
+		}
+	}
+
 	locationEventJson, _ := json.Marshal(locationEvent)
 
 	queue.PublishBytes(locationEventJson)
