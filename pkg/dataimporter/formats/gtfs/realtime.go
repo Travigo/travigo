@@ -102,7 +102,10 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 			if vehiclePosition != nil {
 				if vehiclePosition.OccupancyPercentage != nil {
-					pretty.Println(vehiclePosition.OccupancyPercentage)
+					locationEvent.Occupancy.OccupancyAvailable = true
+					locationEvent.Occupancy.ActualValues = true
+
+					locationEvent.Occupancy.TotalPercentageOccupancy = int(vehiclePosition.GetOccupancyPercentage())
 				}
 
 				if vehiclePosition.OccupancyStatus != nil {
