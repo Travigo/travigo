@@ -9,6 +9,7 @@ import (
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 	"github.com/adjust/rmq/v5"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
@@ -70,8 +71,6 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		tripID := trip.GetTripId()
 
-		// pretty.Println(entity)
-
 		if tripID != "" {
 			withTripID += 1
 
@@ -102,6 +101,44 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			}
 
 			if vehiclePosition != nil {
+				if vehiclePosition.OccupancyPercentage != nil {
+					pretty.Println(vehiclePosition.OccupancyPercentage)
+				}
+
+				if vehiclePosition.OccupancyStatus != nil {
+					switch vehiclePosition.GetOccupancyStatus() {
+					case gtfs.VehiclePosition_EMPTY:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 0
+					case gtfs.VehiclePosition_MANY_SEATS_AVAILABLE:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 30
+					case gtfs.VehiclePosition_FEW_SEATS_AVAILABLE:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 50
+					case gtfs.VehiclePosition_STANDING_ROOM_ONLY:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 70
+					case gtfs.VehiclePosition_CRUSHED_STANDING_ROOM_ONLY:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 80
+					case gtfs.VehiclePosition_FULL:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 90
+					case gtfs.VehiclePosition_NOT_ACCEPTING_PASSENGERS:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 100
+					case gtfs.VehiclePosition_NO_DATA_AVAILABLE:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 10
+					case gtfs.VehiclePosition_NOT_BOARDABLE:
+						locationEvent.Occupancy.TotalPercentageOccupancy = 100
+					}
+
+					locationEvent.Occupancy.OccupancyAvailable = true
+					locationEvent.Occupancy.ActualValues = false
+				}
+
+				if vehiclePosition.CongestionLevel != nil {
+					pretty.Println(vehiclePosition.CongestionLevel)
+				}
+
+				if len(vehiclePosition.MultiCarriageDetails) > 0 {
+					pretty.Println(vehiclePosition.MultiCarriageDetails)
+				}
+
 				locationEvent.Location = ctdf.Location{
 					Type: "Point",
 					Coordinates: []float64{
