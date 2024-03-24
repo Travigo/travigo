@@ -43,7 +43,7 @@ cronjobs:
     schedule: "0 3 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
   - name: networkrail-corpus
-    schedule: "30 3 * * 6"
+    schedule: "30 4 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
   - name: gb-bods-gtfs-timetable
     schedule: "20 6 * * *"
