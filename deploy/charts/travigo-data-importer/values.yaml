@@ -31,19 +31,19 @@ image:
 
 cronjobs:
   - name: travelinenoc
-    schedule: "0 2 * * 0"
+    schedule: "0 2 * * *"
     args: ["data-importer", "dataset", "--id", "gb-traveline-noc"]
   - name: nationalrail-toc
-    schedule: "10 2 * * 0"
+    schedule: "10 2 * * *"
     args: ["data-importer", "dataset", "--id", "gb-nationalrail-toc"]
   - name: nationalrail-timetable
     schedule: "15 5 * * *"
     args: ["data-importer", "dataset", "--id", "gb-nationalrail-timetable"]
   - name: naptan
-    schedule: "0 3 * * 6"
+    schedule: "0 3 * * *"
     args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
   - name: networkrail-corpus
-    schedule: "30 4 * * 6"
+    schedule: "30 4 * * *"
     args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
   - name: gb-bods-gtfs-timetable
     schedule: "20 6 * * *"
