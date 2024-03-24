@@ -40,10 +40,10 @@ cronjobs:
     schedule: "15 5 * * *"
     args: ["data-importer", "dataset", "--id", "gb-nationalrail-timetable"]
   - name: naptan
-    schedule: "0 3 * * *"
+    schedule: "0 3 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
   - name: networkrail-corpus
-    schedule: "30 4 * * *"
+    schedule: "30 4 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
   - name: gb-bods-gtfs-timetable
     schedule: "20 6 * * *"
