@@ -12,20 +12,3 @@ Data:
   Toilets: true
   PowerPlugs: true
   # USBPlugs: false
-  Carriages:
-  - ID: "1"
-    Class: "Standard"
-    Occupancy: -1
-  - ID: "2"
-    Class: "Standard"
-    Occupancy: -1
-    Toilets:
-    - Type: "Standard"
-  - ID: "3"
-    Class: "Standard"
-    Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
-  - ID: "4"
-    Class: "Standard"
-    Occupancy: -1
