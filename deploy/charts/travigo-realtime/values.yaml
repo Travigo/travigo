@@ -28,6 +28,8 @@ runner:
     requests:
       cpu: 200m
       memory: 150Mi
+    limits:
+      memory: 4Gbi
 
 image:
   repository: ghcr.io/travigo/travigo
