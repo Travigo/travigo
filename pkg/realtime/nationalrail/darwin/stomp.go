@@ -67,13 +67,12 @@ func (s *StompClient) Run() {
 				log.Fatal().Err(err).Msg("cannot decode gzip stream")
 				continue
 			}
-			defer gzipDecoder.Close()
 
 			pushPortData, err := ParseXMLFile(gzipDecoder)
+			gzipDecoder.Close()
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
-			gzipDecoder.Close()
 
 			go pushPortData.UpdateRealtimeJourneys(queue)
 		}
