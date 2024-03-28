@@ -95,11 +95,15 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		identifiedJourneyID := identifyVehicle(vehicleLocationEvent)
 
 		if identifiedJourneyID != "" {
-			writeModel, _ := updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
+			writeModel, err := updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
 
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
+			} else {
+				log.Debug().Err(err).Interface("event", vehicleLocationEvent.IdentifyingInformation).Msg("Couldnt update realtime journey")
 			}
+		} else {
+			log.Debug().Interface("event", vehicleLocationEvent.IdentifyingInformation).Msg("Couldnt identify journey")
 		}
 	}
 
@@ -286,7 +290,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 	if realtimeJourney.Journey == nil {
 		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
 		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
-		return nil, nil
+		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
 	}
 
 	var offset time.Duration
@@ -491,7 +495,6 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 				refTime = journeyStopUpdates[path.OriginStopRef].ArrivalTime
 			}
 
-			// pretty.Println(refTime)
 			if refTime.Before(now) && now.Sub(refTime) < closestPathTime {
 				closestDistanceJourneyPath = path
 
@@ -501,7 +504,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 	}
 
 	if closestDistanceJourneyPath == nil {
-		return nil, nil
+		return nil, errors.New("unable to find next journeypath")
 	}
 
 	// Update database
