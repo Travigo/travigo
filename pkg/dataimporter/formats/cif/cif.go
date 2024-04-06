@@ -524,6 +524,7 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		ServiceRef:         operatorRef,
 		OperatorRef:        operatorRef,
 		DepartureTime:      departureTime,
+		DepartureTimezone:  "Europe/London",
 		DestinationDisplay: destinationDisplay,
 		Availability:       availability,
 		Path:               path,

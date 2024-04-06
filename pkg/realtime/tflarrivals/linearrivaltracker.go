@@ -230,6 +230,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 				Service:    l.Line.Service,
 				ServiceRef: l.Line.Service.PrimaryIdentifier,
+
+				DepartureTimezone: "Europe/London",
 			},
 			JourneyRunDate: journeyDate,
 

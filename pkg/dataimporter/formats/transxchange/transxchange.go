@@ -476,6 +476,7 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 					OperatorRef:        operatorRef,
 					Direction:          txcJourney.Direction,
 					DepartureTime:      departureTime,
+					DepartureTimezone:  "Europe/London",
 					DestinationDisplay: destinationDisplay,
 
 					Availability: availability,

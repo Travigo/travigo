@@ -18,32 +18,34 @@ const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
 const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty"`
+	PrimaryIdentifier string            `groups:"basic" bson:",omitempty"`
+	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty" bson:",omitempty"`
 
-	CreationDateTime     time.Time `groups:"detailed"`
-	ModificationDateTime time.Time `groups:"detailed"`
+	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
+	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"detailed"`
+	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
 
-	ServiceRef string   `groups:"internal"`
+	ServiceRef string   `groups:"internal" bson:",omitempty"`
 	Service    *Service `groups:"basic" json:",omitempty" bson:"-"`
 
-	OperatorRef string    `groups:"internal"`
+	OperatorRef string    `groups:"internal" bson:",omitempty"`
 	Operator    *Operator `groups:"basic" json:",omitempty" bson:"-"`
 
-	Direction          string    `groups:"detailed" json:",omitempty"`
-	DepartureTime      time.Time `groups:"basic"`
-	DestinationDisplay string    `groups:"basic"`
+	Direction         string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
+	DepartureTime     time.Time `groups:"basic" bson:",omitempty"`
+	DepartureTimezone string    `groups:"basic" bson:",omitempty"`
 
-	Availability *Availability `groups:"internal"`
+	DestinationDisplay string `groups:"basic" bson:",omitempty"`
 
-	Path []*JourneyPathItem `groups:"detailed"`
+	Availability *Availability `groups:"internal" bson:",omitempty"`
 
-	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
+	Path []*JourneyPathItem `groups:"detailed" bson:",omitempty"`
+
+	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-" bson:",omitempty"`
 
 	// Detailed journey information
-	DetailedRailInformation *JourneyDetailedRail `groups:"detailed"`
+	DetailedRailInformation *JourneyDetailedRail `groups:"detailed" bson:",omitempty"`
 }
 
 func (j *Journey) GetReferences() {

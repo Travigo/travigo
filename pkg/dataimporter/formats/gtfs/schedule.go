@@ -112,7 +112,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	if dataset.SupportedObjects.Operators {
 		agenciesQueue.Process()
 	}
+	agenciesMap := map[string]*Agency{}
 	for _, gtfsAgency := range g.Agencies {
+		agenciesMap[gtfsAgency.ID] = &gtfsAgency
 		operatorID := fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsAgency.ID)
 		ctdfOperator := &ctdf.Operator{
 			PrimaryIdentifier:    operatorID,
@@ -212,7 +214,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	ctdfServices := map[string]*ctdf.Service{}
+	routeMap := map[string]Route{}
 	for _, gtfsRoute := range g.Routes {
+		routeMap[gtfsRoute.ID] = gtfsRoute
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, gtfsRoute.ID)
 
 		serviceName := gtfsRoute.ShortName
@@ -321,6 +325,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			OperatorRef:          ctdfServices[trip.RouteID].OperatorRef,
 			// Direction:            trip.DirectionID,
 			DestinationDisplay: trip.Headsign,
+			DepartureTimezone:  agenciesMap[routeMap[trip.RouteID].AgencyID].Timezone,
 			Availability:       availability,
 			Path:               []*ctdf.JourneyPathItem{},
 		}
