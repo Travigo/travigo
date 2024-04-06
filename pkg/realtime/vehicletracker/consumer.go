@@ -376,6 +376,8 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			return nil, errors.New("nil closestdistancejourneypath")
 		}
 
+		journeyTimezone, _ := time.LoadLocation(realtimeJourney.Journey.DepartureTimezone)
+
 		// Get the arrival & departure times with date of the journey
 		destinationArrivalTimeWithDate := time.Date(
 			realtimeTimeframe.Year(),
@@ -385,7 +387,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
 			closestDistanceJourneyPath.DestinationArrivalTime.Second(),
 			closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
-			time.Local,
+			journeyTimezone,
 		)
 		originDepartureTimeWithDate := time.Date(
 			realtimeTimeframe.Year(),
@@ -395,7 +397,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			closestDistanceJourneyPath.OriginDepartureTime.Minute(),
 			closestDistanceJourneyPath.OriginDepartureTime.Second(),
 			closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
-			time.Local,
+			journeyTimezone,
 		)
 
 		// How long it take to travel between origin & destination
