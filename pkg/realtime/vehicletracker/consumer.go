@@ -476,6 +476,9 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		closestPathTime := 9999999 * time.Minute
 		now := time.Now()
 		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+
+		journeyTimezone, _ := time.LoadLocation(realtimeJourney.Journey.DepartureTimezone)
+
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to parse realtime time frame")
 		}
@@ -488,7 +491,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 				path.OriginArrivalTime.Minute(),
 				path.OriginArrivalTime.Second(),
 				path.OriginArrivalTime.Nanosecond(),
-				time.Local,
+				journeyTimezone,
 			)
 
 			if journeyStopUpdates[path.OriginStopRef] != nil {
