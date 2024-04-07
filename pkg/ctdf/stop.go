@@ -19,6 +19,8 @@ type Stop struct {
 	OtherNames     map[string]string `groups:"basic"`
 	TransportTypes []TransportType   `groups:"detailed"`
 
+	Timezone string `groups:"basic"`
+
 	Location *Location `groups:"basic"`
 
 	Services []*Service `bson:"-" groups:"basic"`

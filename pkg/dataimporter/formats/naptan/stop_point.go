@@ -181,7 +181,8 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			Coordinates: []float64{orig.Location.Longitude, orig.Location.Latitude},
 		},
 
-		Active: orig.Status == "active",
+		Active:   orig.Status == "active",
+		Timezone: "Europe/London",
 	}
 
 	if orig.AtcoCode != "" {

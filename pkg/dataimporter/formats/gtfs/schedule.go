@@ -148,6 +148,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		stopsQueue.Process()
 	}
 	for _, gtfsStop := range g.Stops {
+		timezone := gtfsStop.Timezone
+
+		if timezone == "" {
+			timezone = g.Agencies[0].Timezone
+		}
+
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, gtfsStop.ID)
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier: stopID,
@@ -163,7 +169,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 				Type:        "Point",
 				Coordinates: []float64{gtfsStop.Longitude, gtfsStop.Latitude},
 			},
-			Active: true,
+			Active:   true,
+			Timezone: timezone,
 		}
 
 		if dataset.SupportedObjects.Stops {
