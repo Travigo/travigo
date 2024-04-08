@@ -157,7 +157,9 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 	var startDateTime time.Time
 	if startDateTimeString == "" {
-		startDateTime = time.Now()
+		stopTimezone, _ := time.LoadLocation(stop.Timezone)
+
+		startDateTime = time.Now().In(stopTimezone)
 	} else {
 		startDateTime, err = time.Parse(time.RFC3339, startDateTimeString)
 
