@@ -7,30 +7,30 @@ import (
 const GBStopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string            `groups:"basic" bson:",omitempty"`
+	OtherIdentifiers  map[string]string `groups:"basic" bson:",omitempty"`
 
-	CreationDateTime     time.Time `groups:"detailed"`
-	ModificationDateTime time.Time `groups:"detailed"`
+	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
+	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
-	PrimaryName    string            `groups:"basic"`
-	OtherNames     map[string]string `groups:"basic"`
-	TransportTypes []TransportType   `groups:"detailed"`
+	PrimaryName    string            `groups:"basic" bson:",omitempty"`
+	OtherNames     map[string]string `groups:"basic" bson:",omitempty"`
+	TransportTypes []TransportType   `groups:"detailed" bson:",omitempty"`
 
-	Timezone string `groups:"basic"`
+	Timezone string `groups:"basic" bson:",omitempty"`
 
-	Location *Location `groups:"basic"`
+	Location *Location `groups:"basic" bson:",omitempty"`
 
-	Services []*Service `bson:"-" groups:"basic"`
+	Services []*Service `bson:"-" groups:"basic" bson:",omitempty"`
 
-	Active bool `groups:"basic"`
+	Active bool `groups:"basic" bson:",omitempty"`
 
-	Associations []*StopAssociation `groups:"detailed"`
+	Associations []*StopAssociation `groups:"detailed" bson:",omitempty"`
 
-	Platforms []*StopPlatform `groups:"detailed"`
-	Entrances []*StopEntrance `groups:"detailed"`
+	Platforms []*StopPlatform `groups:"detailed" bson:",omitempty"`
+	Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
 }
 
 type StopPlatform struct {

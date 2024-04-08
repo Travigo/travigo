@@ -15,31 +15,31 @@ const OperatorNOCIDFormat = "GB:NOCID:%s"
 const OperatorTOCFormat = "GB:TOC:%s"
 
 type Operator struct {
-	PrimaryIdentifier string   `groups:"basic"`
-	OtherIdentifiers  []string `groups:"detailed"`
+	PrimaryIdentifier string   `groups:"basic" bson:",omitempty"`
+	OtherIdentifiers  []string `groups:"detailed" bson:",omitempty"`
 
-	CreationDateTime     time.Time `groups:"detailed"`
-	ModificationDateTime time.Time `groups:"detailed"`
+	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
+	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
-	PrimaryName string   `groups:"basic"`
-	OtherNames  []string `groups:"detailed"`
+	PrimaryName string   `groups:"basic" bson:",omitempty"`
+	OtherNames  []string `groups:"detailed" bson:",omitempty"`
 
-	OperatorGroupRef string         `groups:"internal"`
+	OperatorGroupRef string         `groups:"internal" bson:",omitempty"`
 	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
 
-	TransportType string `groups:"detailed"`
+	TransportType string `groups:"detailed" bson:",omitempty"`
 
-	Licence string `groups:"internal"`
+	Licence string `groups:"internal" bson:",omitempty"`
 
-	Website     string            `groups:"detailed"`
-	Email       string            `groups:"detailed"`
-	Address     string            `groups:"detailed"`
-	PhoneNumber string            `groups:"detailed"`
-	SocialMedia map[string]string `groups:"detailed"`
+	Website     string            `groups:"detailed" bson:",omitempty"`
+	Email       string            `groups:"detailed" bson:",omitempty"`
+	Address     string            `groups:"detailed" bson:",omitempty"`
+	PhoneNumber string            `groups:"detailed" bson:",omitempty"`
+	SocialMedia map[string]string `groups:"detailed" bson:",omitempty"`
 
-	Regions []string `groups:"detailed"`
+	Regions []string `groups:"detailed" bson:",omitempty"`
 }
 
 func (operator *Operator) GetReferences() {
