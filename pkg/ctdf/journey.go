@@ -36,6 +36,8 @@ type Journey struct {
 	DepartureTime     time.Time `groups:"basic" bson:",omitempty"`
 	DepartureTimezone string    `groups:"basic" bson:",omitempty"`
 
+	Track []Location `groups:"detailed" bson:",omitempty"`
+
 	DestinationDisplay string `groups:"basic" bson:",omitempty"`
 
 	Availability *Availability `groups:"internal" bson:",omitempty"`

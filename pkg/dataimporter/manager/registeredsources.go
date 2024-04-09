@@ -270,9 +270,9 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			Source:       "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip",
 			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
+				Operators: false,
+				Stops:     false,
+				Services:  false,
 				Journeys:  true,
 			},
 		},

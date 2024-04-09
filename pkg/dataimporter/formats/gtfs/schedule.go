@@ -51,7 +51,7 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 		"calendar.txt":       &gtfs.Calendars,
 		"calendar_dates.txt": &gtfs.CalendarDates,
 		// "frequencies.txt":    &gtfs.Frequencies,
-		// "shapes.txt":         &gtfs.Shapes,
+		"shapes.txt": &gtfs.Shapes,
 	}
 
 	// TODO this uses a load of ram :(
@@ -198,6 +198,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		calendarDateMapping[calendarDate.ServiceID] = append(calendarDateMapping[calendarDate.ServiceID], &calendarDate)
 	}
 
+	// Shapes
+	shapsMapping := map[string][]*Shape{}
+	for _, shape := range g.Shapes {
+		shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
+	}
+
 	// Routes / Services
 	routeTypeMapping := map[int]ctdf.TransportType{
 		0:   ctdf.TransportTypeTram,
@@ -272,6 +278,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	ctdfJourneys := map[string]*ctdf.Journey{}
+	// fullJourneyTracks := map[string][]ctdf.Location{}
 
 	// Journeys
 	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
@@ -340,6 +347,27 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		if trip.BlockID != "" {
 			ctdfJourneys[trip.ID].OtherIdentifiers["BlockNumber"] = trip.BlockID
 		}
+
+		if trip.ShapeID != "" {
+			journeyTrack := []ctdf.Location{}
+
+			shapes := shapsMapping[trip.ShapeID]
+
+			// Make sure its in order
+			sort.Slice(shapes, func(i, j int) bool {
+				return shapes[i].PointSequence < shapes[j].PointSequence
+			})
+
+			for _, shape := range shapes {
+				journeyTrack = append(journeyTrack, ctdf.Location{
+					Type:        "Point",
+					Coordinates: []float64{shape.PointLongitude, shape.PointLatitude},
+				})
+			}
+
+			// fullJourneyTracks[trip.ID] = journeyTrack
+			ctdfJourneys[trip.ID].Track = journeyTrack
+		}
 	}
 
 	// Stop Times
@@ -397,7 +425,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 				DestinationDisplay:     stopTime.StopHeadsign,
 				OriginActivity:         []ctdf.JourneyPathItemActivity{},
 				DestinationActivity:    []ctdf.JourneyPathItemActivity{},
-				Track:                  []ctdf.Location{},
 			}
 
 			if previousStopTime.DropOffType == 0 {
