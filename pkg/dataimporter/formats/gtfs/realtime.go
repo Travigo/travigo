@@ -71,9 +71,9 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		tripID := trip.GetTripId()
 
-		// if entity.Alert != nil {
-		// 	pretty.Println(entity.GetAlert())
-		// }
+		if entity.Alert != nil {
+			pretty.Println(entity.GetAlert())
+		}
 
 		if tripID != "" {
 			withTripID += 1
