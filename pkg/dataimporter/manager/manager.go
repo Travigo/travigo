@@ -123,7 +123,8 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	var existingDatasetVersion *ctdf.DatasetVersion
 	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
 
-	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport {
+	// TODO temp always import gb-networkrail-corpus
+	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport && dataset.Identifier != "gb-networkrail-corpus" {
 		log.Info().Str("dataset", dataset.Identifier).Msg("File is not new, skipping processing")
 		return nil
 	}
