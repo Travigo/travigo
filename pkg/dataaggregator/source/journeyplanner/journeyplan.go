@@ -1,12 +1,13 @@
 package journeyplanner
 
 import (
+	"sort"
+	"time"
+
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"go.mongodb.org/mongo-driver/bson"
-	"sort"
-	"time"
 )
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {

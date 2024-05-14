@@ -2,9 +2,11 @@ package localdepartureboard
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -31,7 +33,12 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	var journeys []*ctdf.Journey
 	// Load from cache
-	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s", q.Stop.PrimaryIdentifier)
+
+	filterHash := sha256.New()
+	filterHash.Write([]byte(pretty.Sprint(q.Filter)))
+	filterHashString := fmt.Sprintf("%x", filterHash.Sum(nil))
+
+	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
 	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
 
 	if err != nil {
@@ -63,6 +70,8 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 				},
 			}
 		}
+
+		pretty.Println(journeyQuery)
 
 		cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 		if err != nil {
