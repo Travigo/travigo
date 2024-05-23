@@ -27,7 +27,7 @@ type Stop struct {
 
 	Active bool `groups:"basic" bson:",omitempty"`
 
-	Associations []*StopAssociation `groups:"detailed" bson:",omitempty"`
+	Associations []*Association `groups:"detailed" bson:",omitempty"`
 
 	Platforms []*StopPlatform `groups:"detailed" bson:",omitempty"`
 	Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
@@ -76,9 +76,4 @@ func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
 			return
 		}
 	}
-}
-
-type StopAssociation struct {
-	Type                 string
-	AssociatedIdentifier string
 }

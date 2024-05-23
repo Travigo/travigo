@@ -203,6 +203,8 @@ type JourneyPathItem struct {
 	DestinationActivity []JourneyPathItemActivity `groups:"basic"`
 
 	Track []Location `groups:"basic"`
+
+	Associations []*Association `groups:"detailed" bson:",omitempty"`
 }
 
 func (jpi *JourneyPathItem) GetReferences() {
