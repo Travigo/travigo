@@ -206,6 +206,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 func searchStops(c *fiber.Ctx) error {
 	searchTerm := c.Query("name")
+	transportType := c.Query("transporttype")
 
 	if searchTerm == "" {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -221,33 +222,49 @@ func searchStops(c *fiber.Ctx) error {
 		})
 	}
 
+	queryFilters := []interface{}{
+		map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []interface{}{
+					map[string]interface{}{
+						"match_phrase_prefix": map[string]interface{}{
+							"PrimaryName.search_as_you_type": searchTerm,
+						},
+					},
+					map[string]interface{}{
+						"match_phrase_prefix": map[string]interface{}{
+							"OtherIdentifiers.Crs.search_as_you_type": searchTerm,
+						},
+					},
+					map[string]interface{}{
+						"match_phrase_prefix": map[string]interface{}{
+							"OtherIdentifiers.AtcoCode.search_as_you_type": searchTerm,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if transportType != "" {
+		queryFilters = append(queryFilters, map[string]interface{}{
+			"bool": map[string]interface{}{
+				"should": []interface{}{
+					map[string]interface{}{
+						"match": map[string]interface{}{
+							"TransportTypes": transportType,
+						},
+					},
+				},
+			},
+		})
+	}
+
 	var queryBytes bytes.Buffer
 	searchQuery := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"filter": []interface{}{
-					map[string]interface{}{
-						"bool": map[string]interface{}{
-							"should": []interface{}{
-								map[string]interface{}{
-									"match_phrase_prefix": map[string]interface{}{
-										"PrimaryName.search_as_you_type": searchTerm,
-									},
-								},
-								map[string]interface{}{
-									"match_phrase_prefix": map[string]interface{}{
-										"OtherIdentifiers.Crs.search_as_you_type": searchTerm,
-									},
-								},
-								map[string]interface{}{
-									"match_phrase_prefix": map[string]interface{}{
-										"OtherIdentifiers.AtcoCode.search_as_you_type": searchTerm,
-									},
-								},
-							},
-						},
-					},
-				},
+				"filter": queryFilters,
 			},
 		},
 	}
