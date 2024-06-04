@@ -3,8 +3,8 @@ package ctdf
 import "math"
 
 type Location struct {
-	Type        string    `json:"point" groups:"basic"`
-	Coordinates []float64 `json:"coordinates" groups:"basic"`
+	Type        string    `json:"point" groups:"basic,detailed,stop-llm"`
+	Coordinates []float64 `json:"coordinates" groups:"basic,detailed,stop-llm"`
 }
 
 // Shameless taken 'inspiration' from https://stackoverflow.com/a/6853926

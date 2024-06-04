@@ -15,7 +15,7 @@ const OperatorNOCIDFormat = "GB:NOCID:%s"
 const OperatorTOCFormat = "GB:TOC:%s"
 
 type Operator struct {
-	PrimaryIdentifier string   `groups:"basic" bson:",omitempty"`
+	PrimaryIdentifier string   `groups:"basic,departures-llm" bson:",omitempty"`
 	OtherIdentifiers  []string `groups:"detailed" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
@@ -23,7 +23,7 @@ type Operator struct {
 
 	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
-	PrimaryName string   `groups:"basic" bson:",omitempty"`
+	PrimaryName string   `groups:"basic,departures-llm" bson:",omitempty"`
 	OtherNames  []string `groups:"detailed" bson:",omitempty"`
 
 	OperatorGroupRef string         `groups:"internal" bson:",omitempty"`

@@ -105,6 +105,7 @@ func listStops(c *fiber.Ctx) error {
 
 func getStop(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
+	isLLM := c.Query("isllm")
 
 	var stop *ctdf.Stop
 	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
@@ -123,8 +124,13 @@ func getStop(c *fiber.Ctx) error {
 
 		transforms.Transform(stop, 3)
 
+		reduceGroupsName := []string{"basic", "detailed"}
+		if isLLM == "true" {
+			reduceGroupsName = []string{"stop-llm"}
+		}
+
 		reducedStop, _ := sheriff.Marshal(&sheriff.Options{
-			Groups: []string{"basic", "detailed"},
+			Groups: reduceGroupsName,
 		}, stop)
 
 		return c.JSON(reducedStop)
@@ -135,6 +141,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
 	startDateTimeString := c.Query("datetime")
+	isLLM := c.Query("isllm")
 
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -190,8 +197,13 @@ func getStopDepartures(c *fiber.Ctx) error {
 		departureBoard = departureBoard[:count]
 	}
 
+	reduceGroupsName := []string{"basic"}
+	if isLLM == "true" {
+		reduceGroupsName = []string{"departures-llm"}
+	}
+
 	departureBoardReduced, err := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{"basic"},
+		Groups: reduceGroupsName,
 	}, departureBoard)
 
 	if err != nil {
@@ -207,6 +219,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 func searchStops(c *fiber.Ctx) error {
 	searchTerm := c.Query("name")
 	transportType := c.Query("transporttype")
+	isLLM := c.Query("isllm")
 
 	if searchTerm == "" {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -306,7 +319,16 @@ func searchStops(c *fiber.Ctx) error {
 		stops = append(stops, hit.Source)
 	}
 
+	reduceGroupName := "search"
+	if isLLM == "true" {
+		reduceGroupName = "search-llm"
+	}
+
+	stopsReduced, err := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{reduceGroupName},
+	}, stops)
+
 	return c.JSON(fiber.Map{
-		"stops": stops,
+		"stops": stopsReduced,
 	})
 }

@@ -3,7 +3,7 @@ package ctdf
 import "time"
 
 type Service struct {
-	PrimaryIdentifier string            `groups:"basic"`
+	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm,departures-llm"`
 	OtherIdentifiers  map[string]string `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
@@ -11,21 +11,21 @@ type Service struct {
 
 	DataSource *DataSource `groups:"internal"`
 
-	ServiceName string `groups:"basic"`
+	ServiceName string `groups:"basic,search,search-llm,stop-llm,departures-llm"`
 
 	OperatorRef string `groups:"basic"`
 	// Operator *Operator
 
 	Routes []Route `groups:"detailed"`
 
-	BrandColour          string `groups:"basic"`
-	SecondaryBrandColour string `groups:"basic"`
-	BrandIcon            string `groups:"basic"`
-	BrandDisplayMode     string `groups:"basic"`
+	BrandColour          string `groups:"basic,search"`
+	SecondaryBrandColour string `groups:"basic,search"`
+	BrandIcon            string `groups:"basic,search"`
+	BrandDisplayMode     string `groups:"basic,search"`
 
 	StopNameOverrides map[string]string `groups:"internal"`
 
-	TransportType TransportType `groups:"basic"`
+	TransportType TransportType `groups:"basic,search,search-llm,stop-llm,departures-llm"`
 }
 
 type Route struct {

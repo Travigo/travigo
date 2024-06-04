@@ -13,14 +13,14 @@ import (
 )
 
 type DepartureBoard struct {
-	Journey            *Journey                 `groups:"basic"`
-	DestinationDisplay string                   `groups:"basic"`
-	Type               DepartureBoardRecordType `groups:"basic"`
+	Journey            *Journey                 `groups:"basic,departures-llm"`
+	DestinationDisplay string                   `groups:"basic,departures-llm"`
+	Type               DepartureBoardRecordType `groups:"basic,departures-llm"`
 
-	Platform     string `groups:"basic"`
-	PlatformType string `groups:"basic"`
+	Platform     string `groups:"basic,departures-llm"`
+	PlatformType string `groups:"basic,departures-llm"`
 
-	Time time.Time `groups:"basic"`
+	Time time.Time `groups:"basic,departures-llm"`
 }
 
 type DepartureBoardRecordType string

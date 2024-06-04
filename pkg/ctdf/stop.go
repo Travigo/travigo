@@ -7,23 +7,23 @@ import (
 const GBStopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
-	PrimaryIdentifier string            `groups:"basic" bson:",omitempty"`
-	OtherIdentifiers  map[string]string `groups:"basic" bson:",omitempty"`
+	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	OtherIdentifiers  map[string]string `groups:"basic,search" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
 	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
-	PrimaryName    string            `groups:"basic" bson:",omitempty"`
-	OtherNames     map[string]string `groups:"basic" bson:",omitempty"`
-	TransportTypes []TransportType   `groups:"detailed" bson:",omitempty"`
+	PrimaryName    string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	OtherNames     map[string]string `groups:"basic,stop-llm" bson:",omitempty"`
+	TransportTypes []TransportType   `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Timezone string `groups:"basic" bson:",omitempty"`
 
-	Location *Location `groups:"basic" bson:",omitempty"`
+	Location *Location `groups:"basic,stop-llm" bson:",omitempty"`
 
-	Services []*Service `bson:"-" groups:"basic" bson:",omitempty"`
+	Services []*Service `bson:"-" groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Active bool `groups:"basic" bson:",omitempty"`
 

@@ -18,7 +18,7 @@ const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
 const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
-	PrimaryIdentifier string            `groups:"basic" bson:",omitempty"`
+	PrimaryIdentifier string            `groups:"basic,departures-llm" bson:",omitempty"`
 	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
@@ -27,18 +27,18 @@ type Journey struct {
 	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal" bson:",omitempty"`
-	Service    *Service `groups:"basic" json:",omitempty" bson:"-"`
+	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
 	OperatorRef string    `groups:"internal" bson:",omitempty"`
-	Operator    *Operator `groups:"basic" json:",omitempty" bson:"-"`
+	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
 	Direction         string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
-	DepartureTime     time.Time `groups:"basic" bson:",omitempty"`
+	DepartureTime     time.Time `groups:"basic,departures-llm" bson:",omitempty"`
 	DepartureTimezone string    `groups:"basic" bson:",omitempty"`
 
 	Track []Location `groups:"detailed" bson:",omitempty"`
 
-	DestinationDisplay string `groups:"basic" bson:",omitempty"`
+	DestinationDisplay string `groups:"basic,departures-llm" bson:",omitempty"`
 
 	Availability *Availability `groups:"internal" bson:",omitempty"`
 

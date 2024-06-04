@@ -77,7 +77,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
-				ActivelyTracked:        false,
+				ActivelyTracked:        true,
 				TimeoutDurationMinutes: 181,
 				CreationDateTime:       now,
 				Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
@@ -113,6 +113,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 		} else {
 			updateMap["datasource.timestamp"] = datasource.Timestamp
+			updateMap["activelytracked"] = true
 		}
 
 		for _, location := range trainStatus.Locations {
