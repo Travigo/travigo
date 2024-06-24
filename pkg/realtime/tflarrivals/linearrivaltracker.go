@@ -258,6 +258,8 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			ArrivalTime:   scheduledTime,
 			DepartureTime: scheduledTime,
+
+			Platform: prediction.PlatformName,
 		}
 
 		updatedStops[stopID] = true
