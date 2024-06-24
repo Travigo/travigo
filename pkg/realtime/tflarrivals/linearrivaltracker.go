@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/exp/slices"
 
@@ -246,6 +247,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add new predictions to the realtime journey
+	platformMatchRegex, _ := regexp.Compile("(.+) - Platform (\\d)+")
 	updatedStops := map[string]bool{}
 	for _, prediction := range predictions {
 		stopID := getStopFromTfLStop(prediction.NaptanID).PrimaryIdentifier
@@ -253,13 +255,20 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 		scheduledTime = scheduledTime.In(now.Location())
 
+		platform := prediction.PlatformName
+		platformMatches := platformMatchRegex.FindStringSubmatch(platform)
+		if len(platformMatches) == 3 {
+			platform = fmt.Sprintf("%s - %s", platformMatches[2], platformMatches[1])
+		}
+		pretty.Println(platform)
+
 		realtimeJourney.Stops[stopID] = &ctdf.RealtimeJourneyStops{
 			StopRef:       stopID,
 			TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			ArrivalTime:   scheduledTime,
 			DepartureTime: scheduledTime,
 
-			Platform: prediction.PlatformName,
+			Platform: platform,
 		}
 
 		updatedStops[stopID] = true

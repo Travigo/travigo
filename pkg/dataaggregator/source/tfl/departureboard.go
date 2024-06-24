@@ -85,6 +85,13 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			departure.Journey.Operator = tflOperator
 			departure.Journey.OperatorRef = tflOperator.PrimaryIdentifier
 
+			platform := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].Platform
+
+			if platform != "" {
+				departure.Platform = platform
+				departure.PlatformType = "ACTUAL"
+			}
+
 			transforms.Transform(departure.Journey.Service, 2)
 			transforms.Transform(departure.Journey.Operator, 2)
 			departureBoard = append(departureBoard, departure)
