@@ -247,7 +247,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add new predictions to the realtime journey
-	platformMatchRegex, _ := regexp.Compile("(.+) [- ]?Platform (\\d)+")
+	platformMatchRegex, _ := regexp.Compile("(\\w+) (?:- )?Platform (\\d+)")
 	updatedStops := map[string]bool{}
 	for _, prediction := range predictions {
 		stopID := getStopFromTfLStop(prediction.NaptanID).PrimaryIdentifier
