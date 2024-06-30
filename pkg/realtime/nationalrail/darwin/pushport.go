@@ -70,7 +70,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if journey == nil {
-				log.Error().Str("uid", trainStatus.UID).Msg("Failed to find respective Journey for this train status update")
+				log.Debug().Str("uid", trainStatus.UID).Msg("Failed to find respective Journey for this train status update")
 				continue
 			}
 
@@ -225,7 +225,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if journey == nil {
-				log.Error().Str("uid", schedule.UID).Msg("Failed to find respective Journey for this train schedule update")
+				log.Debug().Str("uid", schedule.UID).Msg("Failed to find respective Journey for this train schedule update")
 				continue
 			}
 
