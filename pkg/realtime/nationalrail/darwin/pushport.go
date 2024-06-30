@@ -329,7 +329,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			deleteServiceAlert(fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
-			pretty.Println(schedule.InnerXML)
+			pretty.Println("partialcancel", realtimeJourney.PrimaryIdentifier, schedule.InnerXML)
 		} else {
 			updateMap["cancelled"] = false
 
