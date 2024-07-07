@@ -144,5 +144,5 @@ const (
 )
 
 func GetActiveRealtimeJourneyCutOffDate() time.Time {
-	return time.Now().Add(-10 * time.Minute)
+	return time.Now().Add(-240 * time.Minute)
 }
