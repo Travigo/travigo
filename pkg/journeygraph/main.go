@@ -158,7 +158,7 @@ func main() {
 						ctx, `
 						MATCH (i:JourneyPathItem {id: $jpiID})
 						MATCH (j:Journey {primaryidentifier: $journey})
-						MERGE (i)-[:JOURNEY]->(j)
+						CREATE (i)-[:JOURNEY]->(j)
 						`, map[string]any{
 							"jpiID":   jpiID,
 							"journey": journey.PrimaryIdentifier,
@@ -171,7 +171,7 @@ func main() {
 						ctx, `
 						MATCH (o:Stop {primaryidentifier: $originstop})
 						MATCH (i:JourneyPathItem {id: $jpiID})
-						MERGE (i)-[:ORIGIN]->(o)
+						CREATE (i)-[:ORIGIN]->(o)
 						`, map[string]any{
 							"jpiID":      jpiID,
 							"originstop": path.OriginStopRef,
@@ -184,7 +184,7 @@ func main() {
 						ctx, `
 						MATCH (d:Stop {primaryidentifier: $destinationstop})
 						MATCH (i:JourneyPathItem {id: $jpiID})
-						MERGE (i)-[:DESTINATION]->(d)
+						CREATE (i)-[:DESTINATION]->(d)
 						`, map[string]any{
 							"jpiID":           jpiID,
 							"destinationstop": path.DestinationStopRef,
