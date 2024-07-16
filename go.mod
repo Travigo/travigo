@@ -66,6 +66,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/neo4j/neo4j-go-driver/v5 v5.22.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

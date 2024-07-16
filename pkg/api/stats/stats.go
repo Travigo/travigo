@@ -60,6 +60,8 @@ func UpdateRecordsStats() {
 		},
 	}
 
+	return
+
 	for {
 		startTime := time.Now()
 
