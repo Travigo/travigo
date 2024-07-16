@@ -82,6 +82,9 @@ func main() {
 	cursor.All(ctx, &ctdfStops)
 	// var ctdfJourney []ctdf.Journey
 
+	_, err = session.Run(ctx, "match (a) -[r] -> () delete a, r", map[string]any{})
+	_, err = session.Run(ctx, "match (a) delete a", map[string]any{})
+
 	for _, stop := range ctdfStops {
 		pretty.Println(stop.PrimaryIdentifier)
 
@@ -89,7 +92,7 @@ func main() {
 			func(tx neo4j.ManagedTransaction) (any, error) {
 				_, err := tx.Run(
 					ctx,
-					"MERGE (s:Stop {primaryidentifier: $primaryidentifier, primaryname: $primaryname})",
+					"CREATE (s:Stop {primaryidentifier: $primaryidentifier, primaryname: $primaryname})",
 					map[string]any{
 						"primaryidentifier": stop.PrimaryIdentifier,
 						"primaryname":       stop.PrimaryName,
@@ -109,7 +112,7 @@ func main() {
 	ctdfJourneys := []ctdf.Journey{}
 	journeysSollection := database.GetCollection("journeys")
 	cursor, _ = journeysSollection.Find(context.Background(), bson.M{"primaryidentifier": bson.M{"$in": []string{
-		"GB:RAIL:G50852:240603:P",
+		"GB:RAIL:G54460:240603:P",
 		"GB:RAIL:G54374:240603:P",
 	}}})
 	cursor.All(ctx, &ctdfJourneys)
@@ -121,7 +124,7 @@ func main() {
 			func(tx neo4j.ManagedTransaction) (any, error) {
 				_, err := tx.Run(
 					ctx,
-					"MERGE (j:Journey {primaryidentifier: $primaryidentifier, destinationdisplay: $destinationdisplay})",
+					"CREATE (j:Journey {primaryidentifier: $primaryidentifier, destinationdisplay: $destinationdisplay})",
 					map[string]any{
 						"primaryidentifier":  journey.PrimaryIdentifier,
 						"destinationdisplay": journey.DestinationDisplay,
@@ -142,7 +145,7 @@ func main() {
 					_, err := tx.Run(
 						ctx,
 						`
-						MERGE (i:JourneyPathItem {id: $id, originstop: $originstop, destinationstop: $destinationstop, journey: $journey})
+						CREATE (i:JourneyPathItem {id: $id, originstop: $originstop, destinationstop: $destinationstop, journey: $journey})
 						`,
 						map[string]any{
 							"id":              jpiID,
