@@ -13,6 +13,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -107,10 +108,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	currentTime = time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
-	// for _, item := range departureBoard {
-	// 	transforms.Transform(item.Journey.Operator, 1)
-	// 	transforms.Transform(item.Journey.Service, 1)
-	// }
+	for _, item := range departureBoard {
+		transforms.Transform(item.Journey.Operator, 1)
+		transforms.Transform(item.Journey.Service, 1)
+	}
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Transform")
 
 	return departureBoard, nil
