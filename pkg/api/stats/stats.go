@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math/rand/v2"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -137,13 +138,18 @@ func UpdateRecordsStats() {
 			},
 		}
 		activeRealtimeJourneys, _ := realtimeJourneysCollection.Aggregate(context.Background(), mongo.Pipeline{matchStage, projectStage})
-		var realtimeJourneys []ctdf.RealtimeJourney
-		activeRealtimeJourneys.All(context.Background(), &realtimeJourneys)
 
 		log.Debug().Str("Length", time.Now().Sub(startTime).String()).Msg("Stats - get all realtime journeys")
 		startTime = time.Now()
 
-		for _, realtimeJourney := range realtimeJourneys {
+		for activeRealtimeJourneys.Next(context.Background()) {
+			var realtimeJourney ctdf.RealtimeJourney
+			err := activeRealtimeJourneys.Decode(&realtimeJourney)
+
+			if err != nil {
+				continue
+			}
+
 			if realtimeJourney.IsActive() {
 				if realtimeJourney.ActivelyTracked {
 					numberActiveRealtimeJourneys += 1
@@ -223,6 +229,6 @@ func UpdateRecordsStats() {
 
 		elastic_client.IndexRequest("overall-stats-1", bytes.NewReader(elasticEvent))
 
-		time.Sleep(20 * time.Minute)
+		time.Sleep(time.Duration(18+rand.IntN(5)) * time.Minute)
 	}
 }
