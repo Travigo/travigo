@@ -24,7 +24,7 @@ spec:
           restartPolicy: OnFailure
           {{- if .batchburst }}
           nodeSelector:
-            cloud.google.com/gke-nodepool: travigo-gke-batch-burst-node-pool
+            cloud.google.com/gke-nodepool: batch-burst-node-pool
           tolerations:
             - effect: NoSchedule
               key: BATCH_BURST
