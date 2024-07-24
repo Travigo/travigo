@@ -516,7 +516,6 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 	updateMap := bson.M{
 		"reliability":          realtimeJourneyReliability,
 		"modificationdatetime": currentTime,
-		"vehiclelocation":      vehicleLocationEvent.Location,
 		"vehiclebearing":       vehicleLocationEvent.Bearing,
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
@@ -524,6 +523,9 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		"occupancy":            vehicleLocationEvent.Occupancy,
 		"datasource":           vehicleLocationEvent.DataSource,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
+	}
+	if vehicleLocationEvent.Location.Type != "" {
+		updateMap["vehiclelocation"] = vehicleLocationEvent.Location
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
