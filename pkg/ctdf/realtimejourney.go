@@ -24,7 +24,7 @@ type RealtimeJourney struct {
 
 	DataSource *DataSource `groups:"internal"`
 
-	VehicleLocation            Location `groups:"basic" bson:"-"`
+	VehicleLocation            Location `groups:"basic" bson:",omitempty"`
 	VehicleLocationDescription string   `groups:"basic"`
 	VehicleBearing             float64  `groups:"basic"`
 
