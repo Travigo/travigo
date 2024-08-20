@@ -22,6 +22,13 @@ Match:
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---
+Type: ctdf.Service
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5816"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
