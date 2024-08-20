@@ -12,8 +12,9 @@ type RealtimeJourney struct {
 
 	ActivelyTracked bool `groups:"basic"`
 
-	//JourneyRef string   `groups:"internal"`
 	Journey *Journey `groups:"basic"`
+
+	Service *Service `groups:"internal"`
 
 	JourneyRunDate time.Time `groups:"basic"`
 

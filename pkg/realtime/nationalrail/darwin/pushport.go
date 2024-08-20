@@ -74,6 +74,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
+			journey.GetService()
+
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
@@ -86,6 +88,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Journey:        journey,
 				JourneyRunDate: journeyDate,
+				Service:        journey.Service,
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
@@ -229,6 +232,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				continue
 			}
 
+			journey.GetService()
+
 			// Construct the base realtime journey
 			realtimeJourney = &ctdf.RealtimeJourney{
 				PrimaryIdentifier:      realtimeJourneyID,
@@ -241,6 +246,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Journey:        journey,
 				JourneyRunDate: journeyDate,
+				Service:        journey.Service,
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}

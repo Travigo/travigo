@@ -165,9 +165,8 @@ func UpdateRecordsStats() {
 						numberActiveRealtimeJourneysExternal += 1
 					}
 
-					realtimeJourney.Journey.GetService()
-					if realtimeJourney.Journey.Service != nil {
-						transportTypes[realtimeJourney.Journey.Service.TransportType] += 1
+					if realtimeJourney.Service != nil {
+						transportTypes[realtimeJourney.Service.TransportType] += 1
 					}
 
 					datasources[realtimeJourney.DataSource.DatasetID] += 1

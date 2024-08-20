@@ -81,6 +81,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 			return
 		}
 
+		journey.GetService()
+
 		// Construct the base realtime journey
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier: realtimeJourneyID,
@@ -97,6 +99,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 			Journey:        journey,
 			JourneyRunDate: journeyDate,
+			Service:        journey.Service,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}

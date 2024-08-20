@@ -270,6 +270,8 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			pathItem.GetDestinationStop()
 		}
 
+		journey.GetService()
+
 		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
@@ -278,6 +280,7 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 			TimeoutDurationMinutes: 10,
 			Journey:                journey,
 			JourneyRunDate:         journeyDate,
+			Service:                journey.Service,
 
 			CreationDateTime: currentTime,
 
