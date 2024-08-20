@@ -365,3 +365,45 @@ Match:
   ServiceRef: "gb-dft-bods-gtfs-schedule-service-82178"
 Data:
   OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5816"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5825"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5835"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5819"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3104"
+Data:
+  OperatorRef: "GB:NOC:TFLO"
