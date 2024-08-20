@@ -52,7 +52,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 	operatorRef := vehicle.MonitoredVehicleJourney.OperatorRef
 	vehicleRef := ""
 	if vehicle.MonitoredVehicleJourney.VehicleRef != "" {
-		vehicleRef = fmt.Sprintf("GB:VEHICLE:%s:%s", operatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
+		vehicleRef = vehicle.MonitoredVehicleJourney.VehicleRef //fmt.Sprintf("GB:VEHICLE:%s:%s", operatorRef, vehicle.MonitoredVehicleJourney.VehicleRef)
 	}
 
 	vehicleJourneyRef := vehicle.MonitoredVehicleJourney.VehicleJourneyRef
