@@ -97,6 +97,7 @@ func UpdateRecordsStats() {
 				Key: "$match",
 				Value: bson.D{
 					{Key: "modificationdatetime", Value: bson.M{"$gt": realtimeActiveCutoffDate}},
+					{Key: "activelytracked", Value: true},
 				},
 			},
 		}

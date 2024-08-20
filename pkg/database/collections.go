@@ -224,6 +224,9 @@ func createJourneysIndexes() {
 			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
 		},
+		{
+			Keys: bson.D{{Key: "activelytracked", Value: 1}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
