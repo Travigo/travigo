@@ -71,7 +71,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			}
 		}
 
-		pretty.Println(journeyQuery)
+		// pretty.Println(journeyQuery)
 
 		cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 		if err != nil {

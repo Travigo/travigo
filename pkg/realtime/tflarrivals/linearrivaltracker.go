@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/exp/slices"
 
@@ -261,7 +260,6 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		if len(platformMatches) == 3 {
 			platform = fmt.Sprintf("%s - %s", platformMatches[2], platformMatches[1])
 		}
-		pretty.Println(platform)
 
 		realtimeJourney.Stops[stopID] = &ctdf.RealtimeJourneyStops{
 			StopRef:       stopID,
