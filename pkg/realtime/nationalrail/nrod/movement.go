@@ -96,6 +96,12 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
 
 		updateMap["vehiclelocationdescription"] = fmt.Sprintf("Arrived at %s", locationStop.PrimaryName)
+
+		// If we've arrived at the end, then it's not actively tracked anymore
+		if locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
+			updateMap["activelytracked"] = false
+			updateMap["timeoutdurationminutes"] = 15
+		}
 	}
 
 	// Create update
