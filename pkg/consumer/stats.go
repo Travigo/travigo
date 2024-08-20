@@ -51,7 +51,7 @@ func (handler *HealthHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Requ
 		return
 	}
 
-	testMongo := database.Instance.Client.Ping(context.Background(), nil)
+	testMongo := database.MongoGlobalInstance.Client.Ping(context.Background(), nil)
 	if testMongo != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(writer, testMongo)

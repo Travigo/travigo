@@ -9,6 +9,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 type MongoInstance struct {
@@ -16,14 +19,47 @@ type MongoInstance struct {
 	Database *mongo.Database
 }
 
-var Instance *MongoInstance
+var MongoGlobalInstance *MongoInstance
 
-const defaultConnectionString = "mongodb://localhost:27017/"
-const defaultDatabase = "travigo"
+var GlobalGorm *gorm.DB
+
+const defaultMongoConnectionString = "mongodb://localhost:27017/"
+const defaultMongoDatabase = "travigo"
 
 func Connect() error {
-	connectionString := defaultConnectionString
-	dbName := defaultDatabase
+	if err := ConnectMongoDB(); err != nil {
+		return err
+	}
+
+	if err := ConnectPostgres(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ConnectPostgres() error {
+	env := util.GetEnvironmentVariables()
+
+	connectionString := "postgres://travigo:password@localhost:5432/travigo"
+
+	if env["TRAVIGO_POSTGRES_CONNECTION"] != "" {
+		connectionString = env["TRAVIGO_POSTGRES_CONNECTION"]
+	}
+
+	var err error
+
+	GlobalGorm, err = gorm.Open(postgres.Open(connectionString), &gorm.Config{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ConnectMongoDB() error {
+	connectionString := defaultMongoConnectionString
+	dbName := defaultMongoDatabase
 
 	env := util.GetEnvironmentVariables()
 
@@ -46,7 +82,7 @@ func Connect() error {
 		return err
 	}
 
-	Instance = &MongoInstance{
+	MongoGlobalInstance = &MongoInstance{
 		Client:   client,
 		Database: database,
 	}
@@ -64,7 +100,7 @@ func Connect() error {
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
-	return Instance.Database.Collection(collectionName)
+	return MongoGlobalInstance.Database.Collection(collectionName)
 }
 
 // Requires
@@ -76,7 +112,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 
 func runCommands() {
 	var result bson.M
-	err := Instance.Database.RunCommand(context.Background(), bson.D{
+	err := MongoGlobalInstance.Database.RunCommand(context.Background(), bson.D{
 		{Key: "collMod", Value: "realtime_journeys"},
 		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
 	}).Decode(&result)

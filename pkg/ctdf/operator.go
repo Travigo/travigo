@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -15,19 +16,19 @@ const OperatorNOCIDFormat = "GB:NOCID:%s"
 const OperatorTOCFormat = "GB:TOC:%s"
 
 type Operator struct {
-	PrimaryIdentifier string   `groups:"basic,departures-llm" bson:",omitempty"`
-	OtherIdentifiers  []string `groups:"detailed" bson:",omitempty"`
+	PrimaryIdentifier string         `groups:"basic,departures-llm" bson:",omitempty" gorm:"uniqueIndex"`
+	OtherIdentifiers  pq.StringArray `groups:"detailed" bson:",omitempty" gorm:"type:text[]"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"internal" bson:",omitempty"`
+	DataSource *DataSource `groups:"internal" bson:",omitempty" gorm:"embedded;embeddedPrefix:datasource_"`
 
-	PrimaryName string   `groups:"basic,departures-llm" bson:",omitempty"`
-	OtherNames  []string `groups:"detailed" bson:",omitempty"`
+	PrimaryName string         `groups:"basic,departures-llm" bson:",omitempty"`
+	OtherNames  pq.StringArray `groups:"detailed" bson:",omitempty" gorm:"type:text[]"`
 
 	OperatorGroupRef string         `groups:"internal" bson:",omitempty"`
-	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
+	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-" gorm:"-"`
 
 	TransportType string `groups:"detailed" bson:",omitempty"`
 
@@ -37,9 +38,9 @@ type Operator struct {
 	Email       string            `groups:"detailed" bson:",omitempty"`
 	Address     string            `groups:"detailed" bson:",omitempty"`
 	PhoneNumber string            `groups:"detailed" bson:",omitempty"`
-	SocialMedia map[string]string `groups:"detailed" bson:",omitempty"`
+	SocialMedia map[string]string `groups:"detailed" bson:",omitempty" gorm:"type:jsonb;serializer:json"`
 
-	Regions []string `groups:"detailed" bson:",omitempty"`
+	Regions pq.StringArray `groups:"detailed" bson:",omitempty" gorm:"type:text[]"`
 }
 
 func (operator *Operator) GetReferences() {

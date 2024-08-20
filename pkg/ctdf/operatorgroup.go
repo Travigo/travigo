@@ -14,12 +14,12 @@ import (
 const OperatorGroupIDFormat = "GB:NOCGRPID:%s"
 
 type OperatorGroup struct {
-	Identifier string `groups:"basic"`
+	Identifier string `groups:"basic" gorm:"uniqueIndex"`
 	Name       string `groups:"basic"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSource `groups:"internal" gorm:"embedded;embeddedPrefix:datasource_"`
 
-	Operators []*Operator `bson:"-" groups:"detailed"`
+	Operators []*Operator `bson:"-" groups:"detailed" gorm:"-"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`

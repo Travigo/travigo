@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/gorm/clause"
 )
 
 type TravelineData struct {
@@ -228,6 +229,8 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 	maxBatchSize := int(math.Ceil(float64(len(operators)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(operators)) / float64(maxBatchSize)))
 
+	startTime := time.Now()
+
 	processingGroup := sync.WaitGroup{}
 	processingGroup.Add(numBatches)
 
@@ -275,8 +278,19 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 
 	processingGroup.Wait()
 
+	log.Info().Str("Length", time.Now().Sub(startTime).String()).Msg("Mongodb")
+
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorOperationInsert)
+
+	startTime = time.Now()
+
+	database.GlobalGorm.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "primary_identifier"}},
+		UpdateAll: true,
+	}).CreateInBatches(operators, maxBatchSize)
+
+	log.Info().Str("Length", time.Now().Sub(startTime).String()).Msg("Postgres")
 
 	// Import operator groups
 	log.Info().Msg("Importing CTDF OperatorGroups into Mongo")
@@ -284,6 +298,8 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 
 	maxBatchSize = int(math.Ceil(float64(len(operatorGroups)) / float64(runtime.NumCPU())))
 	numBatches = int(math.Ceil(float64(len(operatorGroups)) / float64(maxBatchSize)))
+
+	startTime = time.Now()
 
 	processingGroup = sync.WaitGroup{}
 	processingGroup.Add(numBatches)
@@ -331,6 +347,17 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 	}
 
 	processingGroup.Wait()
+
+	log.Info().Str("Length", time.Now().Sub(startTime).String()).Msg("Mongodb")
+
+	startTime = time.Now()
+
+	database.GlobalGorm.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "identifier"}},
+		UpdateAll: true,
+	}).CreateInBatches(operatorGroups, maxBatchSize)
+
+	log.Info().Str("Length", time.Now().Sub(startTime).String()).Msg("Postgres")
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operatorGroupOperationInsert)
