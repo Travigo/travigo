@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/stats/web_api"
 	"github.com/urfave/cli/v2"
@@ -22,6 +23,9 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := elastic_client.Connect(true); err != nil {
 						return err
 					}

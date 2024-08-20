@@ -9,9 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 type MongoInstance struct {
@@ -19,47 +16,14 @@ type MongoInstance struct {
 	Database *mongo.Database
 }
 
-var MongoGlobalInstance *MongoInstance
+var Instance *MongoInstance
 
-var GlobalGorm *gorm.DB
-
-const defaultMongoConnectionString = "mongodb://localhost:27017/"
-const defaultMongoDatabase = "travigo"
+const defaultConnectionString = "mongodb://localhost:27017/"
+const defaultDatabase = "travigo"
 
 func Connect() error {
-	if err := ConnectMongoDB(); err != nil {
-		return err
-	}
-
-	if err := ConnectPostgres(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ConnectPostgres() error {
-	env := util.GetEnvironmentVariables()
-
-	connectionString := "postgres://travigo:password@localhost:5432/travigo"
-
-	if env["TRAVIGO_POSTGRES_CONNECTION"] != "" {
-		connectionString = env["TRAVIGO_POSTGRES_CONNECTION"]
-	}
-
-	var err error
-
-	GlobalGorm, err = gorm.Open(postgres.Open(connectionString), &gorm.Config{})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func ConnectMongoDB() error {
-	connectionString := defaultMongoConnectionString
-	dbName := defaultMongoDatabase
+	connectionString := defaultConnectionString
+	dbName := defaultDatabase
 
 	env := util.GetEnvironmentVariables()
 
@@ -82,7 +46,7 @@ func ConnectMongoDB() error {
 		return err
 	}
 
-	MongoGlobalInstance = &MongoInstance{
+	Instance = &MongoInstance{
 		Client:   client,
 		Database: database,
 	}
@@ -100,7 +64,7 @@ func ConnectMongoDB() error {
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
-	return MongoGlobalInstance.Database.Collection(collectionName)
+	return Instance.Database.Collection(collectionName)
 }
 
 // Requires
@@ -112,7 +76,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 
 func runCommands() {
 	var result bson.M
-	err := MongoGlobalInstance.Database.RunCommand(context.Background(), bson.D{
+	err := Instance.Database.RunCommand(context.Background(), bson.D{
 		{Key: "collMod", Value: "realtime_journeys"},
 		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
 	}).Decode(&result)

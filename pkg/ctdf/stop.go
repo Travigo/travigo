@@ -7,16 +7,16 @@ import (
 const GBStopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
-	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty" gorm:"uniqueIndex"`
-	OtherIdentifiers  map[string]string `groups:"basic,search" bson:",omitempty" gorm:"type:jsonb;serializer:json"`
+	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	OtherIdentifiers  map[string]string `groups:"basic,search" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"internal" bson:",omitempty" gorm:"embedded;embeddedPrefix:datasource_"`
+	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
 	PrimaryName    string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	OtherNames     map[string]string `groups:"basic,stop-llm" bson:",omitempty" gorm:"type:jsonb;serializer:json"`
+	OtherNames     map[string]string `groups:"basic,stop-llm" bson:",omitempty"`
 	TransportTypes []TransportType   `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Timezone string `groups:"basic" bson:",omitempty"`

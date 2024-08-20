@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 )
@@ -20,6 +21,9 @@ func RegisterCLI() *cli.Command {
 				Name:  "run",
 				Usage: "run an instance an instance of vehicle tracker",
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}

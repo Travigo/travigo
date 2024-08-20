@@ -6,6 +6,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
 
@@ -39,6 +40,9 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Redis")
 					}

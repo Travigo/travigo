@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/darwin"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/nrod"
 	"github.com/travigo/travigo/pkg/redis_client"
@@ -30,6 +31,9 @@ func RegisterCLI() *cli.Command {
 						log.Fatal().Msg("TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD must be set")
 					}
 
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}
@@ -60,6 +64,9 @@ func RegisterCLI() *cli.Command {
 						log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
 					}
 
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}

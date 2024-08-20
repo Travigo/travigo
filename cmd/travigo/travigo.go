@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/api"
-	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter"
 	"github.com/travigo/travigo/pkg/dbwatch"
 	"github.com/travigo/travigo/pkg/events"
@@ -38,22 +36,6 @@ func main() {
 	}
 
 	transforms.SetupClient()
-
-	if err := database.Connect(); err != nil {
-		log.Info().Err(err).Msg("Failed to connect to database")
-		// TODO this should be fatal
-	}
-
-	tablesToMigrate := []interface{}{
-		ctdf.DatasetVersion{},
-		ctdf.Operator{},
-		ctdf.OperatorGroup{},
-		ctdf.Stop{},
-	}
-
-	for _, tableObject := range tablesToMigrate {
-		database.GlobalGorm.AutoMigrate(tableObject)
-	}
 
 	app := &cli.App{
 		Name:        "travigo",

@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
@@ -19,6 +20,9 @@ func RegisterCLI() *cli.Command {
 				Name:  "run",
 				Usage: "run an instance of the realtime engine",
 				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
 					if err := elastic_client.Connect(false); err != nil {
 						return err
 					}
