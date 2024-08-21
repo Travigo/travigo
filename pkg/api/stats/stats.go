@@ -128,7 +128,7 @@ func UpdateRecordsStats() {
 					bson.E{Key: "modificationdatetime", Value: 1},
 					bson.E{Key: "reliability", Value: 1},
 					bson.E{Key: "datasource.datasetid", Value: 1},
-					bson.E{Key: "journey.serviceref", Value: 1},
+					bson.E{Key: "service.transporttype", Value: 1},
 					// bson.E{Key: "vehiclelocation", Value: 1},
 					bson.E{Key: "journey.path.destinationstopref", Value: 1},
 					bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
