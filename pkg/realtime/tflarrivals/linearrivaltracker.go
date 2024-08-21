@@ -206,7 +206,12 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	var realtimeJourney *ctdf.RealtimeJourney
 
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+	opts := options.FindOne().SetProjection(bson.D{
+		{Key: "stops", Value: 1},
+		{Key: "journey", Value: 1},
+	})
+
+	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {

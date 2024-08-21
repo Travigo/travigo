@@ -253,8 +253,14 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 	var realtimeJourney *ctdf.RealtimeJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 
+	opts := options.FindOne().SetProjection(bson.D{
+		{Key: "journey.path", Value: 1},
+		{Key: "journey.departuretimezone", Value: 1},
+		{Key: "nextstopref", Value: 1},
+	})
+
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
