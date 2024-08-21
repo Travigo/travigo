@@ -538,6 +538,8 @@ func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocati
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
 
+		updateMap["service"] = realtimeJourney.Service
+
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 
 		updateMap["vehicleref"] = vehicleLocationEvent.VehicleIdentifier

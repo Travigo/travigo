@@ -125,6 +125,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 		updateMap["journey"] = realtimeJourney.Journey
 		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+
+		updateMap["service"] = realtimeJourney.Service
 	} else {
 		updateMap["datasource.timestamp"] = datasource.Timestamp
 	}

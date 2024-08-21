@@ -114,6 +114,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+
+			updateMap["service"] = realtimeJourney.Service
 		} else {
 			updateMap["datasource.timestamp"] = datasource.Timestamp
 			updateMap["activelytracked"] = true
@@ -356,6 +358,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			updateMap["journey"] = realtimeJourney.Journey
 			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
+
+			updateMap["service"] = realtimeJourney.Service
 		} else {
 			updateMap["datasource.timestamp"] = datasource.Timestamp
 		}
