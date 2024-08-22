@@ -12,6 +12,7 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -162,11 +163,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 			journey, err = journeyIdentifier.IdentifyJourney()
 
 			// TODO yet another special TfL only thing that shouldn't be here
+			pretty.Println(vehicleLocationEvent.IdentifyingInformation["OperatorRef"])
 			if vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "GB:NOC:TFLO" {
 				tflEventBytes, _ := json.Marshal(map[string]string{
 					"NumberPlate": vehicleLocationEvent.VehicleIdentifier,
 				})
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
+				pretty.Println("push to tfl")
 			}
 		} else if vehicleLocationEvent.SourceType == "GTFS-RT" {
 			journeyIdentifier := identifiers.GTFSRT{
