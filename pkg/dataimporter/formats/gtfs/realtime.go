@@ -91,6 +91,8 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
+			pretty.Println(*entity.Vehicle.Vehicle.Id)
+
 			locationEvent := vehicletracker.VehicleLocationEvent{
 				LocalID: fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
 				IdentifyingInformation: map[string]string{

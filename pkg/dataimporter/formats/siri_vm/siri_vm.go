@@ -33,7 +33,7 @@ type queueEmptyElasticEvent struct {
 	Duration  int
 }
 
-func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource *ctdf.DataSource) bool {
+func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSource) bool {
 	datasource.OriginalFormat = "siri-vm"
 
 	currentTime := time.Now()
@@ -87,6 +87,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, datasource 
 			"DestinationRef":           fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
 			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
 			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+			"LinkedDataset":            dataset.LinkedDataset,
 		},
 		SourceType: "siri-vm",
 		Location: ctdf.Location{
@@ -190,7 +191,7 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 				} else {
 					retrievedRecords += 1
 
-					successfullyPublished := SubmitToProcessQueue(s.queue, &vehicleActivity, datasource)
+					successfullyPublished := SubmitToProcessQueue(s.queue, &vehicleActivity, dataset, datasource)
 
 					if successfullyPublished {
 						submittedRecords += 1

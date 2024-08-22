@@ -161,6 +161,11 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 
+			// Set cross dataset ID
+			if vehicleLocationEvent.VehicleIdentifier != "" {
+				identificationCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier), vehicleLocationEvent.SourceType)
+			}
+
 			// Temporary https://github.com/travigo/travigo/issues/43
 			// TODO dont just compare the string value here!!
 			errorCode := "UNKNOWN"
