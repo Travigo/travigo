@@ -66,9 +66,8 @@ cronjobs:
     args: [ "indexer", "stops" ]
 
 deployments:
-  # TODO make sirivm ignore if its handled by gtfs / make gtfs the priority - then go back to 10s
-  # - name: sirivm-all
-  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
+  - name: sirivm-all
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
   - name: gb-bods-gtfs-rt
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
   - name: ie-gtfs-realtime
