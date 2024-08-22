@@ -164,8 +164,9 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 
 			// TODO yet another special TfL only thing that shouldn't be here
 			pretty.Println(vehicleLocationEvent.IdentifyingInformation["OperatorRef"])
-			if vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "GB:NOC:TFLO" {
+			if err != nil && vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "GB:NOC:TFLO" {
 				tflEventBytes, _ := json.Marshal(map[string]string{
+					"Line":        vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 					"NumberPlate": vehicleLocationEvent.VehicleIdentifier,
 				})
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
