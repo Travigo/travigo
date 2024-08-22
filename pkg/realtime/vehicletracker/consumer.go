@@ -70,11 +70,17 @@ func startRealtimeConsumer(queue rmq.Queue, id int) {
 }
 
 type BatchConsumer struct {
-	id int
+	id          int
+	TfLBusQueue rmq.Queue
 }
 
 func NewBatchConsumer(id int) *BatchConsumer {
-	return &BatchConsumer{id: id}
+	tfLBusQueue, err := redis_client.QueueConnection.OpenQueue("tfl-bus-queue")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to start notify queue")
+	}
+
+	return &BatchConsumer{id: id, TfLBusQueue: tfLBusQueue}
 }
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
@@ -92,10 +98,10 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		identifiedJourneyID := identifyVehicle(vehicleLocationEvent)
+		identifiedJourneyID := consumer.identifyVehicle(vehicleLocationEvent)
 
 		if identifiedJourneyID != "" {
-			writeModel, err := updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
+			writeModel, err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
 
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
@@ -126,7 +132,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	}
 }
 
-func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
+func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
@@ -154,6 +160,14 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
 			}
 			journey, err = journeyIdentifier.IdentifyJourney()
+
+			// TODO yet another special TfL only thing that shouldn't be here
+			if vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "GB:NOC:TFLO" {
+				tflEventBytes, _ := json.Marshal(map[string]string{
+					"NumberPlate": vehicleLocationEvent.VehicleIdentifier,
+				})
+				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
+			}
 		} else if vehicleLocationEvent.SourceType == "GTFS-RT" {
 			journeyIdentifier := identifiers.GTFSRT{
 				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
@@ -256,7 +270,7 @@ func identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
 	return journeyID
 }
 
-func updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
+func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
 	currentTime := vehicleLocationEvent.RecordedAt
 
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, journeyID)
