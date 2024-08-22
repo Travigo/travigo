@@ -1,6 +1,7 @@
 package gtfs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,21 +10,31 @@ import (
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
 	"github.com/adjust/rmq/v5"
+	"github.com/eko/gocache/lib/v4/cache"
+	"github.com/eko/gocache/lib/v4/store"
+	redisstore "github.com/eko/gocache/store/redis/v4"
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"google.golang.org/protobuf/proto"
 )
 
 type Realtime struct {
 	reader io.Reader
 	queue  rmq.Queue
+
+	redisCache *cache.Cache[string]
 }
 
 func (r *Realtime) SetupRealtimeQueue(queue rmq.Queue) {
 	r.queue = queue
+
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(90*time.Minute))
+
+	r.redisCache = cache.New[string](redisStore)
 }
 
 func (r *Realtime) ParseFile(reader io.Reader) error {
@@ -180,6 +191,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 			r.queue.PublishBytes(locationEventJson)
 
+		} else {
+			if entity.Vehicle != nil && entity.Vehicle.Vehicle != nil && entity.Vehicle.Vehicle.GetId() != "" {
+				vehicleID := entity.Vehicle.Vehicle.GetId()
+
+				// Set cross dataset ID
+				if vehicleID != "" {
+					r.redisCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", dataset.Identifier, vehicleID), "gtfs-rt")
+				}
+			}
 		}
 	}
 
