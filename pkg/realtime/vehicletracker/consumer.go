@@ -150,6 +150,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 
 		// TODO use an interface here to reduce duplication
 		if vehicleLocationEvent.SourceType == "siri-vm" {
+			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
+			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
+			if vehicleLocationEvent.VehicleIdentifier != "" && successVehicleID != "" {
+				identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
+				return ""
+			}
+
 			// TODO only exists here if siri-vm only comes from the 1 source
 			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
 			if vehicleLocationEvent.VehicleIdentifier != "" && failedVehicleID == "" {
@@ -165,8 +172,12 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 			// TODO yet another special TfL only thing that shouldn't be here
 			if err != nil && vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "GB:NOC:TFLO" {
 				tflEventBytes, _ := json.Marshal(map[string]string{
-					"Line":        vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
-					"NumberPlate": vehicleLocationEvent.VehicleIdentifier,
+					"Line":                     vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
+					"DirectionRef":             vehicleLocationEvent.IdentifyingInformation["DirectionRef"],
+					"NumberPlate":              vehicleLocationEvent.VehicleIdentifier,
+					"OriginRef":                vehicleLocationEvent.IdentifyingInformation["OriginRef"],
+					"DestinationRef":           vehicleLocationEvent.IdentifyingInformation["DestinationRef"],
+					"OriginAimedDepartureTime": vehicleLocationEvent.IdentifyingInformation["OriginAimedDepartureTime"],
 				})
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
 				pretty.Println("push to tfl")
@@ -234,6 +245,11 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 		})
 
 		identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
+
+		// Set cross dataset ID
+		if vehicleLocationEvent.VehicleIdentifier != "" {
+			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier), vehicleLocationEvent.SourceType)
+		}
 
 		// Record the successful identification event
 		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
