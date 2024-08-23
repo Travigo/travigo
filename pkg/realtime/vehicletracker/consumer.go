@@ -151,6 +151,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 		// TODO use an interface here to reduce duplication
 		if vehicleLocationEvent.SourceType == "siri-vm" {
 			// TODO only exists here if siri-vm only comes from the 1 source
+			pretty.Println(vehicleLocationEvent.IdentifyingInformation)
 			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
 			pretty.Println(fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier), vehicleLocationEvent.VehicleIdentifier, failedVehicleID)
 			if vehicleLocationEvent.VehicleIdentifier != "" && failedVehicleID == "" {
