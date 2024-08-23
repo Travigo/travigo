@@ -197,7 +197,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 				// Set cross dataset ID
 				if vehicleID != "" {
-					r.redisCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", dataset.LinkedDataset, vehicleID), "gtfs-rt")
+					r.redisCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", dataset.LinkedDataset, vehicleID), "GTFS-RT")
 				}
 			}
 		}
