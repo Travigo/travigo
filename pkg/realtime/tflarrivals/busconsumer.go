@@ -39,8 +39,6 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 			continue
 		}
 
-		log.Info().Interface("event", event).Msg("Received event")
-
 		tripID, err := c.IdentifyBus(event)
 		if err == nil {
 			log.Info().Str("tripid", tripID).Msg("Identified")
@@ -97,7 +95,7 @@ func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
 		}
 	}
 
-	return "", errors.New("Could not be identified")
+	return "", errors.New(fmt.Sprintf("Could not be identified. Count: %d", len(groupedLineArrivals)))
 }
 
 func (c *BusBatchConsumer) Test() {
