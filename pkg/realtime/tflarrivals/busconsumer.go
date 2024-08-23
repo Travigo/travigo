@@ -73,7 +73,7 @@ func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
 	// Group all the arrivals predictions that are part of the same journey
 	groupedLineArrivals := map[string][]ArrivalPrediction{}
 	for _, arrival := range arrivalPredictions {
-		if arrival.VehicleID != event.NumberPlate || arrival.Direction != eventDirection {
+		if arrival.VehicleID != event.NumberPlate {
 			continue
 		}
 
