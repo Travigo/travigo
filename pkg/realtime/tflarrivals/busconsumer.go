@@ -2,7 +2,11 @@ package tflarrivals
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 
 	"github.com/adjust/rmq/v5"
@@ -37,6 +41,12 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 
 		log.Info().Interface("event", event).Msg("Received event")
 
+		tripID, err := c.IdentifyBus(event)
+		if err == nil {
+			log.Info().Str("tripid", tripID).Msg("Identified")
+		} else {
+			log.Info().Interface("event", event).Err(err).Msg("Failed to identify")
+		}
 	}
 
 	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
@@ -44,4 +54,61 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 			log.Fatal().Err(err).Msg("Failed to consume from queue")
 		}
 	}
+}
+
+func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
+	eventDirection := strings.ToLower(event.DirectionRef)
+	if eventDirection == "1" {
+		eventDirection = "inbound"
+	} else if eventDirection == "2" {
+		eventDirection = "outbound"
+	}
+
+	lineTracker := LineArrivalTracker{
+		Line: &TfLLine{
+			LineID: event.Line,
+		},
+	}
+
+	arrivalPredictions := lineTracker.GetLatestArrivals()
+
+	// Group all the arrivals predictions that are part of the same journey
+	groupedLineArrivals := map[string][]ArrivalPrediction{}
+	for _, arrival := range arrivalPredictions {
+		if arrival.VehicleID != event.NumberPlate || arrival.Direction != eventDirection {
+			continue
+		}
+
+		realtimeJourneyID := fmt.Sprintf(
+			"REALTIME:TFL:%s:%s:%s:%s:%s",
+			arrival.ModeName,
+			arrival.LineID,
+			arrival.Direction,
+			arrival.VehicleID,
+			arrival.DestinationNaptanID,
+		)
+
+		groupedLineArrivals[realtimeJourneyID] = append(groupedLineArrivals[realtimeJourneyID], arrival)
+	}
+
+	if len(groupedLineArrivals) == 1 {
+		for _, lineArrival := range groupedLineArrivals {
+			return lineArrival[0].TripID, nil
+		}
+	}
+
+	return "", errors.New("Could not be identified")
+}
+
+func (c *BusBatchConsumer) Test() {
+	value, err := c.IdentifyBus(BusMonitorEvent{
+		Line:                     "269",
+		DirectionRef:             "2",
+		NumberPlate:              "LJ11ABV",
+		OriginRef:                "GB:ATCO:490003975E",
+		DestinationRef:           "GB:ATCO:490003975L",
+		OriginAimedDepartureTime: "2024-08-23T21:53:00+00:00",
+	})
+
+	pretty.Println(value, err)
 }

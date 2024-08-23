@@ -132,6 +132,10 @@ func RegisterCLI() *cli.Command {
 						Timeout:         2 * time.Second,
 						Consumer:        NewBusBatchConsumer(),
 					}
+
+					NewBusBatchConsumer().Test()
+					return nil
+
 					redisConsumer.Setup()
 
 					signals := make(chan os.Signal, 1)

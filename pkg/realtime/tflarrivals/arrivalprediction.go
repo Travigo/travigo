@@ -15,6 +15,8 @@ type ArrivalPrediction struct {
 	Direction    string `json:"direction"`
 	Bearing      string `json:"bearing"`
 
+	TripID string `json:"tripId"`
+
 	DestinationNaptanID string `json:"destinationNaptanId"`
 	DestinationName     string `json:"destinationName"`
 
