@@ -1,0 +1,34 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:9400ZZDLBNK"
+Data:
+  platforms:
+  - primaryidentifier: "GB:ATCO:9400ZZDLBNK1"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLBNK1"
+    primaryname: "Bank DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.08791080098
+      - 51.5121708265
+  - primaryidentifier: "GB:ATCO:9400ZZDLBNK2"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLBNK2"
+    primaryname: "Bank DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.08791080098
+      - 51.5121708265

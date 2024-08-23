@@ -1,0 +1,34 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:9400ZZDLCUT"
+Data:
+  platforms:
+  - primaryidentifier: "GB:ATCO:9400ZZDLCUT1"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLCUT1"
+    primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01065381926
+      - 51.48161464854
+  - primaryidentifier: "GB:ATCO:9400ZZDLCUT2"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLCUT2"
+    primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01065381926
+      - 51.48161464854

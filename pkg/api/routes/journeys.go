@@ -43,10 +43,10 @@ func getJourney(c *fiber.Ctx) error {
 				}, journey.RealtimeJourney)
 			}
 		} else {
-			for _, pathItem := range journey.Path {
-				pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
-				pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
-			}
+			// for _, pathItem := range journey.Path {
+			// 	pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
+			// 	pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+			// }
 
 			transforms.Transform(journey.Service, 1)
 			transforms.Transform(journey.DetailedRailInformation, 1)

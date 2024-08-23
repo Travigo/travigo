@@ -1,0 +1,34 @@
+---
+Collection: stops
+Match:
+  primaryidentifier: "GB:ATCO:9400ZZDLISL"
+Data:
+  platforms:
+  - primaryidentifier: "GB:ATCO:9400ZZDLISL1"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLISL1"
+    primaryname: "Island Gardens DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512
+  - primaryidentifier: "GB:ATCO:9400ZZDLISL2"
+    otheridentifiers:
+      AtcoCode: "9400ZZDLISL2"
+    primaryname: "Island Gardens DLR Station"
+    othernames:
+      Street: "-"
+      Indicator: ""
+      Landmark: ""
+      ShortCommonName: ""
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512
