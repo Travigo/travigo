@@ -152,9 +152,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 		if vehicleLocationEvent.SourceType == "siri-vm" {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
 			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
-			pretty.Println(successVehicleID)
 			if vehicleLocationEvent.VehicleIdentifier != "" && successVehicleID != "" {
-				pretty.Println("okay ignore")
 				identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 				return ""
 			}
