@@ -5,12 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 
 	"github.com/adjust/rmq/v5"
 )
+
+var totalEvents atomic.Uint64
+var successEvents atomic.Uint64
 
 type BusBatchConsumer struct {
 }
@@ -39,13 +43,18 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 			continue
 		}
 
+		totalEvents.Add(1)
+
 		tripID, err := c.IdentifyBus(event)
 		if err == nil {
+			successEvents.Add(1)
 			log.Info().Str("tripid", tripID).Msg("Identified")
 		} else {
 			log.Info().Interface("event", event).Err(err).Msg("Failed to identify")
 		}
 	}
+
+	log.Info().Float64("rate", float64(successEvents.Load())/float64(totalEvents.Load())).Int("total", int(totalEvents.Load())).Int("success", int(successEvents.Load())).Msg("Events rate")
 
 	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
 		for _, err := range ackErrors {
