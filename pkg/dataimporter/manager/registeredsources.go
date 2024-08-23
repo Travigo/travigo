@@ -102,6 +102,8 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
 
+			LinkedDataset: "gb-dft-bods-gtfs-schedule",
+
 			DownloadHandler: func(r *http.Request) {
 				env := util.GetEnvironmentVariables()
 				if env["TRAVIGO_BODS_API_KEY"] == "" {
