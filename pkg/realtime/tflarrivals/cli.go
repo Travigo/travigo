@@ -133,8 +133,8 @@ func RegisterCLI() *cli.Command {
 						Consumer:        NewBusBatchConsumer(),
 					}
 
-					NewBusBatchConsumer().Test()
-					return nil
+					// NewBusBatchConsumer().Test()
+					// return nil
 
 					redisConsumer.Setup()
 
