@@ -29,7 +29,7 @@ type LineArrivalTracker struct {
 	OrderedLineRoutes []OrderedLineRoute
 }
 
-func (l *LineArrivalTracker) Run() {
+func (l *LineArrivalTracker) Run(getRoutes bool) {
 	if l.Line.Service == nil {
 		log.Error().
 			Str("id", l.Line.LineID).
@@ -38,13 +38,15 @@ func (l *LineArrivalTracker) Run() {
 		return
 	}
 
-	l.GetTfLRouteSequences()
-	if len(l.OrderedLineRoutes) == 0 {
-		log.Error().
-			Str("id", l.Line.LineID).
-			Str("type", string(l.Line.TransportType)).
-			Msg("Failed setting up line tracker - couldnt TfL ordered line routes")
-		return
+	if getRoutes {
+		l.GetTfLRouteSequences()
+		if len(l.OrderedLineRoutes) == 0 {
+			log.Error().
+				Str("id", l.Line.LineID).
+				Str("type", string(l.Line.TransportType)).
+				Msg("Failed setting up line tracker - couldnt TfL ordered line routes")
+			return
+		}
 	}
 
 	log.Info().
@@ -255,7 +257,13 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	platformMatchRegex, _ := regexp.Compile("(\\w+) (?:- )?Platform (\\d+)")
 	updatedStops := map[string]bool{}
 	for _, prediction := range predictions {
-		stopID := getStopFromTfLStop(prediction.NaptanID).PrimaryIdentifier
+		stop := getStopFromTfLStop(prediction.NaptanID)
+
+		if stop == nil {
+			continue
+		}
+
+		stopID := stop.PrimaryIdentifier
 
 		scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 		scheduledTime = scheduledTime.In(now.Location())
@@ -484,6 +492,13 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	stopGroupCollection := database.GetCollection("stop_groups")
 	stopCollection := database.GetCollection("stops")
 
+	var stop *ctdf.Stop
+	stopCollection.FindOne(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("GB:ATCO:%s", tflStopID)}).Decode(&stop)
+
+	if stop != nil {
+		return stop
+	}
+
 	var stopGroup *ctdf.StopGroup
 	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers.AtcoCode": tflStopID}).Decode(&stopGroup)
 
@@ -502,7 +517,6 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 		return stop
 	}
 
-	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
 
 	stopTflStopCacheMutex.Lock()

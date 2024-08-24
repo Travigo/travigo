@@ -88,7 +88,7 @@ func (m *TfLMode) GetLines() {
 	}
 }
 
-func (t TrackerManager) Run() {
+func (t TrackerManager) Run(getRoutes bool) {
 	log.Info().Msg("Starting TfL Arrivals & Distuptions Tracker")
 
 	env := util.GetEnvironmentVariables()
@@ -117,6 +117,11 @@ func (t TrackerManager) Run() {
 
 		if mode.TrackArrivals {
 			for _, line := range mode.Lines {
+				// DEBUG
+				if line.LineID != "40" {
+					continue
+				}
+
 				log.Info().
 					Str("mode", mode.ModeID).
 					Str("line", line.LineID).
@@ -130,7 +135,7 @@ func (t TrackerManager) Run() {
 						RefreshRate: mode.ArrivalRefreshRate,
 					}
 
-					lineArrivalTracker.Run()
+					lineArrivalTracker.Run(getRoutes)
 				}(line, mode)
 			}
 		}

@@ -255,7 +255,7 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys:    bson.D{{Key: "validuntil", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(32 * 3600), // Expire after 4 hours
+			Options: options.Index().SetExpireAfterSeconds(32 * 3600), // Expire after 32 hours
 		},
 	}, options.CreateIndexes())
 	if err != nil {
@@ -281,6 +281,18 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bson.D{{Key: "eventtype", Value: 1}},
+		},
+	}, options.CreateIndexes())
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
+
+	// UserPushNotificationTarget
+	tflTrackerCollection := GetCollection("tfl_tracker")
+	_, err = tflTrackerCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "creationdatetime", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
 		},
 	}, options.CreateIndexes())
 	if err != nil {

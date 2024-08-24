@@ -97,7 +97,7 @@ func RegisterCLI() *cli.Command {
 							// },
 						},
 					}
-					trackerManager.Run()
+					trackerManager.Run(true)
 
 					signals := make(chan os.Signal, 1)
 					signal.Notify(signals, syscall.SIGINT)
@@ -124,6 +124,19 @@ func RegisterCLI() *cli.Command {
 					}
 
 					dataaggregator.Setup()
+
+					// trackerManager := TrackerManager{
+					// 	Modes: []*TfLMode{
+					// 		{
+					// 			ModeID:             "bus",
+					// 			TransportType:      ctdf.TransportTypeBus,
+					// 			TrackArrivals:      true,
+					// 			TrackDisruptions:   false,
+					// 			ArrivalRefreshRate: 30 * time.Second,
+					// 		},
+					// 	},
+					// }
+					// trackerManager.Run(false)
 
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "tfl-bus-queue",

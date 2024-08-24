@@ -1,14 +1,17 @@
 package tflarrivals
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/database"
 
 	"github.com/adjust/rmq/v5"
 )
@@ -32,8 +35,16 @@ type BusMonitorEvent struct {
 	OriginAimedDepartureTime string
 }
 
+type TflTracker struct {
+	Line             string
+	TripID           string
+	CreationDateTime time.Time
+}
+
 func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
+
+	tflTrackerCollection := database.GetCollection("tfl_tracker")
 
 	for _, payload := range payloads {
 		var event BusMonitorEvent
@@ -49,6 +60,14 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 		if err == nil {
 			successEvents.Add(1)
 			log.Info().Str("tripid", tripID).Str("line", event.Line).Msg("Identified")
+
+			tflTracker := TflTracker{
+				Line:             event.Line,
+				TripID:           tripID,
+				CreationDateTime: time.Now(),
+			}
+
+			tflTrackerCollection.InsertOne(context.Background(), tflTracker)
 		} else {
 			log.Info().Interface("event", event).Err(err).Msg("Failed to identify")
 		}
