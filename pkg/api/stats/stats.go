@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand/v2"
+	"regexp"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -46,6 +47,7 @@ type recordStatsElasticEvent struct {
 var CurrentRecordsStats *RecordsStats
 
 func UpdateRecordsStats() {
+	tflBusRegex := regexp.MustCompile("gb-tfl-line\\/[0-9]+\\/arrivals")
 	CurrentRecordsStats = &RecordsStats{
 		Stops:     0,
 		Operators: 0,
@@ -169,7 +171,12 @@ func UpdateRecordsStats() {
 						transportTypes[realtimeJourney.Service.TransportType] += 1
 					}
 
-					datasources[realtimeJourney.DataSource.DatasetID] += 1
+					datasetID := realtimeJourney.DataSource.DatasetID
+					if tflBusRegex.MatchString(datasetID) {
+						datasetID = "gb-tfl-line/bus/arrivals"
+					}
+
+					datasources[datasetID] += 1
 
 					// Features
 					if realtimeJourney.Occupancy.OccupancyAvailable {
