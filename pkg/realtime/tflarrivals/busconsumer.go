@@ -48,7 +48,7 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 		tripID, err := c.IdentifyBus(event)
 		if err == nil {
 			successEvents.Add(1)
-			log.Info().Str("tripid", tripID).Msg("Identified")
+			log.Info().Str("tripid", tripID).Str("line", event.Line).Msg("Identified")
 		} else {
 			log.Info().Interface("event", event).Err(err).Msg("Failed to identify")
 		}
