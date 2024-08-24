@@ -27,6 +27,9 @@ type LineArrivalTracker struct {
 	RefreshRate time.Duration
 
 	OrderedLineRoutes []OrderedLineRoute
+
+	RuntimeLineFilter    func(string) bool
+	RuntimeJourneyFilter func(string, string) bool
 }
 
 func (l *LineArrivalTracker) Run(getRoutes bool) {
@@ -59,8 +62,10 @@ func (l *LineArrivalTracker) Run(getRoutes bool) {
 	for {
 		startTime := time.Now()
 
-		arrivals := l.GetLatestArrivals()
-		l.ParseArrivals(arrivals)
+		if l.RuntimeLineFilter(l.Line.LineID) {
+			arrivals := l.GetLatestArrivals()
+			l.ParseArrivals(arrivals)
+		}
 
 		endTime := time.Now()
 		executionDuration := endTime.Sub(startTime)
@@ -151,12 +156,14 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 	// Generate RealtimeJourneys for each group
 	for realtimeJourneyID, predictions := range groupedLineArrivals {
-		realtimeJourneyID := realtimeJourneyID
-		predictions := predictions
+		if l.RuntimeJourneyFilter(l.Line.LineID, predictions[0].TripID) {
+			realtimeJourneyID := realtimeJourneyID
+			predictions := predictions
 
-		p.Go(func() mongo.WriteModel {
-			return l.parseGroupedArrivals(realtimeJourneyID, predictions, datasource)
-		})
+			p.Go(func() mongo.WriteModel {
+				return l.parseGroupedArrivals(realtimeJourneyID, predictions, datasource)
+			})
+		}
 	}
 
 	realtimeJourneyUpdateOperations := p.Wait()

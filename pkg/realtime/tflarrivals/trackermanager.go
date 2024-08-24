@@ -20,6 +20,9 @@ var TfLAppKey string
 
 type TrackerManager struct {
 	Modes []*TfLMode
+
+	RuntimeLineFilter    func(string) bool
+	RuntimeJourneyFilter func(string, string) bool
 }
 
 type TfLLine struct {
@@ -117,11 +120,6 @@ func (t TrackerManager) Run(getRoutes bool) {
 
 		if mode.TrackArrivals {
 			for _, line := range mode.Lines {
-				// DEBUG
-				if line.LineID != "40" {
-					continue
-				}
-
 				log.Info().
 					Str("mode", mode.ModeID).
 					Str("line", line.LineID).
@@ -133,6 +131,9 @@ func (t TrackerManager) Run(getRoutes bool) {
 					lineArrivalTracker := LineArrivalTracker{
 						Line:        line,
 						RefreshRate: mode.ArrivalRefreshRate,
+
+						RuntimeLineFilter:    t.RuntimeLineFilter,
+						RuntimeJourneyFilter: t.RuntimeJourneyFilter,
 					}
 
 					lineArrivalTracker.Run(getRoutes)

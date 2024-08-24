@@ -1,6 +1,7 @@
 package tflarrivals
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func RegisterCLI() *cli.Command {
@@ -96,6 +98,13 @@ func RegisterCLI() *cli.Command {
 							// 	DisruptionRefreshRate: 5 * time.Minute,
 							// },
 						},
+
+						RuntimeLineFilter: func(lineID string) bool {
+							return true
+						},
+						RuntimeJourneyFilter: func(lineID string, tripID string) bool {
+							return true
+						},
 					}
 					trackerManager.Run(true)
 
@@ -125,18 +134,34 @@ func RegisterCLI() *cli.Command {
 
 					dataaggregator.Setup()
 
-					// trackerManager := TrackerManager{
-					// 	Modes: []*TfLMode{
-					// 		{
-					// 			ModeID:             "bus",
-					// 			TransportType:      ctdf.TransportTypeBus,
-					// 			TrackArrivals:      true,
-					// 			TrackDisruptions:   false,
-					// 			ArrivalRefreshRate: 30 * time.Second,
-					// 		},
-					// 	},
-					// }
-					// trackerManager.Run(false)
+					trackerManager := TrackerManager{
+						Modes: []*TfLMode{
+							{
+								ModeID:             "bus",
+								TransportType:      ctdf.TransportTypeBus,
+								TrackArrivals:      true,
+								TrackDisruptions:   false,
+								ArrivalRefreshRate: 30 * time.Second,
+							},
+						},
+
+						RuntimeLineFilter: func(lineID string) bool {
+							tflTrackerCollection := database.GetCollection("tfl_tracker")
+
+							count, _ := tflTrackerCollection.CountDocuments(context.Background(), bson.M{"line": lineID})
+
+							return count != 0
+						},
+
+						RuntimeJourneyFilter: func(lineID string, tripID string) bool {
+							tflTrackerCollection := database.GetCollection("tfl_tracker")
+
+							count, _ := tflTrackerCollection.CountDocuments(context.Background(), bson.M{"line": lineID, "tripid": tripID})
+
+							return count != 0
+						},
+					}
+					trackerManager.Run(false)
 
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "tfl-bus-queue",
@@ -145,9 +170,6 @@ func RegisterCLI() *cli.Command {
 						Timeout:         2 * time.Second,
 						Consumer:        NewBusBatchConsumer(),
 					}
-
-					// NewBusBatchConsumer().Test()
-					// return nil
 
 					redisConsumer.Setup()
 
