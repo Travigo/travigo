@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/exp/slices"
 
@@ -273,12 +274,19 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		stopID := stop.PrimaryIdentifier
 
 		scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
-		scheduledTime = scheduledTime.In(now.Location())
+
+		stopTimezone, _ := time.LoadLocation(stop.Timezone)
+		scheduledTime = scheduledTime.In(stopTimezone)
+
+		pretty.Println(prediction.ExpectedArrival, scheduledTime, scheduledTime.String())
 
 		platform := prediction.PlatformName
 		platformMatches := platformMatchRegex.FindStringSubmatch(platform)
 		if len(platformMatches) == 3 {
 			platform = fmt.Sprintf("%s - %s", platformMatches[2], platformMatches[1])
+		}
+		if platform == "null" {
+			platform = ""
 		}
 
 		realtimeJourney.Stops[stopID] = &ctdf.RealtimeJourneyStops{

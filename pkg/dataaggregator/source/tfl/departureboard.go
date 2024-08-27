@@ -48,6 +48,8 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	now = time.Now()
 	latestDepartureTime := now
 
+	stopTimezone, _ := time.LoadLocation(q.Stop.Timezone)
+
 	// Query for services from the realtime_journeys table
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
@@ -67,7 +69,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
-			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime
+			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime.In(stopTimezone)
 
 			// Skip over this one if we've already past its arrival time (allow 30 second overlap)
 			if scheduledTime.Before(now.Add(-30 * time.Second)) {
