@@ -41,12 +41,16 @@ func Set(c *Cache, key string, object any, expiration time.Duration) {
 }
 
 func Get[T any](c *Cache, key string) (T, error) {
+	currentTime := time.Now()
 	cachedObjecString, err := c.Cache.Get(context.Background(), key)
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - read")
 	var cachedObject T
 
 	if err != nil {
 		return cachedObject, err
 	}
+
+	currentTime = time.Now()
 
 	compressedBytes := bytes.NewReader([]byte(cachedObjecString))
 	gzip, err := gzip.NewReader(compressedBytes)
@@ -58,7 +62,11 @@ func Get[T any](c *Cache, key string) (T, error) {
 		return cachedObject, err
 	}
 
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - dezip")
+
+	currentTime = time.Now()
 	err = json.Unmarshal(uncompressedBytes, &cachedObject)
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - unmarshall")
 
 	return cachedObject, err
 }
