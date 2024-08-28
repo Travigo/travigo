@@ -55,23 +55,23 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			bson.E{Key: "modificationdatetime", Value: 0},
 			bson.E{Key: "direction", Value: 0},
 			bson.E{Key: "path.track", Value: 0},
+			bson.E{Key: "path.associations", Value: 0},
 			bson.E{Key: "path.destinationactivity", Value: 0},
 			bson.E{Key: "path.distance", Value: 0},
 			bson.E{Key: "path.originstop", Value: 0},
 			bson.E{Key: "path.destinationstop", Value: 0},
+			bson.E{Key: "detailedrailinformation", Value: 0},
 		})
 
 		journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
 		if q.Filter != nil {
 			journeyQuery = bson.M{
 				"$and": bson.A{
-					bson.M{"path.originstopref": bson.M{"$in": allStopIDs}},
+					journeyQuery,
 					q.Filter,
 				},
 			}
 		}
-
-		// pretty.Println(journeyQuery)
 
 		cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 		if err != nil {
