@@ -38,7 +38,8 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
-	journeys = FilterIdenticalJourneys(journeys, true)
+	// Dont think this is necessary anymore?
+	// journeys = FilterIdenticalJourneys(journeys, true)
 
 	wg := &sync.WaitGroup{}
 	departureBoardGenerationMutex := sync.Mutex{}
