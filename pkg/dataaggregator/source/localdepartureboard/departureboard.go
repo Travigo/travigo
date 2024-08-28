@@ -108,10 +108,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	currentTime = time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
-	for _, item := range departureBoard {
-		transforms.Transform(item.Journey.Operator, 1)
-		transforms.Transform(item.Journey.Service, 1)
-	}
+	// for _, item := range departureBoard {
+	// 	transforms.Transform(item.Journey.Operator, 1)
+	// 	transforms.Transform(item.Journey.Service, 1)
+	// }
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Transform")
 
 	return departureBoard, nil
