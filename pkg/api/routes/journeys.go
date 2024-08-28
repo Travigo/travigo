@@ -30,7 +30,7 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-		journey.GetRealtimeJourney()
+		journey.GetRealtimeJourney(nil)
 
 		var journeyReduced interface{}
 

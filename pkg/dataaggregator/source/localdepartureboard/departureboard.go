@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/kr/pretty"
+	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+
 	// "github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -38,8 +40,12 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	filterHash.Write([]byte(pretty.Sprint(q.Filter)))
 	filterHashString := fmt.Sprintf("%x", filterHash.Sum(nil))
 
+	currentTime := time.Now()
+
 	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
 	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
+
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeys)).Msg("Get cached journeys")
 
 	if err != nil {
 		journeysCollection := database.GetCollection("journeys")
@@ -87,10 +93,17 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		}
 
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
-		cachedresults.Set(s.CachedResults, cacheItemPath, journeys, 4*time.Hour)
+
+		writeCacheTime := time.Now()
+		reducedJourneys, _ := sheriff.Marshal(&sheriff.Options{
+			Groups: []string{"departureboard-cache"},
+		}, journeys)
+
+		cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 4*time.Hour)
+		log.Debug().Str("Length", time.Now().Sub(writeCacheTime).String()).Msg("Write cache")
 	}
 
-	currentTime := time.Now()
+	currentTime = time.Now()
 	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, q.StartDateTime, true)
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 
@@ -104,15 +117,6 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	} else {
 		departureBoard = departureBoardToday
 	}
-
-	currentTime = time.Now()
-	// Transforming the whole document is incredibly ineffecient
-	// Instead just transform the Operator & Service as those are the key values
-	// for _, item := range departureBoard {
-	// 	transforms.Transform(item.Journey.Operator, 1)
-	// 	transforms.Transform(item.Journey.Service, 1)
-	// }
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Transform")
 
 	return departureBoard, nil
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
@@ -18,7 +19,7 @@ const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
 const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
-	PrimaryIdentifier string            `groups:"basic,departures-llm" bson:",omitempty"`
+	PrimaryIdentifier string            `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
@@ -26,23 +27,23 @@ type Journey struct {
 
 	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
 
-	ServiceRef string   `groups:"internal" bson:",omitempty"`
+	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
-	OperatorRef string    `groups:"internal" bson:",omitempty"`
+	OperatorRef string    `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
 	Direction         string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
-	DepartureTime     time.Time `groups:"basic,departures-llm" bson:",omitempty"`
-	DepartureTimezone string    `groups:"basic" bson:",omitempty"`
+	DepartureTime     time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	DepartureTimezone string    `groups:"basic,departureboard-cache" bson:",omitempty"`
 
 	Track []Location `groups:"detailed" bson:",omitempty"`
 
-	DestinationDisplay string `groups:"basic,departures-llm" bson:",omitempty"`
+	DestinationDisplay string `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 
-	Availability *Availability `groups:"internal" bson:",omitempty"`
+	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 
-	Path []*JourneyPathItem `groups:"detailed" bson:",omitempty"`
+	Path []*JourneyPathItem `groups:"detailed,departureboard-cache" bson:",omitempty"`
 
 	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-" bson:",omitempty"`
 
@@ -84,7 +85,7 @@ func (j *Journey) GetDeepReferences() {
 
 	wg.Wait()
 }
-func (j *Journey) GetRealtimeJourney() {
+func (j *Journey) GetRealtimeJourney(opts *options.FindOneOptions) {
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -93,7 +94,7 @@ func (j *Journey) GetRealtimeJourney() {
 	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
 		"journey.primaryidentifier": j.PrimaryIdentifier,
 		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-	}).Decode(&realtimeJourney)
+	}, opts).Decode(&realtimeJourney)
 
 	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
@@ -181,8 +182,8 @@ func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition b
 }
 
 type JourneyPathItem struct {
-	OriginStopRef      string `groups:"basic"`
-	DestinationStopRef string `groups:"basic"`
+	OriginStopRef      string `groups:"basic,departureboard-cache"`
+	DestinationStopRef string `groups:"basic,departureboard-cache"`
 
 	OriginStop      *Stop `groups:"basic"`
 	DestinationStop *Stop `groups:"basic"`
@@ -195,16 +196,16 @@ type JourneyPathItem struct {
 	OriginArrivalTime      time.Time `groups:"basic"`
 	DestinationArrivalTime time.Time `groups:"basic"`
 
-	OriginDepartureTime time.Time `groups:"basic"`
+	OriginDepartureTime time.Time `groups:"basic,departureboard-cache"`
 
-	DestinationDisplay string `groups:"basic"`
+	DestinationDisplay string `groups:"basic,departureboard-cache"`
 
-	OriginActivity      []JourneyPathItemActivity `groups:"basic"`
+	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 	DestinationActivity []JourneyPathItemActivity `groups:"basic"`
 
 	Track []Location `groups:"basic"`
 
-	Associations []*Association `groups:"detailed" bson:",omitempty"`
+	// Associations []*Association `groups:"detailed" bson:",omitempty"`
 }
 
 func (jpi *JourneyPathItem) GetReferences() {

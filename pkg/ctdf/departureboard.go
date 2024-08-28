@@ -2,10 +2,10 @@ package ctdf
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -33,22 +33,31 @@ const (
 )
 
 func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool) []*DepartureBoard {
-	var departureBoard []*DepartureBoard
 	journeysCollection := database.GetCollection("journeys")
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
+	realtimeJourneyOptions := options.FindOne().SetProjection(bson.D{
+		bson.E{Key: "activelytracked", Value: 1},
+		bson.E{Key: "modificationdatetime", Value: 1},
+		bson.E{Key: "timeoutdurationminutes", Value: 1},
+		bson.E{Key: "stops.*.cancelled", Value: 1},
+		bson.E{Key: "stops.*.platform", Value: 1},
+		bson.E{Key: "stops.*.departuretime", Value: 1},
+		bson.E{Key: "cancelled", Value: 1},
+		bson.E{Key: "vehiclelocation", Value: 1},
+		bson.E{Key: "journey.path.destinationstopref", Value: 1},
+		bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
+	})
+
 	// Dont think this is necessary anymore?
 	// journeys = FilterIdenticalJourneys(journeys, true)
 
-	wg := &sync.WaitGroup{}
-	departureBoardGenerationMutex := sync.Mutex{}
+	p := pool.NewWithResults[*DepartureBoard]()
+	p.WithMaxGoroutines(200)
 
 	for _, journey := range journeys {
-		wg.Add(1)
-		go func(journey *Journey) {
-			defer wg.Done()
-
+		p.Go(func() *DepartureBoard {
 			var stopDepartureTime time.Time
 			var stopPlatform string
 			var stopPlatformType string
@@ -56,7 +65,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
 			if journey.Availability.MatchDate(dateTime) {
-				journey.GetRealtimeJourney()
+				journey.GetRealtimeJourney(realtimeJourneyOptions)
 
 				for _, path := range journey.Path {
 					if slices.Contains(stopRefs, path.OriginStopRef) {
@@ -66,7 +75,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 						// Ignore drop off only stops from the departure board as no one should be getting onto the vehicle at this point
 						if len(path.OriginActivity) == 1 && path.OriginActivity[0] == JourneyPathItemActivitySetdown {
-							return
+							return nil
 						}
 
 						// Use the realtime estimated stop time based if realtime is available
@@ -105,7 +114,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				}
 
 				if stopDepartureTime.Before(dateTime) {
-					return
+					return nil
 				}
 
 				if journey.DetailedRailInformation != nil && journey.DetailedRailInformation.ReplacementBus {
@@ -170,22 +179,28 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 				}
 
-				departureBoardGenerationMutex.Lock()
-				departureBoard = append(departureBoard, &DepartureBoard{
+				return &DepartureBoard{
 					Journey:            journey,
 					Time:               stopDepartureTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
 					Platform:           stopPlatform,
 					PlatformType:       stopPlatformType,
-				})
-				departureBoardGenerationMutex.Unlock()
+				}
 			}
-		}(journey)
 
+			return nil
+		})
 	}
 
-	wg.Wait()
+	departureBoardWithNil := p.Wait()
+	var departureBoard []*DepartureBoard
+
+	for _, i := range departureBoardWithNil {
+		if i != nil {
+			departureBoard = append(departureBoard, i)
+		}
+	}
 
 	return departureBoard
 }

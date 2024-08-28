@@ -8,10 +8,10 @@ import (
 )
 
 type Availability struct {
-	Match          []AvailabilityRule `groups:"basic"` // Must match at least one
-	MatchSecondary []AvailabilityRule `groups:"basic"` // Must match at least one if exists
-	Condition      []AvailabilityRule `groups:"basic"` // Must match all
-	Exclude        []AvailabilityRule `groups:"basic"` // Must not match one
+	Match          []AvailabilityRule `groups:"basic,departureboard-cache"` // Must match at least one
+	MatchSecondary []AvailabilityRule `groups:"basic,departureboard-cache"` // Must match at least one if exists
+	Condition      []AvailabilityRule `groups:"basic,departureboard-cache"` // Must match all
+	Exclude        []AvailabilityRule `groups:"basic,departureboard-cache"` // Must not match one
 }
 
 func (availability *Availability) MatchDate(dateTime time.Time) bool {
@@ -54,9 +54,9 @@ func (availability *Availability) MatchDate(dateTime time.Time) bool {
 }
 
 type AvailabilityRule struct {
-	Type        AvailabilityRecordType `groups:"basic"`
-	Value       string                 `groups:"basic"`
-	Description string                 `groups:"basic"`
+	Type        AvailabilityRecordType `groups:"basic,departureboard-cache"`
+	Value       string                 `groups:"basic,departureboard-cache"`
+	Description string                 `groups:"basic,departureboard-cache"`
 }
 
 type AvailabilityRecordType string

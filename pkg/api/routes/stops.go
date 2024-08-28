@@ -197,6 +197,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 		departureBoard = departureBoard[:count]
 	}
 
+	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
 	for _, item := range departureBoard {
@@ -220,6 +221,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 			"error": "Sherrif could not reduce departureBoard",
 		})
 	}
+
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Prepare departures response")
 
 	return c.JSON(departureBoardReduced)
 }
