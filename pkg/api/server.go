@@ -7,8 +7,10 @@ import (
 	"github.com/travigo/travigo/pkg/http_server"
 )
 
-func SetupServer(listen string) error {
-	go stats.UpdateRecordsStats()
+func SetupServer(listen string, enableStats bool) error {
+	if enableStats {
+		go stats.UpdateRecordsStats()
+	}
 
 	webApp := fiber.New()
 	webApp.Use(http_server.NewLogger())
