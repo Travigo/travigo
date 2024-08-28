@@ -113,8 +113,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					stopPlatformType = "ACTUAL"
 				}
 
-				journey.GetReferences()
-
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
 				// We estimate the current vehicle realtime journey based on the Block Number
 				stopDepartureTimeFromNow := stopDepartureTime.Sub(dateTime).Minutes()
@@ -164,6 +162,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					if lastPathItem.DestinationStop == nil {
 						destinationDisplay = "See Vehicle"
 					} else {
+						journey.GetService()
 						lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
 
 						destinationDisplay = lastPathItem.DestinationStop.PrimaryName
