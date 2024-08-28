@@ -197,6 +197,14 @@ func getStopDepartures(c *fiber.Ctx) error {
 		departureBoard = departureBoard[:count]
 	}
 
+	// Transforming the whole document is incredibly ineffecient
+	// Instead just transform the Operator & Service as those are the key values
+	for _, item := range departureBoard {
+		item.Journey.GetOperator()
+		transforms.Transform(item.Journey.Operator, 1)
+		transforms.Transform(item.Journey.Service, 1)
+	}
+
 	reduceGroupsName := []string{"basic"}
 	if isLLM == "true" {
 		reduceGroupsName = []string{"departures-llm"}
