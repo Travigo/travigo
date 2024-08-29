@@ -180,7 +180,6 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 					"OriginAimedDepartureTime": vehicleLocationEvent.IdentifyingInformation["OriginAimedDepartureTime"],
 				})
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
-				pretty.Println("push to tfl")
 			}
 		} else if vehicleLocationEvent.SourceType == "GTFS-RT" {
 			journeyIdentifier := identifiers.GTFSRT{
@@ -280,6 +279,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 
 			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
 		} else {
+			pretty.Println("skippy do dah")
 			return ""
 		}
 
