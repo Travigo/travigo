@@ -101,12 +101,10 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		identifiedJourneyID := consumer.identifyVehicle(vehicleLocationEvent)
 
 		if identifiedJourneyID != "" {
-			writeModel, err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
+			writeModel, _ := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
 
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
-			} else {
-				log.Debug().Err(err).Interface("event", vehicleLocationEvent.IdentifyingInformation).Msg("Couldnt update realtime journey")
 			}
 		} else {
 			log.Debug().Interface("event", vehicleLocationEvent.IdentifyingInformation).Msg("Couldnt identify journey")
