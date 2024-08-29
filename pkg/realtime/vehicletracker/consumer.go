@@ -12,7 +12,6 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -279,7 +278,6 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 
 			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
 		} else {
-			pretty.Println("skippy do dah")
 			return ""
 		}
 
