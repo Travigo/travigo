@@ -73,6 +73,14 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		if vehiclePosition != nil {
 			trip = vehiclePosition.GetTrip()
 			recordedAtTime = time.Unix(int64(*vehiclePosition.Timestamp), 0)
+
+			recordedAtDifference := time.Now().UTC().Sub(recordedAtTime)
+
+			// Skip any records that haven't been updated in over 20 minutes
+			if recordedAtDifference.Minutes() > 20 {
+				continue
+			}
+
 		} else {
 			recordedAtTime = time.Now()
 		}
