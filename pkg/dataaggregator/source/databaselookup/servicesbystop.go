@@ -36,13 +36,20 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		},
 	}
 
-	opts := options.Find().SetProjection(bson.D{
+	journeyOpts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "serviceref", Value: 1},
+	})
+
+	serviceOpts := options.FindOne().SetProjection(bson.D{
+		bson.E{Key: "creationdatetime", Value: 0},
+		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "otheridentifiers", Value: 0},
+		bson.E{Key: "routes", Value: 0},
 	})
 
 	serviceFound := map[string]bool{}
 
-	cursor, _ := journeysCollection.Find(context.Background(), filter, opts)
+	cursor, _ := journeysCollection.Find(context.Background(), filter, journeyOpts)
 	for cursor.Next(context.Background()) {
 		var journey struct {
 			ServiceRef string
@@ -53,15 +60,14 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 			serviceFound[journey.ServiceRef] = true
 
 			var service *ctdf.Service
-			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.ServiceRef}).Decode(&service)
+			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.ServiceRef}, serviceOpts).Decode(&service)
 
 			if service != nil {
+				transforms.Transform(service, 1)
 				services = append(services, service)
 			}
 		}
 	}
-
-	transforms.Transform(services, 2)
 
 	// Save into cache
 	cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
