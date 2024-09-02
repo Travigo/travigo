@@ -473,7 +473,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 		// Calculate all the estimated stop arrival & departure times
 		for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
 			// Don't update the database if theres no actual change
-			if offset.Seconds() == realtimeJourney.Offset.Seconds() {
+			if (offset.Seconds() == realtimeJourney.Offset.Seconds()) && !newRealtimeJourney {
 				break
 			}
 
