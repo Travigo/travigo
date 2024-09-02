@@ -53,13 +53,6 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
-Data:
-  OperatorRef: "GB:NOC:TFLO"
----
-Type: ctdf.Service
-Group: gb-dft-bods-gtfs-schedule
-Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3104"
 Data:
   OperatorRef: "GB:NOC:TFLO"
@@ -391,13 +384,6 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5819"
-Data:
-  OperatorRef: "GB:NOC:TFLO"
----
-Type: ctdf.Journey
-Group: gb-dft-bods-gtfs-schedule
-Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
 Data:
   OperatorRef: "GB:NOC:TFLO"
 ---

@@ -73,18 +73,18 @@ func RegisterCLI() *cli.Command {
 								ArrivalRefreshRate:    15 * time.Second,
 								DisruptionRefreshRate: 2 * time.Minute,
 							},
+							{
+								ModeID:                "cable-car",
+								TransportType:         ctdf.TransportTypeCableCar,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    45 * time.Second,
+								DisruptionRefreshRate: 5 * time.Minute,
+							},
 
 							// { // HAS ZERO LINES
 							// 	ModeID:                "river-tour",
 							// 	TransportType:         ctdf.TransportTypeFerry,
-							// 	TrackArrivals:         true,
-							// 	TrackDisruptions:      true,
-							// 	ArrivalRefreshRate:    45 * time.Second,
-							// 	DisruptionRefreshRate: 5 * time.Minute,
-							// },
-							// { // NO CTDF SERVICE
-							// 	ModeID:                "cable-car",
-							// 	TransportType:         ctdf.TransportTypeCableCar,
 							// 	TrackArrivals:         true,
 							// 	TrackDisruptions:      true,
 							// 	ArrivalRefreshRate:    45 * time.Second,
