@@ -463,7 +463,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 			time.Duration(int(currentPathPercentageComplete * float64(currentPathTraversalTime.Nanoseconds()))))
 
 		// Offset is how far behind or ahead the vehicle is from its positions expected time
-		offset = currentTime.Sub(currentPathPositionExpectedTime).Round(time.Second)
+		offset = currentTime.Sub(currentPathPositionExpectedTime).Round(15*time.Second)
 
 		// If the offset is too small then just turn it to zero so we can mark buses as on time
 		if offset.Seconds() <= 45 {
