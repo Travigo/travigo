@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 	"time"
@@ -36,7 +37,7 @@ func (d *ModeDisruptionTracker) Run() {
 
 		endTime := time.Now()
 		executionDuration := endTime.Sub(startTime)
-		waitTime := d.RefreshRate - executionDuration
+		waitTime := (d.RefreshRate - executionDuration) + (time.Duration(rand.IntN(45)) * time.Second)
 
 		if waitTime.Seconds() > 0 {
 			time.Sleep(waitTime)
