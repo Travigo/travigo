@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"sort"
@@ -69,7 +70,7 @@ func (l *LineArrivalTracker) Run(getRoutes bool) {
 
 		endTime := time.Now()
 		executionDuration := endTime.Sub(startTime)
-		waitTime := l.RefreshRate - executionDuration
+		waitTime := (l.RefreshRate - executionDuration) + (time.Duration(rand.IntN(3)) * time.Second)
 
 		if waitTime.Seconds() > 0 {
 			time.Sleep(waitTime)
