@@ -106,3 +106,4 @@ Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
 Data:
   OperatorRef: "GB:NOC:TFLO"
+  TransportType: CableCar

@@ -75,7 +75,7 @@ func RegisterCLI() *cli.Command {
 							},
 							{
 								ModeID:                "cable-car",
-								TransportType:         ctdf.TransportTypeTram, //ctdf.TransportTypeCableCar,
+								TransportType:         ctdf.TransportTypeCableCar,
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    45 * time.Second,

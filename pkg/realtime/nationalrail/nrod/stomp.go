@@ -104,7 +104,7 @@ func (s *StompClient) ParseTrainMovementMessages(messagesBytes []byte) {
 
 			reinstatementMessage.Process(s)
 		default:
-			log.Debug().Str("type", message.Header.MsgType).Msg("Unhandled message type")
+			log.Error().Str("type", message.Header.MsgType).Msg("Unhandled message type")
 		}
 	}
 }
