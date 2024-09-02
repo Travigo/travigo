@@ -298,6 +298,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 		{Key: "journey.path", Value: 1},
 		{Key: "journey.departuretimezone", Value: 1},
 		{Key: "nextstopref", Value: 1},
+		{Key: "offset", Value: 1},
 	})
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
@@ -462,7 +463,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 			time.Duration(int(currentPathPercentageComplete * float64(currentPathTraversalTime.Nanoseconds()))))
 
 		// Offset is how far behind or ahead the vehicle is from its positions expected time
-		offset = currentTime.Sub(currentPathPositionExpectedTime)
+		offset = currentTime.Sub(currentPathPositionExpectedTime).Round(time.Second)
 
 		// If the offset is too small then just turn it to zero so we can mark buses as on time
 		if offset.Seconds() <= 45 {
@@ -471,6 +472,11 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 		// Calculate all the estimated stop arrival & departure times
 		for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
+			// Don't update the database if theres no actual change
+			if offset.Seconds() == realtimeJourney.Offset.Seconds() {
+				break
+			}
+
 			path := realtimeJourney.Journey.Path[i]
 
 			arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
