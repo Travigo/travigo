@@ -570,14 +570,11 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 	// Update database
 	updateMap := bson.M{
-		"reliability":          realtimeJourneyReliability,
 		"modificationdatetime": currentTime,
 		"vehiclebearing":       vehicleLocationEvent.Bearing,
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
-		"offset":               offset,
 		"occupancy":            vehicleLocationEvent.Occupancy,
-		"datasource":           vehicleLocationEvent.DataSource,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
 	if vehicleLocationEvent.Location.Type != "" {
@@ -596,6 +593,15 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 
 		updateMap["vehicleref"] = vehicleLocationEvent.VehicleIdentifier
+		updateMap["datasource"] = vehicleLocationEvent.DataSource
+
+		updateMap["reliability"] = realtimeJourneyReliability
+	} else {
+		updateMap["datasource.timestamp"] = vehicleLocationEvent.DataSource.Timestamp
+	}
+
+	if (offset.Seconds() != realtimeJourney.Offset.Seconds()) || newRealtimeJourney {
+		updateMap["offset"] = offset
 	}
 
 	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
