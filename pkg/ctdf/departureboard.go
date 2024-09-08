@@ -51,8 +51,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
 	})
 
-	// Dont think this is necessary anymore?
-	// journeys = FilterIdenticalJourneys(journeys, true)
+	journeys = FilterIdenticalJourneys(journeys, true)
 
 	p := pool.NewWithResults[*DepartureBoard]()
 	p.WithMaxGoroutines(200)

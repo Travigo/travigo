@@ -151,6 +151,14 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Services: true,
 				Journeys: true,
 			},
+			IgnoreObjects: datasets.IgnoreObjects{
+				Services: datasets.IgnoreObjectServiceJourney{
+					ByOperator: []string{"GB:NOC:NATX"},
+				},
+				Journeys: datasets.IgnoreObjectServiceJourney{
+					ByOperator: []string{"GB:NOC:NATX"},
+				},
+			},
 
 			DownloadHandler: func(r *http.Request) {
 				env := util.GetEnvironmentVariables()
@@ -159,6 +167,20 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				}
 
 				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+			},
+		},
+		{
+			Identifier: "gb-dft-bods-transxchange-coach",
+			Format:     datasets.DataSetFormatTransXChange,
+			Provider: datasets.Provider{
+				Name:    "Department for Transport",
+				Website: "https://www.gov.uk/government/organisations/department-for-transport",
+			},
+			Source:       "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Services: true,
+				Journeys: true,
 			},
 		},
 		{

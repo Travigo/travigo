@@ -242,6 +242,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			operatorRef = fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsRoute.AgencyID)
 		}
 
+		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
+			continue
+		}
+
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
 			OtherIdentifiers: map[string]string{
@@ -290,6 +294,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	for _, trip := range g.Trips {
 		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, trip.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, trip.RouteID)
+		operatorRef := ctdfServices[trip.RouteID].OperatorRef
+
+		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
+			continue
+		}
 
 		availability := &ctdf.Availability{}
 		// Calendar availability
@@ -336,7 +345,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
 			ServiceRef:           serviceID,
-			OperatorRef:          ctdfServices[trip.RouteID].OperatorRef,
+			OperatorRef:          operatorRef,
 			// Direction:            trip.DirectionID,
 			DestinationDisplay: trip.Headsign,
 			DepartureTimezone:  agenciesMap[routeMap[trip.RouteID].AgencyID].Timezone,

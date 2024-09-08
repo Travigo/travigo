@@ -46,9 +46,12 @@ cronjobs:
     schedule: "30 4 * * 6"
     args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
   - name: gb-bods-gtfs-timetable
-    schedule: "20 6 * * *"
+    schedule: "10 6 * * *"
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-schedule"]
     batchburst: true
+  - name: gb-bods-transxchange-coach
+    schedule: "40 6 * * *"
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-transxchange-coach"]
   - name: ie-gtfs-schedule
     schedule: "50 6 * * *"
     args: ["data-importer", "dataset", "--id", "ie-gtfs-schedule"]

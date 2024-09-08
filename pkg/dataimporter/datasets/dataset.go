@@ -16,6 +16,7 @@ type DataSet struct {
 
 	UnpackBundle      BundleFormat
 	SupportedObjects  SupportedObjects
+	IgnoreObjects     IgnoreObjects
 	ImportDestination ImportDestination
 
 	LinkedDataset string
