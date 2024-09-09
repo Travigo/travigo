@@ -145,7 +145,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if location.Arrival != nil {
-				arrivalTime, err := location.Arrival.GetTiming()
+				arrivalTime, err := location.Arrival.GetTiming(journeyDate)
 
 				if err == nil {
 					journeyStop.ArrivalTime = arrivalTime
@@ -154,7 +154,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if location.Departure != nil {
-				departureTime, err := location.Departure.GetTiming()
+				departureTime, err := location.Departure.GetTiming(journeyDate)
 
 				if err == nil {
 					journeyStop.DepartureTime = departureTime
