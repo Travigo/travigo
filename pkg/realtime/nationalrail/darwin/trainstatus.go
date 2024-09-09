@@ -63,7 +63,7 @@ func (t *TrainStatusTiming) GetTiming(referenceDate time.Time) (time.Time, error
 	statusTime, err := time.Parse("15:04", statusTimeString)
 
 	statusDateTime := time.Date(
-		referenceDate.Year(), referenceDate.Month(), referenceDateTime.Day(),
+		referenceDate.Year(), referenceDate.Month(), referenceDate.Day(),
 		statusTime.Hour(), statusTime.Minute(), statusTime.Second(), statusTime.Nanosecond(), referenceDate.Location(),
 	)
 
