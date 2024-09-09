@@ -39,7 +39,7 @@ type TrainStatusTiming struct {
 	Delayed string `xml:"delayed,attr"`
 }
 
-func (t *TrainStatusTiming) GetTiming(referenceDate time.Time) (time.Time, error) {
+func (t *TrainStatusTiming) GetTiming() (time.Time, error) {
 	var statusTimeString string
 
 	if t.ET != "" {
@@ -61,13 +61,7 @@ func (t *TrainStatusTiming) GetTiming(referenceDate time.Time) (time.Time, error
 	}
 
 	statusTime, err := time.Parse("15:04", statusTimeString)
-
-	statusDateTime := time.Date(
-		referenceDate.Year(), referenceDate.Month(), referenceDate.Day(),
-		statusTime.Hour(), statusTime.Minute(), statusTime.Second(), statusTime.Nanosecond(), referenceDate.Location(),
-	)
-
-	return statusDateTime, err
+	return statusTime, err
 }
 
 type TrainStatusPlatform struct {
