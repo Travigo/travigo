@@ -64,7 +64,8 @@ func (doc *TransXChange) Validate() error {
 func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
 	datasource.OriginalFormat = "transxchange"
 
-	transportType := ctdf.TransportTypeCoach
+	var transportType ctdf.TransportType
+	transportType = ctdf.TransportTypeCoach
 
 	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
 
