@@ -27,6 +27,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
@@ -74,6 +75,8 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 		format = &gtfs.Realtime{}
 	case datasets.DataSetFormatCIF:
 		format = &cif.CommonInterfaceFormat{}
+	case datasets.DataSetFormatTransXChange:
+		format = &transxchange.TransXChange{}
 	default:
 		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}

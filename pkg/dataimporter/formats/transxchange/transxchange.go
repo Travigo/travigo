@@ -17,6 +17,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -59,8 +61,10 @@ func (doc *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.TransportType, overrides map[string]string) {
+func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
 	datasource.OriginalFormat = "transxchange"
+
+	transportType := ctdf.TransportTypeCoach
 
 	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
 
@@ -123,10 +127,8 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 				}
 			}
 
-			// TODO clean this up
-			// This is a temporary way of doing overrides for TfL import until https://github.com/travigo/travigo/issues/46 is done
-			if overrides["OperatorRef"] != "" {
-				operatorRef = overrides["OperatorRef"]
+			if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
+				continue
 			}
 
 			serviceIdentifier := fmt.Sprintf("%s:%s:%s", operatorRef, txcService.ServiceCode, txcLine.ID)
@@ -312,7 +314,7 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 				service := servicesReferences[serviceRef]
 
 				if service == nil {
-					log.Error().Msgf("Failed to find referenced service in vehicle journey %s", txcJourney.VehicleJourneyCode)
+					log.Debug().Msgf("Failed to find referenced service %s in vehicle journey %s", serviceRef, txcJourney.VehicleJourneyCode)
 					continue
 				}
 
@@ -344,10 +346,8 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 					}
 				}
 
-				// TODO clean this up
-				// This is a temporary way of doing overrides for TfL import until https://github.com/travigo/travigo/issues/46 is done
-				if overrides["OperatorRef"] != "" {
-					operatorRef = overrides["OperatorRef"]
+				if util.ContainsString(dataset.IgnoreObjects.Journeys.ByOperator, operatorRef) {
+					continue
 				}
 
 				journeyPattern := journeyPatternReferences[serviceRef][txcJourney.JourneyPatternRef]
@@ -703,4 +703,6 @@ func (doc *TransXChange) Import(datasource *ctdf.DataSource, transportType ctdf.
 	log.Debug().Msgf(" - %d updates", journeyOperationUpdate)
 
 	log.Debug().Msgf("Successfully imported into MongoDB")
+
+	return nil
 }

@@ -177,10 +177,18 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Website: "https://www.gov.uk/government/organisations/department-for-transport",
 			},
 			Source:       "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip",
-			UnpackBundle: datasets.BundleFormatNone,
+			UnpackBundle: datasets.BundleFormatZIP,
 			SupportedObjects: datasets.SupportedObjects{
 				Services: true,
 				Journeys: true,
+			},
+			IgnoreObjects: datasets.IgnoreObjects{
+				Services: datasets.IgnoreObjectServiceJourney{
+					ByOperator: []string{"GB:NOC:APBX", "GB:NOC:BHAT", "GB:NOC:FLIX", "GB:NOC:MEGA", "GB:NOC:SCLK", "GB:NOC:ULSL"},
+				},
+				Journeys: datasets.IgnoreObjectServiceJourney{
+					ByOperator: []string{"GB:NOC:APBX", "GB:NOC:BHAT", "GB:NOC:FLIX", "GB:NOC:MEGA", "GB:NOC:SCLK", "GB:NOC:ULSL"},
+				},
 			},
 		},
 		{

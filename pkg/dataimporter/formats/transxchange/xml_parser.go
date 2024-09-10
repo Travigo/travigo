@@ -8,9 +8,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
-	transXChange := TransXChange{}
-
+func (transXChange *TransXChange) ParseFile(reader io.Reader) error {
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel
 	for {
@@ -20,7 +18,7 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return nil, err
+			return err
 		}
 
 		switch ty := tok.(type) {
@@ -41,7 +39,7 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 
 				validate := transXChange.Validate()
 				if validate != nil {
-					return nil, validate
+					return validate
 				}
 			} else if ty.Name.Local == "StopPoint" {
 				var stopPoint StopPoint
@@ -120,5 +118,5 @@ func ParseXMLFile(reader io.Reader) (*TransXChange, error) {
 	log.Debug().Msgf(" - Contains %d route sections", len(transXChange.RouteSections))
 	log.Debug().Msgf(" - Contains %d vehicle journeys", len(transXChange.VehicleJourneys))
 
-	return &transXChange, nil
+	return nil
 }
