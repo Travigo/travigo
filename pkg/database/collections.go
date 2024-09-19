@@ -13,6 +13,7 @@ func createIndexes() {
 	createStopsIndexes()
 	createOperatorsIndexes()
 	createJourneysIndexes()
+	createRealtimeIndexes()
 }
 
 func createStopsIndexes() {
@@ -98,6 +99,45 @@ func createOperatorsIndexes() {
 
 	opts = options.CreateIndexes()
 	_, err = operatorGroupsCollection.Indexes().CreateMany(context.Background(), operatorGroupsIndex, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
+}
+
+func createRealtimeIndexes() {
+	// RealtimeJourneys
+	realtimeJourneysCollection := GetCollection("realtime_journeys")
+	_, err := realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "journey.primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "stops.$**", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers.nationalrailrid", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers.TrainID", Value: 1}},
+		},
+		{
+			Keys: bson.D{
+				{Key: "datasource.provider", Value: 1},
+				{Key: "datasource.datasetid", Value: 1},
+				{Key: "datasource.timestamp", Value: 1},
+			},
+		},
+		{
+			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
+		},
+		{
+			Keys: bson.D{{Key: "activelytracked", Value: 1}},
+		},
+	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
 	}
@@ -192,43 +232,6 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bson.D{{Key: "otheridentifiers.GTFS-TripID", Value: 1}},
-		},
-	}, options.CreateIndexes())
-	if err != nil {
-		log.Error().Err(err).Msg("Creating Index")
-	}
-
-	// RealtimeJourneys
-	realtimeJourneysCollection := GetCollection("realtime_journeys")
-	_, err = realtimeJourneysCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{
-			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "journey.primaryidentifier", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "stops.$**", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "otheridentifiers.nationalrailrid", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "otheridentifiers.TrainID", Value: 1}},
-		},
-		{
-			Keys: bson.D{
-				{Key: "datasource.provider", Value: 1},
-				{Key: "datasource.datasetid", Value: 1},
-				{Key: "datasource.timestamp", Value: 1},
-			},
-		},
-		{
-			Keys:    bson.D{{Key: "modificationdatetime", Value: 1}},
-			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
-		},
-		{
-			Keys: bson.D{{Key: "activelytracked", Value: 1}},
 		},
 	}, options.CreateIndexes())
 	if err != nil {

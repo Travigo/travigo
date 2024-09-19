@@ -17,11 +17,30 @@ type MongoInstance struct {
 }
 
 var Instance *MongoInstance
+var RealtimeJourneyInstance *MongoInstance
 
 const defaultConnectionString = "mongodb://localhost:27017/"
 const defaultDatabase = "travigo"
 
 func Connect() error {
+	err := ConnectStandard()
+	if err != nil {
+		return err
+	}
+
+	err = ConnectRealtime()
+	if err != nil {
+		return err
+	}
+
+	createIndexes()
+
+	runCommands()
+
+	return nil
+}
+
+func ConnectStandard() error {
 	connectionString := defaultConnectionString
 	dbName := defaultDatabase
 
@@ -56,15 +75,56 @@ func Connect() error {
 		return err
 	}
 
-	createIndexes()
+	return nil
+}
 
-	runCommands()
+func ConnectRealtime() error {
+	env := util.GetEnvironmentVariables()
+
+	if env["TRAVIGO_REALTIME_MONGODB_CONNECTION"] == "" {
+		return nil
+	}
+	connectionString := env["TRAVIGO_REALTIME_MONGODB_CONNECTION"]
+
+	if env["TRAVIGO_REALTIME_MONGODB_DATABASE"] == "" {
+		return nil
+	}
+	dbName := env["TRAVIGO_REALTIME_MONGODB_DATABASE"]
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
+
+	database := client.Database(dbName)
+
+	if err != nil {
+		return err
+	}
+
+	RealtimeJourneyInstance = &MongoInstance{
+		Client:   client,
+		Database: database,
+	}
+
+	err = client.Ping(context.Background(), nil)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
+func GetInstance(collectionName string) *MongoInstance {
+	if collectionName == "realtime_journeys" && RealtimeJourneyInstance != nil {
+		return RealtimeJourneyInstance
+	} else {
+		return Instance
+	}
+}
+
 func GetCollection(collectionName string) *mongo.Collection {
-	return Instance.Database.Collection(collectionName)
+	return GetInstance(collectionName).Database.Collection(collectionName)
 }
 
 // Requires
@@ -76,7 +136,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 
 func runCommands() {
 	var result bson.M
-	err := Instance.Database.RunCommand(context.Background(), bson.D{
+	err := GetInstance("realtime_journeys").Database.RunCommand(context.Background(), bson.D{
 		{Key: "collMod", Value: "realtime_journeys"},
 		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
 	}).Decode(&result)
