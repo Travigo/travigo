@@ -36,36 +36,27 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		},
 	}
 
-	journeyOpts := options.Find().SetProjection(bson.D{
-		bson.E{Key: "serviceref", Value: 1},
-	})
+	serviceRefs, err := journeysCollection.Distinct(context.Background(), "serviceref", filter)
+
+	if err != nil {
+		return nil, err
+	}
 
 	serviceOpts := options.FindOne().SetProjection(bson.D{
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "otheridentifiers", Value: 0},
 		bson.E{Key: "routes", Value: 0},
+		bson.E{Key: "stopnameoverrides", Value: 0},
 	})
 
-	serviceFound := map[string]bool{}
+	for _, serviceRef := range serviceRefs {
+		var service *ctdf.Service
+		servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceRef}, serviceOpts).Decode(&service)
 
-	cursor, _ := journeysCollection.Find(context.Background(), filter, journeyOpts)
-	for cursor.Next(context.Background()) {
-		var journey struct {
-			ServiceRef string
-		}
-		cursor.Decode(&journey)
-
-		if !serviceFound[journey.ServiceRef] {
-			serviceFound[journey.ServiceRef] = true
-
-			var service *ctdf.Service
-			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journey.ServiceRef}, serviceOpts).Decode(&service)
-
-			if service != nil {
-				transforms.Transform(service, 1)
-				services = append(services, service)
-			}
+		if service != nil {
+			transforms.Transform(service, 1)
+			services = append(services, service)
 		}
 	}
 
