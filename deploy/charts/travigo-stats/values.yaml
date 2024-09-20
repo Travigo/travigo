@@ -5,6 +5,9 @@
 database:
   connectionStringSecret: travigo-mongodb-admin-travigo
   database: travigo
+  realtime:
+    connectionStringSecret: travigo-realtime-mongodb-travigo
+    database: travigo
 
 elasticsearch:
   address: "https://primary-es-http.elastic:9200"

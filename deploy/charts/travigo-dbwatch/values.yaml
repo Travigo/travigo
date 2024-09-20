@@ -7,6 +7,9 @@ replicaCount: 1
 database:
   connectionStringSecret: travigo-mongodb-admin-travigo
   database: travigo
+  realtime:
+    connectionStringSecret: travigo-realtime-mongodb-travigo
+    database: travigo
 
 redis:
   address: "redis-headless.redis:6379"

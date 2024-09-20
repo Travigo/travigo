@@ -50,6 +50,14 @@ spec:
                   optional: false
             - name: TRAVIGO_MONGODB_DATABASE
               value: {{ $.Values.database.database }}
+            - name: TRAVIGO_REALTIME_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.database.realtime.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: TRAVIGO_REALTIME_MONGODB_DATABASE
+              value: {{ $.Values.database.realtime.database }}
             - name: TRAVIGO_REDIS_ADDRESS
               value: {{ $.Values.redis.address }}
             - name: TRAVIGO_REDIS_PASSWORD
