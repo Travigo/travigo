@@ -87,14 +87,14 @@ spec:
                       optional: false
                 - name: TRAVIGO_MONGODB_DATABASE
                   value: {{ $.Values.database.database }}
-                - name: TRAVIGO_REALTIME_MONGODB_CONNECTION
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $.Values.database.realtime.connectionStringSecret }}
-                      key: connectionString.standard
-                      optional: false
-                - name: TRAVIGO_REALTIME_MONGODB_DATABASE
-                  value: {{ $.Values.database.realtime.database }}
+                # - name: TRAVIGO_REALTIME_MONGODB_CONNECTION
+                #   valueFrom:
+                #     secretKeyRef:
+                #       name: {{ $.Values.database.realtime.connectionStringSecret }}
+                #       key: connectionString.standard
+                #       optional: false
+                # - name: TRAVIGO_REALTIME_MONGODB_DATABASE
+                #   value: {{ $.Values.database.realtime.database }}
                 - name: TRAVIGO_ELASTICSEARCH_ADDRESS
                   value: {{ $.Values.elasticsearch.address }}
                 - name: TRAVIGO_ELASTICSEARCH_USERNAME
