@@ -23,9 +23,6 @@ type JourneyDetailedRail struct {
 	DisabledAccess bool `groups:"detailed"`
 	BicycleSpaces  bool `groups:"detailed"`
 
-	DriverOnly    bool `groups:"detailed"`
-	GuardRequired bool `groups:"detailed"`
-
 	ReservationRequired     bool `groups:"detailed"`
 	ReservationBikeRequired bool `groups:"detailed"`
 	ReservationRecommended  bool `groups:"detailed"`
