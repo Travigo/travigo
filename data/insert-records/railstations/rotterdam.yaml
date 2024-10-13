@@ -5,10 +5,10 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:ROTTCS"
   otheridentifiers:
-    - GB:ATCO:9100ROTTCS
-    - GB:TIPLOC:ROTTCS
-    - GB:CRS:ROT
-    - GB:STANOX:918
+    - "GB:ATCO:9100ROTTCS"
+    - "GB:TIPLOC:ROTTCS"
+    - "GB:CRS:ROT"
+    - "GB:STANOX:918"
   primaryname: Rotterdam Central
   othernames:
     ShortCommonName: ""

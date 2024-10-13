@@ -6,7 +6,7 @@ Data:
   platforms:
   - primaryidentifier: "GB:ATCO:9400ZZDLBNK1"
     otheridentifiers:
-      - "9400ZZDLBNK1"
+      - "GB:ATCO:9400ZZDLBNK1"
     primaryname: "Bank DLR Station"
     othernames:
       Street: "-"
@@ -20,7 +20,7 @@ Data:
       - 51.5121708265
   - primaryidentifier: "GB:ATCO:9400ZZDLBNK2"
     otheridentifiers:
-      - "9400ZZDLBNK2"
+      - "GB:ATCO:9400ZZDLBNK2"
     primaryname: "Bank DLR Station"
     othernames:
       Street: "-"

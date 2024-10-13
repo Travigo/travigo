@@ -4,5 +4,5 @@ Match:
   PrimaryIdentifier: "GB:ATCO:9100EBSFLTI"
 Data:
   OtherIdentifiers:
-    - GB:TIPLOC:EBSFLTI
-    - GB:STANOX:89530
+    - "GB:TIPLOC:EBSFLTI"
+    - "GB:STANOX:89530"

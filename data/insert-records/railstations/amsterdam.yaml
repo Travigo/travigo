@@ -5,10 +5,10 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:AMSTDAM"
   otheridentifiers:
-    - GB:ATCO:9100AMSTDAM
-    - GB:TIPLOC:AMSTDAM
-    - GB:CRS:AMS
-    - GB:STANOX950
+    - "GB:ATCO:9100AMSTDAM"
+    - "GB:TIPLOC:AMSTDAM"
+    - "GB:CRS:AMS"
+    - "GB:STANOX950"
   primaryname: Amsterdam Central
   othernames:
     ShortCommonName: ""
