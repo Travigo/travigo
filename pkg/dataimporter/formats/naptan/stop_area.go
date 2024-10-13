@@ -28,9 +28,7 @@ func (orig *StopArea) ToCTDF() *ctdf.StopGroup {
 
 	ctdfStopGroup := ctdf.StopGroup{
 		PrimaryIdentifier: fmt.Sprintf(ctdf.StopGroupIDFormat, orig.StopAreaCode),
-		OtherIdentifiers: map[string]string{
-			"AtcoCode": orig.StopAreaCode,
-		},
+		OtherIdentifiers:  []string{fmt.Sprintf("GB:ATCO:%s", orig.StopAreaCode)},
 
 		Name:                 orig.Name,
 		Status:               orig.Status,

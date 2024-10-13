@@ -237,13 +237,12 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				stop := stopPoint.ToCTDF()
 				stationStop.Platforms = append(stationStop.Platforms, &ctdf.StopPlatform{
 					PrimaryIdentifier: stop.PrimaryIdentifier,
-					OtherIdentifiers:  stop.OtherIdentifiers,
 
 					PrimaryName: stop.PrimaryName,
-					OtherNames:  stop.OtherNames,
 
 					Location: stop.Location,
 				})
+				stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)
 			} else {
 				// TMU - Metro/tram
 				// RSE - Rail
@@ -252,13 +251,12 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					stop := stopPoint.ToCTDF()
 					stationStop.Entrances = append(stationStop.Entrances, &ctdf.StopEntrance{
 						PrimaryIdentifier: stop.PrimaryIdentifier,
-						OtherIdentifiers:  stop.OtherIdentifiers,
 
 						PrimaryName: stop.PrimaryName,
-						OtherNames:  stop.OtherNames,
 
 						Location: stop.Location,
 					})
+					stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)
 				}
 			}
 		}

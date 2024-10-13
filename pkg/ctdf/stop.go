@@ -34,21 +34,17 @@ type Stop struct {
 }
 
 type StopPlatform struct {
-	PrimaryIdentifier string   `groups:"basic"`
-	OtherIdentifiers  []string `groups:"basic"`
+	PrimaryIdentifier string `groups:"basic"`
 
-	PrimaryName string            `groups:"basic"`
-	OtherNames  map[string]string `groups:"basic"`
+	PrimaryName string `groups:"basic"`
 
 	Location *Location `groups:"detailed"`
 }
 
 type StopEntrance struct {
-	PrimaryIdentifier string   `groups:"basic"`
-	OtherIdentifiers  []string `groups:"basic"`
+	PrimaryIdentifier string `groups:"basic"`
 
-	PrimaryName string            `groups:"basic"`
-	OtherNames  map[string]string `groups:"basic"`
+	PrimaryName string `groups:"basic"`
 
 	Location *Location `groups:"detailed"`
 }

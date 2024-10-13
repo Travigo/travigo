@@ -12,8 +12,8 @@ import (
 const StopGroupIDFormat = "GB:STOPGRP:%s"
 
 type StopGroup struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string   `groups:"basic"`
+	OtherIdentifiers  []string `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
