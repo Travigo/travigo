@@ -6,7 +6,7 @@ Data:
   platforms:
   - primaryidentifier: "GB:ATCO:9400ZZLUCAR1"
     otheridentifiers:
-      AtcoCode: "9400ZZLUCAR1"
+      - "9400ZZLUCAR1"
     primaryname: "Caledonian Road Underground Station"
     location:
       type: "Point"
@@ -15,7 +15,7 @@ Data:
       - 51.54875428024
   - primaryidentifier: "GB:ATCO:9400ZZLUCAR2"
     otheridentifiers:
-      AtcoCode: "9400ZZLUCAR2"
+      - "9400ZZLUCAR2"
     primaryname: "Caledonian Road Underground Station"
     location:
       type: "Point"

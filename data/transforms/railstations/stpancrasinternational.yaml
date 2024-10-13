@@ -4,5 +4,5 @@ Match:
   PrimaryIdentifier: "GB:ATCO:9100STPANCI"
 Data:
   OtherIdentifiers:
-    Tiploc: "STPANCI"
-    STANOX: "63631"
+    - GB:TIPLOC:STPANCI
+    - GB:STANOX:63631

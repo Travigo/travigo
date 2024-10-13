@@ -5,10 +5,10 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:PARISND"
   otheridentifiers:
-    AtcoCode: 9100PARISND
-    Tiploc: PARISND
-    Crs: PBN
-    STANOX: "750"
+    - GB:ATCOCODE:9100PARISND
+    - GB:TIPLOC:PARISND
+    - GB:CRS:PBN
+    - GB:STANOX:750
   primaryname: Paris Gare du Nord
   othernames:
     ShortCommonName: ""

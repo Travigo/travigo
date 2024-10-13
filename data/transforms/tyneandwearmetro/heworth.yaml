@@ -1,8 +1,0 @@
----
-Type: ctdf.Stop
-Match:
-  PrimaryIdentifier: "GB:ATCO:9400ZZTWHPW"
-Data:
-  OtherIdentifiers:
-    Tiploc: "HEWOMTR"
-    STANOX: "13157"

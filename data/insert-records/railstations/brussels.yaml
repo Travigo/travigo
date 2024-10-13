@@ -5,10 +5,10 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:BRUXMID"
   otheridentifiers:
-    AtcoCode: 9100BRUXMID
-    Tiploc: BRUXMID
-    Crs: BXS
-    STANOX: "850"
+    - GB:ATCOCODE:9100BRUXMID
+    - GB:TIPLOC:BRUXMID
+    - GB:CRS:BXS
+    - GB:STANOX:850
   primaryname: Brussels-South
   othernames:
     ShortCommonName: ""
