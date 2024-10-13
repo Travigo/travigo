@@ -513,7 +513,7 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	}
 
 	var stopGroup *ctdf.StopGroup
-	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:ATCOCODE:%s", tflStopID)}).Decode(&stopGroup)
+	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:ATCO:%s", tflStopID)}).Decode(&stopGroup)
 
 	if stopGroup == nil {
 		var stop *ctdf.Stop

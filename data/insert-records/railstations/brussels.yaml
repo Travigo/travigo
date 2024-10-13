@@ -5,7 +5,7 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:BRUXMID"
   otheridentifiers:
-    - GB:ATCOCODE:9100BRUXMID
+    - GB:ATCO:9100BRUXMID
     - GB:TIPLOC:BRUXMID
     - GB:CRS:BXS
     - GB:STANOX:850

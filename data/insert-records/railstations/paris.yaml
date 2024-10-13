@@ -5,7 +5,7 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:PARISND"
   otheridentifiers:
-    - GB:ATCOCODE:9100PARISND
+    - GB:ATCO:9100PARISND
     - GB:TIPLOC:PARISND
     - GB:CRS:PBN
     - GB:STANOX:750

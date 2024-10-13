@@ -5,7 +5,7 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:AMSTDAM"
   otheridentifiers:
-    - GB:ATCOCODE:9100AMSTDAM
+    - GB:ATCO:9100AMSTDAM
     - GB:TIPLOC:AMSTDAM
     - GB:CRS:AMS
     - GB:STANOX950

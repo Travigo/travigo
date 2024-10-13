@@ -5,7 +5,7 @@ Match:
 Data:
   primaryidentifier: "GB:ATCO:ROTTCS"
   otheridentifiers:
-    - GB:ATCOCODE:9100ROTTCS
+    - GB:ATCO:9100ROTTCS
     - GB:TIPLOC:ROTTCS
     - GB:CRS:ROT
     - GB:STANOX:918
