@@ -21,6 +21,12 @@ func SetupClient() {
 			if !fileInfo.IsDir() {
 				log.Debug().Str("path", path).Msg("Loading transforms file")
 
+				extension := filepath.Ext(path)
+
+				if extension != ".yaml" {
+					return nil
+				}
+
 				transformYaml, err := os.ReadFile(path)
 				if err != nil {
 					return err
