@@ -3,6 +3,7 @@ package networkrailcorpus
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -46,13 +47,13 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 		}
 
 		var stop ctdf.Stop
-		err := stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Tiploc": tiploc}).Decode(&stop)
+		err := stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:TIPLOC:%s", tiploc)}).Decode(&stop)
 
 		if err != nil {
 			continue
 		}
 
-		bsonRep, _ := bson.Marshal(bson.M{"$set": bson.M{"otheridentifiers.STANOX": stanox}})
+		bsonRep, _ := bson.Marshal(bson.M{"$push": bson.M{"otheridentifiers": fmt.Sprintf("GB:STANOX:%s", stanox)}})
 		updateModel := mongo.NewUpdateOneModel()
 		updateModel.SetFilter(bson.M{"primaryidentifier": stop.PrimaryIdentifier})
 		updateModel.SetUpdate(bsonRep)

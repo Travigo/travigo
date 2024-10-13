@@ -122,7 +122,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		for _, location := range trainStatus.Locations {
-			stop := stopCache.Get("Tiploc", location.TPL)
+			stop := stopCache.Get(fmt.Sprintf("GB:TIPLOC:%s", location.TPL))
 
 			if stop == nil {
 				log.Debug().Str("tiploc", location.TPL).Msg("Failed to find stop")
@@ -275,7 +275,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		cancelCount := 0
 
 		for _, scheduleStop := range scheduleStops {
-			stop := stopCache.Get("Tiploc", scheduleStop.Tiploc)
+			stop := stopCache.Get(fmt.Sprintf("GB:TIPLOC:%s", scheduleStop.Tiploc))
 
 			if stop == nil {
 				log.Error().Str("tiploc", scheduleStop.Tiploc).Msg("Failed to find stop for schedule update")
@@ -402,7 +402,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			for _, station := range stationMessage.Stations {
 				var stop *ctdf.Stop
-				stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers.Crs": station.CRS}).Decode(&stop)
+				stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:CRS:%s", station.CRS)}).Decode(&stop)
 
 				if stop != nil {
 					matchedIdentifiers = append(matchedIdentifiers, stop.PrimaryIdentifier)

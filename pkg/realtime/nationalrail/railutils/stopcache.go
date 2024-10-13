@@ -3,7 +3,6 @@ package railutils
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
@@ -25,11 +24,10 @@ func (s *StopCache) Setup() {
 	s.Cache = cache.New[string](redisStore)
 }
 
-func (s *StopCache) Get(identifierType string, identifier string) *ctdf.Stop {
+func (s *StopCache) Get(identifier string) *ctdf.Stop {
 	var stop *ctdf.Stop
-	fullStopCacheID := fmt.Sprintf("GB:%s:%s", identifierType, identifier)
 
-	stopCacheValue, err := s.Cache.Get(context.Background(), fullStopCacheID)
+	stopCacheValue, err := s.Cache.Get(context.Background(), identifier)
 	if err == nil {
 		if stopCacheValue == "N/A" {
 			return nil
@@ -40,13 +38,13 @@ func (s *StopCache) Get(identifierType string, identifier string) *ctdf.Stop {
 	}
 
 	stopCollection := database.GetCollection("stops")
-	stopCollection.FindOne(context.Background(), bson.M{fmt.Sprintf("otheridentifiers.%s", identifierType): identifier}).Decode(&stop)
+	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": identifier}).Decode(&stop)
 
 	if stop == nil {
-		s.Cache.Set(context.Background(), fullStopCacheID, "N/A")
+		s.Cache.Set(context.Background(), identifier, "N/A")
 	} else {
 		stopJSON, _ := json.Marshal(stop)
-		s.Cache.Set(context.Background(), fullStopCacheID, string(stopJSON))
+		s.Cache.Set(context.Background(), identifier, string(stopJSON))
 	}
 
 	return stop

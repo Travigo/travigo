@@ -68,7 +68,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		"activelytracked":      m.TrainTerminated != "true",
 	}
 
-	locationStop := stompClient.StopCache.Get("STANOX", m.LocationStanox)
+	locationStop := stompClient.StopCache.Get(fmt.Sprintf("GB:STANOX:%s", m.LocationStanox))
 	if locationStop == nil {
 		log.Debug().Str("stanox", m.LocationStanox).Msg("Cannot find stop for movement")
 		return

@@ -157,8 +157,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, gtfsStop.ID)
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier: stopID,
-			OtherIdentifiers: map[string]string{
-				"GTFS-ID": gtfsStop.ID,
+			OtherIdentifiers: []string{
+				fmt.Sprintf("GTFS-ID:%s", gtfsStop.ID),
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),

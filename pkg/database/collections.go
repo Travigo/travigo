@@ -36,13 +36,7 @@ func createStopsIndexes() {
 			Keys: bson.D{{Key: "associations.associatedidentifier", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "otheridentifiers.Tiploc", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "otheridentifiers.STANOX", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "otheridentifiers.Crs", Value: 1}},
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
 		},
 	}
 

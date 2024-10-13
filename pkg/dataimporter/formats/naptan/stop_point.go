@@ -164,7 +164,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 	ctdfStop := ctdf.Stop{
 		PrimaryIdentifier: fmt.Sprintf(ctdf.GBStopIDFormat, orig.AtcoCode),
-		OtherIdentifiers:  map[string]string{},
+		OtherIdentifiers:  []string{},
 		PrimaryName:       orig.Descriptor.CommonName,
 		OtherNames: map[string]string{
 			"ShortCommonName": orig.Descriptor.ShortCommonName,
@@ -186,16 +186,16 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	}
 
 	if orig.AtcoCode != "" {
-		ctdfStop.OtherIdentifiers["AtcoCode"] = orig.AtcoCode
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:ATCOCODE:%s", orig.AtcoCode))
 	}
 	if orig.NaptanCode != "" {
-		ctdfStop.OtherIdentifiers["NaptanCode"] = orig.NaptanCode
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:NAPTANCODE:%s", orig.NaptanCode))
 	}
 	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef != "" {
-		ctdfStop.OtherIdentifiers["Tiploc"] = orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:TIPLOC:%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef))
 	}
 	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef != "" {
-		ctdfStop.OtherIdentifiers["Crs"] = orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:CRS:%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef))
 	}
 
 	for i := 0; i < len(orig.StopAreas); i++ {

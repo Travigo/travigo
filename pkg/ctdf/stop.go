@@ -7,8 +7,8 @@ import (
 const GBStopIDFormat = "GB:ATCO:%s"
 
 type Stop struct {
-	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	OtherIdentifiers  map[string]string `groups:"basic,search" bson:",omitempty"`
+	PrimaryIdentifier string   `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	OtherIdentifiers  []string `groups:"basic,search" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
@@ -34,8 +34,8 @@ type Stop struct {
 }
 
 type StopPlatform struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string   `groups:"basic"`
+	OtherIdentifiers  []string `groups:"basic"`
 
 	PrimaryName string            `groups:"basic"`
 	OtherNames  map[string]string `groups:"basic"`
@@ -44,8 +44,8 @@ type StopPlatform struct {
 }
 
 type StopEntrance struct {
-	PrimaryIdentifier string            `groups:"basic"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string   `groups:"basic"`
+	OtherIdentifiers  []string `groups:"basic"`
 
 	PrimaryName string            `groups:"basic"`
 	OtherNames  map[string]string `groups:"basic"`

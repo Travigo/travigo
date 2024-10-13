@@ -257,12 +257,7 @@ func searchStops(c *fiber.Ctx) error {
 					},
 					map[string]interface{}{
 						"match_phrase_prefix": map[string]interface{}{
-							"OtherIdentifiers.Crs.search_as_you_type": searchTerm,
-						},
-					},
-					map[string]interface{}{
-						"match_phrase_prefix": map[string]interface{}{
-							"OtherIdentifiers.AtcoCode.search_as_you_type": searchTerm,
+							"OtherIdentifiers.search_as_you_type": searchTerm,
 						},
 					},
 				},
