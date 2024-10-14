@@ -328,6 +328,9 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		journeyOrderedNaptanIDs = append(journeyOrderedNaptanIDs, stop.StopRef)
 	}
 
+	if len(journeyOrderedNaptanIDs) == 0 {
+		return nil
+	}
 	lastPredictionStop := journeyOrderedNaptanIDs[len(journeyOrderedNaptanIDs)-1]
 	lastPrediction := predictions[len(predictions)-1]
 
