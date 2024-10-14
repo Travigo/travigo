@@ -247,17 +247,17 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				// TMU - Metro/tram
 				// RSE - Rail
 				// FTD - Ferry
-				if stopPoint.StopClassification.StopType == "TMU" || stopPoint.StopClassification.StopType == "RSE" || stopPoint.StopClassification.StopType == "FTD" {
-					stop := stopPoint.ToCTDF()
-					stationStop.Entrances = append(stationStop.Entrances, &ctdf.StopEntrance{
-						PrimaryIdentifier: stop.PrimaryIdentifier,
+				// if stopPoint.StopClassification.StopType == "TMU" || stopPoint.StopClassification.StopType == "RSE" || stopPoint.StopClassification.StopType == "FTD" {
+				// 	stop := stopPoint.ToCTDF()
+				// 	stationStop.Entrances = append(stationStop.Entrances, &ctdf.StopEntrance{
+				// 		PrimaryIdentifier: stop.PrimaryIdentifier,
 
-						PrimaryName: stop.PrimaryName,
+				// 		PrimaryName: stop.PrimaryName,
 
-						Location: stop.Location,
-					})
-					stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)
-				}
+				// 		Location: stop.Location,
+				// 	})
+				// 	stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)
+				// }
 			}
 		}
 

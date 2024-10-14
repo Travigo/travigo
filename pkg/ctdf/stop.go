@@ -30,7 +30,7 @@ type Stop struct {
 	Associations []*Association `groups:"detailed" bson:",omitempty"`
 
 	Platforms []*StopPlatform `groups:"detailed" bson:",omitempty"`
-	Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
+	// Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
 }
 
 type StopPlatform struct {

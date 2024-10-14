@@ -217,7 +217,7 @@ func (jpi *JourneyPathItem) GetOriginStop() {
 	stopsCollection.FindOne(context.Background(), bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": jpi.OriginStopRef},
-			bson.M{"platforms.primaryidentifier": jpi.OriginStopRef},
+			bson.M{"otheridentifiers": jpi.OriginStopRef},
 		},
 	}).Decode(&jpi.OriginStop)
 }
@@ -226,7 +226,7 @@ func (jpi *JourneyPathItem) GetDestinationStop() {
 	stopsCollection.FindOne(context.Background(), bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": jpi.DestinationStopRef},
-			bson.M{"platforms.primaryidentifier": jpi.DestinationStopRef},
+			bson.M{"otheridentifiers": jpi.DestinationStopRef},
 		},
 	}).Decode(&jpi.DestinationStop)
 }
