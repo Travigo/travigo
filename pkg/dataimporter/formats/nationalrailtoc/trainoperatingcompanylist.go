@@ -28,7 +28,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	var operators []*ctdf.Operator
 	var services []*ctdf.Service
 
-	StopNameOverrides := generateRailStopNameOverrides()
+	stopNameOverrides := generateRailStopNameOverrides()
 
 	now := time.Now()
 
@@ -71,7 +71,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 			BrandColour:      "#ffffff",
 			BrandDisplayMode: "short",
 
-			StopNameOverrides: StopNameOverrides,
+			StopNameOverrides: stopNameOverrides,
 		})
 	}
 
@@ -212,20 +212,16 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 }
 
 func generateRailStopNameOverrides() map[string]string {
-	// stopNameOverrides := map[string]string{}
+	stopNameOverrides := map[string]string{}
 
-	// stopsCollection := database.GetCollection("stops")
-	// var stops []ctdf.Stop
-	// cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers.Tiploc": bson.M{"$exists": true}})
-	// cursor.All(context.Background(), &stops)
+	stopsCollection := database.GetCollection("stops")
+	var stops []ctdf.Stop
+	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$regex": "^GB:TIPLOC:"}})
+	cursor.All(context.Background(), &stops)
 
-	// for _, stop := range stops {
-	// 	stopNameOverrides[stop.PrimaryIdentifier] = strings.Replace(stop.PrimaryName, " Rail Station", "", 1)
-	// }
+	for _, stop := range stops {
+		stopNameOverrides[stop.PrimaryIdentifier] = strings.Replace(stop.PrimaryName, " Rail Station", "", 1)
+	}
 
-	// return stopNameOverrides
-
-	// TODO FIX ME QUICKLY
-
-	return map[string]string{}
+	return stopNameOverrides
 }
