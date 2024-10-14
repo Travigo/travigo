@@ -56,66 +56,11 @@ func createStopIndex(indexName string) {
 					}
 				},
 				"OtherIdentifiers": {
-					"properties": {
-						"AtcoCode": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								},
-								"search_as_you_type": {
-									"type": "search_as_you_type"
-								}
-							}
-						},
-						"Crs": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								},
-								"search_as_you_type": {
-									"type": "search_as_you_type"
-								}
-							}
-						},
-						"NaptanCode": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								},
-								"search_as_you_type": {
-									"type": "search_as_you_type"
-								}
-							}
-						},
-						"STANOX": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								},
-								"search_as_you_type": {
-									"type": "search_as_you_type"
-								}
-							}
-						},
-						"Tiploc": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								},
-								"search_as_you_type": {
-									"type": "search_as_you_type"
-								}
-							}
+					"type": "text",
+					"fields": {
+						"keyword": {
+							"type": "keyword",
+							"ignore_above": 256
 						}
 					}
 				},
