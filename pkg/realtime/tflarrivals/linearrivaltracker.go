@@ -329,7 +329,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	if len(journeyOrderedNaptanIDs) == 0 {
-		return nil
+		panic("nil ordered naptan ids")
 	}
 	lastPredictionStop := journeyOrderedNaptanIDs[len(journeyOrderedNaptanIDs)-1]
 	lastPrediction := predictions[len(predictions)-1]
