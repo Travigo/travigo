@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -168,6 +169,9 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 
 	realtimeJourneyUpdateOperations := p.Wait()
+	util.InPlaceFilter[mongo.WriteModel](&realtimeJourneyUpdateOperations, func(x mongo.WriteModel) bool {
+		return x != nil
+	})
 
 	processingTime := time.Now().Sub(startTime)
 	startTime = time.Now()
@@ -329,7 +333,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	if len(journeyOrderedNaptanIDs) == 0 {
-		panic("nil ordered naptan ids")
+		return nil
 	}
 	lastPredictionStop := journeyOrderedNaptanIDs[len(journeyOrderedNaptanIDs)-1]
 	lastPrediction := predictions[len(predictions)-1]
