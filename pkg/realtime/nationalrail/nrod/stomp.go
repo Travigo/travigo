@@ -41,6 +41,7 @@ func (s *StompClient) Run() {
 	conn, err := stomp.Dial("tcp", s.Address, stompOptions...)
 
 	if err != nil {
+		pretty.Println(err)
 		log.Fatal().Err(err).Msg("cannot connect to server")
 	}
 
