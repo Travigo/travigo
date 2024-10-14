@@ -120,42 +120,11 @@ func createStopIndex(indexName string) {
 					}
 				},
 				"OtherNames": {
-					"properties": {
-						"Indicator": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"Landmark": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"ShortCommonName": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
-						},
-						"Street": {
-							"type": "text",
-							"fields": {
-								"keyword": {
-									"type": "keyword",
-									"ignore_above": 256
-								}
-							}
+					"type": "text",
+					"fields": {
+						"keyword": {
+							"type": "keyword",
+							"ignore_above": 256
 						}
 					}
 				},
@@ -252,7 +221,7 @@ func indexStopsFromMongo(indexName string) {
 			"PrimaryIdentifier": stop.PrimaryIdentifier,
 			"OtherIdentifiers":  stop.OtherIdentifiers,
 			"PrimaryName":       stop.PrimaryName,
-			"OtherNames":        stop.OtherNames,
+			"Descriptor":        stop.Descriptor,
 			"TransportTypes":    stop.TransportTypes,
 			"Location":          stop.Location,
 			"Services":          basicServices,

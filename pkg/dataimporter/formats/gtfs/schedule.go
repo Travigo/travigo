@@ -164,7 +164,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
 			PrimaryName:          gtfsStop.Name,
-			OtherNames:           map[string]string{},
 			Location: &ctdf.Location{
 				Type:        "Point",
 				Coordinates: []float64{gtfsStop.Longitude, gtfsStop.Latitude},

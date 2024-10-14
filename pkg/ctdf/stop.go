@@ -15,9 +15,9 @@ type Stop struct {
 
 	DataSource *DataSource `groups:"internal" bson:",omitempty"`
 
-	PrimaryName    string            `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	OtherNames     map[string]string `groups:"basic,stop-llm" bson:",omitempty"`
-	TransportTypes []TransportType   `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
+	PrimaryName    string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	Descriptor     string          `groups:"basic" bson:",omitempty"`
+	TransportTypes []TransportType `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Timezone string `groups:"basic" bson:",omitempty"`
 

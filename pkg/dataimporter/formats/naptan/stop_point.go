@@ -2,6 +2,7 @@ package naptan
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -162,16 +163,21 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		}
 	}
 
+	var descriptor []string
+
+	if orig.Descriptor.Indicator != "" && orig.Descriptor.Indicator != "--" {
+		descriptor = append(descriptor, orig.Descriptor.Indicator)
+	}
+
+	if orig.Descriptor.Landmark != "" && orig.Descriptor.Landmark != "--" {
+		descriptor = append(descriptor, orig.Descriptor.Landmark)
+	}
+
 	ctdfStop := ctdf.Stop{
 		PrimaryIdentifier: fmt.Sprintf(ctdf.GBStopIDFormat, orig.AtcoCode),
 		OtherIdentifiers:  []string{},
 		PrimaryName:       orig.Descriptor.CommonName,
-		OtherNames: map[string]string{
-			"ShortCommonName": orig.Descriptor.ShortCommonName,
-			"Street":          orig.Descriptor.Street,
-			"Indicator":       orig.Descriptor.Indicator,
-			"Landmark":        orig.Descriptor.Landmark,
-		},
+		Descriptor:        strings.Join(descriptor, " "),
 
 		CreationDateTime:     creationTime,
 		ModificationDateTime: modificationTime,
