@@ -258,6 +258,8 @@ func tempDownloadFile(dataset *datasets.DataSet) (*os.File, string) {
 		log.Fatal().Err(err).Msg("Cannot create temporary file")
 	}
 
+	log.Debug().Str("path", tmpFile.Name()).Msg("Data file downloaded")
+
 	io.Copy(tmpFile, resp.Body)
 
 	return tmpFile, fileExtension

@@ -217,8 +217,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Name:    "Transport for Ireland",
 				Website: "https://www.transportforireland.ie",
 			},
-			Source: "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
-			// Source:       "/Users/aaronclaydon/Downloads/GTFS_Realtime.zip",
+			Source:       "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
 			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: datasets.SupportedObjects{
 				Operators: true,
@@ -234,8 +233,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Name:    "Transport for Ireland",
 				Website: "https://www.transportforireland.ie",
 			},
-			Source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr",
-			// Source:       "/Users/aaronclaydon/Downloads/GTFS_Realtime.zip",
+			Source:       "https://api.nationaltransport.ie/gtfsr/v2/gtfsr",
 			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: datasets.SupportedObjects{
 				RealtimeJourneys: true,
