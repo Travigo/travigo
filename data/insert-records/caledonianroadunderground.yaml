@@ -3,6 +3,9 @@ Collection: stops
 Match:
   primaryidentifier: "GB:ATCO:9400ZZLUCAR"
 Data:
+  otheridentifiers:
+    - "GB:ATCO:9400ZZLUCAR1"
+    - "GB:ATCO:9400ZZLUCAR2"
   platforms:
   - primaryidentifier: "GB:ATCO:9400ZZLUCAR1"
     otheridentifiers:

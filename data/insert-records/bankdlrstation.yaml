@@ -3,16 +3,14 @@ Collection: stops
 Match:
   primaryidentifier: "GB:ATCO:9400ZZDLBNK"
 Data:
+  otheridentifiers:
+    - "GB:ATCO:9400ZZDLBNK1"
+    - "GB:ATCO:9400ZZDLBNK2"
   platforms:
   - primaryidentifier: "GB:ATCO:9400ZZDLBNK1"
     otheridentifiers:
       - "GB:ATCO:9400ZZDLBNK1"
     primaryname: "Bank DLR Station"
-    othernames:
-      Street: "-"
-      Indicator: ""
-      Landmark: ""
-      ShortCommonName: ""
     location:
       type: "Point"
       coordinates:
@@ -22,11 +20,6 @@ Data:
     otheridentifiers:
       - "GB:ATCO:9400ZZDLBNK2"
     primaryname: "Bank DLR Station"
-    othernames:
-      Street: "-"
-      Indicator: ""
-      Landmark: ""
-      ShortCommonName: ""
     location:
       type: "Point"
       coordinates:

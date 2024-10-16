@@ -6,6 +6,7 @@ import (
 
 	"github.com/travigo/travigo/pkg/api"
 	"github.com/travigo/travigo/pkg/dataimporter"
+	"github.com/travigo/travigo/pkg/datalinker"
 	"github.com/travigo/travigo/pkg/dbwatch"
 	"github.com/travigo/travigo/pkg/events"
 	"github.com/travigo/travigo/pkg/indexer"
@@ -50,6 +51,7 @@ func main() {
 			notify.RegisterCLI(),
 			dbwatch.RegisterCLI(),
 			indexer.RegisterCLI(),
+			datalinker.RegisterCLI(),
 		},
 	}
 
