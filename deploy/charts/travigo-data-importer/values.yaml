@@ -68,7 +68,7 @@ cronjobs:
     args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-schedule"]
     batchburst: true
   - name: temp-indexer-stops
-    schedule: "50 3 * * 6"
+    schedule: "20 6 * * *"
     args: [ "indexer", "stops" ]
   - name: temp-data-linker
     schedule: "0 6 * * *"
