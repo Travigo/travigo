@@ -53,9 +53,8 @@ func (stop *Stop) GetAllStopIDs() []string {
 	allStopIDs := []string{
 		stop.PrimaryIdentifier,
 	}
-	for _, platform := range stop.Platforms {
-		allStopIDs = append(allStopIDs, platform.PrimaryIdentifier)
-	}
+
+	allStopIDs = append(allStopIDs, stop.OtherIdentifiers...)
 
 	return allStopIDs
 }
