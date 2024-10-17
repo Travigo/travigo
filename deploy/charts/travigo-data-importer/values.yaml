@@ -70,9 +70,9 @@ cronjobs:
   - name: temp-indexer-stops
     schedule: "20 6 * * *"
     args: [ "indexer", "stops" ]
-  - name: temp-data-linker
-    schedule: "0 6 * * *"
-    args: [ "data-linker", "run", "--type", "stop", "--collection", "stops" ]
+  # - name: temp-data-linker
+  #   schedule: "0 6 * * *"
+  #   args: [ "data-linker", "run", "--type", "stop", "--collection", "stops" ]
 
 deployments:
   - name: sirivm-all
