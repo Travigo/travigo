@@ -132,7 +132,7 @@ type basicService struct {
 }
 
 func indexStopsFromMongo(indexName string) {
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
 

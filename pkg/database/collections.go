@@ -18,7 +18,7 @@ func createIndexes() {
 
 func createStopsIndexes() {
 	// Stops
-	stopsCollection := GetCollection("stops")
+	stopsCollection := GetCollection("stops_raw")
 	stopsIndex := []mongo.IndexModel{
 		{
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},

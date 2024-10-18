@@ -16,8 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func StopExample(collectionName string) {
-	collection := database.GetCollection(collectionName)
+func StopExample() {
+	rawCollection := database.GetCollection("stops_raw")
 
 	aggregation := mongo.Pipeline{
 		bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
@@ -27,6 +27,7 @@ func StopExample(collectionName string) {
 				Key: "$match",
 				Value: bson.M{
 					"$or": bson.A{
+						// Identical values of these we will be merging by
 						bson.M{"otheridentifier": bson.M{"$regex": "^GB:CRS:"}},
 						bson.M{"otheridentifier": bson.M{"$regex": "^TRAVIGO:MANUALMERGE:"}},
 					},
@@ -46,7 +47,7 @@ func StopExample(collectionName string) {
 		bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 	}
 
-	cursor, err := collection.Aggregate(context.TODO(), aggregation)
+	cursor, err := rawCollection.Aggregate(context.TODO(), aggregation)
 	if err != nil {
 		panic(err)
 	}
@@ -113,7 +114,7 @@ func StopExample(collectionName string) {
 		for _, id := range mergeGroup {
 			var record ctdf.Stop
 
-			cursor := collection.FindOne(context.Background(), bson.M{"primaryidentifier": id})
+			cursor := rawCollection.FindOne(context.Background(), bson.M{"primaryidentifier": id})
 			err := cursor.Decode(&record)
 			if err == nil {
 				primaryRecords = append(primaryRecords, record)
@@ -142,9 +143,9 @@ func StopExample(collectionName string) {
 	}
 
 	if len(operations) > 0 {
-		collection = database.GetCollection("stops_linktest") // TODO DEBUG
+		rawCollection = database.GetCollection("stops_linktest") // TODO DEBUG
 
-		_, err := collection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
+		_, err := rawCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write")
 		}

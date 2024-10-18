@@ -510,7 +510,7 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	}
 
 	stopGroupCollection := database.GetCollection("stop_groups")
-	stopCollection := database.GetCollection("stops")
+	stopCollection := database.GetCollection("stops_raw")
 
 	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("GB:ATCO:%s", tflStopID)}).Decode(&stop)

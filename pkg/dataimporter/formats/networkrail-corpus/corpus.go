@@ -34,7 +34,7 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 		return errors.New("This format requires stops to be enabled")
 	}
 
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 
 	var updateOperations []mongo.WriteModel
 

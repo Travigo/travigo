@@ -28,7 +28,7 @@ type StopGroup struct {
 }
 
 func (stopGroup *StopGroup) GetStops() {
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier})
 
 	for cursor.Next(context.Background()) {

@@ -52,7 +52,7 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 		return errors.New("This format requires stops & stopgroups to be enabled")
 	}
 
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 	stopGroupsCollection := database.GetCollection("stop_groups")
 
 	// StopAreas

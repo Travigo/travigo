@@ -1,5 +1,5 @@
 ---
-Collection: stops
+Collection: stops_raw
 Match:
   primaryidentifier: "GB:ATCO:9400ZZDLCUT"
 Data:

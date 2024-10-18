@@ -3,13 +3,14 @@ package databaselookup
 import (
 	"context"
 	"errors"
+
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 )
 
 func (s Source) StopQuery(stopQuery query.Stop) (*ctdf.Stop, error) {
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 	var stop *ctdf.Stop
 	stopsCollection.FindOne(context.Background(), stopQuery.ToBson()).Decode(&stop)
 

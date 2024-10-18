@@ -44,7 +44,7 @@ func listStops(c *fiber.Ctx) error {
 
 	var stops []*ctdf.Stop
 
-	stopsCollection := database.GetCollection("stops")
+	stopsCollection := database.GetCollection("stops_raw")
 
 	bsonQuery := bson.M{"location.coordinates": boundsQuery}
 
