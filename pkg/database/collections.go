@@ -18,7 +18,7 @@ func createIndexes() {
 
 func createStopsIndexes() {
 	// Stops
-	stopsCollection := GetCollection("stops_raw")
+	stopsCollection := GetCollection("stops")
 	stopsIndex := []mongo.IndexModel{
 		{
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
@@ -36,6 +36,29 @@ func createStopsIndexes() {
 
 	opts := options.CreateIndexes()
 	_, err := stopsCollection.Indexes().CreateMany(context.Background(), stopsIndex, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
+
+	// Stops raw
+	stopsRawCollection := GetCollection("stops_raw")
+	stopsRawIndex := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "location.coordinates", Value: "2d"}},
+		},
+		{
+			Keys: bson.D{{Key: "associations.associatedidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
+		},
+	}
+
+	opts = options.CreateIndexes()
+	_, err = stopsRawCollection.Indexes().CreateMany(context.Background(), stopsRawIndex, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
 	}
