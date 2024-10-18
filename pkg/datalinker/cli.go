@@ -28,11 +28,6 @@ func RegisterCLI() *cli.Command {
 						Usage:    "Type of the dataset",
 						Required: true,
 					},
-					&cli.StringFlag{
-						Name:     "collection",
-						Usage:    "Name of the database collection",
-						Required: true,
-					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -44,10 +39,9 @@ func RegisterCLI() *cli.Command {
 					insertrecords.Insert()
 
 					dataType := c.String("type")
-					collectionName := c.String("collection")
 
 					if dataType == "stop" {
-						StopExample(collectionName)
+						StopExample()
 					} else {
 						return errors.New("Unknown type")
 					}
