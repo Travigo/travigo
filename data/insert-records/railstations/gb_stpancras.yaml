@@ -1,0 +1,16 @@
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: "TRAVIGO:MANUALMERGE:STPANCRAS-1"
+Data:
+  otheridentifiers:
+    - "TRAVIGO:MANUALMERGE:STPANCRAS"
+    - "GB:ATCO:9100STPANCI"
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: "TRAVIGO:MANUALMERGE:STPANCRAS-2"
+Data:
+  otheridentifiers:
+    - "TRAVIGO:MANUALMERGE:STPANCRAS"
+    - "GB:ATCO:9100STPX"
