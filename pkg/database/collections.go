@@ -47,10 +47,21 @@ func createStopsIndexes() {
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "location.coordinates", Value: "2d"}},
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
 		},
+	}
+
+	opts = options.CreateIndexes()
+	_, err = stopsRawCollection.Indexes().CreateMany(context.Background(), stopsRawIndex, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
+
+	// Stops staging
+	stopsStagingCollection := GetCollection("stops_staging")
+	stopsStagingIndex := []mongo.IndexModel{
 		{
-			Keys: bson.D{{Key: "associations.associatedidentifier", Value: 1}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
 			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
@@ -58,7 +69,7 @@ func createStopsIndexes() {
 	}
 
 	opts = options.CreateIndexes()
-	_, err = stopsRawCollection.Indexes().CreateMany(context.Background(), stopsRawIndex, opts)
+	_, err = stopsStagingCollection.Indexes().CreateMany(context.Background(), stopsStagingIndex, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
 	}

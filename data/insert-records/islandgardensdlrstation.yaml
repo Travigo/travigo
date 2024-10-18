@@ -1,9 +1,10 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "GB:ATCO:9400ZZDLISL"
+  primaryidentifier: "TRAVIGO:MANUALMERGE:GB:ATCO:9400ZZDLISL"
 Data:
   otheridentifiers:
+    - "GB:ATCO:9400ZZDLISL"
     - "GB:ATCO:9400ZZDLISL1"
     - "GB:ATCO:9400ZZDLISL2"
   platforms:

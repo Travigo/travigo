@@ -10,7 +10,7 @@ import (
 )
 
 func (s Source) StopQuery(stopQuery query.Stop) (*ctdf.Stop, error) {
-	stopsCollection := database.GetCollection("stops_raw")
+	stopsCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
 	stopsCollection.FindOne(context.Background(), stopQuery.ToBson()).Decode(&stop)
 

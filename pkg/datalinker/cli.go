@@ -40,8 +40,8 @@ func RegisterCLI() *cli.Command {
 
 					dataType := c.String("type")
 
-					if dataType == "stop" {
-						StopExample()
+					if dataType == "stops" {
+						StopsExample()
 					} else {
 						return errors.New("Unknown type")
 					}

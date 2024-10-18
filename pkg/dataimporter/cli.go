@@ -3,7 +3,6 @@ package dataimporter
 import (
 	"time"
 
-	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -46,7 +45,6 @@ func RegisterCLI() *cli.Command {
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Redis")
 					}
-					insertrecords.Insert()
 
 					datasetid := c.String("id")
 					forceImport := c.Bool("force")

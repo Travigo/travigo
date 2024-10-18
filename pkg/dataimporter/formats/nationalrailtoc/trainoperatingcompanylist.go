@@ -214,7 +214,7 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 func generateRailStopNameOverrides() map[string]string {
 	stopNameOverrides := map[string]string{}
 
-	stopsCollection := database.GetCollection("stops_raw")
+	stopsCollection := database.GetCollection("stops")
 	var stops []ctdf.Stop
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$regex": "^GB:TIPLOC:"}})
 	cursor.All(context.Background(), &stops)

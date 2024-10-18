@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"sort"
 
@@ -16,9 +17,35 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func StopExample() {
-	rawCollection := database.GetCollection("stops_raw")
+func CopyCollection(source string, destination string) {
+	log.Info().Str("src", source).Str("dst", destination).Msg("Copying collection")
+	sourceCollection := database.GetCollection(source)
 
+	aggregation := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: bson.M{}}},
+		bson.D{{Key: "$out", Value: destination}},
+	}
+
+	sourceCollection.Aggregate(context.Background(), aggregation)
+}
+
+func EmptyCollection(collectionName string) {
+	log.Info().Str("collection", collectionName).Msg("Emptying collection")
+	collection := database.GetCollection(collectionName)
+
+	collection.DeleteMany(context.Background(), bson.M{})
+}
+
+func StopsExample() {
+	liveCollectionName := "stops"
+	rawCollectionName := fmt.Sprintf("%s_raw", liveCollectionName)
+	stagingCollectionName := fmt.Sprintf("%s_staging", liveCollectionName)
+
+	rawCollection := database.GetCollection(rawCollectionName)
+
+	CopyCollection(rawCollectionName, stagingCollectionName)
+
+	// Get matching records
 	aggregation := mongo.Pipeline{
 		bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
 		bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
@@ -71,11 +98,6 @@ func StopExample() {
 		for _, record := range aggregatedRecords.Records {
 			identifiers = append(identifiers, record.PrimaryIdentifier)
 			identifiers = append(identifiers, record.OtherIdentifiers...)
-
-			//Delete old
-			// deleteModel := mongo.NewDeleteOneModel()
-			// deleteModel.SetFilter(bson.M{"primaryidentifier": record.PrimaryIdentifier})
-			// operations = append(operations, deleteModel)
 		}
 
 		identifiers = util.RemoveDuplicateStrings(identifiers, []string{})
@@ -107,11 +129,10 @@ func StopExample() {
 				mergeGroupFiltered = append(mergeGroupFiltered, id)
 			}
 		}
-		mergeGroup = mergeGroupFiltered
 
 		// Get the primary records so we can do the actual merging with them
 		var primaryRecords []ctdf.Stop
-		for _, id := range mergeGroup {
+		for _, id := range mergeGroupFiltered {
 			var record ctdf.Stop
 
 			cursor := rawCollection.FindOne(context.Background(), bson.M{"primaryidentifier": id})
@@ -119,6 +140,17 @@ func StopExample() {
 			if err == nil {
 				primaryRecords = append(primaryRecords, record)
 			}
+		}
+
+		if len(primaryRecords) == 0 {
+			continue
+		}
+
+		// Now delete all the records that are being filtered
+		for _, id := range mergeGroup {
+			deleteModel := mongo.NewDeleteOneModel()
+			deleteModel.SetFilter(bson.M{"primaryidentifier": id})
+			operations = append(operations, deleteModel)
 		}
 
 		// Sort them by creation date and for now we'll just base it on the oldest record
@@ -130,7 +162,7 @@ func StopExample() {
 		// Create new record
 		newRecord := primaryRecords[0]
 		newRecord.PrimaryIdentifier = uuid.New().String()
-		newRecord.OtherIdentifiers = mergeGroup
+		newRecord.OtherIdentifiers = mergeGroupFiltered
 
 		// insert new
 		insertModel := mongo.NewInsertOneModel()
@@ -138,23 +170,28 @@ func StopExample() {
 		insertModel.SetDocument(bsonRep)
 		operations = append(operations, insertModel)
 
-		pretty.Println(mergeGroup)
+		pretty.Println(mergeGroupFiltered)
 		pretty.Println(len(primaryRecords))
 	}
 
 	if len(operations) > 0 {
-		rawCollection = database.GetCollection("stops_linktest") // TODO DEBUG
+		stagingCollection := database.GetCollection(stagingCollectionName)
 
-		_, err := rawCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
+		_, err := stagingCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write")
 		}
 	}
+
+	// Copy staging to live
+	CopyCollection(stagingCollectionName, liveCollectionName)
+	// Delete staging as it's not needed now
+	EmptyCollection(stagingCollectionName)
 }
 
 func hasOverlap(arr1, arr2 []string) bool {
 	// Create a map to store elements from the first array
-	elementSet := make(map[string]struct{})
+	elementSet := map[string]struct{}{}
 	for _, val := range arr1 {
 		elementSet[val] = struct{}{}
 	}

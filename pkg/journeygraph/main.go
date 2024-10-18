@@ -35,7 +35,7 @@ func main() {
 
 	// stops
 	ctdfStops := []ctdf.Stop{}
-	collection := database.GetCollection("stops_raw")
+	collection := database.GetCollection("stops")
 	cursor, _ := collection.Find(context.Background(), bson.M{"primaryidentifier": bson.M{"$in": []string{
 		"GB:ATCO:9100CAMBDGE",
 		"GB:ATCO:9100ROYSTON",

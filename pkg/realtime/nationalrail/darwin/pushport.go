@@ -37,7 +37,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
-	stopsCollection := database.GetCollection("stops_raw")
+	stopsCollection := database.GetCollection("stops")
 	retryRecordsCollection := database.GetCollection("retry_records")
 
 	// Parse Train Statuses

@@ -66,7 +66,7 @@ func UpdateRecordsStats() {
 	for {
 		startTime := time.Now()
 
-		stopsCollection := database.GetCollection("stops_raw")
+		stopsCollection := database.GetCollection("stops")
 		numberStops, _ := stopsCollection.CountDocuments(context.Background(), bson.D{})
 		CurrentRecordsStats.Stops = numberStops
 

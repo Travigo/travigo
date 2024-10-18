@@ -37,7 +37,7 @@ func (s *StopCache) Get(identifier string) *ctdf.Stop {
 		return stop
 	}
 
-	stopCollection := database.GetCollection("stops_raw")
+	stopCollection := database.GetCollection("stops")
 	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": identifier}).Decode(&stop)
 
 	if stop == nil {
