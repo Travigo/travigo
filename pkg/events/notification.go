@@ -53,7 +53,7 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 
 		var stop *ctdf.Stop
 		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-			PrimaryIdentifier: originStopID,
+			Identifier: originStopID,
 		})
 		if err != nil {
 			log.Error().Err(err).Str("stop", originStopID).Msg("Failed to lookup stop")

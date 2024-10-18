@@ -32,7 +32,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	// Get stops
 	var originStop *ctdf.Stop
 	originStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		PrimaryIdentifier: originIdentifier,
+		Identifier: originIdentifier,
 	})
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
@@ -42,7 +42,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	}
 	var destinationStop *ctdf.Stop
 	destinationStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		PrimaryIdentifier: destinationIdentifier,
+		Identifier: destinationIdentifier,
 	})
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)

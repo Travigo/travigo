@@ -109,7 +109,7 @@ func getStop(c *fiber.Ctx) error {
 
 	var stop *ctdf.Stop
 	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		PrimaryIdentifier: identifier,
+		Identifier: identifier,
 	})
 
 	if err != nil {
@@ -152,7 +152,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 	var stop *ctdf.Stop
 	stop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		PrimaryIdentifier: stopIdentifier,
+		Identifier: stopIdentifier,
 	})
 
 	if err != nil {

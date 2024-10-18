@@ -38,7 +38,7 @@ func getStopServiceAlerts(c *fiber.Ctx) error {
 	// First get the stop
 	var stop *ctdf.Stop
 	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		PrimaryIdentifier: identifier,
+		Identifier: identifier,
 	})
 
 	if err != nil {

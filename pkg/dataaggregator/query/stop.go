@@ -3,12 +3,15 @@ package query
 import "go.mongodb.org/mongo-driver/bson"
 
 type Stop struct {
-	PrimaryIdentifier string
+	Identifier string
 }
 
 func (s *Stop) ToBson() bson.M {
-	if s.PrimaryIdentifier != "" {
-		return bson.M{"primaryidentifier": s.PrimaryIdentifier}
+	if s.Identifier != "" {
+		return bson.M{"$or": bson.A{
+			bson.M{"primaryidentifier": s.Identifier},
+			bson.M{"otheridentifiers": s.Identifier},
+		}}
 	}
 
 	return nil
