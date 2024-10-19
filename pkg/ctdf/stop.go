@@ -1,6 +1,10 @@
 package ctdf
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
+	"math"
 	"time"
 )
 
@@ -71,4 +75,23 @@ func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
 			return
 		}
 	}
+}
+
+// Still not perfect as something like st pancras actually covers multiple coordinates
+func (stop *Stop) GenerateDeterministicID() string {
+	hash := sha256.New()
+
+	for _, transportType := range stop.TransportTypes {
+		hash.Write([]byte(transportType))
+	}
+
+	hash.Write([]byte(stop.Location.Type))
+
+	for _, coord := range stop.Location.Coordinates {
+		buf := make([]byte, 8)
+		binary.BigEndian.PutUint64(buf[:], math.Float64bits(coord))
+		hash.Write(buf)
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil))
 }

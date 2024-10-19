@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/google/uuid"
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -78,7 +77,7 @@ func (l StopsLinker) Run() {
 		var aggregatedRecords struct {
 			ID      string `bson:"_id"`
 			Count   int
-			Records []BaseRecord
+			Records []ctdf.BaseRecord
 		}
 		err := cursor.Decode(&aggregatedRecords)
 		if err != nil {
@@ -153,7 +152,7 @@ func (l StopsLinker) Run() {
 
 		// Create new record
 		newRecord := primaryRecords[0]
-		newRecord.PrimaryIdentifier = uuid.New().String()
+		newRecord.PrimaryIdentifier = newRecord.GenerateDeterministicID()
 		newRecord.OtherIdentifiers = mergeGroupFiltered
 
 		// insert new
