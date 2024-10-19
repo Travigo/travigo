@@ -153,7 +153,7 @@ func (l StopsLinker) Run() {
 		// Create new record
 		newRecord := primaryRecords[0]
 		newRecord.PrimaryIdentifier = newRecord.GenerateDeterministicID()
-		newRecord.OtherIdentifiers = mergeGroupFiltered
+		newRecord.OtherIdentifiers = append(mergeGroupFiltered, newRecord.PrimaryIdentifier)
 
 		// insert new
 		insertModel := mongo.NewInsertOneModel()

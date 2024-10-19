@@ -10,11 +10,6 @@ Data:
     - "GB:CRS:ROT"
     - "GB:STANOX:918"
   primaryname: Rotterdam Central
-  othernames:
-    ShortCommonName: ""
-    Street: "-"
-    Indicator: "INTERNATIONAL"
-    Landmark: ""
   transporttypes:
   - Rail
   location:

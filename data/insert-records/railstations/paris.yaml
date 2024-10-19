@@ -10,11 +10,6 @@ Data:
     - "GB:CRS:PBN"
     - "GB:STANOX:750"
   primaryname: Paris Gare du Nord
-  othernames:
-    ShortCommonName: ""
-    Street: "-"
-    Indicator: "INTERNATIONAL"
-    Landmark: ""
   transporttypes:
   - Rail
   location:

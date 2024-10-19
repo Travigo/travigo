@@ -10,11 +10,6 @@ Data:
     - "GB:CRS:AMS"
     - "GB:STANOX:950"
   primaryname: Amsterdam Central
-  othernames:
-    ShortCommonName: ""
-    Street: "-"
-    Indicator: "INTERNATIONAL"
-    Landmark: ""
   transporttypes:
   - Rail
   location:

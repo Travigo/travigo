@@ -10,11 +10,6 @@ Data:
     - "GB:CRS:BXS"
     - "GB:STANOX:850"
   primaryname: Brussels-South
-  othernames:
-    ShortCommonName: ""
-    Street: "-"
-    Indicator: "INTERNATIONAL"
-    Landmark: ""
   transporttypes:
   - Rail
   location:
