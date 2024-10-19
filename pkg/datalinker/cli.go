@@ -40,11 +40,15 @@ func RegisterCLI() *cli.Command {
 
 					dataType := c.String("type")
 
+					var linker Linker
+
 					if dataType == "stops" {
-						StopsExample()
+						linker = NewStopsLinker()
 					} else {
 						return errors.New("Unknown type")
 					}
+
+					linker.Run()
 
 					return nil
 				},

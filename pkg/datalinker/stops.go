@@ -17,33 +17,25 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func CopyCollection(source string, destination string) {
-	log.Info().Str("src", source).Str("dst", destination).Msg("Copying collection")
-	sourceCollection := database.GetCollection(source)
-
-	aggregation := mongo.Pipeline{
-		bson.D{{Key: "$match", Value: bson.M{}}},
-		bson.D{{Key: "$out", Value: destination}},
-	}
-
-	sourceCollection.Aggregate(context.Background(), aggregation)
+type StopsLinker struct {
 }
 
-func EmptyCollection(collectionName string) {
-	log.Info().Str("collection", collectionName).Msg("Emptying collection")
-	collection := database.GetCollection(collectionName)
-
-	collection.DeleteMany(context.Background(), bson.M{})
+func NewStopsLinker() StopsLinker {
+	return StopsLinker{}
 }
 
-func StopsExample() {
-	liveCollectionName := "stops"
+func (l StopsLinker) GetBaseCollectionName() string {
+	return "stops"
+}
+
+func (l StopsLinker) Run() {
+	liveCollectionName := l.GetBaseCollectionName()
 	rawCollectionName := fmt.Sprintf("%s_raw", liveCollectionName)
 	stagingCollectionName := fmt.Sprintf("%s_staging", liveCollectionName)
 
 	rawCollection := database.GetCollection(rawCollectionName)
 
-	CopyCollection(rawCollectionName, stagingCollectionName)
+	copyCollection(rawCollectionName, stagingCollectionName)
 
 	// Get matching records
 	aggregation := mongo.Pipeline{
@@ -74,7 +66,7 @@ func StopsExample() {
 		bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 	}
 
-	cursor, err := rawCollection.Aggregate(context.TODO(), aggregation)
+	cursor, err := rawCollection.Aggregate(context.Background(), aggregation)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +78,7 @@ func StopsExample() {
 		var aggregatedRecords struct {
 			ID      string `bson:"_id"`
 			Count   int
-			Records []ctdf.Stop
+			Records []BaseRecord
 		}
 		err := cursor.Decode(&aggregatedRecords)
 		if err != nil {
@@ -184,23 +176,7 @@ func StopsExample() {
 	}
 
 	// Copy staging to live
-	CopyCollection(stagingCollectionName, liveCollectionName)
+	copyCollection(stagingCollectionName, liveCollectionName)
 	// Delete staging as it's not needed now
-	EmptyCollection(stagingCollectionName)
-}
-
-func hasOverlap(arr1, arr2 []string) bool {
-	// Create a map to store elements from the first array
-	elementSet := map[string]struct{}{}
-	for _, val := range arr1 {
-		elementSet[val] = struct{}{}
-	}
-
-	// Check if any element of the second array is present in the map
-	for _, val := range arr2 {
-		if _, exists := elementSet[val]; exists {
-			return true
-		}
-	}
-	return false
+	emptyCollection(stagingCollectionName)
 }
