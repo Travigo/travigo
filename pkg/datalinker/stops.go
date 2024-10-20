@@ -98,7 +98,7 @@ func (l StopsLinker) Run() {
 
 	for i := 0; i < len(mergeGroups); i++ {
 		for j := i + 1; j < len(mergeGroups); j++ {
-			if hasOverlap(mergeGroups[i], mergeGroups[j]) {
+			if util.SlicesOverlap(mergeGroups[i], mergeGroups[j]) {
 				log.Debug().Msgf("Array %d and Array %d have overlapping values\n", i, j)
 
 				mergeGroups[i] = util.RemoveDuplicateStrings(append(mergeGroups[i], mergeGroups[j]...), []string{})
