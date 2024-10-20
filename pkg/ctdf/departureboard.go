@@ -81,12 +81,18 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						// Use the realtime estimated stop time based if realtime is available
 						if journey.RealtimeJourney != nil {
 							var realtimeJourneyStop *RealtimeJourneyStops
-							path.GetOriginStop()
 
-							for stopID, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
-								if path.OriginStop.PrimaryIdentifier == stopID || slices.Contains(path.OriginStop.OtherIdentifiers, stopID) {
-									realtimeJourneyStop = potentialRealtimeJourneyStop
-									break
+							// Lookup realtime journey stop by either direct reference or other identifiers (which requires extra db call)
+							if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
+								realtimeJourneyStop = journey.RealtimeJourney.Stops[path.OriginStopRef]
+							} else {
+								path.GetOriginStop()
+
+								for stopID, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
+									if path.OriginStop.PrimaryIdentifier == stopID || slices.Contains(path.OriginStop.OtherIdentifiers, stopID) {
+										realtimeJourneyStop = potentialRealtimeJourneyStop
+										break
+									}
 								}
 							}
 
