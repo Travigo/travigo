@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"sort"
@@ -152,7 +153,14 @@ func (l StopsLinker) Run() {
 
 		// Create new record
 		newRecord := primaryRecords[0]
-		newRecord.PrimaryIdentifier = newRecord.GenerateDeterministicID()
+
+		// Generate an ID for the record
+		idHasher := sha256.New()
+		newRecord.GenerateDeterministicID(idHasher)
+
+		idHash := fmt.Sprintf("%x", idHasher.Sum(nil))[:28]
+		newRecord.PrimaryIdentifier = fmt.Sprintf("tmr-stop-%s", idHash)
+
 		newRecord.OtherIdentifiers = append(mergeGroupFiltered, newRecord.PrimaryIdentifier)
 
 		// insert new
