@@ -159,6 +159,9 @@ func createRealtimeIndexes() {
 		{
 			Keys: bson.D{{Key: "activelytracked", Value: 1}},
 		},
+		{
+			Keys: bson.D{{Key: "vehiclelocation.coordinates", Value: "2d"}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")

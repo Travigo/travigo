@@ -26,5 +26,12 @@ func getBoundsQuery(c *fiber.Ctx) (bson.M, error) {
 	topRightLon, _ := strconv.ParseFloat(boundsSplit[2], 32)
 	topRightLat, _ := strconv.ParseFloat(boundsSplit[3], 32)
 
-	return bson.M{"$geoWithin": bson.M{"$box": bson.A{bson.A{bottomLeftLon, bottomLeftLat}, bson.A{topRightLon, topRightLat}}}}, nil
+	return bson.M{
+		"$geoWithin": bson.M{
+			"$box": bson.A{
+				bson.A{bottomLeftLon, bottomLeftLat},
+				bson.A{topRightLon, topRightLat},
+			},
+		},
+	}, nil
 }
