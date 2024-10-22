@@ -144,6 +144,10 @@ const (
 	RealtimeJourneyStopTimeEstimatedFuture                             = "EstimatedFuture"
 )
 
+func GetShortActiveRealtimeJourneyCutOffDate() time.Time {
+	return time.Now().Add(-60 * time.Minute)
+}
+
 func GetActiveRealtimeJourneyCutOffDate() time.Time {
 	return time.Now().Add(-240 * time.Minute)
 }

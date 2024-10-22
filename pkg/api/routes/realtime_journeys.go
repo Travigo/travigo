@@ -60,12 +60,15 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 	var realtimeJourneys []realtimeJourneyMinimised
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
+	realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
 
 	cursor, _ := realtimeJourneysCollection.Find(context.Background(),
-		bson.M{"$and": bson.A{bson.M{"vehiclelocation": boundsQuery}, bson.M{
-			"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-		}}},
+		bson.M{
+			"$and": bson.A{
+				bson.M{"vehiclelocation.coordinates": boundsQuery},
+				bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
+			},
+		},
 	)
 
 	for cursor.Next(context.Background()) {
