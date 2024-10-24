@@ -132,6 +132,7 @@ type basicService struct {
 }
 
 func indexStopsFromMongo(indexName string) {
+	now := time.Now()
 	stopsCollection := database.GetCollection("stops")
 
 	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
@@ -148,6 +149,13 @@ func indexStopsFromMongo(indexName string) {
 		var basicServices []*basicService
 		services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
+		})
+
+		// Force a filling of the cache of the stops journeys
+		dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
+			Stop:          stop,
+			Count:         1,
+			StartDateTime: now,
 		})
 
 		for _, service := range services {
