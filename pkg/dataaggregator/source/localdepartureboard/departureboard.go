@@ -33,7 +33,6 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	// Contains the stops primary id and all platforms primary ids
 	allStopIDs := q.Stop.GetAllStopIDs()
 
-	var journeys []*ctdf.Journey
 	// Load from cache
 
 	filterHash := sha256.New()
@@ -42,75 +41,34 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	currentTime := time.Now()
 
-	cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
-	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
-
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeys)).Msg("Get cached journeys")
-
-	if err != nil {
-		journeysCollection := database.GetCollection("journeys")
-		currentTime := time.Now()
-
-		// This projection excludes values we dont care about - the main ones being path.*
-		// Reduces memory usage and execution time
-		opts := options.Find().SetProjection(bson.D{
-			bson.E{Key: "_id", Value: 0},
-			bson.E{Key: "otheridentifiers", Value: 0},
-			bson.E{Key: "datasource", Value: 0},
-			bson.E{Key: "creationdatetime", Value: 0},
-			bson.E{Key: "modificationdatetime", Value: 0},
-			bson.E{Key: "direction", Value: 0},
-			bson.E{Key: "path.track", Value: 0},
-			bson.E{Key: "path.associations", Value: 0},
-			bson.E{Key: "path.destinationactivity", Value: 0},
-			bson.E{Key: "path.distance", Value: 0},
-			bson.E{Key: "path.originstop", Value: 0},
-			bson.E{Key: "path.destinationstop", Value: 0},
-			bson.E{Key: "detailedrailinformation", Value: 0},
-		})
-
-		journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
-		if q.Filter != nil {
-			journeyQuery = bson.M{
-				"$and": bson.A{
-					journeyQuery,
-					q.Filter,
-				},
-			}
+	baseCacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
+	journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
+	if q.Filter != nil {
+		journeyQuery = bson.M{
+			"$and": bson.A{
+				journeyQuery,
+				q.Filter,
+			},
 		}
-
-		cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to query Journeys")
-		}
-
-		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
-		currentTime = time.Now()
-
-		err = cursor.All(context.Background(), &journeys)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode Journey")
-		}
-
-		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
-
-		writeCacheTime := time.Now()
-		reducedJourneys, _ := sheriff.Marshal(&sheriff.Options{
-			Groups: []string{"departureboard-cache"},
-		}, journeys)
-
-		cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 4*time.Hour)
-		log.Debug().Str("Length", time.Now().Sub(writeCacheTime).String()).Msg("Write cache")
 	}
+	journeysToday := s.getDateJourneys(baseCacheItemPath, journeyQuery, q.StartDateTime)
+
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - today")
 
 	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, q.StartDateTime, true)
+	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true)
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 
 	// If not enough journeys in todays departure board then look into tomorrows
 	if len(departureBoardToday) < q.Count {
 		currentTime = time.Now()
-		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeys, allStopIDs, dayAfterDateTime, false)
+
+		journeysTomorrow := s.getDateJourneys(baseCacheItemPath, journeyQuery, dayAfterDateTime)
+
+		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - tomorrow")
+		currentTime = time.Now()
+
+		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false)
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation tomorrow")
 
 		departureBoard = append(departureBoardToday, departureBoardTomorrow...)
@@ -119,4 +77,73 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	}
 
 	return departureBoard, nil
+}
+
+func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
+	var journeys []*ctdf.Journey
+
+	cacheItemPath := fmt.Sprintf("%s/%s", baseCacheItemPath, dateTime.Format("2006-01-02"))
+
+	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
+
+	if err == nil {
+		return journeys
+	}
+
+	journeysCollection := database.GetCollection("journeys")
+	currentTime := time.Now()
+
+	// This projection excludes values we dont care about - the main ones being path.*
+	// Reduces memory usage and execution time
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "otheridentifiers", Value: 0},
+		bson.E{Key: "datasource", Value: 0},
+		bson.E{Key: "creationdatetime", Value: 0},
+		bson.E{Key: "modificationdatetime", Value: 0},
+		bson.E{Key: "direction", Value: 0},
+		bson.E{Key: "path.track", Value: 0},
+		bson.E{Key: "path.associations", Value: 0},
+		bson.E{Key: "path.destinationactivity", Value: 0},
+		bson.E{Key: "path.distance", Value: 0},
+		bson.E{Key: "path.originstop", Value: 0},
+		bson.E{Key: "path.destinationstop", Value: 0},
+		bson.E{Key: "detailedrailinformation", Value: 0},
+	})
+
+	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query Journeys")
+	}
+
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
+	currentTime = time.Now()
+
+	// err = cursor.All(context.Background(), &journeys)
+	// if err != nil {
+	// 	log.Error().Err(err).Msg("Failed to decode Journey")
+	// }
+	for cursor.Next(context.Background()) {
+		var journey ctdf.Journey
+		err := cursor.Decode(&journey)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode journey")
+		}
+
+		if journey.Availability.MatchDate(dateTime) {
+			journeys = append(journeys, &journey)
+		}
+	}
+
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
+
+	writeCacheTime := time.Now()
+	reducedJourneys, _ := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"departureboard-cache"},
+	}, journeys)
+
+	cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 4*time.Hour)
+	log.Debug().Str("Length", time.Now().Sub(writeCacheTime).String()).Msg("Write cache")
+
+	return journeys
 }

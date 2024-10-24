@@ -65,13 +65,13 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
 			if journey.Availability.MatchDate(dateTime) {
-				// Don't even think about it if we're passed 3 hours departure on this stop
+				// Don't even think about it if we're passed 4 hours departure on this stop
 				for _, path := range journey.Path {
 					if slices.Contains(stopRefs, path.OriginStopRef) {
 						journeyDepMins := (path.OriginDepartureTime.Hour() * 60) + path.OriginDepartureTime.Minute()
 						startMins := (dateTime.Hour() * 60) + dateTime.Minute()
 
-						if (startMins - journeyDepMins) > 180 {
+						if (startMins - journeyDepMins) > 240 {
 							return nil
 						}
 
