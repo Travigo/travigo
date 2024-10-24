@@ -119,10 +119,6 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
 	currentTime = time.Now()
 
-	// err = cursor.All(context.Background(), &journeys)
-	// if err != nil {
-	// 	log.Error().Err(err).Msg("Failed to decode Journey")
-	// }
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)
@@ -142,7 +138,7 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		Groups: []string{"departureboard-cache"},
 	}, journeys)
 
-	cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 4*time.Hour)
+	cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 18*time.Hour)
 	log.Debug().Str("Length", time.Now().Sub(writeCacheTime).String()).Msg("Write cache")
 
 	return journeys
