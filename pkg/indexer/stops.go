@@ -153,11 +153,13 @@ func indexStopsFromMongo(indexName string) {
 
 		// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
 		if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
-			dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
-				Stop:          stop,
-				Count:         1,
-				StartDateTime: now,
-			})
+			go func() {
+				dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
+					Stop:          stop,
+					Count:         1,
+					StartDateTime: now,
+				})
+			}()
 		}
 
 		for _, service := range services {
