@@ -3,46 +3,46 @@
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:LDLR"
+  OperatorRef: "gb-noc-LDLR"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:LDLR"
+  OperatorRef: "gb-noc-LDLR"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 # Underground
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:LULD"
+  OperatorRef: "gb-noc-LULD"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:LULD"
+  OperatorRef: "gb-noc-LULD"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 # Tram
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:TRAM"
+  OperatorRef: "gb-noc-TRAM"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "GB:NOC:TRAM"
+  OperatorRef: "gb-noc-TRAM"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 # River Bus
 ---
 Type: ctdf.Service
@@ -50,14 +50,14 @@ Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 
 # Woolwich Ferry
 ---
@@ -66,14 +66,14 @@ Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5823"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5823"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 
 # Thames River Services
 ---
@@ -82,14 +82,14 @@ Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5820"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5820"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 
 # Cable Car
 ---
@@ -98,12 +98,12 @@ Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
 Data:
-  OperatorRef: "GB:NOC:TFLO"
+  OperatorRef: "gb-noc-TFLO"
   TransportType: CableCar

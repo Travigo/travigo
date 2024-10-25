@@ -1,6 +1,6 @@
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:WHIP"
+  OperatorRef: "gb-noc-WHIP"
 Data:
   BrandColour: "#368BFF"

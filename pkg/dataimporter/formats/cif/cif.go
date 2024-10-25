@@ -128,8 +128,8 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			continue
 		}
 
-		basicJourneyID := fmt.Sprintf("GB:RAIL:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom)
-		journeyID := fmt.Sprintf("GB:RAIL:%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
+		basicJourneyID := fmt.Sprintf("gb-rail-%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom)
+		journeyID := fmt.Sprintf("gb-rail-%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
 
 		// Create whole new journeys
 		if trainDef.BasicSchedule.TransactionType == "N" && (trainDef.BasicSchedule.STPIndicator == "P" || trainDef.BasicSchedule.STPIndicator == "N") {
@@ -494,12 +494,12 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 		detailedRailInformation.PowerType = "Diesel"
 	}
 
-	detailedRailInformation.VehicleType = fmt.Sprintf("GB:RAILCLASS:%s", trainClass)
+	detailedRailInformation.VehicleType = fmt.Sprintf("gb-railclass-%s", trainClass)
 
 	// Rail replacement bus
 	if trainDef.BasicSchedule.TrainCategory == "BR" {
 		detailedRailInformation.ReplacementBus = true
-		detailedRailInformation.VehicleType = "GB:RAILCLASS:REPLACEMENTBUS"
+		detailedRailInformation.VehicleType = "gb-railclass-REPLACEMENTBUS"
 	}
 
 	// Put it all together

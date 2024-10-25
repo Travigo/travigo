@@ -10,9 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const OperatorNOCFormat = "GB:NOC:%s"
-const OperatorNOCIDFormat = "GB:NOCID:%s"
-const OperatorTOCFormat = "GB:TOC:%s"
+const OperatorNOCFormat = "gb-noc-%s"
+const OperatorNOCIDFormat = "gb-nocid-%s"
+const OperatorTOCFormat = "gb-toc-%s"
 
 type Operator struct {
 	PrimaryIdentifier string   `groups:"basic,departures-llm" bson:",omitempty"`

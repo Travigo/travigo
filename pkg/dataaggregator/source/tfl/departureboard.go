@@ -18,7 +18,7 @@ import (
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	tflOperator := &ctdf.Operator{
-		PrimaryIdentifier: "GB:NOC:TFLO",
+		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",
 	}
 

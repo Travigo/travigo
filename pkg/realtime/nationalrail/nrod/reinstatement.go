@@ -47,6 +47,7 @@ func (r *TrustReinstatement) Process(stompClient *StompClient) {
 	stompClient.Queue.Add(updateModel)
 
 	// Also delete the service alert for it
+	// TODO this doesnt seem to delete anything
 	journeyRunDate := realtimeJourney.JourneyRunDate.Format("2006-01-02")
 	serviceAlertID := fmt.Sprintf("GB:RAILCANCELDELAY:%s:%s", journeyRunDate, realtimeJourney.Journey.PrimaryIdentifier)
 

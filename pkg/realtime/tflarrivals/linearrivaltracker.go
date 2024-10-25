@@ -210,7 +210,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
 	tflOperator := &ctdf.Operator{
-		PrimaryIdentifier: "GB:NOC:TFLO",
+		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",
 	}
 	now := time.Now()

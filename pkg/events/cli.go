@@ -74,7 +74,7 @@ func RegisterCLI() *cli.Command {
 						Title: "Line Suspended",
 						Text:  "Northern Line has been suspended due to a fault on the line",
 
-						MatchedIdentifiers: []string{"GB:NOC:TFLO:1-NTN-_-y05-590847:1-NTN-_-y05-590847"},
+						MatchedIdentifiers: []string{"gb-noc-TFLO:1-NTN-_-y05-590847:1-NTN-_-y05-590847"},
 					}
 
 					eventsQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")

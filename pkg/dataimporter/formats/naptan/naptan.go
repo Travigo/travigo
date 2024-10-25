@@ -225,7 +225,7 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 		var stopGroupStops []*StopPoint
 		for _, area := range stationNaptanStop.StopAreas {
-			stopGroupStops = append(stopGroupStops, stationStopGroupContents[fmt.Sprintf("GB:STOPGRP:%s", area.StopAreaCode)]...)
+			stopGroupStops = append(stopGroupStops, stationStopGroupContents[fmt.Sprintf("gb-stopgroup-%s", area.StopAreaCode)]...)
 		}
 
 		// Find all platforms & entrances and add them to the stops

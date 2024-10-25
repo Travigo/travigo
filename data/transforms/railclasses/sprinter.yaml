@@ -2,7 +2,7 @@
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
-  VehicleType: "GB:RAILCLASS:150_153_155_156"
+  VehicleType: "gb-railclass-150_153_155_156"
 Data:
   VehicleTypeName: Sprinter
   # Such a wide range of vehicle classes & operators we cant say any for certain

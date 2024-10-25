@@ -112,8 +112,8 @@ func main() {
 	ctdfJourneys := []ctdf.Journey{}
 	journeysSollection := database.GetCollection("journeys")
 	cursor, _ = journeysSollection.Find(context.Background(), bson.M{"primaryidentifier": bson.M{"$in": []string{
-		"GB:RAIL:G54460:240603:P",
-		"GB:RAIL:G54374:240603:P",
+		"gb-rail-G54460:240603:P",
+		"gb-rail-G54374:240603:P",
 	}}})
 	cursor.All(ctx, &ctdfJourneys)
 

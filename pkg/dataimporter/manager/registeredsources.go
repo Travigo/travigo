@@ -153,10 +153,10 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			IgnoreObjects: datasets.IgnoreObjects{
 				Services: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"GB:NOC:NATX"},
+					ByOperator: []string{"gb-noc-NATX"},
 				},
 				Journeys: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"GB:NOC:NATX"},
+					ByOperator: []string{"gb-noc-NATX"},
 				},
 			},
 
@@ -184,10 +184,10 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			IgnoreObjects: datasets.IgnoreObjects{
 				Services: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"GB:NOC:APBX", "GB:NOC:BHAT", "GB:NOC:FLIX", "GB:NOC:MEGA", "GB:NOC:SCLK", "GB:NOC:ULSL"},
+					ByOperator: []string{"gb-noc-APBX", "gb-noc-BHAT", "gb-noc-FLIX", "gb-noc-MEGA", "gb-noc-SCLK", "gb-noc-ULSL"},
 				},
 				Journeys: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"GB:NOC:APBX", "GB:NOC:BHAT", "GB:NOC:FLIX", "GB:NOC:MEGA", "GB:NOC:SCLK", "GB:NOC:ULSL"},
+					ByOperator: []string{"gb-noc-APBX", "gb-noc-BHAT", "gb-noc-FLIX", "gb-noc-MEGA", "gb-noc-SCLK", "gb-noc-ULSL"},
 				},
 			},
 		},

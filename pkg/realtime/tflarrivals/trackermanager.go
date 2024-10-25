@@ -37,7 +37,7 @@ func (l *TfLLine) GetService() {
 	collection := database.GetCollection("services")
 
 	query := bson.M{
-		"operatorref":   "GB:NOC:TFLO",
+		"operatorref":   "gb-noc-TFLO",
 		"servicename":   l.LineName,
 		"transporttype": l.TransportType,
 	}

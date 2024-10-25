@@ -60,24 +60,24 @@ func loadGBBankHolidayCache() {
 		eventDate, _ := time.Parse(YearMonthDayFormat, event.Date)
 
 		specialDayMapping := map[string]string{
-			"Christmas Day":          "GB:BankHoliday:ChristmasDayHoliday",
-			"Boxing Day":             "GB:BankHoliday:BoxingDayHoliday",
-			"New Year’s Day":         "GB:BankHoliday:NewYearsDayHoliday",
-			"Good Friday":            "GB:BankHoliday:GoodFriday",
-			"Easter Monday":          "GB:BankHoliday:EasterMonday",
-			"Early May bank holiday": "GB:BankHoliday:MayDay",
-			"Spring bank holiday":    "GB:BankHoliday:SpringBank",
-			"Summer bank holiday":    "GB:BankHoliday:LateSummerBankHolidayNotScotland",
-			"St Andrew's Day":        "GB:BankHoliday:StAndrewsDayHoliday",
-			"St Andrew’s Day":        "GB:BankHoliday:StAndrewsDayHoliday",
-			"2nd January":            "GB:BankHoliday:Jan2ndScotlandHoliday",
+			"Christmas Day":          "gb-bankholiday-ChristmasDayHoliday",
+			"Boxing Day":             "gb-bankholiday-BoxingDayHoliday",
+			"New Year’s Day":         "gb-bankholiday-NewYearsDayHoliday",
+			"Good Friday":            "gb-bankholiday-GoodFriday",
+			"Easter Monday":          "gb-bankholiday-EasterMonday",
+			"Early May bank holiday": "gb-bankholiday-MayDay",
+			"Spring bank holiday":    "gb-bankholiday-SpringBank",
+			"Summer bank holiday":    "gb-bankholiday-LateSummerBankHolidayNotScotland",
+			"St Andrew's Day":        "gb-bankholiday-StAndrewsDayHoliday",
+			"St Andrew’s Day":        "gb-bankholiday-StAndrewsDayHoliday",
+			"2nd January":            "gb-bankholiday-Jan2ndScotlandHoliday",
 		}
 
 		eventID := specialDayMapping[event.Title]
 
 		if eventID == "" {
 			basicTitle := nonAlphanumericRegex.ReplaceAllString(event.Title, "")
-			eventID = fmt.Sprintf("GB:UnknownBankHoliday:%s", basicTitle)
+			eventID = fmt.Sprintf("gb-unknownbankholiday-%s", basicTitle)
 		}
 
 		if SpecialDays[eventDate.Year()] == nil {
@@ -89,13 +89,13 @@ func loadGBBankHolidayCache() {
 
 	// Hardcoded set days
 	for year, yearMap := range SpecialDays {
-		yearMap["GB:BankHoliday:ChristmasEve"] = time.Date(year, 12, 24, 0, 0, 0, 0, time.UTC)
-		yearMap["GB:BankHoliday:NewYearsEve"] = time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-ChristmasEve"] = time.Date(year, 12, 24, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-NewYearsEve"] = time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
 
-		yearMap["GB:BankHoliday:ChristmasDay"] = time.Date(year, 12, 25, 0, 0, 0, 0, time.UTC)
-		yearMap["GB:BankHoliday:BoxingDay"] = time.Date(year, 12, 26, 0, 0, 0, 0, time.UTC)
-		yearMap["GB:BankHoliday:NewYearsDay"] = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-		yearMap["GB:BankHoliday:Jan2ndScotland"] = time.Date(year, 1, 2, 0, 0, 0, 0, time.UTC)
-		yearMap["GB:BankHoliday:StAndrewsDay"] = time.Date(year, 11, 30, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-ChristmasDay"] = time.Date(year, 12, 25, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-BoxingDay"] = time.Date(year, 12, 26, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-NewYearsDay"] = time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-Jan2ndScotland"] = time.Date(year, 1, 2, 0, 0, 0, 0, time.UTC)
+		yearMap["gb-bankholiday-StAndrewsDay"] = time.Date(year, 11, 30, 0, 0, 0, 0, time.UTC)
 	}
 }

@@ -42,7 +42,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
-		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", trainStatus.SSD, trainStatus.UID)
+		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", trainStatus.SSD, trainStatus.UID)
 		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
 		var realtimeJourney *ctdf.RealtimeJourney
@@ -173,7 +173,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 		if trainStatus.LateReason != "" && realtimeJourney.Journey != nil {
 			createServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("GB:RAIL:DELAY:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				PrimaryIdentifier:    fmt.Sprintf("gb-raildelay-:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
@@ -202,7 +202,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Schedules
 	for _, schedule := range p.Schedules {
-		realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", schedule.SSD, schedule.UID)
+		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
 		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
 		var realtimeJourney *ctdf.RealtimeJourney
@@ -294,7 +294,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 		if cancelCount > 0 && cancelCount == len(scheduleStops) {
 			createServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				PrimaryIdentifier:    fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
@@ -309,7 +309,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidFrom:  realtimeJourney.JourneyRunDate,
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
-			deleteServiceAlert(fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			deleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
 			updateMap["cancelled"] = true
 
@@ -319,7 +319,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Msg("Train cancelled")
 		} else if cancelCount > 0 {
 			createServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				PrimaryIdentifier:    fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
@@ -335,14 +335,14 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
 
-			deleteServiceAlert(fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			deleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
 			pretty.Println("partialcancel", realtimeJourney.PrimaryIdentifier, schedule.InnerXML)
 		} else {
 			updateMap["cancelled"] = false
 
-			deleteServiceAlert(fmt.Sprintf("GB:RAILCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-			deleteServiceAlert(fmt.Sprintf("GB:RAILPARTIALCANCEL:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			deleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			deleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		}
 
 		// Update database
@@ -381,7 +381,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Station Messages
 	for _, stationMessage := range p.StationMessages {
-		serviceAlertID := fmt.Sprintf("GB:NATIONALRAILSTATIONMESSAGE:%s", stationMessage.ID)
+		serviceAlertID := fmt.Sprintf("gb-railstationmessage-%s", stationMessage.ID)
 
 		if len(stationMessage.Stations) == 0 {
 			log.Info().Str("servicealert", serviceAlertID).Msg("Removing Station Message Service Alert")

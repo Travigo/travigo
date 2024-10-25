@@ -103,7 +103,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			log.Debug().Str("agency", agency.ID).Msg("has no NOC mapping")
 			continue
 		}
-		agencyNOCMapping[agency.ID] = fmt.Sprintf("GB:NOC:%s", agency.NOC)
+		agencyNOCMapping[agency.ID] = fmt.Sprintf("gb-noc-%s", agency.NOC)
 	}
 
 	log.Info().Int("length", len(g.Agencies)).Msg("Starting Operators")
@@ -456,14 +456,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		// TODO fix transforms here
 		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
 		if util.ContainsString([]string{
-			"GB:NOC:LDLR", "GB:NOC:LULD", "GB:NOC:TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
-			"GB:NOC:ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "GB:NOC:ALNO", "GB:NOC:ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
-			"GB:NOC:ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "GB:NOC:LSOV", "GB:NOC:LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
-			"GB:NOC:MTLN", "GB:NOC:SULV",
-		}, ctdfJourneys[tripID].OperatorRef) || (ctdfJourneys[tripID].OperatorRef == "GB:NOC:UNIB" && util.ContainsString([]string{
+			"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
+			"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
+			"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
+			"gb-noc-MTLN", "gb-noc-SULV",
+		}, ctdfJourneys[tripID].OperatorRef) || (ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
 			"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
 		}, ctdfJourneys[tripID].ServiceRef)) {
-			ctdfJourneys[tripID].OperatorRef = "GB:NOC:TFLO"
+			ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
 		}
 
 		// Insert

@@ -2,7 +2,7 @@
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:LD"
+  OperatorRef: "gb-toc-LD"
   TransportType: "Rail"
 Data:
   BrandColour: "#1825EE"
@@ -10,7 +10,7 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:GR"
+  OperatorRef: "gb-toc-GR"
   TransportType: "Rail"
 Data:
   BrandColour: "#ce0e2d"
@@ -18,7 +18,7 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:TL"
+  OperatorRef: "gb-toc-TL"
   TransportType: "Rail"
 Data:
   BrandColour: "#444e55"
@@ -27,7 +27,7 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:GC"
+  OperatorRef: "gb-toc-GC"
   TransportType: "Rail"
 Data:
   BrandColour: "#333132"
@@ -36,7 +36,7 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:GN"
+  OperatorRef: "gb-toc-GN"
   TransportType: "Rail"
 Data:
   BrandColour: "#43165c"
@@ -44,7 +44,7 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:HT"
+  OperatorRef: "gb-toc-HT"
   TransportType: "Rail"
 Data:
   BrandColour: "#14336A"

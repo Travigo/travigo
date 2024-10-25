@@ -2,7 +2,7 @@
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:TOC:ES"
+  OperatorRef: "gb-toc-ES"
   TransportType: "Rail"
 Data:
   BrandColour: "#00286A"

@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const StopGroupIDFormat = "GB:STOPGRP:%s"
+const StopGroupIDFormat = "gb-stopgroup-%s"
 
 type StopGroup struct {
 	PrimaryIdentifier string   `groups:"basic"`

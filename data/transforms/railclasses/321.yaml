@@ -1,7 +1,7 @@
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
-  VehicleType: "GB:RAILCLASS:321"
+  VehicleType: "gb-railclass-321"
 Data:
   # Unsure on this one
   VehicleTypeName: Class 321

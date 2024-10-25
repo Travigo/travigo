@@ -87,7 +87,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 
 	for _, tflDisruption := range tflDisruptionsData {
 		primaryIdentifier := fmt.Sprintf(
-			"GB:TFLDISRUPTION:%s:%s:%s:%s:%s:%s",
+			"gb-tfldisruption-%s:%s:%s:%s:%s:%s",
 			d.Mode.ModeID, strings.ReplaceAll(tflDisruption.Type, " ", ""), tflDisruption.Appearance, tflDisruption.ATCO, tflDisruption.FromDate, tflDisruption.ToDate,
 		)
 
@@ -272,7 +272,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 			}
 
 			primaryIdentifier := fmt.Sprintf(
-				"GB:TFLLINESTATUS:%s:%d",
+				"gb-tfllinestatus-%s:%d",
 				service.PrimaryIdentifier, lineStatusUpdate.StatusSeverity,
 			)
 

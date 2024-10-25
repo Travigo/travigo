@@ -131,7 +131,7 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 
 						record = ctdf.AvailabilityRule{
 							Type:  ctdf.AvailabilitySpecialDay,
-							Value: fmt.Sprintf("GB:BankHoliday:%s", bankHolidayName),
+							Value: fmt.Sprintf("gb-bankholiday-%s", bankHolidayName),
 						}
 					}
 

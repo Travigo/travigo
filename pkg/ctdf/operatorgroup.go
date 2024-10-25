@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const OperatorGroupIDFormat = "GB:NOCGRPID:%s"
+const OperatorGroupIDFormat = "gb-nocgroup-%s"
 
 type OperatorGroup struct {
 	Identifier string `groups:"basic"`

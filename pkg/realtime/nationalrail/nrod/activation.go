@@ -47,7 +47,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 
-	realtimeJourneyID := fmt.Sprintf("GB:NATIONALRAIL:%s:%s", a.TrainPlannedOriginTimestamp, a.TrainUID)
+	realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", a.TrainPlannedOriginTimestamp, a.TrainUID)
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
 	var realtimeJourney *ctdf.RealtimeJourney

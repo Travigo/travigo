@@ -2,25 +2,25 @@
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
 Data:
   BrandColour: "#F2A83B"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCHU"
+  OperatorRef: "gb-noc-SCHU"
 Data:
   BrandColour: "#F2A83B"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCBD"
+  OperatorRef: "gb-noc-SCBD"
 Data:
   BrandColour: "#F2A83B"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCPB"
+  OperatorRef: "gb-noc-SCPB"
 Data:
   BrandColour: "#F2A83B"
 
@@ -28,49 +28,49 @@ Data:
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "A",
 Data:
   BrandColour: "#04A387"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "B",
 Data:
   BrandColour: "#04A387"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "PR1",
 Data:
   BrandColour: "#E72D57"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "PR2",
 Data:
   BrandColour: "#FF6500"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "PR3",
 Data:
   BrandColour: "#4382B3"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "PR4",
 Data:
   BrandColour: "#92BF73"
 ---
 Type: ctdf.Service
 Match:
-  OperatorRef: "GB:NOC:SCCM"
+  OperatorRef: "gb-noc-SCCM"
   ServiceName: "PR5",
 Data:
   BrandColour: "#8547AC"

@@ -2,7 +2,7 @@
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
-  VehicleType: "GB:RAILCLASS:710"
+  VehicleType: "gb-railclass-710"
 Data:
   VehicleTypeName: Class 710
   # WiFi: false
