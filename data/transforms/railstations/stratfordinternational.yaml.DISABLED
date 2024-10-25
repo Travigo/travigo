@@ -1,8 +1,8 @@
 ---
 Type: ctdf.Stop
 Match:
-  PrimaryIdentifier: "GB:ATCO:9100STFORDI"
+  PrimaryIdentifier: "gb-atco-9100STFORDI"
 Data:
   OtherIdentifiers:
-    - "GB:TIPLOC:STFORDI"
-    - "GB:STANOX:52215"
+    - "gb-tiploc-STFORDI"
+    - "gb-stanox-52215"

@@ -192,16 +192,16 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	}
 
 	if orig.AtcoCode != "" {
-		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:ATCO:%s", orig.AtcoCode))
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-atco-%s", orig.AtcoCode))
 	}
 	if orig.NaptanCode != "" {
 		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:NAPTAN:%s", orig.NaptanCode))
 	}
 	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef != "" {
-		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:TIPLOC:%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef))
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-tiploc-%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef))
 	}
 	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef != "" {
-		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:CRS:%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef))
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-crs-%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef))
 	}
 
 	for i := 0; i < len(orig.StopAreas); i++ {

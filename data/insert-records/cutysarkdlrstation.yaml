@@ -1,25 +1,25 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:GB:ATCO:9400ZZDLCUT"
+  primaryidentifier: "TRAVIGO:MANUALMERGE:gb-atco-9400ZZDLCUT"
 Data:
   otheridentifiers:
-    - "GB:ATCO:9400ZZLUCAR"
-    - "GB:ATCO:9400ZZDLCUT1"
-    - "GB:ATCO:9400ZZDLCUT2"
+    - "gb-atco-9400ZZLUCAR"
+    - "gb-atco-9400ZZDLCUT1"
+    - "gb-atco-9400ZZDLCUT2"
   platforms:
-  - primaryidentifier: "GB:ATCO:9400ZZDLCUT1"
+  - primaryidentifier: "gb-atco-9400ZZDLCUT1"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLCUT1"
+      - "gb-atco-9400ZZDLCUT1"
     primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
     location:
       type: "Point"
       coordinates:
       - -0.01065381926
       - 51.48161464854
-  - primaryidentifier: "GB:ATCO:9400ZZDLCUT2"
+  - primaryidentifier: "gb-atco-9400ZZDLCUT2"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLCUT2"
+      - "gb-atco-9400ZZDLCUT2"
     primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
     location:
       type: "Point"

@@ -543,11 +543,11 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 	stopCollection := database.GetCollection("stops_raw")
 	var stop *ctdf.Stop
 
-	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:TIPLOC:%s", tiploc)}).Decode(&stop)
+	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-tiploc-%s", tiploc)}).Decode(&stop)
 
 	// If cant directly find the stop using tiploc then use the MSN map to lookup by CRS
 	if stop == nil && c.TIPLOCToCrsMap[tiploc] != "" {
-		stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:CRS:%s", c.TIPLOCToCrsMap[tiploc])}).Decode(&stop)
+		stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-crs-%s", c.TIPLOCToCrsMap[tiploc])}).Decode(&stop)
 	}
 
 	stopTIPLOCCache[tiploc] = stop

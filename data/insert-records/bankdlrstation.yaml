@@ -1,25 +1,25 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:GB:ATCO:9400ZZDLBNK"
+  primaryidentifier: "TRAVIGO:MANUALMERGE:gb-atco-9400ZZDLBNK"
 Data:
   otheridentifiers:
-    - "GB:ATCO:9400ZZDLBNK"
-    - "GB:ATCO:9400ZZDLBNK1"
-    - "GB:ATCO:9400ZZDLBNK2"
+    - "gb-atco-9400ZZDLBNK"
+    - "gb-atco-9400ZZDLBNK1"
+    - "gb-atco-9400ZZDLBNK2"
   platforms:
-  - primaryidentifier: "GB:ATCO:9400ZZDLBNK1"
+  - primaryidentifier: "gb-atco-9400ZZDLBNK1"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLBNK1"
+      - "gb-atco-9400ZZDLBNK1"
     primaryname: "Bank DLR Station"
     location:
       type: "Point"
       coordinates:
       - -0.08791080098
       - 51.5121708265
-  - primaryidentifier: "GB:ATCO:9400ZZDLBNK2"
+  - primaryidentifier: "gb-atco-9400ZZDLBNK2"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLBNK2"
+      - "gb-atco-9400ZZDLBNK2"
     primaryname: "Bank DLR Station"
     location:
       type: "Point"

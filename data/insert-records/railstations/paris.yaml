@@ -1,14 +1,14 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "GB:ATCO:PARISND"
+  primaryidentifier: "gb-atco-PARISND"
 Data:
-  primaryidentifier: "GB:ATCO:PARISND"
+  primaryidentifier: "gb-atco-PARISND"
   otheridentifiers:
-    - "GB:ATCO:9100PARISND"
-    - "GB:TIPLOC:PARISND"
-    - "GB:CRS:PBN"
-    - "GB:STANOX:750"
+    - "gb-atco-9100PARISND"
+    - "gb-tiploc-PARISND"
+    - "gb-crs-PBN"
+    - "gb-stanox-750"
   primaryname: Paris Gare du Nord
   transporttypes:
   - Rail

@@ -1,14 +1,14 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "GB:ATCO:ROTTCS"
+  primaryidentifier: "gb-atco-ROTTCS"
 Data:
-  primaryidentifier: "GB:ATCO:ROTTCS"
+  primaryidentifier: "gb-atco-ROTTCS"
   otheridentifiers:
-    - "GB:ATCO:9100ROTTCS"
-    - "GB:TIPLOC:ROTTCS"
-    - "GB:CRS:ROT"
-    - "GB:STANOX:918"
+    - "gb-atco-9100ROTTCS"
+    - "gb-tiploc-ROTTCS"
+    - "gb-crs-ROT"
+    - "gb-stanox-918"
   primaryname: Rotterdam Central
   transporttypes:
   - Rail

@@ -47,7 +47,7 @@ func (l StopsLinker) Run() {
 				Value: bson.M{
 					"$or": bson.A{
 						// Identical values of these we will be merging by
-						bson.M{"otheridentifier": bson.M{"$regex": "^GB:CRS:"}},
+						bson.M{"otheridentifier": bson.M{"$regex": "^gb-crs-"}},
 						bson.M{"otheridentifier": bson.M{"$regex": "^TRAVIGO:MANUALMERGE:"}},
 					},
 				},

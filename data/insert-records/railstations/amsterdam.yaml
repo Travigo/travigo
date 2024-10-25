@@ -1,14 +1,14 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "GB:ATCO:AMSTDAM"
+  primaryidentifier: "gb-atco-AMSTDAM"
 Data:
-  primaryidentifier: "GB:ATCO:AMSTDAM"
+  primaryidentifier: "gb-atco-AMSTDAM"
   otheridentifiers:
-    - "GB:ATCO:9100AMSTDAM"
-    - "GB:TIPLOC:AMSTDAM"
-    - "GB:CRS:AMS"
-    - "GB:STANOX:950"
+    - "gb-atco-9100AMSTDAM"
+    - "gb-tiploc-AMSTDAM"
+    - "gb-crs-AMS"
+    - "gb-stanox-950"
   primaryname: Amsterdam Central
   transporttypes:
   - Rail

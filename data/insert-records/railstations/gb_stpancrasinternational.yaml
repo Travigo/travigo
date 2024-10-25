@@ -5,8 +5,8 @@ Match:
 Data:
   otheridentifiers:
     - "TRAVIGO:MANUALMERGE:STPANCRAS"
-    - "GB:ATCO:9100STPANCI"
-    - "GB:STANOX:63631"
+    - "gb-atco-9100STPANCI"
+    - "gb-stanox-63631"
 ---
 Collection: stops_raw
 Match:
@@ -14,4 +14,4 @@ Match:
 Data:
   otheridentifiers:
     - "TRAVIGO:MANUALMERGE:STPANCRAS"
-    - "GB:ATCO:9100STPX"
+    - "gb-atco-9100STPX"

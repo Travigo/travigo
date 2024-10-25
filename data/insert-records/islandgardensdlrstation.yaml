@@ -1,25 +1,25 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:GB:ATCO:9400ZZDLISL"
+  primaryidentifier: "TRAVIGO:MANUALMERGE:gb-atco-9400ZZDLISL"
 Data:
   otheridentifiers:
-    - "GB:ATCO:9400ZZDLISL"
-    - "GB:ATCO:9400ZZDLISL1"
-    - "GB:ATCO:9400ZZDLISL2"
+    - "gb-atco-9400ZZDLISL"
+    - "gb-atco-9400ZZDLISL1"
+    - "gb-atco-9400ZZDLISL2"
   platforms:
-  - primaryidentifier: "GB:ATCO:9400ZZDLISL1"
+  - primaryidentifier: "gb-atco-9400ZZDLISL1"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLISL1"
+      - "gb-atco-9400ZZDLISL1"
     primaryname: "Island Gardens DLR Station"
     location:
       type: "Point"
       coordinates:
       - -0.01002191651
       - 51.48719738512
-  - primaryidentifier: "GB:ATCO:9400ZZDLISL2"
+  - primaryidentifier: "gb-atco-9400ZZDLISL2"
     otheridentifiers:
-      - "GB:ATCO:9400ZZDLISL2"
+      - "gb-atco-9400ZZDLISL2"
     primaryname: "Island Gardens DLR Station"
     location:
       type: "Point"

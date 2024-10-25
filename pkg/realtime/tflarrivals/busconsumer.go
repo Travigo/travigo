@@ -131,8 +131,8 @@ func (c *BusBatchConsumer) Test() {
 		Line:                     "269",
 		DirectionRef:             "2",
 		NumberPlate:              "LJ11ABV",
-		OriginRef:                "GB:ATCO:490003975E",
-		DestinationRef:           "GB:ATCO:490003975L",
+		OriginRef:                "gb-atco-490003975E",
+		DestinationRef:           "gb-atco-490003975L",
 		OriginAimedDepartureTime: "2024-08-23T21:53:00+00:00",
 	})
 

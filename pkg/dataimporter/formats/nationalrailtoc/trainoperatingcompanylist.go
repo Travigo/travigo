@@ -216,7 +216,7 @@ func generateRailStopNameOverrides() map[string]string {
 
 	stopsCollection := database.GetCollection("stops")
 	var stops []ctdf.Stop
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$regex": "^GB:TIPLOC:"}})
+	cursor, _ := stopsCollection.Find(context.Background(), bson.M{"otheridentifiers": bson.M{"$regex": "^gb-tiploc-"}})
 	cursor.All(context.Background(), &stops)
 
 	for _, stop := range stops {

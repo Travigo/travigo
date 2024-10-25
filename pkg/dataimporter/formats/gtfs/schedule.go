@@ -417,8 +417,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 			// TODO no hardocded nonsense!!
 			if dataset.Identifier == "gb-dft-bods-gtfs-schedule" {
-				originStopRef = fmt.Sprintf("GB:ATCO:%s", previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("GB:ATCO:%s", stopTime.StopID)
+				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
+				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
 			} else {
 				originStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, previousStopTime.StopID)
 				destinationStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, stopTime.StopID)

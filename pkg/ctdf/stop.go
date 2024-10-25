@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const GBStopIDFormat = "GB:ATCO:%s"
+const GBStopIDFormat = "gb-atco-%s"
 
 type Stop struct {
 	PrimaryIdentifier string   `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`

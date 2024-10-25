@@ -1,25 +1,25 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:GB:ATCO:9400ZZLUCAR"
+  primaryidentifier: "TRAVIGO:MANUALMERGE:gb-atco-9400ZZLUCAR"
 Data:
   otheridentifiers:
-    - "GB:ATCO:9400ZZLUCAR"
-    - "GB:ATCO:9400ZZLUCAR1"
-    - "GB:ATCO:9400ZZLUCAR2"
+    - "gb-atco-9400ZZLUCAR"
+    - "gb-atco-9400ZZLUCAR1"
+    - "gb-atco-9400ZZLUCAR2"
   platforms:
-  - primaryidentifier: "GB:ATCO:9400ZZLUCAR1"
+  - primaryidentifier: "gb-atco-9400ZZLUCAR1"
     otheridentifiers:
-      - "GB:ATCO:9400ZZLUCAR1"
+      - "gb-atco-9400ZZLUCAR1"
     primaryname: "Caledonian Road Underground Station"
     location:
       type: "Point"
       coordinates:
       - -0.11861346129
       - 51.54875428024
-  - primaryidentifier: "GB:ATCO:9400ZZLUCAR2"
+  - primaryidentifier: "gb-atco-9400ZZLUCAR2"
     otheridentifiers:
-      - "GB:ATCO:9400ZZLUCAR2"
+      - "gb-atco-9400ZZLUCAR2"
     primaryname: "Caledonian Road Underground Station"
     location:
       type: "Point"

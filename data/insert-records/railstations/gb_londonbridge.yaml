@@ -5,7 +5,7 @@ Match:
 Data:
   otheridentifiers:
     - "TRAVIGO:MANUALMERGE:LNDBRIDGE"
-    - "GB:CRS:STP"
+    - "gb-crs-STP"
 ---
 Collection: stops_raw
 Match:
@@ -13,4 +13,4 @@ Match:
 Data:
   otheridentifiers:
     - "TRAVIGO:MANUALMERGE:LNDBRIDGE"
-    - "GB:CRS:SPL"
+    - "gb-crs-SPL"

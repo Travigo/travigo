@@ -47,13 +47,13 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 		}
 
 		var stop ctdf.Stop
-		err := stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("GB:TIPLOC:%s", tiploc)}).Decode(&stop)
+		err := stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-tiploc-%s", tiploc)}).Decode(&stop)
 
 		if err != nil {
 			continue
 		}
 
-		bsonRep, _ := bson.Marshal(bson.M{"$push": bson.M{"otheridentifiers": fmt.Sprintf("GB:STANOX:%s", stanox)}})
+		bsonRep, _ := bson.Marshal(bson.M{"$push": bson.M{"otheridentifiers": fmt.Sprintf("gb-stanox-%s", stanox)}})
 		updateModel := mongo.NewUpdateOneModel()
 		updateModel.SetFilter(bson.M{"primaryidentifier": stop.PrimaryIdentifier})
 		updateModel.SetUpdate(bsonRep)

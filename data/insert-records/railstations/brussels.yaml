@@ -1,14 +1,14 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "GB:ATCO:BRUXMID"
+  primaryidentifier: "gb-atco-BRUXMID"
 Data:
-  primaryidentifier: "GB:ATCO:BRUXMID"
+  primaryidentifier: "gb-atco-BRUXMID"
   otheridentifiers:
-    - "GB:ATCO:9100BRUXMID"
-    - "GB:TIPLOC:BRUXMID"
-    - "GB:CRS:BXS"
-    - "GB:STANOX:850"
+    - "gb-atco-9100BRUXMID"
+    - "gb-tiploc-BRUXMID"
+    - "gb-crs-BXS"
+    - "gb-stanox-850"
   primaryname: Brussels-South
   transporttypes:
   - Rail
