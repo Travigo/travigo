@@ -195,7 +195,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-atco-%s", orig.AtcoCode))
 	}
 	if orig.NaptanCode != "" {
-		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("GB:NAPTAN:%s", orig.NaptanCode))
+		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-naptan-%s", orig.NaptanCode))
 	}
 	if orig.StopClassification.OffStreet.Rail != nil && orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef != "" {
 		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-tiploc-%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.TiplocRef))
