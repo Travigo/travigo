@@ -37,6 +37,60 @@ func (l StopsLinker) Run() {
 
 	copyCollection(rawCollectionName, stagingCollectionName)
 
+	// A location based aggregation
+	// 	bson.A{
+	//     bson.D{{"$match", bson.D{{"location.type", "Point"}}}},
+	//     bson.D{
+	//         {"$addFields",
+	//             bson.D{
+	//                 {"locationconcat",
+	//                     bson.D{
+	//                         {"$concat",
+	//                             bson.A{
+	//                                 "$location.type",
+	//                                 bson.D{
+	//                                     {"$toString",
+	//                                         bson.D{
+	//                                             {"$arrayElemAt",
+	//                                                 bson.A{
+	//                                                     "$location.coordinates",
+	//                                                     0,
+	//                                                 },
+	//                                             },
+	//                                         },
+	//                                     },
+	//                                 },
+	//                                 bson.D{
+	//                                     {"$toString",
+	//                                         bson.D{
+	//                                             {"$arrayElemAt",
+	//                                                 bson.A{
+	//                                                     "$location.coordinates",
+	//                                                     1,
+	//                                                 },
+	//                                             },
+	//                                         },
+	//                                     },
+	//                                 },
+	//                             },
+	//                         },
+	//                     },
+	//                 },
+	//             },
+	//         },
+	//     },
+	//     bson.D{
+	//         {"$group",
+	//             bson.D{
+	//                 {"_id", "$locationconcat"},
+	//                 {"count", bson.D{{"$sum", 1}}},
+	//                 {"records", bson.D{{"$push", "$$ROOT"}}},
+	//             },
+	//         },
+	//     },
+	//     bson.D{{"$match", bson.D{{"count", bson.D{{"$gt", 1}}}}}},
+	// }
+
 	// Get matching records
 	aggregation := mongo.Pipeline{
 		bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},

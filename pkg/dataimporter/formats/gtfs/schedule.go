@@ -156,10 +156,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, gtfsStop.ID)
 		ctdfStop := &ctdf.Stop{
-			PrimaryIdentifier: stopID,
-			OtherIdentifiers: []string{
-				fmt.Sprintf("GTFS-ID:%s", gtfsStop.ID),
-			},
+			PrimaryIdentifier:    stopID,
+			OtherIdentifiers:     []string{},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
@@ -247,8 +245,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
-			OtherIdentifiers: map[string]string{
-				"GTFS-ID": gtfsRoute.ID,
+			OtherIdentifiers: []string{
+				fmt.Sprintf("gtfs-route-%s", gtfsRoute.ID),
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),

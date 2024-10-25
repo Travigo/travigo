@@ -3,8 +3,8 @@ package ctdf
 import "time"
 
 type Service struct {
-	PrimaryIdentifier string            `groups:"basic,search,search-llm,stop-llm,departures-llm"`
-	OtherIdentifiers  map[string]string `groups:"basic"`
+	PrimaryIdentifier string   `groups:"basic,search,search-llm,stop-llm,departures-llm"`
+	OtherIdentifiers  []string `groups:"basic"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`

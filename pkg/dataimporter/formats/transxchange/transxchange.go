@@ -188,10 +188,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 			ctdfService := ctdf.Service{
 				PrimaryIdentifier: serviceIdentifier,
-				OtherIdentifiers: map[string]string{
-					"ServiceCode": txcService.ServiceCode,
-					"LineID":      txcLine.ID,
-				},
+				OtherIdentifiers:  []string{},
 
 				DataSource: datasource,
 
