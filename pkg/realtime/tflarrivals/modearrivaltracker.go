@@ -186,6 +186,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	line := l.Mode.Lines[predictions[0].LineID]
 
+	// Skip ones with a nil service
+	if line.Service == nil {
+		return nil
+	}
+
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
 
