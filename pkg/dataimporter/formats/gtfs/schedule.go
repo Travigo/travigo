@@ -291,6 +291,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	for _, trip := range g.Trips {
 		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, trip.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, trip.RouteID)
+
+		if ctdfServices[trip.RouteID] == nil {
+			log.Debug().Str("trip", trip.RouteID).Msg("Cannot find service for this trip")
+			continue
+		}
+
 		operatorRef := ctdfServices[trip.RouteID].OperatorRef
 
 		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
