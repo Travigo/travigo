@@ -82,11 +82,16 @@ func (stop *Stop) GenerateDeterministicID(writer io.Writer) {
 		writer.Write([]byte(transportType))
 	}
 
-	writer.Write([]byte(stop.Location.Type))
+	if stop.Location == nil {
+		writer.Write([]byte(stop.DataSource.DatasetID))
+		writer.Write([]byte(stop.PrimaryIdentifier))
+	} else {
+		writer.Write([]byte(stop.Location.Type))
 
-	for _, coord := range stop.Location.Coordinates {
-		buf := make([]byte, 8)
-		binary.BigEndian.PutUint64(buf[:], math.Float64bits(coord))
-		writer.Write(buf)
+		for _, coord := range stop.Location.Coordinates {
+			buf := make([]byte, 8)
+			binary.BigEndian.PutUint64(buf[:], math.Float64bits(coord))
+			writer.Write(buf)
+		}
 	}
 }

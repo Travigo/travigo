@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -34,6 +35,8 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 		return errors.New("This format requires stops to be enabled")
 	}
 
+	now := time.Now()
+
 	stopsCollection := database.GetCollection("stops_raw")
 
 	var updateOperations []mongo.WriteModel
@@ -46,25 +49,27 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 			continue
 		}
 
-		var stop ctdf.Stop
-		err := stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-tiploc-%s", tiploc)}).Decode(&stop)
+		tiplocID := fmt.Sprintf("gb-tiploc-%s", tiploc)
+		stanoxID := fmt.Sprintf("gb-stanox-%s", stanox)
 
-		if err != nil {
-			continue
-		}
-
-		bsonRep, _ := bson.Marshal(bson.M{"$push": bson.M{"otheridentifiers": fmt.Sprintf("gb-stanox-%s", stanox)}})
+		bsonRep, _ := bson.Marshal(bson.M{"$set": bson.M{
+			"primaryidentifier":    stanoxID,
+			"otheridentifiers":     []string{stanoxID, tiplocID},
+			"datasource":           datasource,
+			"modificationdatetime": now,
+			"creationdatetime":     now,
+		}})
 		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(bson.M{"primaryidentifier": stop.PrimaryIdentifier})
+		updateModel.SetFilter(bson.M{"primaryidentifier": stanoxID})
 		updateModel.SetUpdate(bsonRep)
 		updateModel.SetUpsert(true)
 
 		updateOperations = append(updateOperations, updateModel)
 
 		log.Info().
-			Str("stop", stop.PrimaryIdentifier).
-			Str("stanox", stanox).
-			Msg("Added STANOX to Stop")
+			Str("tiploc", tiplocID).
+			Str("stanox", stanoxID).
+			Msg("Added STANOX Stop")
 	}
 
 	if len(updateOperations) > 0 {
