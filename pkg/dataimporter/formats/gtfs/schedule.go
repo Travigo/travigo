@@ -396,68 +396,68 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		sequenceIDs := maps.Keys(tripSequencyMap)
 		sort.Ints(sequenceIDs)
 
-		for index := 1; index < len(sequenceIDs); index += 1 {
-			sequenceID := sequenceIDs[index]
-			stopTime := tripSequencyMap[sequenceID]
+		// for index := 1; index < len(sequenceIDs); index += 1 {
+		// 	sequenceID := sequenceIDs[index]
+		// 	stopTime := tripSequencyMap[sequenceID]
 
-			previousSequenceID := sequenceIDs[index-1]
-			previousStopTime := tripSequencyMap[previousSequenceID]
+		// 	previousSequenceID := sequenceIDs[index-1]
+		// 	previousStopTime := tripSequencyMap[previousSequenceID]
 
-			originArrivalTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.ArrivalTime))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse previousStopTime.ArrivalTime")
-			}
-			originDeparturelTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.DepartureTime))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse previousStopTime.DepartureTime")
-			}
-			destinationArrivalTime, err := time.Parse("15:04:05", fixTimestamp(stopTime.ArrivalTime))
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse stopTime.ArrivalTime")
-			}
+		// 	originArrivalTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.ArrivalTime))
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("Failed to parse previousStopTime.ArrivalTime")
+		// 	}
+		// 	originDeparturelTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.DepartureTime))
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("Failed to parse previousStopTime.DepartureTime")
+		// 	}
+		// 	destinationArrivalTime, err := time.Parse("15:04:05", fixTimestamp(stopTime.ArrivalTime))
+		// 	if err != nil {
+		// 		log.Error().Err(err).Msg("Failed to parse stopTime.ArrivalTime")
+		// 	}
 
-			var originStopRef string
-			var destinationStopRef string
+		// 	var originStopRef string
+		// 	var destinationStopRef string
 
-			// TODO no hardocded nonsense!!
-			if dataset.Identifier == "gb-dft-bods-gtfs-schedule" {
-				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
-			} else {
-				originStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, stopTime.StopID)
-			}
+		// 	// TODO no hardocded nonsense!!
+		// 	if dataset.Identifier == "gb-dft-bods-gtfs-schedule" {
+		// 		originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
+		// 		destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
+		// 	} else {
+		// 		originStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, previousStopTime.StopID)
+		// 		destinationStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, stopTime.StopID)
+		// 	}
 
-			journeyPathItem := &ctdf.JourneyPathItem{
-				OriginStopRef:          originStopRef,
-				DestinationStopRef:     destinationStopRef,
-				OriginArrivalTime:      originArrivalTime,
-				DestinationArrivalTime: destinationArrivalTime,
-				OriginDepartureTime:    originDeparturelTime,
-				DestinationDisplay:     stopTime.StopHeadsign,
-				OriginActivity:         []ctdf.JourneyPathItemActivity{},
-				DestinationActivity:    []ctdf.JourneyPathItemActivity{},
-			}
+		// 	journeyPathItem := &ctdf.JourneyPathItem{
+		// 		OriginStopRef:          originStopRef,
+		// 		DestinationStopRef:     destinationStopRef,
+		// 		OriginArrivalTime:      originArrivalTime,
+		// 		DestinationArrivalTime: destinationArrivalTime,
+		// 		OriginDepartureTime:    originDeparturelTime,
+		// 		DestinationDisplay:     stopTime.StopHeadsign,
+		// 		OriginActivity:         []ctdf.JourneyPathItemActivity{},
+		// 		DestinationActivity:    []ctdf.JourneyPathItemActivity{},
+		// 	}
 
-			if previousStopTime.DropOffType == 0 {
-				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
-			}
-			if previousStopTime.PickupType == 0 {
-				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivityPickup)
-			}
-			if stopTime.DropOffType == 0 {
-				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
-			}
-			if stopTime.PickupType == 0 {
-				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
-			}
+		// 	if previousStopTime.DropOffType == 0 {
+		// 		journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
+		// 	}
+		// 	if previousStopTime.PickupType == 0 {
+		// 		journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivityPickup)
+		// 	}
+		// 	if stopTime.DropOffType == 0 {
+		// 		journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
+		// 	}
+		// 	if stopTime.PickupType == 0 {
+		// 		journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
+		// 	}
 
-			ctdfJourneys[tripID].Path = append(ctdfJourneys[tripID].Path, journeyPathItem)
+		// 	ctdfJourneys[tripID].Path = append(ctdfJourneys[tripID].Path, journeyPathItem)
 
-			if index == 1 {
-				ctdfJourneys[tripID].DepartureTime = originDeparturelTime
-			}
-		}
+		// 	if index == 1 {
+		// 		ctdfJourneys[tripID].DepartureTime = originDeparturelTime
+		// 	}
+		// }
 
 		// TODO fix transforms here
 		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
