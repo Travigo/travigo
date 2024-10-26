@@ -90,9 +90,9 @@ func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
 		eventDirection = "outbound"
 	}
 
-	lineTracker := LineArrivalTracker{
-		Line: &TfLLine{
-			LineID: event.Line,
+	lineTracker := ModeArrivalTracker{
+		Mode: &TfLMode{
+			ModeID: "bus",
 		},
 	}
 
@@ -106,7 +106,7 @@ func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
 		}
 
 		realtimeJourneyID := fmt.Sprintf(
-			"REALTIME:TFL:%s:%s:%s:%s:%s",
+			"realtime-tfl-%s-%s-%s-%s-%s",
 			arrival.ModeName,
 			arrival.LineID,
 			arrival.Direction,

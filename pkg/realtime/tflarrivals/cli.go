@@ -99,9 +99,6 @@ func RegisterCLI() *cli.Command {
 							// },
 						},
 
-						RuntimeLineFilter: func(lineID string) bool {
-							return true
-						},
 						RuntimeJourneyFilter: func(lineID string, tripID string) bool {
 							return true
 						},
@@ -143,14 +140,6 @@ func RegisterCLI() *cli.Command {
 								TrackDisruptions:   false,
 								ArrivalRefreshRate: 30 * time.Second,
 							},
-						},
-
-						RuntimeLineFilter: func(lineID string) bool {
-							tflTrackerCollection := database.GetCollection("tfl_tracker")
-
-							count, _ := tflTrackerCollection.CountDocuments(context.Background(), bson.M{"line": lineID})
-
-							return count != 0
 						},
 
 						RuntimeJourneyFilter: func(lineID string, tripID string) bool {

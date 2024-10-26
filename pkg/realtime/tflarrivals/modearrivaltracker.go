@@ -24,50 +24,46 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type LineArrivalTracker struct {
-	Line        *TfLLine
+type ModeArrivalTracker struct {
+	Mode        *TfLMode
 	RefreshRate time.Duration
 
-	OrderedLineRoutes []OrderedLineRoute
-
-	RuntimeLineFilter    func(string) bool
 	RuntimeJourneyFilter func(string, string) bool
 }
 
-func (l *LineArrivalTracker) Run(getRoutes bool) {
-	if l.Line.Service == nil {
-		log.Error().
-			Str("id", l.Line.LineID).
-			Str("type", string(l.Line.TransportType)).
-			Msg("Failed setting up line tracker - couldnt find CTDF Service")
-		return
-	}
+func (l *ModeArrivalTracker) Run(getRoutes bool) {
+	// if l.Line.Service == nil {
+	// 	log.Error().
+	// 		Str("id", l.Line.LineID).
+	// 		Str("type", string(l.Line.TransportType)).
+	// 		Msg("Failed setting up line tracker - couldnt find CTDF Service")
+	// 	return
+	// }
 
 	if getRoutes {
-		l.GetTfLRouteSequences()
-		if len(l.OrderedLineRoutes) == 0 {
-			log.Error().
-				Str("id", l.Line.LineID).
-				Str("type", string(l.Line.TransportType)).
-				Msg("Failed setting up line tracker - couldnt TfL ordered line routes")
-			return
+		for _, line := range l.Mode.Lines {
+			line.GetTfLRouteSequences()
+			if len(line.OrderedLineRoutes) == 0 {
+				log.Error().
+					Str("id", line.LineID).
+					Str("type", string(line.TransportType)).
+					Msg("Failed setting up line tracker - couldnt TfL ordered line routes")
+				// return
+			}
 		}
 	}
 
 	log.Info().
-		Str("id", l.Line.LineID).
-		Str("type", string(l.Line.TransportType)).
-		Str("service", l.Line.Service.PrimaryIdentifier).
-		Int("numroutes", len(l.OrderedLineRoutes)).
-		Msg("Registering new line arrival tracker")
+		Str("id", l.Mode.ModeID).
+		Str("type", string(l.Mode.TransportType)).
+		Int("numlines", len(l.Mode.Lines)).
+		Msg("Registering new mode arrival tracker")
 
 	for {
 		startTime := time.Now()
 
-		if l.RuntimeLineFilter(l.Line.LineID) {
-			arrivals := l.GetLatestArrivals()
-			l.ParseArrivals(arrivals)
-		}
+		arrivals := l.GetLatestArrivals()
+		l.ParseArrivals(arrivals)
 
 		endTime := time.Now()
 		executionDuration := endTime.Sub(startTime)
@@ -79,35 +75,8 @@ func (l *LineArrivalTracker) Run(getRoutes bool) {
 	}
 }
 
-func (l *LineArrivalTracker) GetTfLRouteSequences() {
-	for _, direction := range []string{"inbound", "outbound"} {
-		requestURL := fmt.Sprintf(
-			"https://api.tfl.gov.uk/line/%s/route/sequence/%s/?app_key=%s",
-			l.Line.LineID,
-			direction,
-			TfLAppKey)
-		req, _ := http.NewRequest("GET", requestURL, nil)
-		req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-
-		if err != nil {
-			log.Fatal().Err(err).Msg("Download file")
-		}
-		defer resp.Body.Close()
-
-		jsonBytes, _ := io.ReadAll(resp.Body)
-
-		var routeSequenceResponse RouteSequenceResponse
-		json.Unmarshal(jsonBytes, &routeSequenceResponse)
-
-		l.OrderedLineRoutes = append(l.OrderedLineRoutes, routeSequenceResponse.OrderedLineRoutes...)
-	}
-}
-
-func (l *LineArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
-	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/line/%s/arrivals?app_key=%s", l.Line.LineID, TfLAppKey)
+func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
+	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/mode/%s/arrivals?app_key=%s", l.Mode.ModeID, TfLAppKey)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
@@ -127,13 +96,13 @@ func (l *LineArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
 	return lineArrivals
 }
 
-func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
+func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime := time.Now()
 
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "tfl-json",
 		Provider:       "GB-TfL",
-		DatasetID:      fmt.Sprintf("gb-tfl-line/%s/arrivals", l.Line.LineID),
+		DatasetID:      fmt.Sprintf("gb-tfl-mode/%s/arrivals", l.Mode.ModeID),
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
 
@@ -145,7 +114,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	groupedLineArrivals := map[string][]ArrivalPrediction{}
 	for _, arrival := range lineArrivals {
 		realtimeJourneyID := fmt.Sprintf(
-			"REALTIME:TFL:%s:%s:%s:%s:%s",
+			"realtime-tfl-%s-%s-%s-%s-%s",
 			arrival.ModeName,
 			arrival.LineID,
 			arrival.Direction,
@@ -158,7 +127,7 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 	// Generate RealtimeJourneys for each group
 	for realtimeJourneyID, predictions := range groupedLineArrivals {
-		if l.RuntimeJourneyFilter(l.Line.LineID, predictions[0].TripID) {
+		if l.RuntimeJourneyFilter(predictions[0].LineID, predictions[0].TripID) {
 			realtimeJourneyID := realtimeJourneyID
 			predictions := predictions
 
@@ -185,11 +154,11 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 
 	log.Info().
-		Str("id", l.Line.LineID).
+		Str("id", l.Mode.ModeID).
 		Str("processing", processingTime.String()).
 		Str("bulkwrite", time.Now().Sub(startTime).String()).
 		Int("length", len(realtimeJourneyUpdateOperations)).
-		Msg("update line arrivals")
+		Msg("update mode arrivals")
 
 	// Remove any tfl realtime journey that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
@@ -202,18 +171,20 @@ func (l *LineArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
 	if d.DeletedCount > 0 {
 		log.Info().
-			Str("id", l.Line.LineID).
+			Str("id", l.Mode.ModeID).
 			Int64("length", d.DeletedCount).
 			Msg("delete expired journeys")
 	}
 }
 
-func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
+func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",
 	}
 	now := time.Now()
+
+	line := l.Mode.Lines[predictions[0].LineID]
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
@@ -247,12 +218,12 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				Operator:    tflOperator,
 				OperatorRef: tflOperator.PrimaryIdentifier,
 
-				Service:    l.Line.Service,
-				ServiceRef: l.Line.Service.PrimaryIdentifier,
+				Service:    line.Service,
+				ServiceRef: line.Service.PrimaryIdentifier,
 
 				DepartureTimezone: "Europe/London",
 			},
-			Service:        l.Line.Service,
+			Service:        line.Service,
 			JourneyRunDate: journeyDate,
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
@@ -350,7 +321,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	// Identify the route the vehicle is on
 	var potentialOrderLineRouteMatches []OrderedLineRoute
-	for _, route := range l.OrderedLineRoutes {
+	for _, route := range line.OrderedLineRoutes {
 		routeOrderedNaptanIDs := route.NaptanIDs
 
 		// Reduce the route naptan ids so that it only contains the same stops in the predictions
@@ -380,7 +351,7 @@ func (l *LineArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	if destinationDisplay == "" && lastPrediction.Towards != "" && lastPrediction.Towards != "Check Front of Train" {
 		destinationDisplay = lastPrediction.Towards
 	} else if destinationDisplay == "" {
-		destinationDisplay = l.Line.Service.ServiceName
+		destinationDisplay = line.Service.ServiceName
 	}
 
 	nameMatches := nameRegex.FindStringSubmatch(lastPrediction.DestinationName)
