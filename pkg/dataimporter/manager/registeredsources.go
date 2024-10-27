@@ -344,7 +344,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Name:    "Ilévia",
 				Website: "http://www.ilevia.fr",
 			},
-			Source:       "https://opendata.lillemetropole.fr/api/datasets/1.0/transport_arret_transpole-point/alternative_exports/gtfszip",
+			Source:       "https://media.ilevia.fr/opendata/gtfs.zip",
 			UnpackBundle: datasets.BundleFormatNone,
 			SupportedObjects: datasets.SupportedObjects{
 				Operators: true,

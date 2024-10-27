@@ -142,7 +142,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 	// Stops
 	log.Info().Int("length", len(g.Stops)).Msg("Starting Stops")
-	stopsQueue := NewDatabaseBatchProcessingQueue("stops", 1*time.Second, 10*time.Second, 500)
+	stopsQueue := NewDatabaseBatchProcessingQueue("stops_raw", 1*time.Second, 10*time.Second, 500)
 
 	if dataset.SupportedObjects.Stops {
 		stopsQueue.Process()
