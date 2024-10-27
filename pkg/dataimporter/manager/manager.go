@@ -79,17 +79,6 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		return nil, errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
 
-	return format, nil
-}
-
-func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
-	datasetVersionCollection := database.GetCollection("dataset_versions")
-
-	format, err := createDatasetFormat(dataset)
-	if err != nil {
-		return err
-	}
-
 	if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
 		if dataset.Queue == nil {
 			realtimeQueue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")
@@ -104,6 +93,12 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 
 		realtimeQueueFormat.SetupRealtimeQueue(*dataset.Queue)
 	}
+
+	return format, nil
+}
+
+func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
+	datasetVersionCollection := database.GetCollection("dataset_versions")
 
 	datasource := &ctdf.DataSource{
 		OriginalFormat: string(dataset.Format),
@@ -183,12 +178,9 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	}
 
 	for i, sourceFileReader := range sourceFileReaders {
-		// Recreate the format importer to clear any internal cache or anything between runs
-		if dataset.UnpackBundle == datasets.BundleFormatZIP {
-			format, err = createDatasetFormat(dataset)
-			if err != nil {
-				return err
-			}
+		format, err := createDatasetFormat(dataset)
+		if err != nil {
+			return err
 		}
 
 		// Actually import it
