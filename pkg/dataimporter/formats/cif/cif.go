@@ -393,23 +393,23 @@ func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trai
 
 	// Seating type
 	if strings.TrimSpace(trainDef.BasicSchedule.SeatingClass) == "" || trainDef.BasicSchedule.SeatingClass == "B" {
-		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingFirstStandard
+		detailedRailInformation.Seating = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingFirst, ctdf.JourneyDetailedRailSeatingStandard}
 	} else if trainDef.BasicSchedule.SeatingClass == "S" {
-		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingStandard
+		detailedRailInformation.Seating = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingStandard}
 	} else {
-		detailedRailInformation.Seating = ctdf.JourneyDetailedRailSeatingUnknown
+		detailedRailInformation.Seating = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingUnknown}
 	}
 
 	// Sleepers
 	if trainDef.BasicSchedule.Sleepers == "B" {
 		detailedRailInformation.SleeperAvailable = true
-		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingFirstStandard
+		detailedRailInformation.Sleepers = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingFirst, ctdf.JourneyDetailedRailSeatingStandard}
 	} else if trainDef.BasicSchedule.Sleepers == "F" {
 		detailedRailInformation.SleeperAvailable = true
-		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingFirst
+		detailedRailInformation.Sleepers = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingFirst}
 	} else if trainDef.BasicSchedule.Sleepers == "S" {
 		detailedRailInformation.SleeperAvailable = true
-		detailedRailInformation.Sleepers = ctdf.JourneyDetailedRailSeatingStandard
+		detailedRailInformation.Sleepers = []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingStandard}
 	} else {
 		detailedRailInformation.SleeperAvailable = false
 	}

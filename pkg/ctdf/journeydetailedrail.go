@@ -7,10 +7,10 @@ type JourneyDetailedRail struct {
 
 	Carriages []RailCarriage `groups:"detailed"`
 
-	Seating JourneyDetailedRailSeating `groups:"detailed"`
+	Seating []JourneyDetailedRailSeating `groups:"detailed"`
 
-	SleeperAvailable bool                       `groups:"detailed"`
-	Sleepers         JourneyDetailedRailSeating `groups:"detailed"`
+	SleeperAvailable bool                         `groups:"detailed"`
+	Sleepers         []JourneyDetailedRailSeating `groups:"detailed"`
 
 	SpeedKMH int `groups:"detailed"`
 
@@ -36,10 +36,9 @@ type JourneyDetailedRail struct {
 type JourneyDetailedRailSeating string
 
 const (
-	JourneyDetailedRailSeatingFirstStandard JourneyDetailedRailSeating = "FirstStandard"
-	JourneyDetailedRailSeatingFirst                                    = "First"
-	JourneyDetailedRailSeatingStandard                                 = "Standard"
-	JourneyDetailedRailSeatingUnknown                                  = "Unknown"
+	JourneyDetailedRailSeatingFirst    JourneyDetailedRailSeating = "First"
+	JourneyDetailedRailSeatingStandard                            = "Standard"
+	JourneyDetailedRailSeatingUnknown                             = "Unknown"
 )
 
 type RailCarriage struct {
