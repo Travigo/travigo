@@ -34,6 +34,8 @@ func (transXChange *TransXChange) ParseFile(reader io.Reader) error {
 						transXChange.ModificationDateTime = attr.Value
 					case "SchemaVersion":
 						transXChange.SchemaVersion = attr.Value
+					case "FileName":
+						transXChange.FileName = attr.Value
 					}
 				}
 

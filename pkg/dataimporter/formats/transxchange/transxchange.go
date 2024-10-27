@@ -31,6 +31,7 @@ const DateTimeFormatWithTimezoneRegex = ".+[+-]\\d{2}:\\d{2}"
 const DateTimeFormatWithTimezone = "2006-01-02T15:04:05-07:00"
 
 type TransXChange struct {
+	FileName             string `xml:",attr"`
 	CreationDateTime     string `xml:",attr"`
 	ModificationDateTime string `xml:",attr"`
 

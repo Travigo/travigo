@@ -53,9 +53,7 @@ func GetDataset(identifier string) (datasets.DataSet, error) {
 	return datasets.DataSet{}, errors.New("Dataset could not be found")
 }
 
-func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
-	datasetVersionCollection := database.GetCollection("dataset_versions")
-
+func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 	var format formats.Format
 
 	switch dataset.Format {
@@ -78,7 +76,18 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	case datasets.DataSetFormatTransXChange:
 		format = &transxchange.TransXChange{}
 	default:
-		return errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
+		return nil, errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
+	}
+
+	return format, nil
+}
+
+func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
+	datasetVersionCollection := database.GetCollection("dataset_versions")
+
+	format, err := createDatasetFormat(dataset)
+	if err != nil {
+		return err
 	}
 
 	if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
@@ -158,7 +167,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 		}
 		defer archive.Close()
 
-		for _, zipFile := range archive.File {
+		for i, zipFile := range archive.File {
 			zipFileOpen, err := zipFile.Open()
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to open file")
@@ -166,17 +175,29 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 			defer zipFileOpen.Close()
 
 			sourceFileReaders = append(sourceFileReaders, zipFileOpen)
+
+			log.Debug().Int("index", i).Str("path", zipFile.Name).Msg("Storing zip file")
 		}
 	default:
 		return errors.New(fmt.Sprintf("Cannot handle bundle format %s", dataset.UnpackBundle))
 	}
 
-	for _, sourceFileReader := range sourceFileReaders {
+	for i, sourceFileReader := range sourceFileReaders {
+		// Recreate the format importer to clear any internal cache or anything between runs
+		if dataset.UnpackBundle == datasets.BundleFormatZIP {
+			format, err = createDatasetFormat(dataset)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Actually import it
 		err = format.ParseFile(sourceFileReader)
 		if err != nil {
 			return err
 		}
 
+		log.Debug().Int("index", i).Msg("Opening zipped file")
 		err = format.Import(*dataset, datasource)
 		if err != nil {
 			return err
