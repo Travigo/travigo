@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-var RealtimeJourneyIDFormat = "REALTIME:%s:%s"
+var RealtimeJourneyIDFormat = "realtime-%s:%s"
 
 type RealtimeJourney struct {
 	PrimaryIdentifier string            `groups:"basic"`
