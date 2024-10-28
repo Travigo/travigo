@@ -51,9 +51,15 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	stopTimezone, _ := time.LoadLocation(q.Stop.Timezone)
 
 	// Query for services from the realtime_journeys table
+	stopQueries := []bson.M{}
+	allStopIDS := append(q.Stop.OtherIdentifiers, q.Stop.PrimaryIdentifier)
+	for _, stopID := range allStopIDS {
+		stopQueries = append(stopQueries, bson.M{fmt.Sprintf("stops.%s.timetype", stopID): ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+	}
+
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-		fmt.Sprintf("stops.%s.timetype", q.Stop.PrimaryIdentifier): ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+		"$or": stopQueries,
 	})
 
 	var realtimeJourneys []ctdf.RealtimeJourney
