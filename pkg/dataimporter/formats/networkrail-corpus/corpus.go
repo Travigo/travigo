@@ -44,8 +44,9 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 	for _, tiplocData := range c.TiplocData {
 		tiploc := strings.TrimSpace(tiplocData.TIPLOC)
 		stanox := strings.TrimSpace(tiplocData.STANOX)
+		threeAlpha := strings.TrimSpace(tiplocData.ThreeAlpha)
 
-		if tiploc == "" || stanox == "" {
+		if tiploc == "" || stanox == "" || threeAlpha == "" {
 			continue
 		}
 
