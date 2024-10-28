@@ -46,22 +46,30 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 		stanox := strings.TrimSpace(tiplocData.STANOX)
 		threeAlpha := strings.TrimSpace(tiplocData.ThreeAlpha)
 
-		if tiploc == "" || stanox == "" || threeAlpha == "" {
+		if tiploc == "" || stanox == "" {
 			continue
 		}
 
 		tiplocID := fmt.Sprintf("gb-tiploc-%s", tiploc)
 		stanoxID := fmt.Sprintf("gb-stanox-%s", stanox)
+		threeAlphaID := fmt.Sprintf("gb-crs-%s", threeAlpha)
+
+		primaryID := fmt.Sprintf("travigo-internalmerge-%s-%s-%s", dataset.Identifier, tiploc, stanox)
+
+		otherIDs := []string{stanoxID, tiplocID}
+		if threeAlpha != "" {
+			otherIDs = append(otherIDs, threeAlphaID)
+		}
 
 		bsonRep, _ := bson.Marshal(bson.M{"$set": bson.M{
-			"primaryidentifier":    stanoxID,
-			"otheridentifiers":     []string{stanoxID, tiplocID},
+			"primaryidentifier":    primaryID,
+			"otheridentifiers":     otherIDs,
 			"datasource":           datasource,
 			"modificationdatetime": now,
 			"creationdatetime":     now,
 		}})
 		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(bson.M{"primaryidentifier": stanoxID})
+		updateModel.SetFilter(bson.M{"primaryidentifier": primaryID})
 		updateModel.SetUpdate(bsonRep)
 		updateModel.SetUpsert(true)
 

@@ -1,7 +1,7 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:gb-atco-9400ZZDLBNK"
+  primaryidentifier: "travigo-internalmerge-gb-atco-9400ZZDLBNK"
 Data:
   otheridentifiers:
     - "gb-atco-9400ZZDLBNK"

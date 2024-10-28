@@ -104,7 +104,7 @@ func (l StopsLinker) Run() {
 						bson.M{"otheridentifier": bson.M{"$regex": "^gb-crs-"}},
 						bson.M{"otheridentifier": bson.M{"$regex": "^gb-tiploc-"}},
 						bson.M{"otheridentifier": bson.M{"$regex": "^gb-stanox-"}},
-						bson.M{"otheridentifier": bson.M{"$regex": "^TRAVIGO:MANUALMERGE:"}},
+						bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
 					},
 				},
 			},
@@ -164,7 +164,7 @@ func (l StopsLinker) Run() {
 		}
 	}
 
-	manualMergeRegex := regexp.MustCompile("TRAVIGO:MANUALMERGE:")
+	manualMergeRegex := regexp.MustCompile("travigo-internalmerge-")
 	for _, mergeGroup := range mergeGroups {
 		if len(mergeGroup) == 0 {
 			continue

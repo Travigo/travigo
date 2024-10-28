@@ -1,17 +1,17 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:STPANCRAS-1"
+  primaryidentifier: "travigo-internalmerge-STPANCRAS-1"
 Data:
   otheridentifiers:
-    - "TRAVIGO:MANUALMERGE:STPANCRAS"
+    - "travigo-internalmerge-STPANCRAS"
     - "gb-atco-9100STPANCI"
     - "gb-stanox-63631"
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:STPANCRAS-2"
+  primaryidentifier: "travigo-internalmerge-STPANCRAS-2"
 Data:
   otheridentifiers:
-    - "TRAVIGO:MANUALMERGE:STPANCRAS"
+    - "travigo-internalmerge-STPANCRAS"
     - "gb-atco-9100STPX"

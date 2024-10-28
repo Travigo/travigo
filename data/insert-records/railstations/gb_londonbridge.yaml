@@ -1,16 +1,16 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:LNDBRIDGE-1"
+  primaryidentifier: "travigo-internalmerge-LNDBRIDGE-1"
 Data:
   otheridentifiers:
-    - "TRAVIGO:MANUALMERGE:LNDBRIDGE"
+    - "travigo-internalmerge-LNDBRIDGE"
     - "gb-crs-STP"
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: "TRAVIGO:MANUALMERGE:LNDBRIDGE-2"
+  primaryidentifier: "travigo-internalmerge-LNDBRIDGE-2"
 Data:
   otheridentifiers:
-    - "TRAVIGO:MANUALMERGE:LNDBRIDGE"
+    - "travigo-internalmerge-LNDBRIDGE"
     - "gb-crs-SPL"
