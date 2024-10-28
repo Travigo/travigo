@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -76,7 +77,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	if m.EventType == "DEPARTURE" {
 		for _, path := range realtimeJourney.Journey.Path {
-			if path.OriginStopRef == locationStop.PrimaryIdentifier {
+			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
 				updateMap["departedstopref"] = path.OriginStopRef
 				updateMap["nextstopref"] = path.DestinationStopRef
 				updateMap["departedstop"] = path.OriginStop
