@@ -24,6 +24,13 @@ func (i *InsertDefinition) Upsert() {
 		return
 	}
 
+	i.Data["datasource"] = map[string]string{
+		"originalformat": "travigo-yaml",
+		"provider":       "Travigo",
+		"datasetid":      "travigo-insert-record",
+		"timestamp":      "9999999999",
+	}
+
 	opts := options.Update().SetUpsert(true)
 	_, err = collection.UpdateOne(context.Background(), query, bson.M{"$set": i.Data}, opts)
 	if err != nil {
