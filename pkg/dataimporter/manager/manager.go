@@ -197,7 +197,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	}
 
 	if dataset.SupportedObjects.Stops {
-		cleanupOldRecords("stops", datasource)
+		cleanupOldRecords("stops_raw", datasource)
 	}
 	if dataset.SupportedObjects.StopGroups {
 		cleanupOldRecords("stop_groups", datasource)
