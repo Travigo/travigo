@@ -1,13 +1,16 @@
 package nrod
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/go-stomp/stomp/v3"
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -41,7 +44,6 @@ func (s *StompClient) Run() {
 	conn, err := stomp.Dial("tcp", s.Address, stompOptions...)
 
 	if err != nil {
-		pretty.Println(err)
 		log.Fatal().Err(err).Msg("cannot connect to server")
 	}
 
@@ -137,5 +139,8 @@ func (s *StompClient) StartVSTPSubscription(conn *stomp.Conn) {
 }
 
 func (s *StompClient) ParseVSTPMessages(messagesBytes []byte) {
+	collection := database.GetCollection("datadump")
+	collection.InsertOne(context.Background(), bson.M{"type": "vstp", "document": string(messagesBytes)})
+
 	pretty.Println(string(messagesBytes))
 }

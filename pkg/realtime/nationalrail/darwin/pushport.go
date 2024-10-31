@@ -336,8 +336,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			})
 
 			deleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-
-			pretty.Println("partialcancel", realtimeJourney.PrimaryIdentifier, schedule.InnerXML)
 		} else {
 			updateMap["cancelled"] = false
 
@@ -441,7 +439,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 	// Train Alert
 	for _, trainAlert := range p.TrainAlerts {
-		pretty.Println(trainAlert)
+		collection := database.GetCollection("datadump")
+		collection.InsertOne(context.Background(), bson.M{"type": "trainalert", "document": trainAlert})
 	}
 
 	// Schedule formation

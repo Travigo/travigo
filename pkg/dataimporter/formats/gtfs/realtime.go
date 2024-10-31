@@ -16,9 +16,11 @@ import (
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
+	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -158,11 +160,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 				}
 
 				if vehiclePosition.CongestionLevel != nil {
-					pretty.Println(vehiclePosition.CongestionLevel)
+					// pretty.Println(vehiclePosition.CongestionLevel)
+					collection := database.GetCollection("datadump")
+					collection.InsertOne(context.Background(), bson.M{"type": "gtfsrt-congestionlevel", "document": vehiclePosition})
 				}
 
 				if len(vehiclePosition.MultiCarriageDetails) > 0 {
-					pretty.Println(vehiclePosition.MultiCarriageDetails)
+					// pretty.Println(vehiclePosition.MultiCarriageDetails)
+					collection := database.GetCollection("datadump")
+					collection.InsertOne(context.Background(), bson.M{"type": "gtfsrt-multicarriagedetails", "document": vehiclePosition})
 				}
 
 				locationEvent.Location = ctdf.Location{
