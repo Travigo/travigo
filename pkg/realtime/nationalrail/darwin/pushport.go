@@ -14,7 +14,6 @@ import (
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PushPortData struct {
@@ -172,7 +171,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		if trainStatus.LateReason != "" && realtimeJourney.Journey != nil {
-			createServiceAlert(ctdf.ServiceAlert{
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("gb-raildelay-:%s:%s", trainStatus.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
@@ -293,7 +292,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		if cancelCount > 0 && cancelCount == len(scheduleStops) {
-			createServiceAlert(ctdf.ServiceAlert{
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
@@ -309,7 +308,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidFrom:  realtimeJourney.JourneyRunDate,
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
-			deleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
 			updateMap["cancelled"] = true
 
@@ -318,7 +317,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
 				Msg("Train cancelled")
 		} else if cancelCount > 0 {
-			createServiceAlert(ctdf.ServiceAlert{
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
 				ModificationDateTime: now,
@@ -335,12 +334,12 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
 			})
 
-			deleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		} else {
 			updateMap["cancelled"] = false
 
-			deleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-			deleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		}
 
 		// Update database
@@ -384,7 +383,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		if len(stationMessage.Stations) == 0 {
 			log.Info().Str("servicealert", serviceAlertID).Msg("Removing Station Message Service Alert")
 
-			deleteServiceAlert(serviceAlertID)
+			railutils.DeleteServiceAlert(serviceAlertID)
 		} else {
 			var alertType ctdf.ServiceAlertType
 			switch stationMessage.Severity {
@@ -414,7 +413,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			alertText = strings.ReplaceAll(alertText, "<ns7:a href=", "<a href=")
 			alertText = strings.ReplaceAll(alertText, "</ns7:a>", "</a>")
 
-			createServiceAlert(ctdf.ServiceAlert{
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    serviceAlertID,
 				CreationDateTime:     now,
 				ModificationDateTime: now,
@@ -576,20 +575,4 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			queue.Add(updateModel)
 		}
 	}
-}
-
-func createServiceAlert(serviceAlert ctdf.ServiceAlert) {
-	serviceAlertCollection := database.GetCollection("service_alerts")
-
-	filter := bson.M{"primaryidentifier": serviceAlert.PrimaryIdentifier}
-	update := bson.M{"$set": serviceAlert}
-	opts := options.Update().SetUpsert(true)
-	serviceAlertCollection.UpdateOne(context.Background(), filter, update, opts)
-}
-
-func deleteServiceAlert(id string) {
-	serviceAlertCollection := database.GetCollection("service_alerts")
-	filter := bson.M{"primaryidentifier": id}
-
-	serviceAlertCollection.DeleteOne(context.Background(), filter)
 }
