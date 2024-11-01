@@ -34,13 +34,20 @@ type ScheduleSegment struct {
 }
 
 type ScheduleLocation struct {
-	ScheduledPassTime      string `json:"scheduled_pass_time"`
-	ScheduledDepartureTime string `json:"scheduled_departure_time"`
-	ScheduledArrivalTime   string `json:"scheduled_arrival_time"`
-	PublicDepartureTime    string `json:"public_departure_time"`
-	PublicArrivalTime      string `json:"public_arrival_time"`
-	Path                   string `json:"CIF_path"`
-	Activity               string `json:"CIF_activity"`
-	Platform               string `json:"CIF_platform"`
-	Line                   string `json:"CIF_line"`
+	Location               ScheduleLocationLocation `json:"location"`
+	ScheduledPassTime      string                   `json:"scheduled_pass_time"`
+	ScheduledDepartureTime string                   `json:"scheduled_departure_time"`
+	ScheduledArrivalTime   string                   `json:"scheduled_arrival_time"`
+	PublicDepartureTime    string                   `json:"public_departure_time"`
+	PublicArrivalTime      string                   `json:"public_arrival_time"`
+	Path                   string                   `json:"CIF_path"`
+	Activity               string                   `json:"CIF_activity"`
+	Platform               string                   `json:"CIF_platform"`
+	Line                   string                   `json:"CIF_line"`
+}
+
+type ScheduleLocationLocation struct {
+	Tiploc struct {
+		ID string `json:"tiploc_id"`
+	} `json:"tiploc"`
 }
