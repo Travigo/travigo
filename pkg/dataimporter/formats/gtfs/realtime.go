@@ -162,13 +162,21 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 				if vehiclePosition.CongestionLevel != nil {
 					// pretty.Println(vehiclePosition.CongestionLevel)
 					collection := database.GetCollection("datadump")
-					collection.InsertOne(context.Background(), bson.M{"type": "gtfsrt-congestionlevel", "document": vehiclePosition})
+					collection.InsertOne(context.Background(), bson.M{
+						"type":             "gtfsrt-congestionlevel",
+						"creationdatetime": time.Now(),
+						"document":         vehiclePosition,
+					})
 				}
 
 				if len(vehiclePosition.MultiCarriageDetails) > 0 {
 					// pretty.Println(vehiclePosition.MultiCarriageDetails)
 					collection := database.GetCollection("datadump")
-					collection.InsertOne(context.Background(), bson.M{"type": "gtfsrt-multicarriagedetails", "document": vehiclePosition})
+					collection.InsertOne(context.Background(), bson.M{
+						"type":             "gtfsrt-multicarriagedetails",
+						"creationdatetime": time.Now(),
+						"document":         vehiclePosition,
+					})
 				}
 
 				locationEvent.Location = ctdf.Location{

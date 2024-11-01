@@ -440,7 +440,11 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	// Train Alert
 	for _, trainAlert := range p.TrainAlerts {
 		collection := database.GetCollection("datadump")
-		collection.InsertOne(context.Background(), bson.M{"type": "trainalert", "document": trainAlert})
+		collection.InsertOne(context.Background(), bson.M{
+			"type":             "trainalert",
+			"creationdatetime": time.Now(),
+			"document":         trainAlert,
+		})
 	}
 
 	// Schedule formation
