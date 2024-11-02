@@ -110,21 +110,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 
 	for _, trainDef := range c.TrainDefinitionSets {
 		// Only care about relevant passenger trains
-		if !util.ContainsString([]string{
-			"OO", "OW",
-			"XC", "XD", "XI", "XR", "XX", "XZ",
-			"BR",
-		}, trainDef.BasicSchedule.TrainCategory) {
-			continue
-		}
-
-		// Skip London Underground (?) records
-		if trainDef.BasicScheduleExtraDetails.ATOCCode == "LT" {
-			continue
-		}
-
-		// Skip obfuscated operator records
-		if trainDef.BasicScheduleExtraDetails.ATOCCode == "ZZ" {
+		if !IsValidPassengerJourney(trainDef.BasicSchedule.TrainCategory, trainDef.BasicScheduleExtraDetails.ATOCCode) {
 			continue
 		}
 
@@ -133,7 +119,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 
 		// Create whole new journeys
 		if trainDef.BasicSchedule.TransactionType == "N" && (trainDef.BasicSchedule.STPIndicator == "P" || trainDef.BasicSchedule.STPIndicator == "N") {
-			journeys[basicJourneyID] = c.createJourneyFromTraindef(journeyID, trainDef)
+			journeys[basicJourneyID] = c.CreateJourneyFromTraindef(journeyID, trainDef)
 
 			journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] = append(journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID], journeys[basicJourneyID])
 		} else if trainDef.BasicSchedule.TransactionType == "N" && trainDef.BasicSchedule.STPIndicator == "C" {
@@ -162,7 +148,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 				})
 			}
 
-			journeys[journeyID] = c.createJourneyFromTraindef(journeyID, trainDef)
+			journeys[journeyID] = c.CreateJourneyFromTraindef(journeyID, trainDef)
 			journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] = append(journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID], journeys[journeyID])
 		} else {
 			log.Error().
@@ -249,7 +235,7 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 	return nil
 }
 
-func (c *CommonInterfaceFormat) createJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {
+func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {
 	departureTime, _ := time.Parse("1504", trainDef.OriginLocation.PublicDepartureTime)
 
 	// List of passenger stops

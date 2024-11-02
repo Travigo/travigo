@@ -24,6 +24,7 @@ type Journey struct {
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
+	Expiry               time.Time `groups:"detailed" bson:",omitempty"`
 
 	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
 

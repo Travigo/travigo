@@ -258,6 +258,10 @@ func createJourneysIndexes() {
 		{
 			Keys: bson.D{{Key: "otheridentifiers.GTFS-TripID", Value: 1}},
 		},
+		{
+			Keys:    bson.D{{Key: "expiry", Value: 1}},
+			Options: options.Index().SetExpireAfterSeconds(1), // Expire after 1 second
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
