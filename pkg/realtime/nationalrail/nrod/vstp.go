@@ -69,7 +69,7 @@ func (v *VSTPMessage) Process(stompClient *StompClient) {
 			// For each day between the start & end date that day of week is part of day runs
 			// Add that day instance of to the list of matching identifiers
 			for d := startDate; d.Before(endDate) || d.Equal(endDate); d = d.AddDate(0, 0, 1) {
-				if string(v.VSTP.Schedule.DayRuns[d.Weekday()-1]) == "1" {
+				if string(v.VSTP.Schedule.DayRuns[convertWeekday(d)]) == "1" {
 					ident := fmt.Sprintf("DAYINSTANCEOF:%s:%s", d.Format("2006-01-02"), journey.PrimaryIdentifier)
 
 					matchedIdentifiers = append(matchedIdentifiers, ident)
@@ -82,10 +82,13 @@ func (v *VSTPMessage) Process(stompClient *StompClient) {
 				ModificationDateTime: now,
 
 				DataSource: &ctdf.DataSource{
-					DatasetID: "gb-networkrail-vstp",
+					OriginalFormat: "JSON-CIF",
+					Provider:       "Network Rail UK",
+					DatasetID:      "gb-networkrail-vstp",
+					Timestamp:      string(now.UnixMicro()),
 				},
 
-				AlertType: ctdf.ServiceAlertTypeJourneyPartiallyCancelled,
+				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
 
 				Text: "Timetable entry was deleted by rail operator",
 
@@ -138,4 +141,14 @@ type ScheduleLocationLocation struct {
 	Tiploc struct {
 		ID string `json:"tiploc_id"`
 	} `json:"tiploc"`
+}
+
+func convertWeekday(date time.Time) int {
+	convertedInt := int(date.Weekday()) - 1
+
+	if convertedInt == -1 {
+		return 6
+	}
+
+	return convertedInt
 }
