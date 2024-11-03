@@ -34,6 +34,7 @@ func (l StopsLinker) Run() {
 	stagingCollectionName := fmt.Sprintf("%s_staging", liveCollectionName)
 
 	rawCollection := database.GetCollection(rawCollectionName)
+	stagingCollection := database.GetCollection(stagingCollectionName)
 
 	copyCollection(rawCollectionName, stagingCollectionName)
 
@@ -230,13 +231,14 @@ func (l StopsLinker) Run() {
 	}
 
 	if len(operations) > 0 {
-		stagingCollection := database.GetCollection(stagingCollectionName)
-
 		_, err := stagingCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write")
 		}
 	}
+
+	// Delete any remaining manual merge entries from staging
+	stagingCollection.DeleteMany(context.Background(), bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
 
 	// Copy staging to live
 	copyCollection(stagingCollectionName, liveCollectionName)
