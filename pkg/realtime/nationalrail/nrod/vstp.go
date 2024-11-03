@@ -160,7 +160,7 @@ func (v *VSTPMessage) processCreate() {
 	if len(updateOperations) > 0 {
 		// TODO we also need to clear any stop journey caches
 
-		journeysCollection := database.GetCollection("journeys_test")
+		journeysCollection := database.GetCollection("journeys")
 		_, err := journeysCollection.BulkWrite(context.Background(), updateOperations, &options.BulkWriteOptions{})
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
