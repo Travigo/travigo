@@ -238,7 +238,7 @@ func (l StopsLinker) Run() {
 	}
 
 	// Delete any remaining manual merge entries from staging
-	stagingCollection.DeleteMany(context.Background(), bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
+	stagingCollection.DeleteMany(context.Background(), bson.M{"primaryidentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
 
 	// Copy staging to live
 	copyCollection(stagingCollectionName, liveCollectionName)
