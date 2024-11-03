@@ -175,7 +175,7 @@ func (v *VSTPMessage) processDelete() {
 
 	journeysCollection := database.GetCollection("journeys")
 	cursor := journeysCollection.FindOne(context.Background(), bson.M{
-		"datasource.datasetid":      "gb-nationalrail-timetable",
+		"datasource.datasetid":      bson.M{"$in": bson.A{"gb-nationalrail-timetable", "gb-networkrail-vstp"}},
 		"otheridentifiers.TrainUID": v.VSTP.Schedule.TrainUID,
 	})
 
