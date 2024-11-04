@@ -526,7 +526,7 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 		return cacheValue
 	}
 
-	stopCollection := database.GetCollection("stops_raw")
+	stopCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
 
 	stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-tiploc-%s", tiploc)}).Decode(&stop)
