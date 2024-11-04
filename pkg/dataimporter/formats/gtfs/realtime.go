@@ -94,6 +94,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		if entity.Alert != nil {
 			pretty.Println(entity.GetAlert())
+			collection := database.GetCollection("datadump")
+			collection.InsertOne(context.Background(), bson.M{
+				"type":             "gtfsrt-alert",
+				"creationdatetime": time.Now(),
+				"document":         entity.GetAlert(),
+			})
 		}
 
 		if tripID != "" {
