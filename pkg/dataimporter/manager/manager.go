@@ -9,11 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -100,6 +98,15 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	datasetVersionCollection := database.GetCollection("dataset_versions")
 
+	var existingDatasetVersion *ctdf.DatasetVersion
+	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
+
+	var existingEtag string
+	if existingDatasetVersion != nil && !forceImport {
+		log.Info().Interface("version", existingDatasetVersion).Msg("Existing dataset version found")
+		existingEtag = existingDatasetVersion.ETag
+	}
+
 	datasource := &ctdf.DataSource{
 		OriginalFormat: string(dataset.Format),
 		Provider:       dataset.Provider.Name,
@@ -108,9 +115,17 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	}
 
 	source := dataset.Source
+	var etag string
+
 	if isValidUrl(dataset.Source) {
 		var tempFile *os.File
-		tempFile, _ = tempDownloadFile(dataset)
+		var hasChanged bool
+		hasChanged, tempFile, etag = tempDownloadFile(dataset, existingEtag)
+
+		if !hasChanged {
+			log.Info().Str("dataset", dataset.Identifier).Msg("File ETag is not new, skipping processing")
+			return nil
+		}
 
 		source = tempFile.Name()
 		defer os.Remove(tempFile.Name())
@@ -127,12 +142,8 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	sourceFileHash := hex.EncodeToString(hash.Sum(nil))
 
 	// Check if the file hasn't changed
-	var existingDatasetVersion *ctdf.DatasetVersion
-	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
-
-	// TODO temp always import gb-networkrail-corpus
-	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport && dataset.Identifier != "gb-networkrail-corpus" {
-		log.Info().Str("dataset", dataset.Identifier).Msg("File is not new, skipping processing")
+	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport {
+		log.Info().Str("dataset", dataset.Identifier).Msg("File hash is not new, skipping processing")
 		return nil
 	}
 
@@ -220,6 +231,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 		datasetVersion := ctdf.DatasetVersion{
 			Dataset:      dataset.Identifier,
 			Hash:         sourceFileHash,
+			ETag:         etag,
 			LastModified: time.Now(),
 		}
 
@@ -244,9 +256,13 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func tempDownloadFile(dataset *datasets.DataSet) (*os.File, string) {
+func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, string) {
 	req, _ := http.NewRequest("GET", dataset.Source, nil)
 	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
+
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
 
 	if dataset.DownloadHandler != nil {
 		dataset.DownloadHandler(req)
@@ -255,16 +271,14 @@ func tempDownloadFile(dataset *datasets.DataSet) (*os.File, string) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
+	if resp.StatusCode == http.StatusNotModified {
+		return false, nil, ""
+	}
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("Download file")
 	}
 	defer resp.Body.Close()
-
-	_, params, err := mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
-	fileExtension := filepath.Ext(dataset.Source)
-	if err == nil {
-		fileExtension = filepath.Ext(params["filename"])
-	}
 
 	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
 	if err != nil {
@@ -275,7 +289,7 @@ func tempDownloadFile(dataset *datasets.DataSet) (*os.File, string) {
 
 	io.Copy(tmpFile, resp.Body)
 
-	return tmpFile, fileExtension
+	return true, tmpFile, resp.Header.Get("Etag")
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
