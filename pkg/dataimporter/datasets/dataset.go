@@ -32,7 +32,7 @@ type DataSetFormat string
 const (
 	DataSetFormatNaPTAN            DataSetFormat = "gb-naptan"
 	DataSetFormatTransXChange                    = "gb-transxchange"
-	DataSetFormatTravelineNOC                    = "gb-travelinenov"
+	DataSetFormatTravelineNOC                    = "gb-travelinenoc"
 	DataSetFormatCIF                             = "gb-cif"
 	DataSetFormatNationalRailTOC                 = "gb-nationalrailtoc"
 	DataSetFormatNetworkRailCorpus               = "gb-networkrailcorpus"
