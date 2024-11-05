@@ -434,6 +434,231 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				r.URL.RawQuery = q.Encode()
 			},
 		},
+		{
+			Identifier: "se-gtfs-realtime-sl-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-ul-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/ul/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-otraf-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/otraf/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-klt-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/klt/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-skane-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/skane/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-dt-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/dt/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-varm-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/varm/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-xt-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/xt/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
+		{
+			Identifier: "se-gtfs-realtime-vastmanland-trip",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/vastmanland/TripUpdatesSweden.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "se-gtfs-schedule",
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
+		},
 	}
 }
 

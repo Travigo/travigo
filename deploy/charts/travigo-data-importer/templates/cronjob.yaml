@@ -130,5 +130,10 @@ spec:
                       key: password
                       optional: false
               resources:
+                {{- if .batchburst }}
+                requests:
+                  memory: 40Gi
+                {{- else }}
                 {{- toYaml $.Values.resources | nindent 16 }}
+                {{- end }}
 {{- end }}

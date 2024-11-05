@@ -72,7 +72,7 @@ cronjobs:
     args: ["data-importer", "dataset", "--id", "de-gtfs-full-schedule"]
     batchburst: true
   - name: se-gtfs-schedule
-    schedule: "15 7 * * *"
+    schedule: "30 7 * * *"
     args: ["data-importer", "dataset", "--id", "se-gtfs-schedule"]
     batchburst: true
   - name: fr-ilevia-lille-gtfs-schedule
@@ -97,6 +97,24 @@ deployments:
     args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "90s"]
   - name: de-gtfs-full-realtime
     args: ["data-importer", "dataset", "--id", "de-gtfs-full-realtime", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-sl-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-sl-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-ul-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-ul-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-otraf-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-otraf-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-klt-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-klt-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-skane-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-skane-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-dt-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-dt-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-varm-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-varm-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-xt-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-xt-trip", "--repeat-every", "90s"]
+  - name: se-gtfs-realtime-vastmanland-trip
+    args: ["data-importer", "dataset", "--id", "se-gtfs-realtime-vastmanland-trip", "--repeat-every", "90s"]
   # - name: us-nyc-subway-realtime-numbers
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-relatime-1-2-3-4-5-6-7", "--repeat-every", "60s"]
 
