@@ -42,17 +42,17 @@ spec:
                   key: api_key
                   optional: false
             - name: TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $.Values.se_trafiklab.staticSecret }}
-                      key: api_key
-                      optional: false
-                - name: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: {{ $.Values.se_trafiklab.staticSecret }}
-                      key: api_key
-                      optional: false
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.se_trafiklab.staticSecret }}
+                  key: api_key
+                  optional: false
+            - name: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.se_trafiklab.staticSecret }}
+                  key: api_key
+                  optional: false
             - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:
