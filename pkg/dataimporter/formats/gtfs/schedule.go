@@ -202,20 +202,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	// Routes / Services
-	routeTypeMapping := map[int]ctdf.TransportType{
-		0:   ctdf.TransportTypeTram,
-		1:   ctdf.TransportTypeMetro,
-		2:   ctdf.TransportTypeRail,
-		3:   ctdf.TransportTypeBus,
-		4:   ctdf.TransportTypeFerry,
-		5:   ctdf.TransportTypeTram,
-		6:   ctdf.TransportTypeCableCar,
-		7:   ctdf.TransportTypeUnknown, // Furnicular
-		11:  ctdf.TransportTypeTram,
-		12:  ctdf.TransportTypeUnknown, // Monorail
-		200: ctdf.TransportTypeCoach,
-	}
-
 	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
 	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 500)
 
@@ -243,11 +229,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			continue
 		}
 
-		transportType := routeTypeMapping[gtfsRoute.Type]
-		if transportType == "" {
-			transportType = ctdf.TransportTypeUnknown
-		}
-
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
 			OtherIdentifiers: []string{
@@ -261,7 +242,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			Routes:               []ctdf.Route{},
 			BrandColour:          gtfsRoute.Colour,
 			SecondaryBrandColour: gtfsRoute.TextColour,
-			TransportType:        transportType,
+			TransportType:        convertTransportType(gtfsRoute.Type),
 		}
 
 		transforms.Transform(ctdfService, 1, "gb-dft-bods-gtfs-schedule")
@@ -502,6 +483,48 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	}
 
 	return nil
+}
+
+func convertTransportType(intType int) ctdf.TransportType {
+	routeTypeMapping := map[int]ctdf.TransportType{
+		0:    ctdf.TransportTypeTram,
+		1:    ctdf.TransportTypeMetro,
+		2:    ctdf.TransportTypeRail,
+		3:    ctdf.TransportTypeBus,
+		4:    ctdf.TransportTypeFerry,
+		5:    ctdf.TransportTypeTram,
+		6:    ctdf.TransportTypeCableCar,
+		7:    ctdf.TransportTypeFunicular,
+		11:   ctdf.TransportTypeTram,
+		12:   ctdf.TransportTypeRail, // Monorail
+		200:  ctdf.TransportTypeCoach,
+		1000: ctdf.TransportTypeFerry,
+		// 1100: ctdf.TransportTypeAir,
+		1200: ctdf.TransportTypeFerry,
+		1400: ctdf.TransportTypeFunicular,
+	}
+
+	transportType := routeTypeMapping[intType]
+	if transportType != "" {
+		return transportType
+	}
+
+	// Extended https://developers.google.com/transit/gtfs/reference/extended-route-types
+	if intType >= 100 && intType <= 117 {
+		return ctdf.TransportTypeRail
+	} else if intType >= 200 && intType <= 209 {
+		return ctdf.TransportTypeCoach
+	} else if intType >= 400 && intType <= 405 {
+		return ctdf.TransportTypeMetro
+	} else if intType >= 700 && intType <= 716 {
+		return ctdf.TransportTypeBus
+	} else if intType >= 900 && intType <= 906 {
+		return ctdf.TransportTypeTram
+	} else if intType >= 1300 && intType <= 1307 {
+		return ctdf.TransportTypeCableCar
+	} else {
+		return ctdf.TransportTypeUnknown
+	}
 }
 
 func fixTimestamp(timestamp string) string {
