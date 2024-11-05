@@ -88,7 +88,7 @@ spec:
                 - name: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ $.Values.se_trafiklab.staticSecret }}
+                      name: {{ $.Values.se_trafiklab.realtimeSecret }}
                       key: api_key
                       optional: false
                 - name: TRAVIGO_MONGODB_CONNECTION
