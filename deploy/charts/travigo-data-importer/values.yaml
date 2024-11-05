@@ -87,6 +87,8 @@ deployments:
     args: ["data-importer", "dataset", "--id", "ie-gtfs-realtime", "--repeat-every", "90s"]
   - name: fr-ilevia-lille-gtfs-rt
     args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "90s"]
+  - name: de-gtfs-full-realtime
+    args: ["data-importer", "dataset", "--id", "de-gtfs-full-realtime", "--repeat-every", "90s"]
   # - name: us-nyc-subway-realtime-numbers
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-relatime-1-2-3-4-5-6-7", "--repeat-every", "60s"]
 

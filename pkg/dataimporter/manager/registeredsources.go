@@ -384,6 +384,21 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				Journeys:  true,
 			},
 		},
+		{
+			Identifier: "de-gtfs-full-realtime",
+			Format:     datasets.DataSetFormatGTFSRealtime,
+			Provider: datasets.Provider{
+				Name:    "GTFS.de",
+				Website: "https://gtfs.de",
+			},
+			Source:       "https://realtime.gtfs.de/realtime-free.pb",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				RealtimeJourneys: true,
+			},
+			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+			LinkedDataset:     "de-gtfs-full-schedule",
+		},
 	}
 }
 

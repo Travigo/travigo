@@ -13,7 +13,6 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -92,15 +91,16 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		tripID := trip.GetTripId()
 
-		if entity.Alert != nil {
-			pretty.Println(entity.GetAlert())
-			collection := database.GetCollection("datadump")
-			collection.InsertOne(context.Background(), bson.M{
-				"type":             "gtfsrt-alert",
-				"creationdatetime": time.Now(),
-				"document":         entity.GetAlert(),
-			})
-		}
+		// TODO gtfs-rt alerts
+		// if entity.Alert != nil {
+		// 	pretty.Println(entity.GetAlert())
+		// 	collection := database.GetCollection("datadump")
+		// 	collection.InsertOne(context.Background(), bson.M{
+		// 		"type":             "gtfsrt-alert",
+		// 		"creationdatetime": time.Now(),
+		// 		"document":         entity.GetAlert(),
+		// 	})
+		// }
 
 		if tripID != "" {
 			withTripID += 1
