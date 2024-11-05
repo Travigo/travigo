@@ -1,0 +1,71 @@
+identifier: gb-dft
+region: gb
+provider:
+  name: Department for Transport
+  website: "https://www.gov.uk/government/organisations/department-for-transport"
+datasets:
+- identifier: naptan
+  format: gb-naptan
+  source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
+  supportedobjects:
+    stops:      true
+    stopgroups: true
+- identifier: bods-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-transxchange-coach
+  format: gb-transxchange
+  source: "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip"
+  unpackbundle: zip
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-APBX
+      - gb-noc-BHAT
+      - gb-noc-FLIX
+      - gb-noc-MEGA
+      - gb-noc-SCLK
+      - gb-noc-ULSL
+    journeys:
+      byoperator:
+      - gb-noc-APBX
+      - gb-noc-BHAT
+      - gb-noc-FLIX
+      - gb-noc-MEGA
+      - gb-noc-SCLK
+      - gb-noc-ULSL
+- identifier: bods-sirivm-all
+  format: eu-siri-vm
+  source: "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: gb-dft-bods-gtfs-schedule
+  unpackbundle: zip
+  importdestination: realtime-queue
+- identifier: bods-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: gb-dft-bods-gtfs-schedule
+  unpackbundle: zip
+  importdestination: realtime-queue

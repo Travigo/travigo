@@ -28,6 +28,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
 	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -156,7 +157,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	}
 
 	switch dataset.UnpackBundle {
-	case datasets.BundleFormatNone:
+	case datasets.BundleFormatNone, "":
 		sourceFileReaders = append(sourceFileReaders, file)
 	case datasets.BundleFormatGZ:
 		gzipDecoder, err := gzip.NewReader(file)
@@ -264,6 +265,45 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		req.Header.Set("If-None-Match", etag)
 	}
 
+	//// Handle authentication ////
+	env := util.GetEnvironmentVariables()
+	// Query paramaters
+	for queryKey, queryValue := range dataset.SourceAuthentication.Query {
+		if env[queryValue] == "" {
+			log.Fatal().Msgf("%s must be set", queryValue)
+		}
+
+		q := req.URL.Query()
+		q.Add(queryKey, env[queryValue])
+		req.URL.RawQuery = q.Encode()
+	}
+	// Basic auth
+	if dataset.SourceAuthentication.Basic.Username != "" && dataset.SourceAuthentication.Basic.Password != "" {
+		if env[dataset.SourceAuthentication.Basic.Username] == "" {
+			log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Username)
+		}
+		if env[dataset.SourceAuthentication.Basic.Password] == "" {
+			log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Password)
+		}
+
+		req.SetBasicAuth(env[dataset.SourceAuthentication.Basic.Username], env[dataset.SourceAuthentication.Basic.Password])
+	}
+	// Headers
+	for headerKey, headerValue := range dataset.SourceAuthentication.Header {
+		if env[headerValue] == "" {
+			log.Fatal().Msgf("%s must be set", headerValue)
+		}
+
+		req.Header.Set(headerKey, env[headerValue])
+	}
+	// Customs
+	switch dataset.SourceAuthentication.Custom {
+	case "gb-nationalrail-login":
+		token := customAuthNationalRailLogin()
+		req.Header.Set("X-Auth-Token", token)
+	}
+
+	// TODO delete me later
 	if dataset.DownloadHandler != nil {
 		dataset.DownloadHandler(req)
 	}
@@ -271,14 +311,14 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
-	if resp.StatusCode == http.StatusNotModified {
-		return false, nil, ""
-	}
-
 	if err != nil {
 		log.Fatal().Err(err).Msg("Download file")
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotModified {
+		return false, nil, ""
+	}
 
 	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
 	if err != nil {

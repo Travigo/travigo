@@ -1,704 +1,152 @@
 package manager
 
 import (
-	"encoding/json"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
-	"github.com/travigo/travigo/pkg/util"
+	"gopkg.in/yaml.v3"
 )
 
 // Just a static list for now
 func GetRegisteredDataSets() []datasets.DataSet {
-	return []datasets.DataSet{
-		{
-			Identifier: "gb-traveline-noc",
-			Format:     datasets.DataSetFormatTravelineNOC,
-			Provider: datasets.Provider{
-				Name:    "Traveline",
-				Website: "https://www.travelinedata.org.uk/",
-			},
-			Source:       "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators:      true,
-				OperatorGroups: true,
-			},
-		},
-		{
-			Identifier: "gb-dft-naptan",
-			Format:     datasets.DataSetFormatNaPTAN,
-			Provider: datasets.Provider{
-				Name:    "Department for Transport",
-				Website: "https://www.gov.uk/government/organisations/department-for-transport",
-			},
-			Source:       "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Stops:      true,
-				StopGroups: true,
-			},
-		},
-		{
-			Identifier: "gb-nationalrail-toc",
-			Format:     datasets.DataSetFormatNationalRailTOC,
-			Provider: datasets.Provider{
-				Name:    "National Rail",
-				Website: "https://nationalrail.co.uk",
-			},
-			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Services:  true,
-			},
+	var registeredDatasets []datasets.DataSet
 
-			DownloadHandler: func(r *http.Request) {
-				token := nationalRailLogin()
-				r.Header.Set("X-Auth-Token", token)
-			},
-		},
-		{
-			// Import STANOX Stop IDs to Stops from Network Rail CORPUS dataset
-			Identifier: "gb-networkrail-corpus",
-			Format:     datasets.DataSetFormatNetworkRailCorpus,
-			Provider: datasets.Provider{
-				Name:    "Network Rail",
-				Website: "https://networkrail.co.uk",
-			},
-			Source:       "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS",
-			UnpackBundle: datasets.BundleFormatGZ,
-			SupportedObjects: datasets.SupportedObjects{
-				Stops: true,
-			},
+	err := filepath.Walk("data/datasources/",
+		func(path string, fileInfo os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
 
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_NETWORKRAIL_USERNAME"] == "" {
-					log.Fatal().Msg("TRAVIGO_NETWORKRAIL_USERNAME must be set")
-				}
-				if env["TRAVIGO_NETWORKRAIL_PASSWORD"] == "" {
-					log.Fatal().Msg("TRAVIGO_NETWORKRAIL_PASSWORD must be set")
+			if !fileInfo.IsDir() {
+				log.Debug().Str("path", path).Msg("Loading transforms file")
+
+				extension := filepath.Ext(path)
+
+				if extension != ".yaml" {
+					return nil
 				}
 
-				r.SetBasicAuth(env["TRAVIGO_NETWORKRAIL_USERNAME"], env["TRAVIGO_NETWORKRAIL_PASSWORD"])
-			},
-		},
-		{
-			Identifier: "gb-dft-bods-sirivm-all",
-			Format:     datasets.DataSetFormatSiriVM,
-			Provider: datasets.Provider{
-				Name:    "Department for Transport",
-				Website: "https://www.gov.uk/government/organisations/department-for-transport",
-			},
-			Source:       "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive",
-			UnpackBundle: datasets.BundleFormatZIP,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-
-			LinkedDataset: "gb-dft-bods-gtfs-schedule",
-
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_BODS_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
+				transformYaml, err := os.ReadFile(path)
+				if err != nil {
+					return err
 				}
 
-				q := r.URL.Query()
-				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "gb-dft-bods-gtfs-realtime",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Department for Transport",
-				Website: "https://www.gov.uk/government/organisations/department-for-transport",
-			},
-			Source:       "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt",
-			UnpackBundle: datasets.BundleFormatZIP,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
+				decoder := yaml.NewDecoder(bytes.NewReader(transformYaml))
 
-			LinkedDataset: "gb-dft-bods-gtfs-schedule",
+				for {
+					var datasource datasets.DataSource
+					if decoder.Decode(&datasource) != nil {
+						break
+					}
 
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_BODS_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
+					for _, dataset := range datasource.Datasets {
+						dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
+						dataset.Provider = datasource.Provider
+
+						registeredDatasets = append(registeredDatasets, dataset)
+					}
 				}
+			}
 
-				q := r.URL.Query()
-				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "gb-dft-bods-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "Department for Transport",
-				Website: "https://www.gov.uk/government/organisations/department-for-transport",
-			},
-			Source:       "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Services: true,
-				Journeys: true,
-			},
-			IgnoreObjects: datasets.IgnoreObjects{
-				Services: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"gb-noc-NATX"},
-				},
-				Journeys: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"gb-noc-NATX"},
-				},
-			},
-
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_BODS_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "gb-dft-bods-transxchange-coach",
-			Format:     datasets.DataSetFormatTransXChange,
-			Provider: datasets.Provider{
-				Name:    "Department for Transport",
-				Website: "https://www.gov.uk/government/organisations/department-for-transport",
-			},
-			Source:       "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip",
-			UnpackBundle: datasets.BundleFormatZIP,
-			SupportedObjects: datasets.SupportedObjects{
-				Services: true,
-				Journeys: true,
-			},
-			IgnoreObjects: datasets.IgnoreObjects{
-				Services: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"gb-noc-APBX", "gb-noc-BHAT", "gb-noc-FLIX", "gb-noc-MEGA", "gb-noc-SCLK", "gb-noc-ULSL"},
-				},
-				Journeys: datasets.IgnoreObjectServiceJourney{
-					ByOperator: []string{"gb-noc-APBX", "gb-noc-BHAT", "gb-noc-FLIX", "gb-noc-MEGA", "gb-noc-SCLK", "gb-noc-ULSL"},
-				},
-			},
-		},
-		{
-			Identifier: "gb-nationalrail-timetable",
-			Format:     datasets.DataSetFormatCIF,
-			Provider: datasets.Provider{
-				Name:    "National Rail",
-				Website: "https://nationalrail.co.uk",
-			},
-			Source:       "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Services: true,
-				Journeys: true,
-			},
-
-			DownloadHandler: func(r *http.Request) {
-				token := nationalRailLogin()
-				r.Header.Set("X-Auth-Token", token)
-			},
-		},
-		{
-			Identifier: "ie-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "Transport for Ireland",
-				Website: "https://www.transportforireland.ie",
-			},
-			Source:       "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-		},
-		{
-			Identifier: "ie-gtfs-realtime",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Transport for Ireland",
-				Website: "https://www.transportforireland.ie",
-			},
-			Source:       "https://api.nationaltransport.ie/gtfsr/v2/gtfsr",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "ie-gtfs-schedule",
-
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_IE_NATIONALTRANSPORT_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_IE_NATIONALTRANSPORT_API_KEY must be set")
-				}
-
-				r.Header.Set("x-api-key", env["TRAVIGO_IE_NATIONALTRANSPORT_API_KEY"])
-			},
-		},
-		{
-			Identifier: "us-nyc-subway-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "Metropolitan Transportation Authority",
-				Website: "https://mta.info",
-			},
-			Source:       "http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-		},
-		// {
-		// 	Identifier: "us-nyc-subway-relatime-1-2-3-4-5-6-7",
-		// 	Format:     datasets.DataSetFormatGTFSRealtime,
-		// 	Provider: datasets.Provider{
-		// 		Name:    "Metropolitan Transportation Authority",
-		// 		Website: "https://mta.info",
-		// 	},
-		// 	Source:       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
-		// 	UnpackBundle: datasets.BundleFormatNone,
-		// 	SupportedObjects: datasets.SupportedObjects{
-		// 		RealtimeJourneys: true,
-		// 	},
-		// 	ImportDestination: datasets.ImportDestinationRealtimeQueue,
-		// 	LinkedDataset:     "us-nyc-subway-schedule",
-
-		// 	DownloadHandler: func(r *http.Request) {
-		// 		env := util.GetEnvironmentVariables()
-		// 		if env["TRAVIGO_US_NYC_MTA_API_KEY"] == "" {
-		// 			log.Fatal().Msg("TRAVIGO_US_NYC_MTA_API_KEY must be set")
-		// 		}
-
-		// 		r.Header.Set("x-api-key", env["TRAVIGO_US_NYC_MTA_API_KEY"])
-		// 	},
-		// },
-		{
-			Identifier: "eu-flixbus-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "FlixBus",
-				Website: "https://global.flixbus.com",
-			},
-			Source:       "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: false,
-				Stops:     false,
-				Services:  false,
-				Journeys:  true,
-			},
-		},
-		{
-			Identifier: "us-bart-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "BART",
-				Website: "http://www.bart.gov",
-			},
-			Source:       "https://www.bart.gov/dev/schedules/google_transit.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-		},
-		{
-			Identifier: "us-bart-gtfs-realtime",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "BART",
-				Website: "http://www.bart.gov",
-			},
-			Source:       "https://api.bart.gov/gtfsrt/tripupdate.aspx", // https://api.bart.gov/gtfsrt/alerts.aspx
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "us-bart-gtfs-schedule",
-		},
-		{
-			Identifier: "fr-ilevia-lille-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "Ilévia",
-				Website: "http://www.ilevia.fr",
-			},
-			Source:       "https://media.ilevia.fr/opendata/gtfs.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-		},
-		{
-			Identifier: "fr-ilevia-lille-gtfs-realtime",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Ilévia",
-				Website: "http://www.ilevia.fr",
-			},
-			Source:       "https://proxy.transport.data.gouv.fr/resource/ilevia-lille-gtfs-rt",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "fr-ilevia-lille-gtfs-schedule",
-		},
-		// Germany
-		{
-			Identifier: "de-gtfs-full-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "GTFS.de",
-				Website: "https://gtfs.de",
-			},
-			Source:       "https://download.gtfs.de/germany/free/latest.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-		},
-		{
-			Identifier: "de-gtfs-full-realtime",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "GTFS.de",
-				Website: "https://gtfs.de",
-			},
-			Source:       "https://realtime.gtfs.de/realtime-free.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "de-gtfs-full-schedule",
-		},
-		// Sweden
-		{
-			Identifier: "se-gtfs-schedule",
-			Format:     datasets.DataSetFormatGTFSSchedule,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-sweden/sweden.zip",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				Operators: true,
-				Stops:     true,
-				Services:  true,
-				Journeys:  true,
-			},
-
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-sl-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-ul-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/ul/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-otraf-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/otraf/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-klt-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/klt/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-skane-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/skane/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-dt-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/dt/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-varm-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/varm/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-xt-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/xt/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-		{
-			Identifier: "se-gtfs-realtime-vastmanland-trip",
-			Format:     datasets.DataSetFormatGTFSRealtime,
-			Provider: datasets.Provider{
-				Name:    "Trafiklab",
-				Website: "https://trafiklab.se",
-			},
-			Source:       "https://opendata.samtrafiken.se/gtfs-rt-sweden/vastmanland/TripUpdatesSweden.pb",
-			UnpackBundle: datasets.BundleFormatNone,
-			SupportedObjects: datasets.SupportedObjects{
-				RealtimeJourneys: true,
-			},
-			ImportDestination: datasets.ImportDestinationRealtimeQueue,
-			LinkedDataset:     "se-gtfs-schedule",
-			DownloadHandler: func(r *http.Request) {
-				env := util.GetEnvironmentVariables()
-				if env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"] == "" {
-					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY must be set")
-				}
-
-				q := r.URL.Query()
-				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY"])
-				r.URL.RawQuery = q.Encode()
-			},
-		},
-	}
-}
-
-func nationalRailLogin() string {
-	env := util.GetEnvironmentVariables()
-	if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
-		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
-	}
-	if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
-		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
-	}
-
-	formData := url.Values{
-		"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
-		"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
+			return nil
+		})
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
+		log.Fatal().Err(err).Msg("Failed to load transforms directory")
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return registeredDatasets
 
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
-	}
-	defer resp.Body.Close()
+	// return []datasets.DataSet{
+	// 	{
+	// 		Identifier: "us-nyc-subway-schedule",
+	// 		Format:     datasets.DataSetFormatGTFSSchedule,
+	// 		Provider: datasets.Provider{
+	// 			Name:    "Metropolitan Transportation Authority",
+	// 			Website: "https://mta.info",
+	// 		},
+	// 		Source:       "http://web.mta.info/developers/data/nyct/subway/google_transit.zip",
+	// 		UnpackBundle: datasets.BundleFormatNone,
+	// 		SupportedObjects: datasets.SupportedObjects{
+	// 			Operators: true,
+	// 			Stops:     true,
+	// 			Services:  true,
+	// 			Journeys:  true,
+	// 		},
+	// 	},
+	// {
+	// 	Identifier: "us-nyc-subway-relatime-1-2-3-4-5-6-7",
+	// 	Format:     datasets.DataSetFormatGTFSRealtime,
+	// 	Provider: datasets.Provider{
+	// 		Name:    "Metropolitan Transportation Authority",
+	// 		Website: "https://mta.info",
+	// 	},
+	// 	Source:       "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs",
+	// 	UnpackBundle: datasets.BundleFormatNone,
+	// 	SupportedObjects: datasets.SupportedObjects{
+	// 		RealtimeJourneys: true,
+	// 	},
+	// 	ImportDestination: datasets.ImportDestinationRealtimeQueue,
+	// 	LinkedDataset:     "us-nyc-subway-schedule",
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
-	}
+	// 	DownloadHandler: func(r *http.Request) {
+	// 		env := util.GetEnvironmentVariables()
+	// 		if env["TRAVIGO_US_NYC_MTA_API_KEY"] == "" {
+	// 			log.Fatal().Msg("TRAVIGO_US_NYC_MTA_API_KEY must be set")
+	// 		}
 
-	var loginResponse struct {
-		Token string `json:"token"`
-	}
-	json.Unmarshal(body, &loginResponse)
-
-	return loginResponse.Token
+	// 		r.Header.Set("x-api-key", env["TRAVIGO_US_NYC_MTA_API_KEY"])
+	// 	},
+	// },
+	// 	{
+	// 		Identifier: "eu-flixbus-gtfs-schedule",
+	// 		Format:     datasets.DataSetFormatGTFSSchedule,
+	// 		Provider: datasets.Provider{
+	// 			Name:    "FlixBus",
+	// 			Website: "https://global.flixbus.com",
+	// 		},
+	// 		Source:       "http://gtfs.gis.flix.tech/gtfs_generic_eu.zip",
+	// 		UnpackBundle: datasets.BundleFormatNone,
+	// 		SupportedObjects: datasets.SupportedObjects{
+	// 			Operators: false,
+	// 			Stops:     false,
+	// 			Services:  false,
+	// 			Journeys:  true,
+	// 		},
+	// 	},
+	// 	{
+	// 		Identifier: "us-bart-gtfs-schedule",
+	// 		Format:     datasets.DataSetFormatGTFSSchedule,
+	// 		Provider: datasets.Provider{
+	// 			Name:    "BART",
+	// 			Website: "http://www.bart.gov",
+	// 		},
+	// 		Source:       "https://www.bart.gov/dev/schedules/google_transit.zip",
+	// 		UnpackBundle: datasets.BundleFormatNone,
+	// 		SupportedObjects: datasets.SupportedObjects{
+	// 			Operators: true,
+	// 			Stops:     true,
+	// 			Services:  true,
+	// 			Journeys:  true,
+	// 		},
+	// 	},
+	// 	{
+	// 		Identifier: "us-bart-gtfs-realtime",
+	// 		Format:     datasets.DataSetFormatGTFSRealtime,
+	// 		Provider: datasets.Provider{
+	// 			Name:    "BART",
+	// 			Website: "http://www.bart.gov",
+	// 		},
+	// 		Source:       "https://api.bart.gov/gtfsrt/tripupdate.aspx", // https://api.bart.gov/gtfsrt/alerts.aspx
+	// 		UnpackBundle: datasets.BundleFormatNone,
+	// 		SupportedObjects: datasets.SupportedObjects{
+	// 			RealtimeJourneys: true,
+	// 		},
+	// 		ImportDestination: datasets.ImportDestinationRealtimeQueue,
+	// 		LinkedDataset:     "us-bart-gtfs-schedule",
+	// 	},
+	// }
 }

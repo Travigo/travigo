@@ -1,0 +1,22 @@
+identifier: gb-nationalrail
+region: gb
+provider:
+  name: National Rail
+  website: "https://nationalrail.co.uk"
+datasets:
+- identifier: toc
+  format: gb-nationalrailtoc
+  source: "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs"
+  sourceauthentication:
+    custom: "gb-nationalrail-login"
+  supportedobjects:
+    operators: true
+    services: true
+- identifier: timetable
+  format: gb-cif
+  source: "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
+  sourceauthentication:
+    custom: "gb-nationalrail-login"
+  supportedobjects:
+    journeys: true
+    services: true

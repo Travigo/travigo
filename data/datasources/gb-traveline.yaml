@@ -1,0 +1,12 @@
+identifier: gb-traveline
+region: gb
+provider:
+  name: Traveline
+  website: "https://www.travelinedata.org.uk/"
+datasets:
+- identifier: noc
+  format: gb-travelinenoc
+  source: "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"
+  supportedobjects:
+    operators:      true
+    operatorgroups: true

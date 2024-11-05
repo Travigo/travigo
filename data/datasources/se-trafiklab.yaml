@@ -1,0 +1,107 @@
+identifier: se-trafiklab
+region: se
+provider:
+  name: Trafiklab
+  website: "https://trafiklab.se"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://opendata.samtrafiken.se/gtfs-sweden/sweden.zip"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: gtfs-realtime-sl-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-ul-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/ul/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-otraf-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/otraf/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-klt-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/klt/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-skane-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/skane/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-dt-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/dt/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-varm-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/varm/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-xt-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/xt/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue
+- identifier: gtfs-realtime-vastmanland-trip
+  format: gtfs-realtime
+  source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/vastmanland/TripUpdatesSweden.pb"
+  sourceauthentication:
+    query:
+      key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: se-trafiklab-gtfs-schedule
+  importdestination: realtime-queue

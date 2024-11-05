@@ -1,0 +1,16 @@
+identifier: gb-networkrail
+region: gb
+provider:
+  name: Network Rail
+  website: "https://networkrail.co.uk"
+datasets:
+- identifier: corpus
+  format: gb-networkrailcorpus
+  source: "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS"
+  sourceauthentication:
+    basic:
+      username: TRAVIGO_NETWORKRAIL_USERNAME
+      password: TRAVIGO_NETWORKRAIL_PASSWORD
+  supportedobjects:
+    stops: true
+  unpackbundle: gz

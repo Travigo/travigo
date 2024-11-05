@@ -12,7 +12,8 @@ type DataSet struct {
 
 	Provider Provider
 
-	Source string
+	Source               string
+	SourceAuthentication SourceAuthentication
 
 	UnpackBundle      BundleFormat
 	SupportedObjects  SupportedObjects
@@ -25,6 +26,16 @@ type DataSet struct {
 
 	// Internal only
 	Queue *rmq.Queue
+}
+
+type SourceAuthentication struct {
+	Query  map[string]string
+	Header map[string]string
+	Basic  struct {
+		Username string
+		Password string
+	}
+	Custom string
 }
 
 type DataSetFormat string

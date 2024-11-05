@@ -1,0 +1,21 @@
+identifier: fr-ilevia-lille
+region: fr
+provider:
+  name: Ilévia
+  website: "http://www.ilevia.fr"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://media.ilevia.fr/opendata/gtfs.zip"
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: gtfs-realtime
+  format: gtfs-realtime
+  source: "https://proxy.transport.data.gouv.fr/resource/ilevia-lille-gtfs-rt"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: fr-ilevia-lille-gtfs-schedule
+  importdestination: realtime-queue

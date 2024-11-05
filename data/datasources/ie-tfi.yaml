@@ -1,0 +1,24 @@
+identifier: ie-tfi
+region: ie
+provider:
+  name: Transport for Ireland
+  website: "https://www.transportforireland.ie"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip"
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr"
+  sourceauthentication:
+    header:
+      x-api-key: TRAVIGO_IE_NATIONALTRANSPORT_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: ie-tfi-gtfs-schedule
+  importdestination: realtime-queue
