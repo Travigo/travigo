@@ -368,6 +368,22 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
 			LinkedDataset:     "fr-ilevia-lille-gtfs-schedule",
 		},
+		{
+			Identifier: "de-gtfs-full-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "GTFS.de",
+				Website: "https://gtfs.de",
+			},
+			Source:       "https://download.gtfs.de/germany/free/latest.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+		},
 	}
 }
 

@@ -63,6 +63,10 @@ cronjobs:
     schedule: "0 8 * * *"
     args: ["data-importer", "dataset", "--id", "us-nyc-subway-schedule"]
     batchburst: true
+  - name: de-gtfs-full-schedule
+    schedule: "0 7 * * *"
+    args: ["data-importer", "dataset", "--id", "de-gtfs-full-schedule"]
+    batchburst: true
   - name: fr-ilevia-lille-gtfs-schedule
     schedule: "0 8 * * *"
     args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-schedule"]
