@@ -243,6 +243,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			continue
 		}
 
+		transportType := routeTypeMapping[gtfsRoute.Type]
+		if transportType == "" {
+			transportType = ctdf.TransportTypeUnknown
+		}
+
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
 			OtherIdentifiers: []string{
@@ -256,7 +261,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			Routes:               []ctdf.Route{},
 			BrandColour:          gtfsRoute.Colour,
 			SecondaryBrandColour: gtfsRoute.TextColour,
-			TransportType:        routeTypeMapping[gtfsRoute.Type],
+			TransportType:        transportType,
 		}
 
 		transforms.Transform(ctdfService, 1, "gb-dft-bods-gtfs-schedule")
