@@ -67,9 +67,9 @@ cronjobs:
   #   schedule: "0 8 * * *"
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-schedule"]
     # batchburst: true
-  - name: de-gtfs-full-schedule
+  - name: de-gtfs-gtfs-schedule
     schedule: "0 7 * * *"
-    args: ["data-importer", "dataset", "--id", "de-gtfs-full-schedule"]
+    args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-schedule"]
     batchburst: true
   - name: se-trafiklab-gtfs-schedule
     schedule: "30 7 * * *"
@@ -95,8 +95,8 @@ deployments:
     args: ["data-importer", "dataset", "--id", "ie-tfi-gtfs-realtime", "--repeat-every", "90s"]
   - name: fr-ilevia-lille-gtfs-rt
     args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "90s"]
-  - name: de-gtfs-full-realtime
-    args: ["data-importer", "dataset", "--id", "de-gtfs-full-realtime", "--repeat-every", "90s"]
+  - name: de-gtfs-gtfs-realtime
+    args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-realtime", "--repeat-every", "90s"]
   - name: se-trafiklab-gtfs-realtime-sl-trip
     args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-trip", "--repeat-every", "90s"]
   - name: se-trafiklab-gtfs-realtime-ul-trip
