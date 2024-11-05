@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -213,9 +214,9 @@ func checkQueueSize() {
 	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
 	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue >= 75000 {
+	if inQueue >= 40000 {
 		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
-		time.Sleep(30 * time.Second)
+		time.Sleep(time.Duration(30+rand.IntN(20)) * time.Minute)
 
 		checkQueueSize()
 	}
