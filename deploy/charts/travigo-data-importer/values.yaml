@@ -23,6 +23,10 @@ bods:
 ie_nationaltransport:
   apiKeySecret: travigo-ie-nationaltransport-api
 
+se_trafiklab:
+  staticSecret: travigo-trafiklab-sweden-static
+  realtimeSecret: travigo-trafiklab-sweden-realtime
+
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials

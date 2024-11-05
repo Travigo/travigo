@@ -110,7 +110,9 @@ func GetRegisteredDataSets() []datasets.DataSet {
 					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
 				}
 
-				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				q := r.URL.Query()
+				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				r.URL.RawQuery = q.Encode()
 			},
 		},
 		{
@@ -135,7 +137,9 @@ func GetRegisteredDataSets() []datasets.DataSet {
 					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
 				}
 
-				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				q := r.URL.Query()
+				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				r.URL.RawQuery = q.Encode()
 			},
 		},
 		{
@@ -166,7 +170,9 @@ func GetRegisteredDataSets() []datasets.DataSet {
 					log.Fatal().Msg("TRAVIGO_BODS_API_KEY must be set")
 				}
 
-				r.URL.Query().Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				q := r.URL.Query()
+				q.Add("api_key", env["TRAVIGO_BODS_API_KEY"])
+				r.URL.RawQuery = q.Encode()
 			},
 		},
 		{
@@ -368,6 +374,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
 			LinkedDataset:     "fr-ilevia-lille-gtfs-schedule",
 		},
+		// Germany
 		{
 			Identifier: "de-gtfs-full-schedule",
 			Format:     datasets.DataSetFormatGTFSSchedule,
@@ -398,6 +405,34 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			},
 			ImportDestination: datasets.ImportDestinationRealtimeQueue,
 			LinkedDataset:     "de-gtfs-full-schedule",
+		},
+		// Sweden
+		{
+			Identifier: "se-gtfs-schedule",
+			Format:     datasets.DataSetFormatGTFSSchedule,
+			Provider: datasets.Provider{
+				Name:    "Trafiklab",
+				Website: "https://trafiklab.se",
+			},
+			Source:       "https://opendata.samtrafiken.se/gtfs-sweden/sweden.zip",
+			UnpackBundle: datasets.BundleFormatNone,
+			SupportedObjects: datasets.SupportedObjects{
+				Operators: true,
+				Stops:     true,
+				Services:  true,
+				Journeys:  true,
+			},
+
+			DownloadHandler: func(r *http.Request) {
+				env := util.GetEnvironmentVariables()
+				if env["TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY"] == "" {
+					log.Fatal().Msg("TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY must be set")
+				}
+
+				q := r.URL.Query()
+				q.Add("key", env["TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY"])
+				r.URL.RawQuery = q.Encode()
+			},
 		},
 	}
 }
