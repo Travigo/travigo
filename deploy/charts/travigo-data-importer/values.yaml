@@ -113,7 +113,7 @@ deployments:
     args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-trip", "--repeat-every", "90s"]
   - name: se-trafiklab-gtfs-realtime-xt-trip
     args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-trip", "--repeat-every", "90s"]
-  - name: se-trafiklab-gtfs-realtime-vastmanland-trip
+  - name: se-trafiklab-gtfs-realtime-vastm-trip
     args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-trip", "--repeat-every", "90s"]
   # - name: us-nyc-subway-realtime-numbers
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-relatime-1-2-3-4-5-6-7", "--repeat-every", "60s"]
