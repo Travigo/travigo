@@ -20,7 +20,7 @@ type DataSet struct {
 	IgnoreObjects     IgnoreObjects
 	ImportDestination ImportDestination
 
-	CustomConfig map[stiring]string
+	CustomConfig map[string]string
 
 	LinkedDataset string
 
