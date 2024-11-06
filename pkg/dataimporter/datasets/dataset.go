@@ -20,6 +20,8 @@ type DataSet struct {
 	IgnoreObjects     IgnoreObjects
 	ImportDestination ImportDestination
 
+	CustomConfig map[stiring]string
+
 	LinkedDataset string
 
 	DownloadHandler func(*http.Request)
