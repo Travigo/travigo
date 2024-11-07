@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "travigo-stats.labels" $ | nindent 4 }}
 spec:
-  schedule: {{ .schedule }}
+  schedule: "{{ .schedule }}"
   jobTemplate:
     metadata:
       {{- with $.Values.podAnnotations }}
