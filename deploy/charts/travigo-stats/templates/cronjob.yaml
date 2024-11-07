@@ -34,6 +34,14 @@ spec:
                 {{- end }}
                 - name: TRAVIGO_LOG_FORMAT
                   value: JSON
+                - name: TRAVIGO_MONGODB_CONNECTION
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.database.connectionStringSecret }}
+                      key: connectionString.standard
+                      optional: false
+                - name: TRAVIGO_MONGODB_DATABASE
+                  value: {{ $.Values.database.database }}
                 - name: TRAVIGO_ELASTICSEARCH_ADDRESS
                   value: {{ $.Values.elasticsearch.address }}
                 - name: TRAVIGO_ELASTICSEARCH_USERNAME
