@@ -38,6 +38,14 @@ image:
   pullPolicy: Always
   tag: main
 
+cronjobs:
+  - name: basic
+    schedule: "0 8 * * *"
+    args: ["data-importer", "stats", "calculate", "--object", "services,operators,stops,servicealerts"]
+  - name: realtimejourneys
+    schedule: "*/20 * * * *"
+    args: ["data-importer", "stats", "calculate", "--object", "realtimejourneys"]
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""

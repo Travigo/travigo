@@ -22,9 +22,6 @@ func RegisterCLI() *cli.Command {
 						Value: ":8080",
 						Usage: "listen target for the web server",
 					},
-					&cli.BoolFlag{
-						Name: "disable-stats",
-					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -39,7 +36,7 @@ func RegisterCLI() *cli.Command {
 
 					dataaggregator.Setup()
 
-					return SetupServer(c.String("listen"), !c.Bool("disable-stats"))
+					return SetupServer(c.String("listen"))
 				},
 			},
 		},

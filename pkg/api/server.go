@@ -3,15 +3,10 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/travigo/travigo/pkg/api/routes"
-	"github.com/travigo/travigo/pkg/api/stats"
 	"github.com/travigo/travigo/pkg/http_server"
 )
 
-func SetupServer(listen string, enableStats bool) error {
-	if enableStats {
-		go stats.UpdateRecordsStats()
-	}
-
+func SetupServer(listen string) error {
 	webApp := fiber.New()
 	webApp.Use(http_server.NewLogger())
 
@@ -36,8 +31,6 @@ func SetupServer(listen string, enableStats bool) error {
 	routes.ServiceAlertRouter(group.Group("/service_alerts"))
 
 	routes.AccountRouter(group.Group("/account", EnsureValidToken()))
-
-	group.Get("stats", routes.Stats)
 
 	return webApp.Listen(listen)
 }

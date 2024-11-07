@@ -3,7 +3,7 @@ package web_api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/travigo/travigo/pkg/http_server"
-	"github.com/travigo/travigo/pkg/stats/routes"
+	"github.com/travigo/travigo/pkg/stats/web_api/routes"
 )
 
 func SetupServer(listen string) {
