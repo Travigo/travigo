@@ -9,13 +9,17 @@ import (
 
 type OperatorsStats struct {
 	Total int
+
+	Datasources map[string]int
 }
 
 func GetOperators() OperatorsStats {
+	stats := OperatorsStats{}
 	operatorsCollection := database.GetCollection("operators")
-	numberOperators, _ := operatorsCollection.CountDocuments(context.Background(), bson.D{})
+	numberoperators, _ := operatorsCollection.CountDocuments(context.Background(), bson.D{})
+	stats.Total = int(numberoperators)
 
-	return OperatorsStats{
-		Total: int(numberOperators),
-	}
+	stats.Datasources = CountAggregate(operatorsCollection, "$datasource.datasetid")
+
+	return stats
 }

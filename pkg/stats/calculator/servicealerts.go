@@ -14,6 +14,8 @@ type ServiceAlertsStats struct {
 	Total    int
 	Active   int
 	Inactive int
+
+	Datasources map[string]int
 }
 
 func GetServiceAlerts() ServiceAlertsStats {
@@ -42,5 +44,7 @@ func GetServiceAlerts() ServiceAlertsStats {
 		Total:    numberActiveAlerts + numberInactiveAlerts,
 		Active:   numberActiveAlerts,
 		Inactive: numberInactiveAlerts,
+
+		Datasources: CountAggregate(collection, "$datasource.datasetid"),
 	}
 }

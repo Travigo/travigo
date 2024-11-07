@@ -15,5 +15,7 @@ func SetupServer(listen string) {
 	group.Get("version", routes.APIVersion)
 	routes.IdentificationRateRouter(group.Group("/identification_rate"))
 
+	group.Get("calculated", routes.CalculatedRoute)
+
 	webApp.Listen(listen)
 }

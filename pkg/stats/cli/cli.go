@@ -17,12 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type RecordStatsData struct {
-	Type      string
-	Stats     interface{}
-	Timestamp time.Time
-}
-
 func RegisterCLI() *cli.Command {
 	return &cli.Command{
 		Name:  "stats",
@@ -94,7 +88,7 @@ func RegisterCLI() *cli.Command {
 
 						log.Info().Str("type", objectName).Interface("stats", statsData).Msg("Calculated")
 
-						recordStatsData := RecordStatsData{
+						recordStatsData := calculator.RecordStatsData{
 							Type:      objectName,
 							Stats:     statsData,
 							Timestamp: time.Now(),

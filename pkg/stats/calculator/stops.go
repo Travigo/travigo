@@ -9,13 +9,17 @@ import (
 
 type StopsStats struct {
 	Total int
+
+	Datasources map[string]int
 }
 
 func GetStops() StopsStats {
+	stats := StopsStats{}
 	stopsCollection := database.GetCollection("stops")
 	numberStops, _ := stopsCollection.CountDocuments(context.Background(), bson.D{})
+	stats.Total = int(numberStops)
 
-	return StopsStats{
-		Total: int(numberStops),
-	}
+	stats.Datasources = CountAggregate(stopsCollection, "$datasource.datasetid")
+
+	return stats
 }
