@@ -176,7 +176,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
-				DataSource: &ctdf.DataSource{},
+				DataSource: datasource,
 
 				AlertType: ctdf.ServiceAlertTypeJourneyDelayed,
 
@@ -297,7 +297,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
-				DataSource: &ctdf.DataSource{},
+				DataSource: datasource,
 
 				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
 
@@ -322,7 +322,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
-				DataSource: &ctdf.DataSource{},
+				DataSource: datasource,
 
 				AlertType: ctdf.ServiceAlertTypeJourneyPartiallyCancelled,
 
@@ -418,9 +418,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				CreationDateTime:     now,
 				ModificationDateTime: now,
 
-				DataSource: &ctdf.DataSource{
-					Provider: "National Rail",
-				},
+				DataSource: datasource,
 
 				AlertType: alertType,
 

@@ -49,8 +49,8 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 	now := time.Now()
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "JSON",
-		Provider:       "GB-TfL",
-		DatasetID:      fmt.Sprintf("StopPoint/mode/%s/Disruption", d.Mode.ModeID),
+		Provider:       "Transport for London",
+		DatasetID:      fmt.Sprintf("gb-tfl-stop-disrupt-%s", d.Mode.ModeID),
 		Timestamp:      fmt.Sprint(now.Unix()),
 	}
 
@@ -168,7 +168,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 	datasource := &ctdf.DataSource{
 		OriginalFormat: "JSON",
 		Provider:       "GB-TfL",
-		DatasetID:      fmt.Sprintf("Line/Mode/%s/Status", d.Mode.ModeID),
+		DatasetID:      fmt.Sprintf("gb-tfl-mode-disrupt-%s", d.Mode.ModeID),
 		Timestamp:      fmt.Sprint(now.Unix()),
 	}
 
