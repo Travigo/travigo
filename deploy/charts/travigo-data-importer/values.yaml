@@ -98,23 +98,23 @@ deployments:
   - name: de-gtfs-gtfs-realtime
     args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-realtime", "--repeat-every", "90s"]
   - name: se-trafiklab-gtfs-realtime-sl-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-ul-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-otraf-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-klt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-skane-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-dt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-varm-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-xt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-trip", "--repeat-every", "180s"]
   - name: se-trafiklab-gtfs-realtime-vastm-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-trip", "--repeat-every", "90s"]
+    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-trip", "--repeat-every", "180s"]
   # - name: us-nyc-subway-realtime-numbers
   #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-relatime-1-2-3-4-5-6-7", "--repeat-every", "60s"]
 
