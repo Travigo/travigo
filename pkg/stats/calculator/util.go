@@ -40,7 +40,7 @@ func CountCountries(datasources map[string]int) map[string]int {
 		datasourceSplit := strings.Split(datasource, "-")
 		country := datasourceSplit[0]
 
-		countries[country] = count
+		countries[country] += count
 	}
 
 	return countries
