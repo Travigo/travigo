@@ -9,6 +9,8 @@ import (
 type VehicleUpdateEvent struct {
 	LocalID string
 
+	MessageType VehicleUpdateEventType
+
 	IdentifyingInformation map[string]string
 	SourceType             string
 
@@ -17,6 +19,13 @@ type VehicleUpdateEvent struct {
 	DataSource *ctdf.DataSource
 	RecordedAt time.Time
 }
+
+type VehicleUpdateEventType string
+
+const (
+	VehicleUpdateEventTypeTrip         VehicleUpdateEventType = "Trip"
+	VehicleUpdateEventTypeServiceAlert                        = "ServiceAlert"
+)
 
 type VehicleLocationUpdate struct {
 	Location  ctdf.Location

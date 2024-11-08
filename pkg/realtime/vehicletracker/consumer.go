@@ -89,8 +89,8 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	var locationEventOperations []mongo.WriteModel
 
 	for _, payload := range payloads {
-		var vehicleLocationEvent *VehicleUpdateEvent
-		if err := json.Unmarshal([]byte(payload), &vehicleLocationEvent); err != nil {
+		var vehicleUpdateEvent *VehicleUpdateEvent
+		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil {
 			if batchErrors := batch.Reject(); err != nil {
 				for _, err := range batchErrors {
 					log.Error().Err(err).Msg("Failed to reject realtime event")
@@ -98,16 +98,20 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		identifiedJourneyID := consumer.identifyVehicle(vehicleLocationEvent)
+		identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent)
 
 		if identifiedJourneyID != "" {
-			writeModel, _ := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleLocationEvent)
+			var writeModel mongo.WriteModel
+
+			if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
+				writeModel, _ = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+			}
 
 			if writeModel != nil {
 				locationEventOperations = append(locationEventOperations, writeModel)
 			}
 		} else {
-			log.Debug().Interface("event", vehicleLocationEvent.IdentifyingInformation).Msg("Couldnt identify journey")
+			log.Debug().Interface("event", vehicleUpdateEvent.IdentifyingInformation).Msg("Couldnt identify journey")
 		}
 	}
 

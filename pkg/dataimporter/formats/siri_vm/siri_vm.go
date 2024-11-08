@@ -76,7 +76,8 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 	)
 
 	locationEvent := vehicletracker.VehicleUpdateEvent{
-		LocalID: localJourneyID,
+		MessageType: vehicletracker.VehicleUpdateEventTypeTrip,
+		LocalID:     localJourneyID,
 		IdentifyingInformation: map[string]string{
 			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
 			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
