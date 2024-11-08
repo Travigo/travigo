@@ -75,7 +75,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		vehicleJourneyRef,
 	)
 
-	locationEvent := vehicletracker.VehicleLocationEvent{
+	locationEvent := vehicletracker.VehicleUpdateEvent{
 		LocalID: localJourneyID,
 		IdentifyingInformation: map[string]string{
 			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
@@ -91,18 +91,20 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 			"LinkedDataset":            dataset.LinkedDataset,
 		},
 		SourceType: "siri-vm",
-		Location: ctdf.Location{
-			Type: "Point",
-			Coordinates: []float64{
-				vehicle.MonitoredVehicleJourney.VehicleLocation.Longitude,
-				vehicle.MonitoredVehicleJourney.VehicleLocation.Latitude,
+		VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
+			Location: ctdf.Location{
+				Type: "Point",
+				Coordinates: []float64{
+					vehicle.MonitoredVehicleJourney.VehicleLocation.Longitude,
+					vehicle.MonitoredVehicleJourney.VehicleLocation.Latitude,
+				},
 			},
+			Bearing:           vehicle.MonitoredVehicleJourney.Bearing,
+			VehicleIdentifier: vehicleRef,
+			Timeframe:         timeframe,
 		},
-		Bearing:           vehicle.MonitoredVehicleJourney.Bearing,
-		VehicleIdentifier: vehicleRef,
-		Timeframe:         timeframe,
-		DataSource:        datasource,
-		RecordedAt:        recordedAtTime,
+		DataSource: datasource,
+		RecordedAt: recordedAtTime,
 	}
 
 	// Calculate occupancy
@@ -110,7 +112,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		totalCapacity := vehicle.Extensions.VehicleJourney.SeatedCapacity + vehicle.Extensions.VehicleJourney.WheelchairCapacity
 		totalOccupancy := vehicle.Extensions.VehicleJourney.SeatedOccupancy + vehicle.Extensions.VehicleJourney.WheelchairOccupancy
 
-		locationEvent.Occupancy = ctdf.RealtimeJourneyOccupancy{
+		locationEvent.VehicleLocationUpdate.Occupancy = ctdf.RealtimeJourneyOccupancy{
 			OccupancyAvailable: true,
 			ActualValues:       true,
 
@@ -127,21 +129,21 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		}
 
 		if totalCapacity > 0 && totalOccupancy > 0 {
-			locationEvent.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
+			locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = int((float64(totalOccupancy) / float64(totalCapacity)) * 100)
 		}
 	} else if vehicle.MonitoredVehicleJourney.Occupancy != "" {
-		locationEvent.Occupancy = ctdf.RealtimeJourneyOccupancy{
+		locationEvent.VehicleLocationUpdate.Occupancy = ctdf.RealtimeJourneyOccupancy{
 			OccupancyAvailable: true,
 			ActualValues:       false,
 		}
 
 		switch vehicle.MonitoredVehicleJourney.Occupancy {
 		case "full":
-			locationEvent.Occupancy.TotalPercentageOccupancy = 100
+			locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 100
 		case "standingAvailable":
-			locationEvent.Occupancy.TotalPercentageOccupancy = 75
+			locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 75
 		case "seatsAvailable":
-			locationEvent.Occupancy.TotalPercentageOccupancy = 40
+			locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 40
 		}
 	}
 

@@ -119,7 +119,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
-			locationEvent := vehicletracker.VehicleLocationEvent{
+			locationEvent := vehicletracker.VehicleUpdateEvent{
 				LocalID: fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
 				IdentifyingInformation: map[string]string{
 					"TripID":        tripID,
@@ -127,43 +127,45 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					"LinkedDataset": dataset.LinkedDataset,
 				},
 				SourceType: "GTFS-RT",
-				Timeframe:  timeframe,
+				VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
+					Timeframe: timeframe,
+				},
 				DataSource: datasource,
 				RecordedAt: recordedAtTime,
 			}
 
 			if vehiclePosition != nil {
 				if vehiclePosition.OccupancyPercentage != nil {
-					locationEvent.Occupancy.OccupancyAvailable = true
-					locationEvent.Occupancy.ActualValues = true
+					locationEvent.VehicleLocationUpdate.Occupancy.OccupancyAvailable = true
+					locationEvent.VehicleLocationUpdate.Occupancy.ActualValues = true
 
-					locationEvent.Occupancy.TotalPercentageOccupancy = int(vehiclePosition.GetOccupancyPercentage())
+					locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = int(vehiclePosition.GetOccupancyPercentage())
 				}
 
 				if vehiclePosition.OccupancyStatus != nil {
 					switch vehiclePosition.GetOccupancyStatus() {
 					case gtfs.VehiclePosition_EMPTY:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 0
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 0
 					case gtfs.VehiclePosition_MANY_SEATS_AVAILABLE:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 30
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 30
 					case gtfs.VehiclePosition_FEW_SEATS_AVAILABLE:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 50
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 50
 					case gtfs.VehiclePosition_STANDING_ROOM_ONLY:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 70
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 70
 					case gtfs.VehiclePosition_CRUSHED_STANDING_ROOM_ONLY:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 80
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 80
 					case gtfs.VehiclePosition_FULL:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 90
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 90
 					case gtfs.VehiclePosition_NOT_ACCEPTING_PASSENGERS:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 100
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 100
 					case gtfs.VehiclePosition_NO_DATA_AVAILABLE:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 10
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 10
 					case gtfs.VehiclePosition_NOT_BOARDABLE:
-						locationEvent.Occupancy.TotalPercentageOccupancy = 100
+						locationEvent.VehicleLocationUpdate.Occupancy.TotalPercentageOccupancy = 100
 					}
 
-					locationEvent.Occupancy.OccupancyAvailable = true
-					locationEvent.Occupancy.ActualValues = false
+					locationEvent.VehicleLocationUpdate.Occupancy.OccupancyAvailable = true
+					locationEvent.VehicleLocationUpdate.Occupancy.ActualValues = false
 				}
 
 				if vehiclePosition.CongestionLevel != nil {
@@ -186,7 +188,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					})
 				}
 
-				locationEvent.Location = ctdf.Location{
+				locationEvent.VehicleLocationUpdate.Location = ctdf.Location{
 					Type: "Point",
 					Coordinates: []float64{
 						float64(vehiclePosition.Position.GetLongitude()),
@@ -194,15 +196,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					},
 				}
 
-				locationEvent.Bearing = float64(vehiclePosition.Position.GetBearing())
-				locationEvent.VehicleIdentifier = vehiclePosition.Vehicle.GetId()
+				locationEvent.VehicleLocationUpdate.Bearing = float64(vehiclePosition.Position.GetBearing())
+				locationEvent.VehicleLocationUpdate.VehicleIdentifier = vehiclePosition.Vehicle.GetId()
 
 				withLocation += 1
 			}
 
 			if tripUpdate != nil {
 				for _, stopTimeUpdate := range tripUpdate.GetStopTimeUpdate() {
-					locationEvent.StopUpdates = append(locationEvent.StopUpdates, vehicletracker.VehicleLocationEventStopUpdate{
+					locationEvent.VehicleLocationUpdate.StopUpdates = append(locationEvent.VehicleLocationUpdate.StopUpdates, vehicletracker.VehicleLocationEventStopUpdate{
 						StopID:          fmt.Sprintf("%s-stop-%s", dataset.LinkedDataset, stopTimeUpdate.GetStopId()),
 						ArrivalTime:     time.Unix(stopTimeUpdate.GetArrival().GetTime(), 0),
 						DepartureTime:   time.Unix(stopTimeUpdate.GetDeparture().GetTime(), 0),
@@ -211,7 +213,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					})
 				}
 
-				locationEvent.VehicleIdentifier = tripUpdate.Vehicle.GetId()
+				locationEvent.VehicleLocationUpdate.VehicleIdentifier = tripUpdate.Vehicle.GetId()
 
 				withTripUpdate += 1
 			}

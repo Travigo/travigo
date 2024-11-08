@@ -89,7 +89,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	var locationEventOperations []mongo.WriteModel
 
 	for _, payload := range payloads {
-		var vehicleLocationEvent *VehicleLocationEvent
+		var vehicleLocationEvent *VehicleUpdateEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleLocationEvent); err != nil {
 			if batchErrors := batch.Reject(); err != nil {
 				for _, err := range batchErrors {
@@ -130,7 +130,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	}
 }
 
-func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLocationEvent) string {
+func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpdateEvent) string {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
@@ -148,15 +148,15 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 		// TODO use an interface here to reduce duplication
 		if vehicleLocationEvent.SourceType == "siri-vm" {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
-			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
-			if vehicleLocationEvent.VehicleIdentifier != "" && successVehicleID != "" {
+			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
 				identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 				return ""
 			}
 
 			// TODO only exists here if siri-vm only comes from the 1 source
-			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier))
-			if vehicleLocationEvent.VehicleIdentifier != "" && failedVehicleID == "" {
+			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" && failedVehicleID == "" {
 				return ""
 			}
 
@@ -171,7 +171,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 				tflEventBytes, _ := json.Marshal(map[string]string{
 					"Line":                     vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
 					"DirectionRef":             vehicleLocationEvent.IdentifyingInformation["DirectionRef"],
-					"NumberPlate":              vehicleLocationEvent.VehicleIdentifier,
+					"NumberPlate":              vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier,
 					"OriginRef":                vehicleLocationEvent.IdentifyingInformation["OriginRef"],
 					"DestinationRef":           vehicleLocationEvent.IdentifyingInformation["DestinationRef"],
 					"OriginAimedDepartureTime": vehicleLocationEvent.IdentifyingInformation["OriginAimedDepartureTime"],
@@ -193,8 +193,8 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
 
 			// Set cross dataset ID
-			if vehicleLocationEvent.VehicleIdentifier != "" {
-				identificationCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier), vehicleLocationEvent.SourceType)
+			if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
+				identificationCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleLocationEvent.SourceType)
 			}
 
 			// Temporary https://github.com/travigo/travigo/issues/43
@@ -243,8 +243,8 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 		identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
 
 		// Set cross dataset ID
-		if vehicleLocationEvent.VehicleIdentifier != "" {
-			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleIdentifier), vehicleLocationEvent.SourceType)
+		if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
+			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleLocationEvent.SourceType)
 		}
 
 		// Record the successful identification event
@@ -285,10 +285,10 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleLoca
 	return journeyID
 }
 
-func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLocationEvent *VehicleLocationEvent) (mongo.WriteModel, error) {
-	currentTime := vehicleLocationEvent.RecordedAt
+func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
+	currentTime := vehicleUpdateEvent.RecordedAt
 
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleLocationEvent.Timeframe, journeyID)
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
 	var realtimeJourney *ctdf.RealtimeJourney
@@ -320,7 +320,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 		journey.GetService()
 
-		journeyDate, _ := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		journeyDate, _ := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
@@ -332,7 +332,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 			CreationDateTime: currentTime,
 
-			VehicleRef: vehicleLocationEvent.VehicleIdentifier,
+			VehicleRef: vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier,
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
 		}
 		newRealtimeJourney = true
@@ -349,7 +349,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem // TODO maybe not here?
 
 	// Calculate everything based on location if we aren't provided with updates
-	if len(vehicleLocationEvent.StopUpdates) == 0 && vehicleLocationEvent.Location.Type == "Point" {
+	if len(vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates) == 0 && vehicleUpdateEvent.VehicleLocationUpdate.Location.Type == "Point" {
 		closestDistance := 999999999999.0
 		var closestDistanceJourneyPathIndex int
 		var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
@@ -362,7 +362,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 				a := journeyPathItem.Track[i]
 				b := journeyPathItem.Track[i+1]
 
-				distance := vehicleLocationEvent.Location.DistanceFromLine(a, b)
+				distance := vehicleUpdateEvent.VehicleLocationUpdate.Location.DistanceFromLine(a, b)
 
 				if distance < journeyPathClosestDistance {
 					journeyPathClosestDistance = distance
@@ -388,7 +388,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
 				}
 
-				distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
+				distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
 
 				if distance < closestDistance {
 					closestDistance = distance
@@ -407,7 +407,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
 				}
 
-				previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleLocationEvent.Location)
+				previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
 
 				closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
 			}
@@ -418,7 +418,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 		}
 
 		// Calculate new stop arrival times
-		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to parse realtime time frame")
 		}
@@ -501,7 +501,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 			}
 		}
 	} else {
-		for _, stopUpdate := range vehicleLocationEvent.StopUpdates {
+		for _, stopUpdate := range vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates {
 			arrivalTime := stopUpdate.ArrivalTime
 			departureTime := stopUpdate.DepartureTime
 
@@ -533,7 +533,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 		closestPathTime := 9999999 * time.Minute
 		now := time.Now()
-		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleLocationEvent.Timeframe)
+		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 
 		journeyTimezone, _ := time.LoadLocation(realtimeJourney.Journey.DepartureTimezone)
 
@@ -571,14 +571,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 	// Update database
 	updateMap := bson.M{
 		"modificationdatetime": currentTime,
-		"vehiclebearing":       vehicleLocationEvent.Bearing,
+		"vehiclebearing":       vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
-		"occupancy":            vehicleLocationEvent.Occupancy,
+		"occupancy":            vehicleUpdateEvent.VehicleLocationUpdate.Occupancy,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
-	if vehicleLocationEvent.Location.Type != "" {
-		updateMap["vehiclelocation"] = vehicleLocationEvent.Location
+	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
+		updateMap["vehiclelocation"] = vehicleUpdateEvent.VehicleLocationUpdate.Location
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
@@ -592,12 +592,12 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleLo
 
 		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
 
-		updateMap["vehicleref"] = vehicleLocationEvent.VehicleIdentifier
-		updateMap["datasource"] = vehicleLocationEvent.DataSource
+		updateMap["vehicleref"] = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
+		updateMap["datasource"] = vehicleUpdateEvent.DataSource
 
 		updateMap["reliability"] = realtimeJourneyReliability
 	} else {
-		updateMap["datasource.timestamp"] = vehicleLocationEvent.DataSource.Timestamp
+		updateMap["datasource.timestamp"] = vehicleUpdateEvent.DataSource.Timestamp
 	}
 
 	if (offset.Seconds() != realtimeJourney.Offset.Seconds()) || newRealtimeJourney {

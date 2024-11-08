@@ -6,12 +6,19 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
-type VehicleLocationEvent struct {
+type VehicleUpdateEvent struct {
 	LocalID string
 
 	IdentifyingInformation map[string]string
 	SourceType             string
 
+	VehicleLocationUpdate *VehicleLocationUpdate
+
+	DataSource *ctdf.DataSource
+	RecordedAt time.Time
+}
+
+type VehicleLocationUpdate struct {
 	Location  ctdf.Location
 	Bearing   float64
 	Timeframe string
@@ -21,9 +28,6 @@ type VehicleLocationEvent struct {
 	Occupancy ctdf.RealtimeJourneyOccupancy
 
 	VehicleIdentifier string
-
-	DataSource *ctdf.DataSource
-	RecordedAt time.Time
 }
 
 type VehicleLocationEventStopUpdate struct {
