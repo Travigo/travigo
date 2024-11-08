@@ -11,6 +11,7 @@ type OperatorsStats struct {
 	Total int
 
 	Datasources map[string]int
+	Countries   map[string]int
 }
 
 func GetOperators() OperatorsStats {
@@ -20,6 +21,7 @@ func GetOperators() OperatorsStats {
 	stats.Total = int(numberoperators)
 
 	stats.Datasources = CountAggregate(operatorsCollection, "$datasource.datasetid")
+	stats.Countries = CountCountries(stats.Datasources)
 
 	return stats
 }

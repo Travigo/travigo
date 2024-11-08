@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"context"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -29,4 +30,18 @@ func CountAggregate(collection *mongo.Collection, aggregateKey string) map[strin
 	}
 
 	return countMap
+}
+
+func CountCountries(datasources map[string]int) map[string]int {
+	countries := map[string]int{}
+
+	for datasource, count := range datasources {
+		// Making a big assumption here
+		datasourceSplit := strings.Split(datasource, "-")
+		country := datasourceSplit[0]
+
+		countries[country] = count
+	}
+
+	return countries
 }

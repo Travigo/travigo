@@ -11,6 +11,7 @@ type StopsStats struct {
 	Total int
 
 	Datasources map[string]int
+	Countries   map[string]int
 }
 
 func GetStops() StopsStats {
@@ -20,6 +21,7 @@ func GetStops() StopsStats {
 	stats.Total = int(numberStops)
 
 	stats.Datasources = CountAggregate(stopsCollection, "$datasource.datasetid")
+	stats.Countries = CountCountries(stats.Datasources)
 
 	return stats
 }

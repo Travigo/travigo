@@ -21,6 +21,7 @@ type RealtimeJourneyStats struct {
 	TransportTypes map[ctdf.TransportType]int
 	Features       map[string]int
 	Datasources    map[string]int
+	Countries      map[string]int
 }
 
 func GetRealtimeJourneys() RealtimeJourneyStats {
@@ -138,6 +139,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 		TransportTypes:       transportTypes,
 		Features:             features,
 		Datasources:          datasources,
+		Countries:            CountCountries(datasources),
 		NotActivelyTracked:   numberActiveRealtimeJourneysNotActivelyTracked,
 	}
 }

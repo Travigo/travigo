@@ -12,6 +12,7 @@ type ServicesStats struct {
 
 	TransportTypes map[string]int
 	Datasources    map[string]int
+	Countries      map[string]int
 }
 
 func GetServices() ServicesStats {
@@ -26,6 +27,7 @@ func GetServices() ServicesStats {
 
 	stats.TransportTypes = CountAggregate(servicesCollection, "$transporttype")
 	stats.Datasources = CountAggregate(servicesCollection, "$datasource.datasetid")
+	stats.Countries = CountCountries(stats.Datasources)
 
 	return stats
 }
