@@ -40,6 +40,10 @@ func CountCountries(datasources map[string]int) map[string]int {
 		datasourceSplit := strings.Split(datasource, "-")
 		country := datasourceSplit[0]
 
+		if country == "travigo" {
+			continue
+		}
+
 		countries[country] += count
 	}
 

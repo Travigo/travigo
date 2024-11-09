@@ -15,6 +15,7 @@ type VehicleUpdateEvent struct {
 	SourceType             string
 
 	VehicleLocationUpdate *VehicleLocationUpdate
+	ServiceAlertUpdate    *ServiceAlertUpdate
 
 	DataSource *ctdf.DataSource
 	RecordedAt time.Time
@@ -47,4 +48,14 @@ type VehicleLocationEventStopUpdate struct {
 
 	ArrivalOffset   int
 	DepartureOffset int
+}
+
+type ServiceAlertUpdate struct {
+	Type ctdf.ServiceAlertType
+
+	Title       string
+	Description string
+
+	ValidFrom  time.Time
+	ValidUntil time.Time
 }
