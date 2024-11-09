@@ -14,7 +14,6 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -65,6 +64,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	withTripID := 0
 	withLocation := 0
 	withTripUpdate := 0
+	serviceAlertCount := 0
 
 	for _, entity := range feed.Entity {
 		vehiclePosition := entity.GetVehicle()
@@ -93,15 +93,80 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 		tripID := trip.GetTripId()
 
-		// TODO gtfs-rt alerts
 		if entity.Alert != nil {
-			pretty.Println(entity.GetAlert())
-			collection := database.GetCollection("datadump")
-			collection.InsertOne(context.Background(), bson.M{
-				"type":             "gtfsrt-alert",
-				"creationdatetime": time.Now(),
-				"document":         entity.GetAlert(),
-			})
+			var alertType ctdf.ServiceAlertType
+
+			switch entity.Alert.Effect {
+			case gtfs.Alert_NO_SERVICE.Enum():
+				alertType = ctdf.ServiceAlertTypeServiceSuspended
+			case gtfs.Alert_REDUCED_SERVICE.Enum():
+				alertType = ctdf.ServiceAlertTypeServicePartSuspended
+			case gtfs.Alert_SIGNIFICANT_DELAYS.Enum():
+				alertType = ctdf.ServiceAlertTypeSevereDelays
+			case gtfs.Alert_DETOUR.Enum():
+				alertType = ctdf.ServiceAlertTypeWarning // TODO new type?
+			case gtfs.Alert_ADDITIONAL_SERVICE.Enum():
+				alertType = ctdf.ServiceAlertTypeInformation
+			case gtfs.Alert_MODIFIED_SERVICE.Enum():
+				alertType = ctdf.ServiceAlertTypeWarning
+			case gtfs.Alert_OTHER_EFFECT.Enum():
+				alertType = ctdf.ServiceAlertTypeInformation
+			case gtfs.Alert_UNKNOWN_EFFECT.Enum():
+				alertType = ctdf.ServiceAlertTypeInformation
+			case gtfs.Alert_STOP_MOVED.Enum():
+				alertType = ctdf.ServiceAlertTypeWarning
+			case gtfs.Alert_NO_EFFECT.Enum():
+				alertType = ctdf.ServiceAlertTypeInformation
+			case gtfs.Alert_ACCESSIBILITY_ISSUE.Enum():
+				alertType = ctdf.ServiceAlertTypeInformation
+			default:
+				alertType = ctdf.ServiceAlertTypeInformation
+			}
+
+			// Create one per active period & informed entity
+			for _, informedEntity := range entity.Alert.InformedEntity {
+				for _, activePeriod := range entity.Alert.ActivePeriod {
+					validFromTimestamp := activePeriod.GetStart()
+					validToTimestamp := activePeriod.GetEnd()
+
+					validFrom := time.Unix(int64(validFromTimestamp), 0)
+					validTo := time.Unix(int64(validToTimestamp), 0)
+
+					tripID := informedEntity.GetTrip().GetTripId()
+					routeID := informedEntity.GetRouteId()
+					stopID := informedEntity.GetStopId()
+					agencyID := informedEntity.GetAgencyId()
+
+					updateEvent := vehicletracker.VehicleUpdateEvent{
+						MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
+						LocalID:     fmt.Sprintf("%s-realtime-%d-%d", dataset.Identifier, validFromTimestamp, validToTimestamp),
+						IdentifyingInformation: map[string]string{
+							"TripID":        tripID,
+							"RouteID":       routeID,
+							"StopID":        stopID,
+							"AgencyID":      agencyID,
+							"LinkedDataset": dataset.LinkedDataset,
+						},
+
+						ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
+							Type:        alertType,
+							Title:       *entity.Alert.HeaderText.GetTranslation()[0].Text, // TODO assume we only use the 1 translation
+							Description: *entity.Alert.DescriptionText.GetTranslation()[0].Text,
+							ValidFrom:   validFrom,
+							ValidUntil:  validTo,
+						},
+
+						SourceType: "GTFS-RT",
+						DataSource: datasource,
+						RecordedAt: recordedAtTime,
+					}
+
+					updateEventJson, _ := json.Marshal(updateEvent)
+					r.queue.PublishBytes(updateEventJson)
+
+					serviceAlertCount += 1
+				}
+			}
 		}
 
 		if tripID != "" {
@@ -240,6 +305,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 		Int("withtrip", withTripID).
 		Int("withlocation", withLocation).
 		Int("withtripupdate", withTripUpdate).
+		Int("servicealert", serviceAlertCount).
 		Int("total", len(feed.Entity)).
 		Msg("Submitted vehicle updates")
 

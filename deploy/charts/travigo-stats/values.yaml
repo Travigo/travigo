@@ -40,11 +40,11 @@ image:
 
 cronjobs:
   - name: basic
-    schedule: "0 8 * * *"
-    args: ["stats", "calculate", "--object", "services,operators,stops,servicealerts"]
-  - name: realtimejourneys
+    schedule: "0 */4 * * *"
+    args: ["stats", "calculate", "--object", "services,operators,stops"]
+  - name: dynamic
     schedule: "*/20 * * * *"
-    args: ["stats", "calculate", "--object", "realtimejourneys"]
+    args: ["stats", "calculate", "--object", "realtimejourneys,servicealerts"]
 
 imagePullSecrets: []
 nameOverride: ""
