@@ -50,6 +50,7 @@ const (
 	DataSetFormatNationalRailTOC                 = "gb-nationalrailtoc"
 	DataSetFormatNetworkRailCorpus               = "gb-networkrailcorpus"
 	DataSetFormatSiriVM                          = "eu-siri-vm"
+	DataSetFormatSiriSX                          = "eu-siri-sx"
 	DataSetFormatGTFSSchedule                    = "gtfs-schedule"
 	DataSetFormatGTFSRealtime                    = "gtfs-realtime"
 )

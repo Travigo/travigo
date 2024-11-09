@@ -24,6 +24,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/naptan"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/nationalrailtoc"
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_sx"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
@@ -66,6 +67,8 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		format = &networkrailcorpus.Corpus{}
 	case datasets.DataSetFormatSiriVM:
 		format = &siri_vm.SiriVM{}
+	case datasets.DataSetFormatSiriSX:
+		format = &siri_sx.SiriSX{}
 	case datasets.DataSetFormatGTFSSchedule:
 		format = &gtfs.Schedule{}
 	case datasets.DataSetFormatGTFSRealtime:
