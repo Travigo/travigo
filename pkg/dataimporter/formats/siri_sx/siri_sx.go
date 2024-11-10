@@ -92,6 +92,9 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 
 	var alertType ctdf.ServiceAlertType
 	alertType = ctdf.ServiceAlertTypeInformation // TODO debug
+	if len(situationElement.Consequence) > 0 && situationElement.Consequence[0].Severity == "severe" {
+		alertType = ctdf.ServiceAlertTypeWarning
+	}
 
 	var identifyingInformation []map[string]string
 	for _, consequence := range situationElement.Consequence {
