@@ -10,29 +10,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func (consumer *BatchConsumer) updateServiceAlert(journeyID string, stopID string, serviceID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
+func (consumer *BatchConsumer) updateServiceAlert(matchedIdentifiers []string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
 	primaryIdentifier := fmt.Sprintf(
 		"%s-%s-%d-%d",
 		vehicleUpdateEvent.DataSource.DatasetID, vehicleUpdateEvent.ServiceAlertUpdate.Type,
 		vehicleUpdateEvent.ServiceAlertUpdate.ValidFrom.UnixMilli(),
 		vehicleUpdateEvent.ServiceAlertUpdate.ValidUntil.UnixMilli(),
 	)
-	var matchedIdentifiers []string
-
-	if journeyID != "" {
-		matchedIdentifiers = append(matchedIdentifiers, journeyID)
-		primaryIdentifier = fmt.Sprintf("%s-%s", primaryIdentifier, journeyID)
-	}
-
-	if stopID != "" {
-		matchedIdentifiers = append(matchedIdentifiers, stopID)
-		primaryIdentifier = fmt.Sprintf("%s-%s", primaryIdentifier, stopID)
-	}
-
-	if serviceID != "" {
-		matchedIdentifiers = append(matchedIdentifiers, serviceID)
-		primaryIdentifier = fmt.Sprintf("%s-%s", primaryIdentifier, serviceID)
-	}
 
 	if len(matchedIdentifiers) == 0 {
 		return nil, errors.New("No matching identifiers")

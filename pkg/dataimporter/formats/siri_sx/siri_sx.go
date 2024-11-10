@@ -103,13 +103,13 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 			ValidFrom:   validityPeriodStart,
 			ValidUntil:  validityPeriodEnd,
 
-			IdentifyingInformation: map[string]string{
-				// "TripID":        tripID,
-				// "RouteID":       routeID,
-				// "StopID":        stopID,
-				// "AgencyID":      agencyID,
-				"LinkedDataset": dataset.LinkedDataset,
-			},
+			// IdentifyingInformation: map[string]string{
+			// 	// "TripID":        tripID,
+			// 	// "RouteID":       routeID,
+			// 	// "StopID":        stopID,
+			// 	// "AgencyID":      agencyID,
+			// 	"LinkedDataset": dataset.LinkedDataset,
+			// },
 		},
 
 		SourceType: "siri-sx",

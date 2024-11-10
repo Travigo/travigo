@@ -2,6 +2,7 @@ package gtfs
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,49 +125,62 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			}
 
 			// Create one per active period & informed entity
+			var identifyingInformation []map[string]string
+
 			for _, informedEntity := range entity.Alert.InformedEntity {
-				for _, activePeriod := range entity.Alert.ActivePeriod {
-					validFromTimestamp := activePeriod.GetStart()
-					validToTimestamp := activePeriod.GetEnd()
+				tripID := informedEntity.GetTrip().GetTripId()
+				routeID := informedEntity.GetRouteId()
+				stopID := informedEntity.GetStopId()
+				agencyID := informedEntity.GetAgencyId()
 
-					validFrom := time.Unix(int64(validFromTimestamp), 0)
-					validTo := time.Unix(int64(validToTimestamp), 0)
+				identifyingInformation = append(identifyingInformation, map[string]string{
+					"TripID":        tripID,
+					"RouteID":       routeID,
+					"StopID":        stopID,
+					"AgencyID":      agencyID,
+					"LinkedDataset": dataset.LinkedDataset,
+				})
+			}
 
-					tripID := informedEntity.GetTrip().GetTripId()
-					routeID := informedEntity.GetRouteId()
-					stopID := informedEntity.GetStopId()
-					agencyID := informedEntity.GetAgencyId()
+			for _, activePeriod := range entity.Alert.ActivePeriod {
+				validFromTimestamp := activePeriod.GetStart()
+				validToTimestamp := activePeriod.GetEnd()
 
-					updateEvent := vehicletracker.VehicleUpdateEvent{
-						MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
-						LocalID:     fmt.Sprintf("%s-realtime-%d-%d", dataset.Identifier, validFromTimestamp, validToTimestamp),
+				validFrom := time.Unix(int64(validFromTimestamp), 0)
+				validTo := time.Unix(int64(validToTimestamp), 0)
 
-						ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
-							Type:        alertType,
-							Title:       *entity.Alert.HeaderText.GetTranslation()[0].Text, // TODO assume we only use the 1 translation
-							Description: *entity.Alert.DescriptionText.GetTranslation()[0].Text,
-							ValidFrom:   validFrom,
-							ValidUntil:  validTo,
+				title := *entity.Alert.HeaderText.GetTranslation()[0].Text // TODO assume we only use the 1 translation
+				description := *entity.Alert.DescriptionText.GetTranslation()[0].Text
 
-							IdentifyingInformation: map[string]string{
-								"TripID":        tripID,
-								"RouteID":       routeID,
-								"StopID":        stopID,
-								"AgencyID":      agencyID,
-								"LinkedDataset": dataset.LinkedDataset,
-							},
-						},
+				hash := sha256.New()
+				hash.Write([]byte(alertType))
+				hash.Write([]byte(title))
+				hash.Write([]byte(description))
+				localIDhash := fmt.Sprintf("%x", hash.Sum(nil))
 
-						SourceType: "GTFS-RT",
-						DataSource: datasource,
-						RecordedAt: recordedAtTime,
-					}
+				updateEvent := vehicletracker.VehicleUpdateEvent{
+					MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
+					LocalID:     fmt.Sprintf("%s-realtime-%d-%d-%s", dataset.Identifier, validFromTimestamp, validToTimestamp, localIDhash),
 
-					updateEventJson, _ := json.Marshal(updateEvent)
-					r.queue.PublishBytes(updateEventJson)
+					ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
+						Type:        alertType,
+						Title:       title,
+						Description: description,
+						ValidFrom:   validFrom,
+						ValidUntil:  validTo,
 
-					serviceAlertCount += 1
+						IdentifyingInformation: identifyingInformation,
+					},
+
+					SourceType: "GTFS-RT",
+					DataSource: datasource,
+					RecordedAt: recordedAtTime,
 				}
+
+				updateEventJson, _ := json.Marshal(updateEvent)
+				r.queue.PublishBytes(updateEventJson)
+
+				serviceAlertCount += 1
 			}
 		}
 

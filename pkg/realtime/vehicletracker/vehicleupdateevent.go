@@ -60,5 +60,5 @@ type ServiceAlertUpdate struct {
 	ValidFrom  time.Time
 	ValidUntil time.Time
 
-	IdentifyingInformation map[string]string
+	IdentifyingInformation []map[string]string
 }
