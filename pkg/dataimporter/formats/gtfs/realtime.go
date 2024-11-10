@@ -160,7 +160,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 
 				updateEvent := vehicletracker.VehicleUpdateEvent{
 					MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
-					LocalID:     fmt.Sprintf("%s-realtime-%d-%d-%s", dataset.Identifier, validFromTimestamp, validToTimestamp, localIDhash),
+					LocalID:     fmt.Sprintf("%s-servicealert-%d-%d-%s", dataset.Identifier, validFromTimestamp, validToTimestamp, localIDhash),
 
 					ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
 						Type:        alertType,

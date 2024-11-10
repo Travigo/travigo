@@ -176,9 +176,21 @@ func (consumer *BatchConsumer) identifyStop(sourceType string, identifyingInform
 		}
 
 		return stop
-	}
+	} else if sourceType == "siri-sx" {
+		stopIdentifier := identifiers.SiriSX{
+			IdentifyingInformation: identifyingInformation,
+		}
+		stop, err := stopIdentifier.IdentifyStop()
 
-	return ""
+		if err != nil {
+			return ""
+		}
+
+		return stop
+	} else {
+		log.Error().Str("sourcetype", sourceType).Msg("Unknown sourcetype")
+		return ""
+	}
 }
 
 func (consumer *BatchConsumer) identifyService(sourceType string, identifyingInformation map[string]string) string {
@@ -193,9 +205,21 @@ func (consumer *BatchConsumer) identifyService(sourceType string, identifyingInf
 		}
 
 		return service
-	}
+	} else if sourceType == "siri-sx" {
+		serviceIdentifier := identifiers.SiriSX{
+			IdentifyingInformation: identifyingInformation,
+		}
+		service, err := serviceIdentifier.IdentifyService()
 
-	return ""
+		if err != nil {
+			return ""
+		}
+
+		return service
+	} else {
+		log.Error().Str("sourcetype", sourceType).Msg("Unknown sourcetype")
+		return ""
+	}
 }
 
 func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdateEvent, sourceType string, identifyingInformation map[string]string) string {
@@ -251,6 +275,8 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 				IdentifyingInformation: identifyingInformation,
 			}
 			journey, err = journeyIdentifier.IdentifyJourney()
+		} else if sourceType == "siri-sx" {
+			return "" // TODO not now
 		} else {
 			log.Error().Str("sourcetype", sourceType).Msg("Unknown sourcetype")
 			return ""

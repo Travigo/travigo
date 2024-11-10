@@ -87,8 +87,10 @@ cronjobs:
     args: [ "data-linker", "run", "--type", "stops" ]
 
 deployments:
-  - name: sirivm-all
+  - name: gb-dft-bods-sirivm-all
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
+  - name: gb-dft-bods-sirisx-all
+    args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirisx-all", "--repeat-every", "300s"]
   - name: gb-bods-gtfs-rt
     args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
   - name: ie-gtfs-realtime

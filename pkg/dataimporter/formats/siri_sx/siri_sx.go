@@ -1,6 +1,8 @@
 package siri_sx
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -8,7 +10,6 @@ import (
 	"time"
 
 	"github.com/adjust/rmq/v5"
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
@@ -92,24 +93,48 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	var alertType ctdf.ServiceAlertType
 	alertType = ctdf.ServiceAlertTypeInformation // TODO debug
 
+	var identifyingInformation []map[string]string
+	for _, consequence := range situationElement.Consequence {
+		for _, network := range consequence.AffectedNetworks {
+			for _, line := range network.AffectedLine {
+				identifyingInformation = append(identifyingInformation, map[string]string{
+					"LineRef":         line.LineRef,
+					"PubishedLineRef": line.PublishedLineRef,
+					"OperatorRef":     line.OperatorRef,
+					"LinkedDataset":   "gb-dft-bods-gtfs-schedule", // not always going to be true in future
+				})
+			}
+		}
+
+		for _, stopPoint := range consequence.AffectedStopPoints {
+			identifyingInformation = append(identifyingInformation, map[string]string{
+				"StopPointRef":  stopPoint.StopPointRef,
+				"LinkedDataset": "gb-dft-naptan", // not always going to be true in future
+			})
+		}
+	}
+
+	title := situationElement.Summary
+	description := situationElement.Description
+
+	hash := sha256.New()
+	hash.Write([]byte(alertType))
+	hash.Write([]byte(title))
+	hash.Write([]byte(description))
+	localIDhash := fmt.Sprintf("%x", hash.Sum(nil))
+
 	updateEvent := vehicletracker.VehicleUpdateEvent{
 		MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
-		LocalID:     fmt.Sprintf("%s-realtime-%d-%d", dataset.Identifier, validityPeriodStart.UnixMicro(), validityPeriodEnd.UnixMicro()),
+		LocalID:     fmt.Sprintf("%s-servicealert-%d-%d-%s", dataset.Identifier, validityPeriodStart.UnixMicro(), validityPeriodEnd.UnixMicro(), localIDhash),
 
 		ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
 			Type:        alertType,
-			Title:       situationElement.Summary,
-			Description: situationElement.Description,
+			Title:       title,
+			Description: description,
 			ValidFrom:   validityPeriodStart,
 			ValidUntil:  validityPeriodEnd,
 
-			// IdentifyingInformation: map[string]string{
-			// 	// "TripID":        tripID,
-			// 	// "RouteID":       routeID,
-			// 	// "StopID":        stopID,
-			// 	// "AgencyID":      agencyID,
-			// 	"LinkedDataset": dataset.LinkedDataset,
-			// },
+			IdentifyingInformation: identifyingInformation,
 		},
 
 		SourceType: "siri-sx",
@@ -117,10 +142,8 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		RecordedAt: versionedAtTime,
 	}
 
-	pretty.Println(updateEvent)
-
-	// updateEventJson, _ := json.Marshal(updateEvent)
-	// queue.PublishBytes(updateEventJson)
+	updateEventJson, _ := json.Marshal(updateEvent)
+	queue.PublishBytes(updateEventJson)
 
 	return true
 }
