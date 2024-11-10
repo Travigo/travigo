@@ -11,8 +11,7 @@ type VehicleUpdateEvent struct {
 
 	MessageType VehicleUpdateEventType
 
-	IdentifyingInformation map[string]string
-	SourceType             string
+	SourceType string
 
 	VehicleLocationUpdate *VehicleLocationUpdate
 	ServiceAlertUpdate    *ServiceAlertUpdate
@@ -32,6 +31,8 @@ type VehicleLocationUpdate struct {
 	Location  ctdf.Location
 	Bearing   float64
 	Timeframe string
+
+	IdentifyingInformation map[string]string
 
 	StopUpdates []VehicleLocationEventStopUpdate
 
@@ -58,4 +59,6 @@ type ServiceAlertUpdate struct {
 
 	ValidFrom  time.Time
 	ValidUntil time.Time
+
+	IdentifyingInformation map[string]string
 }

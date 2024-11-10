@@ -140,13 +140,6 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 					updateEvent := vehicletracker.VehicleUpdateEvent{
 						MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
 						LocalID:     fmt.Sprintf("%s-realtime-%d-%d", dataset.Identifier, validFromTimestamp, validToTimestamp),
-						IdentifyingInformation: map[string]string{
-							"TripID":        tripID,
-							"RouteID":       routeID,
-							"StopID":        stopID,
-							"AgencyID":      agencyID,
-							"LinkedDataset": dataset.LinkedDataset,
-						},
 
 						ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
 							Type:        alertType,
@@ -154,6 +147,14 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 							Description: *entity.Alert.DescriptionText.GetTranslation()[0].Text,
 							ValidFrom:   validFrom,
 							ValidUntil:  validTo,
+
+							IdentifyingInformation: map[string]string{
+								"TripID":        tripID,
+								"RouteID":       routeID,
+								"StopID":        stopID,
+								"AgencyID":      agencyID,
+								"LinkedDataset": dataset.LinkedDataset,
+							},
 						},
 
 						SourceType: "GTFS-RT",
@@ -188,14 +189,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 			locationEvent := vehicletracker.VehicleUpdateEvent{
 				MessageType: vehicletracker.VehicleUpdateEventTypeTrip,
 				LocalID:     fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
-				IdentifyingInformation: map[string]string{
-					"TripID":        tripID,
-					"RouteID":       trip.GetRouteId(),
-					"LinkedDataset": dataset.LinkedDataset,
-				},
-				SourceType: "GTFS-RT",
+				SourceType:  "GTFS-RT",
 				VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
 					Timeframe: timeframe,
+
+					IdentifyingInformation: map[string]string{
+						"TripID":        tripID,
+						"RouteID":       trip.GetRouteId(),
+						"LinkedDataset": dataset.LinkedDataset,
+					},
 				},
 				DataSource: datasource,
 				RecordedAt: recordedAtTime,

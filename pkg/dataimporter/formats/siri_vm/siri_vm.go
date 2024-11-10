@@ -78,20 +78,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 	locationEvent := vehicletracker.VehicleUpdateEvent{
 		MessageType: vehicletracker.VehicleUpdateEventTypeTrip,
 		LocalID:     localJourneyID,
-		IdentifyingInformation: map[string]string{
-			"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
-			"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
-			"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
-			"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
-			"VehicleJourneyRef":        vehicleJourneyRef,
-			"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
-			"OriginRef":                originRef,
-			"DestinationRef":           fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
-			"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
-			"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
-			"LinkedDataset":            dataset.LinkedDataset,
-		},
-		SourceType: "siri-vm",
+		SourceType:  "siri-vm",
 		VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
 			Location: ctdf.Location{
 				Type: "Point",
@@ -103,6 +90,20 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 			Bearing:           vehicle.MonitoredVehicleJourney.Bearing,
 			VehicleIdentifier: vehicleRef,
 			Timeframe:         timeframe,
+
+			IdentifyingInformation: map[string]string{
+				"ServiceNameRef":           vehicle.MonitoredVehicleJourney.LineRef,
+				"DirectionRef":             vehicle.MonitoredVehicleJourney.DirectionRef,
+				"PublishedLineName":        vehicle.MonitoredVehicleJourney.PublishedLineName,
+				"OperatorRef":              fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
+				"VehicleJourneyRef":        vehicleJourneyRef,
+				"BlockRef":                 vehicle.MonitoredVehicleJourney.BlockRef,
+				"OriginRef":                originRef,
+				"DestinationRef":           fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.DestinationRef),
+				"OriginAimedDepartureTime": vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
+				"FramedVehicleJourneyDate": vehicle.MonitoredVehicleJourney.FramedVehicleJourneyRef.DataFrameRef,
+				"LinkedDataset":            dataset.LinkedDataset,
+			},
 		},
 		DataSource: datasource,
 		RecordedAt: recordedAtTime,

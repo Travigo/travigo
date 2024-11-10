@@ -95,13 +95,6 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	updateEvent := vehicletracker.VehicleUpdateEvent{
 		MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
 		LocalID:     fmt.Sprintf("%s-realtime-%d-%d", dataset.Identifier, validityPeriodStart.UnixMicro(), validityPeriodEnd.UnixMicro()),
-		IdentifyingInformation: map[string]string{
-			// "TripID":        tripID,
-			// "RouteID":       routeID,
-			// "StopID":        stopID,
-			// "AgencyID":      agencyID,
-			"LinkedDataset": dataset.LinkedDataset,
-		},
 
 		ServiceAlertUpdate: &vehicletracker.ServiceAlertUpdate{
 			Type:        alertType,
@@ -109,6 +102,14 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 			Description: situationElement.Description,
 			ValidFrom:   validityPeriodStart,
 			ValidUntil:  validityPeriodEnd,
+
+			IdentifyingInformation: map[string]string{
+				// "TripID":        tripID,
+				// "RouteID":       routeID,
+				// "StopID":        stopID,
+				// "AgencyID":      agencyID,
+				"LinkedDataset": dataset.LinkedDataset,
+			},
 		},
 
 		SourceType: "siri-sx",

@@ -106,7 +106,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 					realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
 				}
 			} else {
-				log.Debug().Interface("event", vehicleUpdateEvent.IdentifyingInformation).Msg("Couldnt identify journey")
+				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
 			}
 		} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeServiceAlert {
 			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent)
@@ -154,7 +154,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 func (consumer *BatchConsumer) identifyStop(vehicleUpdateEvent *VehicleUpdateEvent) string {
 	if vehicleUpdateEvent.SourceType == "GTFS-RT" {
 		stopIdentifier := identifiers.GTFSRT{
-			IdentifyingInformation: vehicleUpdateEvent.IdentifyingInformation,
+			IdentifyingInformation: vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation,
 		}
 		stop, err := stopIdentifier.IdentifyStop()
 
@@ -171,7 +171,7 @@ func (consumer *BatchConsumer) identifyStop(vehicleUpdateEvent *VehicleUpdateEve
 func (consumer *BatchConsumer) identifyService(vehicleUpdateEvent *VehicleUpdateEvent) string {
 	if vehicleUpdateEvent.SourceType == "GTFS-RT" {
 		serviceIdentifier := identifiers.GTFSRT{
-			IdentifyingInformation: vehicleUpdateEvent.IdentifyingInformation,
+			IdentifyingInformation: vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation,
 		}
 		service, err := serviceIdentifier.IdentifyService()
 
@@ -185,71 +185,71 @@ func (consumer *BatchConsumer) identifyService(vehicleUpdateEvent *VehicleUpdate
 	return ""
 }
 
-func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpdateEvent) string {
+func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdateEvent) string {
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
 
-	operatorRef := vehicleLocationEvent.IdentifyingInformation["OperatorRef"]
+	operatorRef := vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["OperatorRef"]
 
 	var journeyID string
 
-	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), vehicleLocationEvent.LocalID)
+	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), vehicleUpdateEvent.LocalID)
 
 	if cachedJourneyMapping == "" {
 		var journey string
 		var err error
 
 		// TODO use an interface here to reduce duplication
-		if vehicleLocationEvent.SourceType == "siri-vm" {
+		if vehicleUpdateEvent.SourceType == "siri-vm" {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
-			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier))
-			if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
-				identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
+			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
+				identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
 				return ""
 			}
 
 			// TODO only exists here if siri-vm only comes from the 1 source
-			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier))
-			if vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" && failedVehicleID == "" {
+			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && failedVehicleID == "" {
 				return ""
 			}
 
 			// perform the actual sirivm
 			journeyIdentifier := identifiers.SiriVM{
-				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
+				IdentifyingInformation: vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation,
 			}
 			journey, err = journeyIdentifier.IdentifyJourney()
 
 			// TODO yet another special TfL only thing that shouldn't be here
-			if err != nil && vehicleLocationEvent.IdentifyingInformation["OperatorRef"] == "gb-noc-TFLO" {
+			if err != nil && vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["OperatorRef"] == "gb-noc-TFLO" {
 				tflEventBytes, _ := json.Marshal(map[string]string{
-					"Line":                     vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
-					"DirectionRef":             vehicleLocationEvent.IdentifyingInformation["DirectionRef"],
-					"NumberPlate":              vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier,
-					"OriginRef":                vehicleLocationEvent.IdentifyingInformation["OriginRef"],
-					"DestinationRef":           vehicleLocationEvent.IdentifyingInformation["DestinationRef"],
-					"OriginAimedDepartureTime": vehicleLocationEvent.IdentifyingInformation["OriginAimedDepartureTime"],
+					"Line":                     vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["PublishedLineName"],
+					"DirectionRef":             vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["DirectionRef"],
+					"NumberPlate":              vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier,
+					"OriginRef":                vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["OriginRef"],
+					"DestinationRef":           vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["DestinationRef"],
+					"OriginAimedDepartureTime": vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["OriginAimedDepartureTime"],
 				})
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
 			}
-		} else if vehicleLocationEvent.SourceType == "GTFS-RT" {
+		} else if vehicleUpdateEvent.SourceType == "GTFS-RT" {
 			journeyIdentifier := identifiers.GTFSRT{
-				IdentifyingInformation: vehicleLocationEvent.IdentifyingInformation,
+				IdentifyingInformation: vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation,
 			}
 			journey, err = journeyIdentifier.IdentifyJourney()
 		} else {
-			log.Error().Str("sourcetype", vehicleLocationEvent.SourceType).Msg("Unknown sourcetype")
+			log.Error().Str("sourcetype", vehicleUpdateEvent.SourceType).Msg("Unknown sourcetype")
 			return ""
 		}
 
 		if err != nil {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, "N/A")
+			identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
 
 			// Set cross dataset ID
-			if vehicleLocationEvent.VehicleLocationUpdate != nil && vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
-				identificationCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleLocationEvent.SourceType)
+			if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
+				identificationCache.Set(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleUpdateEvent.SourceType)
 			}
 
 			// Temporary https://github.com/travigo/travigo/issues/43
@@ -278,10 +278,10 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpda
 				FailReason: errorCode,
 
 				Operator: operatorRef,
-				Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
-				Trip:     vehicleLocationEvent.IdentifyingInformation["TripID"],
+				Service:  vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["PublishedLineName"],
+				Trip:     vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["TripID"],
 
-				SourceType: vehicleLocationEvent.SourceType,
+				SourceType: vehicleUpdateEvent.SourceType,
 			})
 
 			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
@@ -292,14 +292,14 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpda
 
 		journeyMapJson, _ := json.Marshal(localJourneyIDMap{
 			JourneyID:   journeyID,
-			LastUpdated: vehicleLocationEvent.RecordedAt,
+			LastUpdated: vehicleUpdateEvent.RecordedAt,
 		})
 
-		identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
+		identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, string(journeyMapJson))
 
 		// Set cross dataset ID
-		if vehicleLocationEvent.VehicleLocationUpdate != nil && vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
-			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleLocationEvent.IdentifyingInformation["LinkedDataset"], vehicleLocationEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleLocationEvent.SourceType)
+		if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
+			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier), vehicleUpdateEvent.SourceType)
 		}
 
 		// Record the successful identification event
@@ -309,10 +309,10 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpda
 			Success: true,
 
 			Operator: operatorRef,
-			Service:  vehicleLocationEvent.IdentifyingInformation["PublishedLineName"],
-			Trip:     vehicleLocationEvent.IdentifyingInformation["TripID"],
+			Service:  vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["PublishedLineName"],
+			Trip:     vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation["TripID"],
 
-			SourceType: vehicleLocationEvent.SourceType,
+			SourceType: vehicleUpdateEvent.SourceType,
 		})
 
 		elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
@@ -323,13 +323,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleLocationEvent *VehicleUpda
 		json.Unmarshal([]byte(cachedJourneyMapping), &journeyMap)
 
 		// skip this journey if hasnt changed
-		if vehicleLocationEvent.RecordedAt.After(journeyMap.LastUpdated) {
+		if vehicleUpdateEvent.RecordedAt.After(journeyMap.LastUpdated) {
 			// Update the last updated time
-			journeyMap.LastUpdated = vehicleLocationEvent.RecordedAt
+			journeyMap.LastUpdated = vehicleUpdateEvent.RecordedAt
 
 			journeyMapJson, _ := json.Marshal(journeyMap)
 
-			identificationCache.Set(context.Background(), vehicleLocationEvent.LocalID, string(journeyMapJson))
+			identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, string(journeyMapJson))
 		} else {
 			return ""
 		}
