@@ -3,6 +3,7 @@ package nrod
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -107,16 +108,16 @@ func (v *VSTPMessage) processCreate() {
 			if index == 0 {
 				trainDefinitionSet.OriginLocation = cif.OriginLocation{
 					Location:               location.Location.Tiploc.ID,
-					ScheduledDepartureTime: location.ScheduledDepartureTime,
-					PublicDepartureTime:    location.PublicDepartureTime,
+					ScheduledDepartureTime: strings.TrimSpace(location.ScheduledDepartureTime),
+					PublicDepartureTime:    strings.TrimSpace(location.PublicDepartureTime),
 					Platform:               location.Platform,
 					Activity:               location.Activity,
 				}
 			} else if index == len(scheduleSegment.ScheduleLocations)-1 {
 				trainDefinitionSet.TerminatingLocation = cif.TerminatingLocation{
 					Location:             location.Location.Tiploc.ID,
-					ScheduledArrivalTime: location.ScheduledArrivalTime,
-					PublicArrivalTime:    location.PublicArrivalTime,
+					ScheduledArrivalTime: strings.TrimSpace(location.ScheduledArrivalTime),
+					PublicArrivalTime:    strings.TrimSpace(location.PublicArrivalTime),
 					Platform:             location.Platform,
 					Path:                 location.Path,
 					Activity:             location.Activity,
@@ -124,10 +125,10 @@ func (v *VSTPMessage) processCreate() {
 			} else {
 				trainDefinitionSet.IntermediateLocations = append(trainDefinitionSet.IntermediateLocations, &cif.IntermediateLocation{
 					Location:               location.Location.Tiploc.ID,
-					ScheduledArrivalTime:   location.ScheduledArrivalTime,
-					ScheduledDepartureTime: location.ScheduledDepartureTime,
-					PublicArrivalTime:      location.PublicArrivalTime,
-					PublicDepartureTime:    location.PublicDepartureTime,
+					ScheduledArrivalTime:   strings.TrimSpace(location.ScheduledArrivalTime),
+					ScheduledDepartureTime: strings.TrimSpace(location.ScheduledDepartureTime),
+					PublicArrivalTime:      strings.TrimSpace(location.PublicArrivalTime),
+					PublicDepartureTime:    strings.TrimSpace(location.PublicDepartureTime),
 					Platform:               location.Platform,
 					Activity:               location.Activity,
 				})
