@@ -145,6 +145,8 @@ func (v *VSTPMessage) processCreate() {
 		}
 		journey.Expiry = endDate.Add(48 * time.Hour)
 
+		cacheBustJourney(journey)
+
 		// Insert into DB
 		bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
 		updateModel := mongo.NewUpdateOneModel()

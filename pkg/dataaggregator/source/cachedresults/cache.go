@@ -70,3 +70,11 @@ func Get[T any](c *Cache, key string) (T, error) {
 
 	return cachedObject, err
 }
+
+func DeletePrefix(key string) {
+	ctx := context.Background()
+	iter := redis_client.Client.Scan(ctx, 0, key, 0).Iterator()
+	for iter.Next(ctx) {
+		redis_client.Client.Del(ctx, iter.Val()).Err()
+	}
+}
