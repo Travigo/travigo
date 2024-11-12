@@ -26,3 +26,11 @@ func ContainsString(s []string, str string) bool {
 
 	return false
 }
+
+func TrimString(s string, length int) string {
+	if len(s) <= length {
+		return s
+	}
+
+	return s[:length]
+}

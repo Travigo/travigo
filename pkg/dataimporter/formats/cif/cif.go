@@ -236,7 +236,7 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 }
 
 func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {
-	departureTime, _ := time.Parse("1504", trainDef.OriginLocation.PublicDepartureTime)
+	departureTime, _ := time.Parse("1504", util.TrimString(trainDef.OriginLocation.PublicDepartureTime, 4))
 
 	// List of passenger stops
 	// Start with the origin location
@@ -301,13 +301,13 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		originPassengerStop := passengerStops[i-1]
 		originTIPLOC := originPassengerStop.Location
 		originStop := c.getStopFromTIPLOC(originTIPLOC)
-		originArrivalTime, _ := time.Parse("1504", originPassengerStop.PublicArrivalTime)
-		originDepartureTime, _ := time.Parse("1504", originPassengerStop.PublicDepartureTime)
+		originArrivalTime, _ := time.Parse("1504", util.TrimString(originPassengerStop.PublicArrivalTime, 4))
+		originDepartureTime, _ := time.Parse("1504", util.TrimString(originPassengerStop.PublicDepartureTime, 4))
 
 		destinationPassengerStop := passengerStops[i]
 		destinationTIPLOC := destinationPassengerStop.Location
 		destinationStop := c.getStopFromTIPLOC(destinationTIPLOC)
-		destinationArrivalTime, _ := time.Parse("1504", destinationPassengerStop.PublicArrivalTime)
+		destinationArrivalTime, _ := time.Parse("1504", util.TrimString(destinationPassengerStop.PublicArrivalTime, 4))
 
 		if originStop == nil {
 			//log.Error().Str("tiploc", originTIPLOC).Msg("Unknown stop")
