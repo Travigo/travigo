@@ -59,7 +59,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource)
 	feed := gtfs.FeedMessage{}
 	err = proto.Unmarshal(body, &feed)
 	if err != nil {
-		return errors.New("Failed parsing GTFS-RT protobuf")
+		return err
 	}
 
 	withTripID := 0
