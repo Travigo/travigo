@@ -157,6 +157,29 @@ func (v *VSTPMessage) processCreate() {
 		updateOperations = append(updateOperations, updateModel)
 
 		log.Info().Str("journeyid", journeyID).Msg("Created new VSTP journey")
+
+		// Create information alert about it being a short notice journey
+		railutils.CreateServiceAlert(ctdf.ServiceAlert{
+			PrimaryIdentifier:    fmt.Sprintf("gb-networkrail-vstpcreate-%s:%s:%s", v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, journey.PrimaryIdentifier),
+			CreationDateTime:     now,
+			ModificationDateTime: now,
+
+			DataSource: &ctdf.DataSource{
+				OriginalFormat: "JSON-CIF",
+				Provider:       "Network Rail UK",
+				DatasetID:      "gb-networkrail-vstp",
+				Timestamp:      fmt.Sprintf("%d", now.Unix()),
+			},
+
+			AlertType: ctdf.ServiceAlertTypeInformation,
+
+			Text: "This timetable entry was added at short notice and is not part of a regularly scheduled service",
+
+			MatchedIdentifiers: []string{journeyID},
+
+			ValidFrom:  startDate,
+			ValidUntil: endDate.Add(24 * time.Hour),
+		})
 	}
 
 	if len(updateOperations) > 0 {
@@ -218,7 +241,7 @@ func (v *VSTPMessage) processDelete() {
 				OriginalFormat: "JSON-CIF",
 				Provider:       "Network Rail UK",
 				DatasetID:      "gb-networkrail-vstp",
-				Timestamp:      string(now.UnixMicro()),
+				Timestamp:      fmt.Sprintf("%d", now.Unix()),
 			},
 
 			AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
