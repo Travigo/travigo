@@ -3,6 +3,7 @@ package global
 import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/databaselookup"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/datasources"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/journeyplanner"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/tfl"
@@ -27,4 +28,5 @@ func Setup() {
 	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboardSource)
 
 	dataaggregator.GlobalAggregator.RegisterSource(journeyplanner.Source{})
+	dataaggregator.GlobalAggregator.RegisterSource(datasources.Source{})
 }

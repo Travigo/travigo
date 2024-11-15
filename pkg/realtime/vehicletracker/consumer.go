@@ -89,7 +89,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil {
-			if batchErrors := batch.Reject(); err != nil {
+			if batchErrors := batch.Reject(); len(batchErrors) > 0 {
 				for _, err := range batchErrors {
 					log.Error().Err(err).Msg("Failed to reject realtime event")
 				}

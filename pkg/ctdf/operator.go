@@ -21,7 +21,7 @@ type Operator struct {
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"internal" bson:",omitempty"`
+	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
 
 	PrimaryName string   `groups:"basic,departures-llm" bson:",omitempty"`
 	OtherNames  []string `groups:"detailed" bson:",omitempty"`

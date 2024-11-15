@@ -13,9 +13,9 @@ type DataSet struct {
 	Provider Provider
 
 	Source               string
-	SourceAuthentication SourceAuthentication
+	SourceAuthentication SourceAuthentication `json:"-"`
 
-	UnpackBundle      BundleFormat
+	UnpackBundle      BundleFormat `json:"-"`
 	SupportedObjects  SupportedObjects
 	IgnoreObjects     IgnoreObjects
 	ImportDestination ImportDestination
@@ -24,10 +24,10 @@ type DataSet struct {
 
 	LinkedDataset string
 
-	DownloadHandler func(*http.Request)
+	DownloadHandler func(*http.Request) `json:"-"`
 
 	// Internal only
-	Queue *rmq.Queue
+	Queue *rmq.Queue `json:"-"`
 }
 
 type SourceAuthentication struct {

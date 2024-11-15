@@ -32,5 +32,7 @@ func SetupServer(listen string) error {
 
 	routes.AccountRouter(group.Group("/account", EnsureValidToken()))
 
+	routes.DatasetsRouter(group.Group("/datasets"))
+
 	return webApp.Listen(listen)
 }
