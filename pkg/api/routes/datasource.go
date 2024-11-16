@@ -7,8 +7,9 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 )
 
-func DatasetsRouter(router fiber.Router) {
-	router.Get("/:identifier", getDataset)
+func DatasourcesRouter(router fiber.Router) {
+	router.Get("/dataset/:identifier", getDataset)
+	router.Get("/provider/:identifier", getProvider)
 }
 
 func getDataset(c *fiber.Ctx) error {
@@ -26,5 +27,23 @@ func getDataset(c *fiber.Ctx) error {
 		})
 	} else {
 		return c.JSON(dataset)
+	}
+}
+
+func getProvider(c *fiber.Ctx) error {
+	identifier := c.Params("identifier")
+
+	var datasource *datasets.DataSource
+	datasource, err := dataaggregator.Lookup[*datasets.DataSource](query.DataSource{
+		Identifier: identifier,
+	})
+
+	if err != nil {
+		c.SendStatus(404)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	} else {
+		return c.JSON(datasource)
 	}
 }

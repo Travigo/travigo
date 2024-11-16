@@ -34,6 +34,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+func GetDatasource(identifier string) (datasets.DataSource, error) {
+	registered := GetRegisteredDataSources()
+
+	for _, datasource := range registered {
+		if datasource.Identifier == identifier {
+			return datasource, nil
+		}
+	}
+
+	return datasets.DataSource{}, errors.New("Dataset could not be found")
+}
+
 func GetDataset(identifier string) (datasets.DataSet, error) {
 	registered := GetRegisteredDataSets()
 

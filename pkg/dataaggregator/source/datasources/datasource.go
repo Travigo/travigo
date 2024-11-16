@@ -6,12 +6,12 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 )
 
-func (s Source) DataSetQuery(q query.DataSet) (*datasets.DataSet, error) {
-	dataset, err := manager.GetDataset(q.DataSetID)
+func (s Source) DataSourceQuery(q query.DataSource) (*datasets.DataSource, error) {
+	datasource, err := manager.GetDatasource(q.Identifier)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &dataset, nil
+	return &datasource, nil
 }

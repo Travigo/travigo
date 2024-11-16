@@ -8,7 +8,7 @@ import (
 
 type DataSet struct {
 	Identifier    string
-	DataSourceRef string
+	DataSourceRef string `json:"-"`
 	Format        DataSetFormat
 
 	Provider Provider
@@ -19,7 +19,7 @@ type DataSet struct {
 	UnpackBundle      BundleFormat `json:"-"`
 	SupportedObjects  SupportedObjects
 	IgnoreObjects     IgnoreObjects
-	ImportDestination ImportDestination
+	ImportDestination ImportDestination `json:"-"`
 
 	CustomConfig map[string]string
 

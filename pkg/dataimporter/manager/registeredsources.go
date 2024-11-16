@@ -11,9 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Just a static list for now
-func GetRegisteredDataSets() []datasets.DataSet {
-	var registeredDatasets []datasets.DataSet
+func GetRegisteredDataSources() []datasets.DataSource {
+	var registeredDatasources []datasets.DataSource
 
 	err := filepath.Walk("data/datasources/",
 		func(path string, fileInfo os.FileInfo, err error) error {
@@ -43,20 +42,32 @@ func GetRegisteredDataSets() []datasets.DataSet {
 						break
 					}
 
-					for _, dataset := range datasource.Datasets {
-						dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
-						dataset.DataSourceRef = datasource.Identifier
-						dataset.Provider = datasource.Provider
-
-						registeredDatasets = append(registeredDatasets, dataset)
-					}
+					registeredDatasources = append(registeredDatasources, datasource)
 				}
 			}
 
 			return nil
 		})
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load transforms directory")
+		log.Fatal().Err(err).Msg("Failed to load datasources directory")
+	}
+
+	return registeredDatasources
+}
+
+func GetRegisteredDataSets() []datasets.DataSet {
+	var registeredDatasets []datasets.DataSet
+
+	registeredDatasources := GetRegisteredDataSources()
+
+	for _, datasource := range registeredDatasources {
+		for _, dataset := range datasource.Datasets {
+			dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
+			dataset.DataSourceRef = datasource.Identifier
+			dataset.Provider = datasource.Provider
+
+			registeredDatasets = append(registeredDatasets, dataset)
+		}
 	}
 
 	return registeredDatasets
