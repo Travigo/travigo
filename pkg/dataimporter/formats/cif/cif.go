@@ -134,6 +134,11 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 				})
 			}
 		} else if trainDef.BasicSchedule.TransactionType == "N" && trainDef.BasicSchedule.STPIndicator == "O" {
+			// Only care about relevant passenger trains
+			if !IsValidPassengerJourney(trainDef.BasicSchedule.TrainCategory, trainDef.BasicScheduleExtraDetails.ATOCCode) {
+				continue
+			}
+
 			// Handle an overlay
 			// Do this by excluding the date range on the original journey and then creating a new one with the overlay
 			for _, journey := range journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] {
