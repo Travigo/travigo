@@ -109,16 +109,15 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	journeysTrainUIDOnly := map[string][]*ctdf.Journey{}
 
 	for _, trainDef := range c.TrainDefinitionSets {
-		// Only care about relevant passenger trains
-		if !IsValidPassengerJourney(trainDef.BasicSchedule.TrainCategory, trainDef.BasicScheduleExtraDetails.ATOCCode) {
-			continue
-		}
-
 		basicJourneyID := fmt.Sprintf("gb-rail-%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom)
 		journeyID := fmt.Sprintf("gb-rail-%s:%s:%s", trainDef.BasicSchedule.TrainUID, trainDef.BasicSchedule.DateRunsFrom, trainDef.BasicSchedule.STPIndicator)
 
 		// Create whole new journeys
 		if trainDef.BasicSchedule.TransactionType == "N" && (trainDef.BasicSchedule.STPIndicator == "P" || trainDef.BasicSchedule.STPIndicator == "N") {
+			// Only care about relevant passenger trains
+			if !IsValidPassengerJourney(trainDef.BasicSchedule.TrainCategory, trainDef.BasicScheduleExtraDetails.ATOCCode) {
+				continue
+			}
 			journeys[basicJourneyID] = c.CreateJourneyFromTraindef(journeyID, trainDef)
 
 			journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID] = append(journeysTrainUIDOnly[trainDef.BasicSchedule.TrainUID], journeys[basicJourneyID])
@@ -170,6 +169,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 			continue
 		}
 		journeysArray = append(journeysArray, journey)
+		// pretty.Println(journey.Availability)
 	}
 
 	return journeysArray

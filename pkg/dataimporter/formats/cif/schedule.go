@@ -262,6 +262,10 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 
 			c.TrainDefinitionSets = append(c.TrainDefinitionSets, currentTrainDef)
 			holdingTrainDef = false
+		case "ZZ":
+			if holdingTrainDef {
+				c.TrainDefinitionSets = append(c.TrainDefinitionSets, currentTrainDef)
+			}
 		}
 	}
 }
