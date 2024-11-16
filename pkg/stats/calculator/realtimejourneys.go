@@ -143,6 +143,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 		TransportTypes:       transportTypes,
 		Features:             features,
 		Datasets:             datasources,
+		Providers:            providers,
 		Countries:            CountCountries(datasources),
 		NotActivelyTracked:   numberActiveRealtimeJourneysNotActivelyTracked,
 	}
