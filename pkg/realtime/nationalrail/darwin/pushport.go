@@ -29,7 +29,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	now := time.Now()
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "DarwinPushPort",
-		ProviderName:   "National-Rail",
+		ProviderName:   "National Rail",
+		ProviderID:     "gb-nationalrail",
 		DatasetID:      "gb-nationalrail-darwinpush",
 		Timestamp:      now.String(),
 	}

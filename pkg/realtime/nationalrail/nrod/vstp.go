@@ -140,7 +140,8 @@ func (v *VSTPMessage) processCreate() {
 		journey := cifDoc.CreateJourneyFromTraindef(journeyID, trainDefinitionSet)
 		journey.DataSource = &ctdf.DataSourceReference{
 			OriginalFormat: "JSON-CIF",
-			ProviderName:   "Network Rail UK",
+			ProviderName:   "Network Rail",
+			ProviderID:     "gb-networkrail",
 			DatasetID:      "gb-networkrail-vstp",
 			Timestamp:      fmt.Sprintf("%d", now.Unix()),
 		}
@@ -167,7 +168,8 @@ func (v *VSTPMessage) processCreate() {
 
 			DataSource: &ctdf.DataSourceReference{
 				OriginalFormat: "JSON-CIF",
-				ProviderName:   "Network Rail UK",
+				ProviderName:   "Network Rail",
+				ProviderID:     "gb-networkrail",
 				DatasetID:      "gb-networkrail-vstp",
 				Timestamp:      fmt.Sprintf("%d", now.Unix()),
 			},
@@ -240,7 +242,8 @@ func (v *VSTPMessage) processDelete() {
 
 			DataSource: &ctdf.DataSourceReference{
 				OriginalFormat: "JSON-CIF",
-				ProviderName:   "Network Rail UK",
+				ProviderName:   "Network Rail",
+				ProviderID:     "gb-networkrail",
 				DatasetID:      "gb-networkrail-vstp",
 				Timestamp:      fmt.Sprintf("%d", now.Unix()),
 			},

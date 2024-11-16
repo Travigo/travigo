@@ -45,6 +45,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 
 					for _, dataset := range datasource.Datasets {
 						dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
+						dataset.DataSourceRef = datasource.Identifier
 						dataset.Provider = datasource.Provider
 
 						registeredDatasets = append(registeredDatasets, dataset)

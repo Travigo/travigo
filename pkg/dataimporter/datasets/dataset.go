@@ -7,8 +7,9 @@ import (
 )
 
 type DataSet struct {
-	Identifier string
-	Format     DataSetFormat
+	Identifier    string
+	DataSourceRef string
+	Format        DataSetFormat
 
 	Provider Provider
 

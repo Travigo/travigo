@@ -114,6 +114,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: string(dataset.Format),
 		ProviderName:   dataset.Provider.Name,
+		ProviderID:     dataset.DataSourceRef,
 		DatasetID:      dataset.Identifier,
 		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
 	}

@@ -101,7 +101,8 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "tfl-json",
-		ProviderName:   "GB-TfL",
+		ProviderName:   "Transport for London",
+		ProviderID:     "gb-tfl",
 		DatasetID:      fmt.Sprintf("gb-tfl-mode/%s/arrivals", l.Mode.ModeID),
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}

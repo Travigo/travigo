@@ -39,7 +39,8 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	now := time.Now()
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "TrainActivationJSON",
-		ProviderName:   "Network-Rail",
+		ProviderName:   "Network Rail",
+		ProviderID:     "gb-networkrail",
 		DatasetID:      "gb-networkrail-activation",
 		Timestamp:      now.String(),
 	}
