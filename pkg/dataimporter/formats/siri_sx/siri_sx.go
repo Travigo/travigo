@@ -32,7 +32,7 @@ func (s *SiriSX) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.ServiceAlerts {
 		return errors.New("This format requires servicealerts to be enabled")
 	}
@@ -77,7 +77,7 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) e
 	return nil
 }
 
-func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, dataset datasets.DataSet, datasource *ctdf.DataSource) bool {
+func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) bool {
 	datasource.OriginalFormat = "siri-sx"
 
 	currentTime := time.Now()

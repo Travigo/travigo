@@ -47,7 +47,7 @@ func (naptanDoc *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.Stops || !dataset.SupportedObjects.StopGroups {
 		return errors.New("This format requires stops & stopgroups to be enabled")
 	}

@@ -18,7 +18,7 @@ type StopGroup struct {
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSourceReference `groups:"internal"`
 
 	Name   string `groups:"basic"`
 	Type   string `groups:"basic"`

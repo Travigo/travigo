@@ -175,7 +175,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	return journeysArray
 }
 
-func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.Journeys || !dataset.SupportedObjects.Services {
 		return errors.New("This format requires services & journeys to be enabled")
 	}
@@ -499,9 +499,9 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		},
 		CreationDateTime:     time.Now(),
 		ModificationDateTime: time.Now(),
-		DataSource: &ctdf.DataSource{
+		DataSource: &ctdf.DataSourceReference{
 			OriginalFormat: "CIF",
-			Provider:       "GB-NationalRail",
+			ProviderName:   "GB-NationalRail",
 			DatasetID:      "timetable",
 			Timestamp:      "",
 		},

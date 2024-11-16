@@ -46,7 +46,7 @@ func (r *Realtime) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.RealtimeJourneys {
 		return errors.New("This format requires realtimejourneys to be enabled")
 	}

@@ -9,7 +9,7 @@ type ServiceAlert struct {
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSourceReference `groups:"internal"`
 
 	AlertType ServiceAlertType `groups:"basic"`
 

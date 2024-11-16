@@ -111,9 +111,9 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 		existingEtag = existingDatasetVersion.ETag
 	}
 
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: string(dataset.Format),
-		Provider:       dataset.Provider.Name,
+		ProviderName:   dataset.Provider.Name,
 		DatasetID:      dataset.Identifier,
 		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
 	}
@@ -335,7 +335,7 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 	return true, tmpFile, resp.Header.Get("Etag")
 }
 
-func cleanupOldRecords(collectionName string, datasource *ctdf.DataSource) {
+func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {
 	collection := database.GetCollection(collectionName)
 
 	query := bson.M{

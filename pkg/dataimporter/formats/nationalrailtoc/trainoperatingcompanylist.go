@@ -78,7 +78,7 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	return operators, services
 }
 
-func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.Operators || !dataset.SupportedObjects.Services {
 		return errors.New("This format requires operators & services to be enabled")
 	}

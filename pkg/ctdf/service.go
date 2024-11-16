@@ -9,7 +9,7 @@ type Service struct {
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
-	DataSource *DataSource `groups:"detailed"`
+	DataSource *DataSourceReference `groups:"detailed"`
 
 	ServiceName string `groups:"basic,search,search-llm,stop-llm,departures-llm"`
 

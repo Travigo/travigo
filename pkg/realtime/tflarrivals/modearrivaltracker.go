@@ -99,9 +99,9 @@ func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
 func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime := time.Now()
 
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "tfl-json",
-		Provider:       "GB-TfL",
+		ProviderName:   "GB-TfL",
 		DatasetID:      fmt.Sprintf("gb-tfl-mode/%s/arrivals", l.Mode.ModeID),
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
@@ -163,7 +163,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	// Remove any tfl realtime journey that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
 	deleteQuery := bson.M{
-		"datasource.provider":  datasource.Provider,
+		"datasource.provider":  datasource.ProviderName,
 		"datasource.datasetid": datasource.DatasetID,
 		"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
 	}
@@ -177,7 +177,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 }
 
-func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSource) mongo.WriteModel {
+func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSourceReference) mongo.WriteModel {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",

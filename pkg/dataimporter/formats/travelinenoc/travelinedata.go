@@ -205,7 +205,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	return operators, operatorGroups
 }
 
-func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.Operators || !dataset.SupportedObjects.OperatorGroups {
 		return errors.New("This format requires operators & operatorgroups to be enabled")
 	}

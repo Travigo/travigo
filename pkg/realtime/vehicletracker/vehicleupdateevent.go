@@ -16,7 +16,7 @@ type VehicleUpdateEvent struct {
 	VehicleLocationUpdate *VehicleLocationUpdate
 	ServiceAlertUpdate    *ServiceAlertUpdate
 
-	DataSource *ctdf.DataSource
+	DataSource *ctdf.DataSourceReference
 	RecordedAt time.Time
 }
 

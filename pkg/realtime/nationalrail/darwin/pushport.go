@@ -27,9 +27,9 @@ type PushPortData struct {
 
 func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
 	now := time.Now()
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "DarwinPushPort",
-		Provider:       "National-Rail",
+		ProviderName:   "National-Rail",
 		DatasetID:      "gb-nationalrail-darwinpush",
 		Timestamp:      now.String(),
 	}

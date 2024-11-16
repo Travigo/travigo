@@ -62,7 +62,7 @@ func (doc *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	datasource.OriginalFormat = "transxchange"
 
 	var transportType ctdf.TransportType

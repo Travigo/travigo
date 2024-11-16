@@ -47,9 +47,9 @@ func (d *ModeDisruptionTracker) Run() {
 
 func (d *ModeDisruptionTracker) GetDisruptions() {
 	now := time.Now()
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "JSON",
-		Provider:       "Transport for London",
+		ProviderName:   "Transport for London",
 		DatasetID:      fmt.Sprintf("gb-tfl-stop-disrupt-%s", d.Mode.ModeID),
 		Timestamp:      fmt.Sprint(now.Unix()),
 	}
@@ -165,9 +165,9 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 
 func (d *ModeDisruptionTracker) GetLineStatuses() {
 	now := time.Now()
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "JSON",
-		Provider:       "GB-TfL",
+		ProviderName:   "GB-TfL",
 		DatasetID:      fmt.Sprintf("gb-tfl-mode-disrupt-%s", d.Mode.ModeID),
 		Timestamp:      fmt.Sprint(now.Unix()),
 	}
@@ -342,13 +342,13 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 	d.cleanupOldServiceAlerts(datasource)
 }
 
-func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSource) {
+func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSourceReference) {
 	serviceAlertsCollection := database.GetCollection("service_alerts")
 
 	// Remove any tfl service alerts that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
 	deleteQuery := bson.M{
-		"datasource.provider":  datasource.Provider,
+		"datasource.provider":  datasource.ProviderName,
 		"datasource.datasetid": datasource.DatasetID,
 		"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
 	}

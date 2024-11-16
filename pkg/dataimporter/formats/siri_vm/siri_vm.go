@@ -25,7 +25,7 @@ type SiriVM struct {
 
 type SiriVMVehicleIdentificationEvent struct {
 	VehicleActivity *VehicleActivity
-	DataSource      *ctdf.DataSource
+	DataSource      *ctdf.DataSourceReference
 	ResponseTime    time.Time
 }
 
@@ -34,7 +34,7 @@ type queueEmptyElasticEvent struct {
 	Duration  int
 }
 
-func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSource) bool {
+func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) bool {
 	datasource.OriginalFormat = "siri-vm"
 
 	currentTime := time.Now()
@@ -166,7 +166,7 @@ func (s *SiriVM) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.RealtimeJourneys {
 		return errors.New("This format requires realtimejourneys to be enabled")
 	}

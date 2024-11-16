@@ -23,7 +23,7 @@ type RealtimeJourney struct {
 
 	TimeoutDurationMinutes int `groups:"internal"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSourceReference `groups:"internal"`
 
 	VehicleLocation            Location `groups:"basic" bson:",omitempty"`
 	VehicleLocationDescription string   `groups:"basic"`

@@ -26,7 +26,7 @@ type Journey struct {
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 	Expiry               time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`

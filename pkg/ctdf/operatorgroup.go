@@ -17,7 +17,7 @@ type OperatorGroup struct {
 	Identifier string `groups:"basic"`
 	Name       string `groups:"basic"`
 
-	DataSource *DataSource `groups:"internal"`
+	DataSource *DataSourceReference `groups:"internal"`
 
 	Operators []*Operator `bson:"-" groups:"detailed"`
 

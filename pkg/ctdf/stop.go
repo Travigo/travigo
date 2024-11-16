@@ -16,7 +16,7 @@ type Stop struct {
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSource `groups:"detailed" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
 	PrimaryName    string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
 	Descriptor     string          `groups:"basic" bson:",omitempty"`

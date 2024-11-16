@@ -37,9 +37,9 @@ type TrustActivation struct {
 
 func (a *TrustActivation) Process(stompClient *StompClient) {
 	now := time.Now()
-	datasource := &ctdf.DataSource{
+	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "TrainActivationJSON",
-		Provider:       "Network-Rail",
+		ProviderName:   "Network-Rail",
 		DatasetID:      "gb-networkrail-activation",
 		Timestamp:      now.String(),
 	}

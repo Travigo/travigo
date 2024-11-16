@@ -30,7 +30,7 @@ type TiplocData struct {
 	NLCDESC16  string
 }
 
-func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	if !dataset.SupportedObjects.Stops {
 		return errors.New("This format requires stops to be enabled")
 	}

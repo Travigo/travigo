@@ -1,8 +1,9 @@
 package ctdf
 
-type DataSource struct {
+type DataSourceReference struct {
 	OriginalFormat string `groups:"internal"` // or enum (eg. NaPTAN, TransXChange)
-	Provider       string `groups:"detailed"`
+	ProviderName   string `groups:"detailed"`
+	ProviderID     string `groups:"detailed"`
 	DatasetID      string `groups:"detailed"`
 	Timestamp      string `groups:"internal"`
 }

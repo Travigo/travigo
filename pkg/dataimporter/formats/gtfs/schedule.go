@@ -92,7 +92,7 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSource) error {
+func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	// Agencies / Operators
