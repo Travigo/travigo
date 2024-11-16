@@ -10,8 +10,9 @@ import (
 type OperatorsStats struct {
 	Total int
 
-	Datasources map[string]int
-	Countries   map[string]int
+	Datasets  map[string]int
+	Providers map[string]int
+	Countries map[string]int
 }
 
 func GetOperators() OperatorsStats {
@@ -20,8 +21,9 @@ func GetOperators() OperatorsStats {
 	numberoperators, _ := operatorsCollection.CountDocuments(context.Background(), bson.D{})
 	stats.Total = int(numberoperators)
 
-	stats.Datasources = CountAggregate(operatorsCollection, "$datasource.datasetid")
-	stats.Countries = CountCountries(stats.Datasources)
+	stats.Datasets = CountAggregate(operatorsCollection, "$datasource.datasetid")
+	stats.Providers = CountAggregate(operatorsCollection, "$datasource.providerid")
+	stats.Countries = CountCountries(stats.Datasets)
 
 	return stats
 }

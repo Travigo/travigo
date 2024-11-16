@@ -10,8 +10,9 @@ import (
 type StopsStats struct {
 	Total int
 
-	Datasources map[string]int
-	Countries   map[string]int
+	Datasets  map[string]int
+	Providers map[string]int
+	Countries map[string]int
 }
 
 func GetStops() StopsStats {
@@ -20,8 +21,9 @@ func GetStops() StopsStats {
 	numberStops, _ := stopsCollection.CountDocuments(context.Background(), bson.D{})
 	stats.Total = int(numberStops)
 
-	stats.Datasources = CountAggregate(stopsCollection, "$datasource.datasetid")
-	stats.Countries = CountCountries(stats.Datasources)
+	stats.Datasets = CountAggregate(stopsCollection, "$datasource.datasetid")
+	stats.Providers = CountAggregate(stopsCollection, "$datasource.providerid")
+	stats.Countries = CountCountries(stats.Datasets)
 
 	return stats
 }

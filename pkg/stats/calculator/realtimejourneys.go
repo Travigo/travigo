@@ -20,7 +20,8 @@ type RealtimeJourneyStats struct {
 
 	TransportTypes map[ctdf.TransportType]int
 	Features       map[string]int
-	Datasources    map[string]int
+	Datasets       map[string]int
+	Providers      map[string]int
 	Countries      map[string]int
 }
 
@@ -35,6 +36,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 	transportTypes := map[ctdf.TransportType]int{}
 	features := map[string]int{}
 	datasources := map[string]int{}
+	providers := map[string]int{}
 
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 
@@ -74,6 +76,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 				bson.E{Key: "modificationdatetime", Value: 1},
 				bson.E{Key: "reliability", Value: 1},
 				bson.E{Key: "datasource.datasetid", Value: 1},
+				bson.E{Key: "datasource.providerid", Value: 1},
 				bson.E{Key: "service.transporttype", Value: 1},
 				// bson.E{Key: "vehiclelocation", Value: 1},
 				bson.E{Key: "journey.path.destinationstopref", Value: 1},
@@ -113,6 +116,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 				}
 
 				datasources[realtimeJourney.DataSource.DatasetID] += 1
+				providers[realtimeJourney.DataSource.ProviderID] += 1
 
 				// Features
 				if realtimeJourney.Occupancy.OccupancyAvailable {
@@ -138,7 +142,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 		ExternalProvided:     numberActiveRealtimeJourneysExternal,
 		TransportTypes:       transportTypes,
 		Features:             features,
-		Datasources:          datasources,
+		Datasets:             datasources,
 		Countries:            CountCountries(datasources),
 		NotActivelyTracked:   numberActiveRealtimeJourneysNotActivelyTracked,
 	}

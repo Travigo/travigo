@@ -11,14 +11,15 @@ type ServicesStats struct {
 	Total int
 
 	TransportTypes map[string]int
-	Datasources    map[string]int
+	Datasets       map[string]int
+	Providers      map[string]int
 	Countries      map[string]int
 }
 
 func GetServices() ServicesStats {
 	stats := ServicesStats{
 		TransportTypes: map[string]int{},
-		Datasources:    map[string]int{},
+		Datasets:       map[string]int{},
 	}
 	servicesCollection := database.GetCollection("services")
 
@@ -26,8 +27,9 @@ func GetServices() ServicesStats {
 	stats.Total = int(numberServices)
 
 	stats.TransportTypes = CountAggregate(servicesCollection, "$transporttype")
-	stats.Datasources = CountAggregate(servicesCollection, "$datasource.datasetid")
-	stats.Countries = CountCountries(stats.Datasources)
+	stats.Datasets = CountAggregate(servicesCollection, "$datasource.datasetid")
+	stats.Providers = CountAggregate(servicesCollection, "$datasource.providerid")
+	stats.Countries = CountCountries(stats.Datasets)
 
 	return stats
 }
