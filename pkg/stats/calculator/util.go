@@ -26,7 +26,13 @@ func CountAggregate(collection *mongo.Collection, aggregateKey string) map[strin
 	cursor.All(context.Background(), &result)
 
 	for _, record := range result {
-		countMap[record["_id"].(string)] = int(record["count"].(int32))
+		var id string
+		if record["_id"] == nil {
+			id = "Unknown"
+		} else {
+			id = record["_id"].(string)
+		}
+		countMap[id] = int(record["count"].(int32))
 	}
 
 	return countMap
