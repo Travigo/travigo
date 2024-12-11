@@ -67,6 +67,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			RouteItems: []ctdf.JourneyPlanRouteItem{
 				{
 					Journey:            *departure.Journey,
+					JourneyType:        *departure.Type,
 					OriginStopRef:      q.OriginStop.PrimaryIdentifier,
 					DestinationStopRef: q.DestinationStop.PrimaryIdentifier,
 					StartTime:          startTime,

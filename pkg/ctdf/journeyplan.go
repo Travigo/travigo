@@ -20,6 +20,8 @@ type JourneyPlan struct {
 type JourneyPlanRouteItem struct {
 	Journey Journey
 
+	JourneyType DepartureBoardRecordType
+
 	OriginStopRef      string
 	DestinationStopRef string
 
