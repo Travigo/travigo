@@ -8,6 +8,8 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"go.mongodb.org/mongo-driver/bson"
+
+	"golang.org/x/exp/slices"
 )
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
@@ -49,7 +51,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		var arrivalTime time.Time
 
 		for _, item := range departure.Journey.Path {
-			if item.DestinationStopRef == q.DestinationStop.PrimaryIdentifier {
+			if item.DestinationStopRef == q.DestinationStop.PrimaryIdentifier || slices.Contains[[]string](item.DestinationStopRef, q.DestinationStop.OtherIdentifiers) {
 				refTime := item.DestinationArrivalTime
 				dateTime := q.StartDateTime
 				arrivalTime = time.Date(
