@@ -51,7 +51,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		var arrivalTime time.Time
 
 		for _, item := range departure.Journey.Path {
-			if item.DestinationStopRef == q.DestinationStop.PrimaryIdentifier || slices.Contains[[]string](item.DestinationStopRef, q.DestinationStop.OtherIdentifiers) {
+			if item.DestinationStopRef == q.DestinationStop.PrimaryIdentifier || slices.Contains[[]string](q.DestinationStop.OtherIdentifiers, item.DestinationStopRef) {
 				refTime := item.DestinationArrivalTime
 				dateTime := q.StartDateTime
 				arrivalTime = time.Date(
