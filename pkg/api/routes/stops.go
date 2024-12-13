@@ -105,7 +105,7 @@ func listStops(c *fiber.Ctx) error {
 
 func getStop(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
-	isLLM := c.Query("isllm")
+	isLLM := strings.ToLower(c.Query("isllm"))
 
 	var stop *ctdf.Stop
 	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
@@ -141,7 +141,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
 	startDateTimeString := c.Query("datetime")
-	isLLM := c.Query("isllm")
+	isLLM := strings.ToLower(c.Query("isllm"))
 
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -230,7 +230,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 func searchStops(c *fiber.Ctx) error {
 	searchTerm := c.Query("name")
 	transportType := c.Query("transporttype")
-	isLLM := c.Query("isllm")
+	isLLM := strings.ToLower(c.Query("isllm"))
 
 	if searchTerm == "" {
 		c.SendStatus(fiber.StatusBadRequest)
