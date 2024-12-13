@@ -21,7 +21,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 
 	departureBoard, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
 		Stop:          q.OriginStop,
-		Count:         q.Count * 4,
+		Count:         q.Count * 10,
 		StartDateTime: q.StartDateTime,
 		Filter:        &bson.M{"path.destinationstopref": q.DestinationStop.PrimaryIdentifier},
 	})
