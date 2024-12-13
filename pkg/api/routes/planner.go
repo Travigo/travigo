@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -87,5 +88,9 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		journeyPlans.JourneyPlans = journeyPlans.JourneyPlans[:count]
 	}
 
-	return c.JSON(journeyPlans)
+	reducedJourneyPlans, _ := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"basic"},
+	}, journeyPlans)
+
+	return c.JSON(reducedJourneyPlans)
 }
