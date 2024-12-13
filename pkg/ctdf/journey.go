@@ -194,8 +194,8 @@ type JourneyPathItem struct {
 
 	Distance int `groups:"basic"`
 
-	OriginArrivalTime      time.Time `groups:"basic"`
-	DestinationArrivalTime time.Time `groups:"basic"`
+	OriginArrivalTime      time.Time `groups:"basic,departureboard-cache"`
+	DestinationArrivalTime time.Time `groups:"basic,departureboard-cache"`
 
 	OriginDepartureTime time.Time `groups:"basic,departureboard-cache"`
 
