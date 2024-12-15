@@ -4,7 +4,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -55,9 +54,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		seenOrigin := false
 
 		for _, item := range departure.Journey.Path {
-			pretty.Println(item.OriginStopRef, q.OriginStop.PrimaryIdentifier, q.OriginStop.OtherIdentifiers)
 			if item.OriginStopRef == q.OriginStop.PrimaryIdentifier || slices.Contains[[]string](q.OriginStop.OtherIdentifiers, item.OriginStopRef) {
-				pretty.Println("cum")
 				seenOrigin = true
 			}
 
