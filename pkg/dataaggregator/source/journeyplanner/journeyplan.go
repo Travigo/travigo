@@ -23,7 +23,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		Stop:          q.OriginStop,
 		Count:         q.Count * 10,
 		StartDateTime: q.StartDateTime,
-		Filter:        &bson.M{"path.destinationstopref": q.DestinationStop.PrimaryIdentifier},
+		Filter:        &bson.M{"path.destinationstopref": bson.M{"$in": append(q.DestinationStop.OtherIdentifiers, q.DestinationStop.PrimaryIdentifier)}},
 	})
 
 	if err != nil {

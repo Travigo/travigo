@@ -38,6 +38,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
+			"field": "origin",
 			"error": err.Error(),
 		})
 	}
@@ -48,6 +49,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
+			"field": "destination",
 			"error": err.Error(),
 		})
 	}
