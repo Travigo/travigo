@@ -22,7 +22,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		Stop:          q.OriginStop,
 		Count:         q.Count * 10,
 		StartDateTime: q.StartDateTime,
-		Filter:        &bson.M{"path.destinationstopref": bson.M{"$in": append(q.DestinationStop.OtherIdentifiers, q.DestinationStop.PrimaryIdentifier)}},
+		// Filter:        &bson.M{"path.destinationstopref": bson.M{"$in": append(q.DestinationStop.OtherIdentifiers, q.DestinationStop.PrimaryIdentifier)}},
 	})
 
 	if err != nil {
@@ -52,6 +52,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		var arrivalTime time.Time
 
 		seenOrigin := false
+		seenDestination := false
 
 		for _, item := range departure.Journey.Path {
 			if item.OriginStopRef == q.OriginStop.PrimaryIdentifier || slices.Contains[[]string](q.OriginStop.OtherIdentifiers, item.OriginStopRef) {
@@ -59,6 +60,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			}
 
 			if item.DestinationStopRef == q.DestinationStop.PrimaryIdentifier || slices.Contains[[]string](q.DestinationStop.OtherIdentifiers, item.DestinationStopRef) {
+				seenDestination = true
+
 				refTime := item.DestinationArrivalTime
 				dateTime := q.StartDateTime
 				arrivalTime = time.Date(
@@ -73,7 +76,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		}
 
 		// If we've not seen origin by the time we've seen destination then this journey is running in the wrong direction
-		if !seenOrigin {
+		// If not seen destination then it doesn't go there
+		if !seenOrigin || !seenDestination {
 			continue
 		}
 
