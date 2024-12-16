@@ -7,7 +7,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"go.mongodb.org/mongo-driver/bson"
+	// "go.mongodb.org/mongo-driver/bson"
 
 	"golang.org/x/exp/slices"
 )
