@@ -24,7 +24,6 @@ with DAG(
       namespace='default',
       image='ghcr.io/travigo/travigo:main',
       image_pull_policy='Always',
-      cmds=["travigo"],
       arguments=["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"],
       name="data-import",
       task_id="task",
