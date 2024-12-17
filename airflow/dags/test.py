@@ -16,19 +16,18 @@ default_args = {
 with DAG(
     dag_id='k8s-example-0',
     default_args=default_args,
-    schedule_interval="*/5 * * * *",
-    start_date=days_ago(2),
+    schedule_interval="0 7 * * *",
     catchup=False,
-    tags=['k8s-pod-operator','example'],
 ) as dag:
     k = KubernetesPodOperator(
-        namespace='airflow',
-        image="ubuntu:latest",
-        cmds=["bash", "-cx"],
-        arguments=["echo hello"],
-        name="k8s-pod",
-        task_id="task",
-        is_delete_operator_pod=True,
-        hostnetwork=False,
-        startup_timeout_seconds=1000
+      namespace='default',
+      image='ghcr.io/travigo/travigo',
+      image_pull_policy='Always'
+      cmds=["travigo"],
+      arguments=["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"],
+      name="k8s-pod",
+      task_id="task",
+      is_delete_operator_pod=True,
+      hostnetwork=False,
+      startup_timeout_seconds=1000
     )
