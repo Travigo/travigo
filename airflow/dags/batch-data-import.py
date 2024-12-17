@@ -14,7 +14,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id='k8s-example-0',
+    dag_id='batch-data-import',
     default_args=default_args,
     schedule_interval="0 7 * * *",
     start_date=days_ago(2),
