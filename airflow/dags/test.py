@@ -17,6 +17,7 @@ with DAG(
     dag_id='k8s-example-0',
     default_args=default_args,
     schedule_interval="0 7 * * *",
+    start_date=days_ago(2),
     catchup=False,
 ) as dag:
     k = KubernetesPodOperator(
