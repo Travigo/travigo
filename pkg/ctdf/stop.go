@@ -19,14 +19,14 @@ type Stop struct {
 	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
 	PrimaryName    string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	Descriptor     string          `groups:"basic" bson:",omitempty"`
+	Descriptor     string          `groups:"basic,search" bson:",omitempty"`
 	TransportTypes []TransportType `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Timezone string `groups:"basic" bson:",omitempty"`
 
 	Location *Location `groups:"basic,stop-llm" bson:",omitempty"`
 
-	Services []*Service `bson:"-" groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	Services []*Service `bson:"-" groups:"basic,search,search-llm,stop-llm"`
 
 	Active bool `groups:"basic" bson:",omitempty"`
 

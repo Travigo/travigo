@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 type StopPoint struct {
@@ -165,11 +166,15 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 	var descriptor []string
 
-	if orig.Descriptor.Indicator != "" && orig.Descriptor.Indicator != "--" {
+	if util.ContainsString([]string{
+		"", "-", "--", "unknown",
+	}, strings.ToLower(orig.Descriptor.Indicator)) {
 		descriptor = append(descriptor, orig.Descriptor.Indicator)
 	}
 
-	if orig.Descriptor.Landmark != "" && orig.Descriptor.Landmark != "--" {
+	if util.ContainsString([]string{
+		"", "-", "--", "unknown",
+	}, strings.ToLower(orig.Descriptor.Landmark)) {
 		descriptor = append(descriptor, orig.Descriptor.Landmark)
 	}
 
