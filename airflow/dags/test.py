@@ -22,11 +22,11 @@ with DAG(
 ) as dag:
     k = KubernetesPodOperator(
       namespace='default',
-      image='ghcr.io/travigo/travigo',
+      image='ghcr.io/travigo/travigo:main',
       image_pull_policy='Always',
       cmds=["travigo"],
       arguments=["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"],
-      name="k8s-pod",
+      name="data-import",
       task_id="task",
       is_delete_operator_pod=True,
       hostnetwork=False,
