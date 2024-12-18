@@ -33,11 +33,11 @@ with DAG(
       env_vars = [
         k8s.V1EnvVar(
             name = "TRAVIGO_IE_NATIONALTRANSPORT_API_KEY",
-            value_from = k8s.V1EnvVarSource(secret_key_ref="travigo-ie-nationaltransport-api", field_ref="api_key")
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-ie-nationaltransport-api", key="api_key"))
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_MONGODB_CONNECTION",
-            value_from = k8s.V1EnvVarSource(secret_key_ref="travigo-mongodb-admin-travigo", field_ref="connectionString.standard")
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-mongodb-admin-travigo", key="connectionString.standard"))
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_ELASTICSEARCH_ADDRESS",
@@ -45,11 +45,11 @@ with DAG(
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_ELASTICSEARCH_USERNAME",
-            value_from = k8s.V1EnvVarSource(secret_key_ref="travigo-elasticsearch-user", field_ref="username")
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-elasticsearch-user", key="username"))
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_ELASTICSEARCH_PASSWORD",
-            value_from = k8s.V1EnvVarSource(secret_key_ref="travigo-elasticsearch-user", field_ref="password")
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-elasticsearch-user", key="password"))
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_REDIS_ADDRESS",
@@ -57,7 +57,7 @@ with DAG(
         ),
         k8s.V1EnvVar(
             name = "TRAVIGO_REDIS_PASSWORD",
-            value_from = k8s.V1EnvVarSource(secret_key_ref="redis-password", field_ref="password")
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="redis-password", key="password"))
         )
       ]
     )
