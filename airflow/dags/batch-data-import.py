@@ -97,7 +97,7 @@ def generate_job(name : str, command : str):
 with DAG(
     dag_id='batch-data-import',
     default_args=default_args,
-    schedule_interval="0 7 * * *",
+    schedule_interval="0 17 * * *",
     start_date=days_ago(2),
     catchup=False,
 ) as dag:
@@ -109,7 +109,7 @@ with DAG(
     ie >> stop_linker
     fr >> stop_linker
 
-    with open("../../data/datasources/gb-dft.yaml") as stream:
+    with open("/opt/airflow/dags/repo/data/datasources/gb-dft.yaml") as stream:
         try:
             print(yaml.safe_load(stream))
             noc = generate_data_job("gb-traveline-noc")
