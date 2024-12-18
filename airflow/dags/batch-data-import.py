@@ -117,16 +117,16 @@ with DAG(
         path_in_str = str(path)   
         
         with open(path_in_str) as stream:
-        try:
-            yaml_file = yaml.safe_load(stream)
+            try:
+                yaml_file = yaml.safe_load(stream)
 
-            source_identifier = yaml_file["identifier"]
+                source_identifier = yaml_file["identifier"]
 
-            for dataset in yaml_file["datasets"]:
-                dataset_identifier = dataset["identifier"]
+                for dataset in yaml_file["datasets"]:
+                    dataset_identifier = dataset["identifier"]
 
-                import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}")
+                    import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}")
 
-                import_job >> stop_linker
-        except yaml.YAMLError as exc:
-            print(exc)
+                    import_job >> stop_linker
+            except yaml.YAMLError as exc:
+                print(exc)
