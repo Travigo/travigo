@@ -118,9 +118,9 @@ with DAG(
     # fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
 
-    # ie >> stop_linker
-    # fr >> stop_linker
+    stop_linker >> stop_indexer
 
     pathlist = Path("/opt/airflow/dags/repo/data/datasources").glob('**/*.yaml')
     for path in pathlist:
