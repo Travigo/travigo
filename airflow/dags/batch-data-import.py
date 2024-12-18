@@ -113,6 +113,8 @@ with DAG(
     schedule_interval="0 17 * * *",
     start_date=days_ago(2),
     catchup=False,
+    max_active_runs=1,
+    concurrency=4,
 ) as dag:
     # ie = generate_data_job("ie-tfi-gtfs-schedule")
     # fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
