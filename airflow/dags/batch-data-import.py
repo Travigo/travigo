@@ -17,13 +17,15 @@ def generate_data_job(dataset : str):
     return generate_job(dataset, ["data-importer", "dataset", "--id", dataset])
 
 def generate_job(name : str, command : str):
+    name = f"data-import-{name}"
+    
     k = KubernetesPodOperator(
       namespace='default',
       image='ghcr.io/travigo/travigo:main',
       image_pull_policy='Always',
       arguments=command,
-      name=f"data-import-{name}",
-      task_id="task",
+      name=name,
+      task_id=name,
       is_delete_operator_pod=True,
       hostnetwork=False,
       startup_timeout_seconds=1000,
