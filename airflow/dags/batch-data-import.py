@@ -11,6 +11,8 @@ from airflow.contrib.operators.slack_webhook_operator import SlackWebhookOperato
 
 import yaml
 
+from pathlib import Path
+
 default_args = {
     'owner': 'airflow'
 }
@@ -101,20 +103,30 @@ with DAG(
     start_date=days_ago(2),
     catchup=False,
 ) as dag:
-    ie = generate_data_job("ie-tfi-gtfs-schedule")
-    fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
+    # ie = generate_data_job("ie-tfi-gtfs-schedule")
+    # fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
 
-    ie >> stop_linker
-    fr >> stop_linker
+    # ie >> stop_linker
+    # fr >> stop_linker
 
-    with open("/opt/airflow/dags/repo/data/datasources/gb-dft.yaml") as stream:
+    pathlist = Path("/opt/airflow/dags/repo/data/datasources").glob('**/*.yaml')
+    for path in pathlist:
+        # because path is object not string
+        path_in_str = str(path)   
+        
+        with open(path_in_str) as stream:
         try:
-            print(yaml.safe_load(stream))
-            noc = generate_data_job("gb-traveline-noc")
+            yaml_file = yaml.safe_load(stream)
 
-            noc >> ie
-            noc >> fr
+            source_identifier = yaml_file["identifier"]
+
+            for dataset in yaml_file["datasets"]:
+                dataset_identifier = dataset["identifier"]
+
+                import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}")
+
+                import_job >> stop_linker
         except yaml.YAMLError as exc:
             print(exc)
