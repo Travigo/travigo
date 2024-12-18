@@ -131,12 +131,12 @@ with DAG(
             try:
                 yaml_file = yaml.safe_load(stream)
 
-                if "importdestination" in yaml_file and yaml_file["importdestination"] == "realtime-queue":
-                    continue
-
                 source_identifier = yaml_file["identifier"]
 
                 for dataset in yaml_file["datasets"]:
+                    if "importdestination" in dataset and dataset["importdestination"] == "realtime-queue":
+                        continue
+
                     dataset_identifier = dataset["identifier"]
 
                     dataset_size = "small"
