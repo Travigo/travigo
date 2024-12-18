@@ -110,11 +110,11 @@ with DAG(
     fr >> stop_linker
 
     with open("../../data/datasources/gb-dft.yaml") as stream:
-    try:
-        print(yaml.safe_load(stream))
-        noc = generate_data_job("gb-traveline-noc")
+        try:
+            print(yaml.safe_load(stream))
+            noc = generate_data_job("gb-traveline-noc")
 
-        noc >> ie
-        noc >> fr
-    except yaml.YAMLError as exc:
-        print(exc)
+            noc >> ie
+            noc >> fr
+        except yaml.YAMLError as exc:
+            print(exc)
