@@ -141,7 +141,7 @@ with DAG(
 
                     dataset_size = "small"
                     if "datasetsize" in dataset:
-                        dataset_size = yaml_file["datasetsize"]
+                        dataset_size = dataset["datasetsize"]
 
                     import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size)
 
