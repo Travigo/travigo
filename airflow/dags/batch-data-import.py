@@ -13,19 +13,16 @@ default_args = {
     'owner': 'airflow'
 }
 
-with DAG(
-    dag_id='batch-data-import',
-    default_args=default_args,
-    schedule_interval="0 7 * * *",
-    start_date=days_ago(2),
-    catchup=False,
-) as dag:
+def generate_data_job(dataset : str):
+    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset])
+
+def generate_job(name : str, command : str):
     k = KubernetesPodOperator(
       namespace='default',
       image='ghcr.io/travigo/travigo:main',
       image_pull_policy='Always',
-      arguments=["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"],
-      name="data-import",
+      arguments=command,
+      name=f"data-import-{name}",
       task_id="task",
       is_delete_operator_pod=True,
       hostnetwork=False,
@@ -61,3 +58,24 @@ with DAG(
         )
       ]
     )
+
+    return k
+
+with DAG(
+    dag_id='batch-data-import',
+    default_args=default_args,
+    schedule_interval="0 7 * * *",
+    start_date=days_ago(2),
+    catchup=False,
+) as dag:
+    noc = generate_data_job("gb-traveline-noc")
+    ie = generate_data_job("ie-tfi-gtfs-schedule")
+    fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
+
+    stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
+
+    noc >> ie
+    noc >> fr
+
+    ie >> stop_linker
+    fr >> stop_linker
