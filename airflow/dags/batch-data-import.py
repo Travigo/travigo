@@ -131,7 +131,7 @@ with DAG(
             try:
                 yaml_file = yaml.safe_load(stream)
 
-                if "importdestination" not in yaml_file or yaml_file["importdestination"] == "realtime-queue":
+                if "importdestination" in yaml_file and yaml_file["importdestination"] == "realtime-queue":
                     continue
 
                 source_identifier = yaml_file["identifier"]
