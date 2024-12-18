@@ -18,7 +18,7 @@ def generate_data_job(dataset : str):
 
 def generate_job(name : str, command : str):
     name = f"data-import-{name}"
-    
+
     k = KubernetesPodOperator(
       namespace='default',
       image='ghcr.io/travigo/travigo:main',
@@ -31,9 +31,38 @@ def generate_job(name : str, command : str):
       startup_timeout_seconds=1000,
       env_vars = [
         k8s.V1EnvVar(
+            name = "TRAVIGO_BODS_API_KEY",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-bods-api", key="api_key"))
+        ),
+        k8s.V1EnvVar(
             name = "TRAVIGO_IE_NATIONALTRANSPORT_API_KEY",
             value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-ie-nationaltransport-api", key="api_key"))
         ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_NATIONALRAIL_USERNAME",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-nationalrail-credentials", key="username"))
+        ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_NATIONALRAIL_PASSWORD",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-nationalrail-credentials", key="password"))
+        ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_NETWORKRAIL_USERNAME",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-networkrail-credentials", key="username"))
+        ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_NETWORKRAIL_PASSWORD",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-networkrail-credentials", key="password"))
+        ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-trafiklab-sweden-static", key="api_key"))
+        ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-trafiklab-sweden-realtime", key="api_key"))
+        ),
+
         k8s.V1EnvVar(
             name = "TRAVIGO_MONGODB_CONNECTION",
             value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-mongodb-admin-travigo", key="connectionString.standard"))
