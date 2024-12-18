@@ -13,6 +13,7 @@ datasets:
 - identifier: bods-gtfs-schedule
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
+  datasetsize: large
   supportedobjects:
     services: true
     journeys: true

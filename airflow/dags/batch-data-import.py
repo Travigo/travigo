@@ -17,11 +17,19 @@ default_args = {
     'owner': 'airflow'
 }
 
-def generate_data_job(dataset : str):
-    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset])
+def generate_data_job(dataset : str, instance_size : str = "small"):
+    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset], instance_size=instance_size)
 
-def generate_job(name : str, command : str):
+def generate_job(name : str, command : str, instance_size : str = "small"):
     name = f"data-import-{name}"
+
+    tolerations = []
+    node_selector = None
+    container_resources = None
+    if instance_size == "large":
+        node_selector = {"cloud.google.com/gke-nodepool": "batch-burst-node-pool"}
+        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
+        container_resources = k8s.V1ResourceRequirements(requests={"memory": "40Gi"})
 
     k = KubernetesPodOperator(
       namespace='default',
@@ -33,6 +41,9 @@ def generate_job(name : str, command : str):
       is_delete_operator_pod=True,
       hostnetwork=False,
       startup_timeout_seconds=1000,
+      tolerations=tolerations,
+      node_selector=node_selector,
+      container_resources=container_resources,
       env_vars = [
         k8s.V1EnvVar(
             name = "TRAVIGO_BODS_API_KEY",
@@ -128,7 +139,11 @@ with DAG(
                 for dataset in yaml_file["datasets"]:
                     dataset_identifier = dataset["identifier"]
 
-                    import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}")
+                    dataset_size = "small"
+                    if "datasetsize" in dataset:
+                        dataset_size = yaml_file["datasetsize"]
+
+                    import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size)
 
                     import_job >> stop_linker
             except yaml.YAMLError as exc:

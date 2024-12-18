@@ -16,6 +16,8 @@ type DataSet struct {
 	Source               string
 	SourceAuthentication SourceAuthentication `json:"-"`
 
+	DatasetSize string
+
 	UnpackBundle      BundleFormat `json:"-"`
 	SupportedObjects  SupportedObjects
 	IgnoreObjects     IgnoreObjects
