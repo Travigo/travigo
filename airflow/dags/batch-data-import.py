@@ -4,6 +4,7 @@ This is an example dag for using the KubernetesPodOperator.
 
 from kubernetes.client import models as k8s
 from airflow import DAG
+from airflow.operators.dummy import DummyOperator
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
@@ -137,6 +138,9 @@ with DAG(
     max_active_runs=1,
     concurrency=2,
 ) as dag:
+    start = DummyOperator(task_id="start")
+    end = DummyOperator(task_id="end")
+
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stopsDDDDD" ])
     stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDDDDD" ])
 
@@ -173,4 +177,4 @@ with DAG(
             except yaml.YAMLError as exc:
                 print(exc)
 
-    taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> stop_indexer
+    start >> taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> stop_indexer >> end
