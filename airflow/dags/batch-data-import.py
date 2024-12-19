@@ -18,10 +18,10 @@ default_args = {
     'owner': 'airflow'
 }
 
-def generate_data_job(dataset : str, instance_size : str = "small"):
+def generate_data_job(dataset : str, instance_size : str = "small", taskgroup : TaskGroup = None):
     return generate_job(dataset, ["data-importer", "dataset", "--idDDDDD", dataset], instance_size=instance_size)
 
-def generate_job(name : str, command : str, instance_size : str = "small"):
+def generate_job(name : str, command : str, instance_size : str = "small", taskgroup : TaskGroup = None):
     name = f"data-import-{name}"
 
     tolerations = []
@@ -52,6 +52,7 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
       node_selector=node_selector,
       container_resources=container_resources,
       trigger_rule="all_done",
+      task_group=taskgroup,
     #   on_success_callback=[
     #     send_slack_webhook_notification(
     #         slack_webhook_conn_id="slack-dataimport",
@@ -168,9 +169,7 @@ with DAG(
                     if "datasetsize" in dataset:
                         dataset_size = dataset["datasetsize"]
 
-                    import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size)
-
-                    taskgroups[dataset_size].add(import_job)
+                    import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size, taskgroup=taskgroups[dataset_size])
             except yaml.YAMLError as exc:
                 print(exc)
 
