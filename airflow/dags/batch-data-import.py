@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
-from airflow.providers.slack.notifications.slack import send_slack_notification
+from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
 
 import yaml
 
@@ -45,20 +45,18 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
       node_selector=node_selector,
       container_resources=container_resources,
       trigger_rule="all_done",
-    #   on_succes_callback=[
-    #     send_slack_notification(
-    #         text="The task {{ ti.task_id }} was successful",
-    #         channel="#dataimport",
-    #         username="Airflow",
-    #     )
-    #   ],
-    #   on_failure_callback=[
-    #     send_slack_notification(
-    #         text="The task {{ ti.task_id }} failed",
-    #         channel="#dataimport",
-    #         username="Airflow",
-    #     )
-    #   ],
+      on_succes_callback=[
+        send_slack_webhook_notification(
+            slack_webhook_conn_id="slack-dataimport",
+            text="The task {{ ti.task_id }} was successful",
+        )
+      ],
+      on_failure_callback=[
+        send_slack_webhook_notification(
+            slack_webhook_conn_id="slack-dataimport",
+            text="The task {{ ti.task_id }} failed",
+        )
+      ],
       env_vars = [
         k8s.V1EnvVar(
             name = "TRAVIGO_BODS_API_KEY",
@@ -135,7 +133,7 @@ with DAG(
     # fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
-    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDISABLED" ])
 
     stop_linker >> stop_indexer
 
