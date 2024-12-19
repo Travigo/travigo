@@ -7,6 +7,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://media.ilevia.fr/opendata/gtfs.zip"
+  datasetsize: medium
   supportedobjects:
     operators: true
     stops:     true
