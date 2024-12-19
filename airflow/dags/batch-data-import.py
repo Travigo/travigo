@@ -170,7 +170,7 @@ with DAG(
 
                     import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size)
 
-                    import_job >> taskgroups[dataset_size]
+                    taskgroups[dataset_size].add(import_job)
             except yaml.YAMLError as exc:
                 print(exc)
 
