@@ -8,6 +8,7 @@ from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import Kubernete
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
 from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
+from airflow.utils.task_group import TaskGroup
 
 import yaml
 
@@ -18,7 +19,7 @@ default_args = {
 }
 
 def generate_data_job(dataset : str, instance_size : str = "small"):
-    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset], instance_size=instance_size)
+    return generate_job(dataset, ["data-importer", "dataset", "--idDDDDD", dataset], instance_size=instance_size)
 
 def generate_job(name : str, command : str, instance_size : str = "small"):
     name = f"data-import-{name}"
@@ -26,10 +27,16 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
     tolerations = []
     node_selector = None
     container_resources = None
-    if instance_size == "large":
+    if instance_size == "medium" or instance_size == "large":
         node_selector = {"cloud.google.com/gke-nodepool": "batch-burst-node-pool"}
         tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
-        container_resources = k8s.V1ResourceRequirements(requests={"memory": "40Gi"})
+
+        if instance_size == "medium":
+            memory_requests = "20Gi"
+        elif instance_size == "large":
+            memory_requests = "40Gi"
+
+        container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
 
     k = KubernetesPodOperator(
       namespace='default',
@@ -129,8 +136,14 @@ with DAG(
     max_active_runs=1,
     concurrency=2,
 ) as dag:
-    stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
-    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
+    stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stopsDDDDD" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDDDDD" ])
+
+    taskgroups = {
+        "small": TaskGroup("small"),
+        "medium": TaskGroup("medium"),
+        "large": TaskGroup("large"),
+    }
 
     stop_linker >> stop_indexer
 
@@ -157,6 +170,8 @@ with DAG(
 
                     import_job = generate_data_job(f"{source_identifier}-{dataset_identifier}", instance_size=dataset_size)
 
-                    import_job >> stop_linker
+                    import_job >> taskgroups[dataset_size]
             except yaml.YAMLError as exc:
                 print(exc)
+
+    taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> stop_indexer
