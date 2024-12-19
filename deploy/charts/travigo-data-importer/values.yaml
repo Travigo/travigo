@@ -36,55 +36,55 @@ image:
   pullPolicy: Always
   tag: main
 
-cronjobs:
-  - name: travelinenoc
-    schedule: "0 2 * * *"
-    args: ["data-importer", "dataset", "--id", "gb-traveline-noc"]
-  - name: nationalrail-toc
-    schedule: "10 2 * * *"
-    args: ["data-importer", "dataset", "--id", "gb-nationalrail-toc"]
-  - name: nationalrail-timetable
-    schedule: "15 5 * * *"
-    args: ["data-importer", "dataset", "--id", "gb-nationalrail-timetable"]
-  - name: naptan
-    schedule: "0 3 * * 6"
-    args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
-  - name: networkrail-corpus
-    schedule: "30 4 * * 6"
-    args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
-  - name: gb-bods-gtfs-timetable
-    schedule: "10 6 * * *"
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-schedule"]
-    batchburst: true
-  - name: gb-bods-transxchange-coach
-    schedule: "40 6 * * *"
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-transxchange-coach"]
-  - name: ie-gtfs-schedule
-    schedule: "50 6 * * *"
-    args: ["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"]
-    batchburst: true
-  # - name: us-nyc-subway-schedule
+cronjobs: []
+  # - name: travelinenoc
+  #   schedule: "0 2 * * *"
+  #   args: ["data-importer", "dataset", "--id", "gb-traveline-noc"]
+  # - name: nationalrail-toc
+  #   schedule: "10 2 * * *"
+  #   args: ["data-importer", "dataset", "--id", "gb-nationalrail-toc"]
+  # - name: nationalrail-timetable
+  #   schedule: "15 5 * * *"
+  #   args: ["data-importer", "dataset", "--id", "gb-nationalrail-timetable"]
+  # - name: naptan
+  #   schedule: "0 3 * * 6"
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-naptan"]
+  # - name: networkrail-corpus
+  #   schedule: "30 4 * * 6"
+  #   args: ["data-importer", "dataset", "--id", "gb-networkrail-corpus"]
+  # - name: gb-bods-gtfs-timetable
+  #   schedule: "10 6 * * *"
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-schedule"]
+  #   batchburst: true
+  # - name: gb-bods-transxchange-coach
+  #   schedule: "40 6 * * *"
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-transxchange-coach"]
+  # - name: ie-gtfs-schedule
+  #   schedule: "50 6 * * *"
+  #   args: ["data-importer", "dataset", "--id", "ie-tfi-gtfs-schedule"]
+  #   batchburst: true
+  # # - name: us-nyc-subway-schedule
+  # #   schedule: "0 8 * * *"
+  # #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-schedule"]
+  #   # batchburst: true
+  # - name: de-gtfs-gtfs-schedule
+  #   schedule: "0 7 * * *"
+  #   args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-schedule"]
+  #   batchburst: true
+  # - name: se-trafiklab-gtfs-schedule
+  #   schedule: "30 23 * * *"
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-schedule"]
+  #   batchburst: true
+  # - name: fr-ilevia-lille-gtfs-schedule
   #   schedule: "0 8 * * *"
-  #   args: ["data-importer", "dataset", "--id", "us-nyc-subway-schedule"]
-    # batchburst: true
-  - name: de-gtfs-gtfs-schedule
-    schedule: "0 7 * * *"
-    args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-schedule"]
-    batchburst: true
-  - name: se-trafiklab-gtfs-schedule
-    schedule: "30 23 * * *"
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-schedule"]
-    batchburst: true
-  - name: fr-ilevia-lille-gtfs-schedule
-    schedule: "0 8 * * *"
-    args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-schedule"]
-    batchburst: true
-  - name: temp-indexer-stops
-    schedule: "20 6 * * *"
-    args: [ "indexer", "stops" ]
-  - name: temp-data-linker
-    schedule: "0 6 * * *"
-    args: [ "data-linker", "run", "--type", "stops" ]
+  #   args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-schedule"]
+  #   batchburst: true
+  # - name: temp-indexer-stops
+  #   schedule: "20 6 * * *"
+  #   args: [ "indexer", "stops" ]
+  # - name: temp-data-linker
+  #   schedule: "0 6 * * *"
+  #   args: [ "data-linker", "run", "--type", "stops" ]
 
 deployments:
   - name: gb-dft-bods-sirivm-all
