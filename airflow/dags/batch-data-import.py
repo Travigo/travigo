@@ -45,7 +45,7 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
       node_selector=node_selector,
       container_resources=container_resources,
       trigger_rule="all_done",
-      on_succes_callback=[
+      on_success_callback=[
         send_slack_webhook_notification(
             slack_webhook_conn_id="slack-dataimport",
             text="The task {{ ti.task_id }} was successful",
