@@ -45,12 +45,12 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
       node_selector=node_selector,
       container_resources=container_resources,
       trigger_rule="all_done",
-      on_success_callback=[
-        send_slack_webhook_notification(
-            slack_webhook_conn_id="slack-dataimport",
-            text="The task {{ ti.task_id }} was successful",
-        )
-      ],
+    #   on_success_callback=[
+    #     send_slack_webhook_notification(
+    #         slack_webhook_conn_id="slack-dataimport",
+    #         text="The task {{ ti.task_id }} was successful",
+    #     )
+    #   ],
       on_failure_callback=[
         send_slack_webhook_notification(
             slack_webhook_conn_id="slack-dataimport",
@@ -123,15 +123,12 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
 with DAG(
     dag_id='batch-data-import',
     default_args=default_args,
-    schedule_interval="0 17 * * *",
+    schedule_interval="0 7 * * *",
     start_date=days_ago(2),
     catchup=False,
     max_active_runs=1,
     concurrency=2,
 ) as dag:
-    # ie = generate_data_job("ie-tfi-gtfs-schedule")
-    # fr = generate_data_job("fr-ilevia-lille-gtfs-schedule")
-
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
     stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDISABLED" ])
 
