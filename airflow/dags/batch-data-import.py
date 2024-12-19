@@ -18,7 +18,7 @@ default_args = {
 }
 
 def generate_data_job(dataset : str, instance_size : str = "small"):
-    return generate_job(dataset, ["data-importer", "dataset", "--idDISABLED", dataset], instance_size=instance_size)
+    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset], instance_size=instance_size)
 
 def generate_job(name : str, command : str, instance_size : str = "small"):
     name = f"data-import-{name}"
@@ -130,7 +130,7 @@ with DAG(
     concurrency=2,
 ) as dag:
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
-    stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDISABLED" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
 
     stop_linker >> stop_indexer
 
