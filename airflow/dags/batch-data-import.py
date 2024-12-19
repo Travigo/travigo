@@ -20,7 +20,7 @@ default_args = {
 }
 
 def generate_data_job(dataset : str, instance_size : str = "small", taskgroup : TaskGroup = None):
-    return generate_job(dataset, ["data-importer", "dataset", "--idDDDDD", dataset], instance_size=instance_size, taskgroup=taskgroup)
+    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset], instance_size=instance_size, taskgroup=taskgroup)
 
 def generate_job(name : str, command : str, instance_size : str = "small", taskgroup : TaskGroup = None):
     name = f"data-import-{name}"
@@ -141,8 +141,8 @@ with DAG(
     start = DummyOperator(task_id="start")
     end = DummyOperator(task_id="end")
 
-    stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stopsDDDDD" ])
-    stop_indexer = generate_job("stop-indexer", [ "indexer", "stopsDDDDD" ])
+    stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
 
     taskgroups = {
         "small": TaskGroup("small"),
