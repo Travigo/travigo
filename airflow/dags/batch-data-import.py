@@ -19,7 +19,7 @@ default_args = {
 }
 
 def generate_data_job(dataset : str, instance_size : str = "small", taskgroup : TaskGroup = None):
-    return generate_job(dataset, ["data-importer", "dataset", "--idDDDDD", dataset], instance_size=instance_size)
+    return generate_job(dataset, ["data-importer", "dataset", "--idDDDDD", dataset], instance_size=instance_size, taskgroup=taskgroup)
 
 def generate_job(name : str, command : str, instance_size : str = "small", taskgroup : TaskGroup = None):
     name = f"data-import-{name}"
