@@ -7,7 +7,7 @@ from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
-from airflow.contrib.operators.slack_webhook_operator import SlackWebhookOperator
+from airflow.providers.slack.notifications.slack import send_slack_notification
 
 import yaml
 
@@ -18,7 +18,7 @@ default_args = {
 }
 
 def generate_data_job(dataset : str, instance_size : str = "small"):
-    return generate_job(dataset, ["data-importer", "dataset", "--id", dataset], instance_size=instance_size)
+    return generate_job(dataset, ["data-importer", "dataset", "--idDISABLED", dataset], instance_size=instance_size)
 
 def generate_job(name : str, command : str, instance_size : str = "small"):
     name = f"data-import-{name}"
@@ -44,6 +44,21 @@ def generate_job(name : str, command : str, instance_size : str = "small"):
       tolerations=tolerations,
       node_selector=node_selector,
       container_resources=container_resources,
+      trigger_rule="all_done",
+    #   on_succes_callback=[
+    #     send_slack_notification(
+    #         text="The task {{ ti.task_id }} was successful",
+    #         channel="#dataimport",
+    #         username="Airflow",
+    #     )
+    #   ],
+    #   on_failure_callback=[
+    #     send_slack_notification(
+    #         text="The task {{ ti.task_id }} failed",
+    #         channel="#dataimport",
+    #         username="Airflow",
+    #     )
+    #   ],
       env_vars = [
         k8s.V1EnvVar(
             name = "TRAVIGO_BODS_API_KEY",
