@@ -166,13 +166,13 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 
 	var descriptor []string
 
-	if util.ContainsString([]string{
+	if !util.ContainsString([]string{
 		"", "-", "--", "unknown",
 	}, strings.ToLower(orig.Descriptor.Indicator)) {
 		descriptor = append(descriptor, orig.Descriptor.Indicator)
 	}
 
-	if util.ContainsString([]string{
+	if !util.ContainsString([]string{
 		"", "-", "--", "unknown",
 	}, strings.ToLower(orig.Descriptor.Landmark)) {
 		descriptor = append(descriptor, orig.Descriptor.Landmark)
