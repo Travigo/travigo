@@ -48,7 +48,6 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
       task_id=name,
       is_delete_operator_pod=True,
       hostnetwork=False,
-      startup_timeout_seconds=1000,
       tolerations=tolerations,
       node_selector=node_selector,
       container_resources=container_resources,
