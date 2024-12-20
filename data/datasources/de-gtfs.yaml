@@ -7,7 +7,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://download.gtfs.de/germany/free/latest.zip"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     operators: true
     stops:     true

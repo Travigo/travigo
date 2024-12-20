@@ -7,7 +7,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     operators: true
     stops:     true
