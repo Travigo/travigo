@@ -54,6 +54,7 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
       container_resources=container_resources,
       trigger_rule="all_done",
       task_group=taskgroup,
+      startup_timeout_seconds=7200,
     #   on_success_callback=[
     #     send_slack_webhook_notification(
     #         slack_webhook_conn_id="slack-dataimport",
