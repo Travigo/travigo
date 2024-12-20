@@ -15,6 +15,7 @@ datasets:
 - identifier: timetable
   format: gb-cif
   source: "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
+  datasetsize: medium
   sourceauthentication:
     custom: "gb-nationalrail-login"
   supportedobjects:
