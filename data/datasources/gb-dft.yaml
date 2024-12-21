@@ -4,12 +4,12 @@ provider:
   name: Department for Transport
   website: "https://www.gov.uk/government/organisations/department-for-transport"
 datasets:
-# - identifier: naptan
-#   format: gb-naptan
-#   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
-#   supportedobjects:
-#     stops:      true
-#     stopgroups: true
+- identifier: naptan
+  format: gb-naptan
+  source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
+  supportedobjects:
+    stops:      true
+    stopgroups: true
 - identifier: bods-gtfs-schedule
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
