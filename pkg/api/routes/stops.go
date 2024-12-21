@@ -286,6 +286,9 @@ func searchStops(c *fiber.Ctx) error {
 				"filter": queryFilters,
 			},
 		},
+		"collapse": map[string]interface{}{
+			"field": "PrimaryIdentifier.keyword",
+		},
 	}
 
 	json.NewEncoder(&queryBytes).Encode(searchQuery)
@@ -298,7 +301,8 @@ func searchStops(c *fiber.Ctx) error {
 	)
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to query index")
+		log.Error().Err(err).Msg("Failed to query index")
+		return nil
 	}
 
 	responseBytes, _ := io.ReadAll(res.Body)

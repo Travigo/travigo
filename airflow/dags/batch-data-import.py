@@ -29,7 +29,7 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
     node_selector = None
     container_resources = None
     if instance_size == "medium" or instance_size == "large":
-        node_selector = {"cloud.google.com/gke-nodepool": "batch-burst-node-pool"}
+        node_selector = {"cloud.google.com/gke-nodepool": "large-batch-burst"}
         tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
 
         if instance_size == "medium":
@@ -38,6 +38,12 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
             memory_requests = "40Gi"
 
         container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
+
+    if instance_size == "index_small":
+        node_selector = {"cloud.google.com/gke-nodepool": "small-batch-burst"}
+        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="SMALL_BATCH_BURST", operator="Equal", value="true"))
+
+        container_resources = k8s.V1ResourceRequirements(requests={"memory": "4Gi"})
 
     k = KubernetesPodOperator(
       namespace='default',
@@ -142,7 +148,7 @@ with DAG(
     end = DummyOperator(task_id="end")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
-    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ])
+    stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ], instance_size="index_small")
 
     taskgroups = {
         "small": TaskGroup("small"),
