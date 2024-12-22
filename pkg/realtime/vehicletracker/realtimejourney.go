@@ -291,6 +291,8 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 				closestPathTime = now.Sub(refTime)
 			}
 		}
+
+		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityExternalProvided
 	}
 
 	if closestDistanceJourneyPath == nil {
