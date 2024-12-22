@@ -43,55 +43,57 @@ cronjobs: []
   #   # batchburst: true
 
 deployments:
-  - name: gb-dft-bods-sirivm-all
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
-  - name: gb-dft-bods-sirisx-all
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirisx-all", "--repeat-every", "300s"]
-  - name: gb-bods-gtfs-rt
-    args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
-  - name: ie-gtfs-realtime
-    args: ["data-importer", "dataset", "--id", "ie-tfi-gtfs-realtime", "--repeat-every", "90s"]
-  - name: fr-ilevia-lille-gtfs-rt
-    args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "90s"]
-  - name: de-gtfs-gtfs-realtime
-    args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-realtime", "--repeat-every", "90s"]
-  # Sweden
-  - name: se-trafiklab-gtfs-realtime-sl-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-ul-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-otraf-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-klt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-skane-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-dt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-varm-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-xt-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-vastm-trip
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-trip", "--repeat-every", "590s"]
-  - name: se-trafiklab-gtfs-realtime-sl-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-ul-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-otraf-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-klt-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-skane-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-dt-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-varm-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-xt-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-alerts", "--repeat-every", "1800s"]
-  - name: se-trafiklab-gtfs-realtime-vastm-alerts
-    args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-alerts", "--repeat-every", "1800s"]
+  - name: realtime-all
+    args: ["data-importer", "multi-realtime"]
+  # - name: gb-dft-bods-sirivm-all
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirivm-all", "--repeat-every", "30s"]
+  # - name: gb-dft-bods-sirisx-all
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-sirisx-all", "--repeat-every", "300s"]
+  # - name: gb-bods-gtfs-rt
+  #   args: ["data-importer", "dataset", "--id", "gb-dft-bods-gtfs-realtime", "--repeat-every", "10s"]
+  # - name: ie-gtfs-realtime
+  #   args: ["data-importer", "dataset", "--id", "ie-tfi-gtfs-realtime", "--repeat-every", "90s"]
+  # - name: fr-ilevia-lille-gtfs-rt
+  #   args: ["data-importer", "dataset", "--id", "fr-ilevia-lille-gtfs-realtime", "--repeat-every", "90s"]
+  # - name: de-gtfs-gtfs-realtime
+  #   args: ["data-importer", "dataset", "--id", "de-gtfs-gtfs-realtime", "--repeat-every", "90s"]
+  # # Sweden
+  # - name: se-trafiklab-gtfs-realtime-sl-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-ul-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-otraf-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-klt-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-skane-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-dt-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-varm-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-xt-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-vastm-trip
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-trip", "--repeat-every", "590s"]
+  # - name: se-trafiklab-gtfs-realtime-sl-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-sl-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-ul-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-ul-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-otraf-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-otraf-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-klt-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-klt-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-skane-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-skane-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-dt-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-dt-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-varm-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-varm-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-xt-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-xt-alerts", "--repeat-every", "1800s"]
+  # - name: se-trafiklab-gtfs-realtime-vastm-alerts
+  #   args: ["data-importer", "dataset", "--id", "se-trafiklab-gtfs-realtime-vastmanland-alerts", "--repeat-every", "1800s"]
 
 resources: {}
 podAnnotations: {}
