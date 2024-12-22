@@ -121,18 +121,18 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 
 						elementChain = elementChain[:len(elementChain)-1] // Using decodeElement means we skip the end element for this
 					} else {
-						bankHolidayName := elementChain[2]
+						// bankHolidayName := elementChain[2]
 
-						if bankHolidayName == "Christmas" {
-							bankHolidayName = "ChristmasDayHoliday"
-						} else if bankHolidayName == "NewYearsDay" {
-							bankHolidayName = "NewYearsDayHoliday"
-						}
+						// if bankHolidayName == "Christmas" {
+						// 	bankHolidayName = "ChristmasDayHoliday"
+						// } else if bankHolidayName == "NewYearsDay" {
+						// 	bankHolidayName = "NewYearsDayHoliday"
+						// }
 
-						record = ctdf.AvailabilityRule{
-							Type:  ctdf.AvailabilitySpecialDay,
-							Value: fmt.Sprintf("gb-bankholiday-%s", bankHolidayName),
-						}
+						// record = ctdf.AvailabilityRule{
+						// 	Type:  ctdf.AvailabilitySpecialDay,
+						// 	Value: fmt.Sprintf("gb-bankholiday-%s", bankHolidayName),
+						// }
 					}
 
 					if elementChain[1] == "DaysOfOperation" {

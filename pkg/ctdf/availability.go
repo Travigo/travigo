@@ -62,11 +62,10 @@ type AvailabilityRule struct {
 type AvailabilityRecordType string
 
 const (
-	AvailabilityDayOfWeek  AvailabilityRecordType = "DayOfWeek"
-	AvailabilityDate                              = "Date"
-	AvailabilityDateRange                         = "DateRange"
-	AvailabilitySpecialDay                        = "SpecialDay"
-	AvailabilityMatchAll                          = "MatchAll"
+	AvailabilityDayOfWeek AvailabilityRecordType = "DayOfWeek"
+	AvailabilityDate                             = "Date"
+	AvailabilityDateRange                        = "DateRange"
+	AvailabilityMatchAll                         = "MatchAll"
 )
 
 const YearMonthDayFormat = "2006-01-02"
@@ -104,34 +103,6 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 		}
 
 		return (dateTime.After(startDate) && dateTime.Before(endDate)) || datesMatch(startDate, dateTime) || datesMatch(endDate, dateTime)
-	case AvailabilitySpecialDay:
-		specialDayDateYear := SpecialDays[dateTime.Year()]
-
-		if specialDayDateYear == nil {
-			log.Error().Msgf("Looks like year %d doesnt exist in SpecialDays", dateTime.Year())
-			return false
-		}
-
-		if rule.Value == "gb-bankholiday-AllBankHolidays" {
-			// If the special case of all bank holidays then loop through every special day in that year and check if any match
-			// Of course if Travigo ever expands to non-UK bank holidays then this doesnt work
-			for _, specialDateTime := range SpecialDays[dateTime.Year()] {
-				if datesMatch(specialDateTime, dateTime) {
-					return true
-				}
-			}
-
-			return false
-		} else {
-			specialDateTime := SpecialDays[dateTime.Year()][rule.Value]
-
-			if specialDateTime.Year() == 1 {
-				log.Debug().Msgf("Could not find special day %s for year %d ", rule.Value, dateTime.Year())
-				return false
-			}
-
-			return datesMatch(specialDateTime, dateTime)
-		}
 	case AvailabilityMatchAll:
 		return true
 	default:
