@@ -19,6 +19,7 @@ datasets:
 - identifier: gtfs-realtime-sl-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -29,6 +30,7 @@ datasets:
 - identifier: gtfs-realtime-ul-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/ul/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -39,6 +41,7 @@ datasets:
 - identifier: gtfs-realtime-otraf-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/otraf/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -49,6 +52,7 @@ datasets:
 - identifier: gtfs-realtime-klt-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/klt/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -59,6 +63,7 @@ datasets:
 - identifier: gtfs-realtime-skane-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/skane/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -69,6 +74,7 @@ datasets:
 - identifier: gtfs-realtime-dt-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/dt/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -79,6 +85,7 @@ datasets:
 - identifier: gtfs-realtime-varm-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/varm/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -89,6 +96,7 @@ datasets:
 - identifier: gtfs-realtime-xt-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/xt/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -99,6 +107,7 @@ datasets:
 - identifier: gtfs-realtime-vastmanland-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/vastmanland/TripUpdatesSweden.pb"
+  refreshinterval: 590s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -109,6 +118,7 @@ datasets:
 - identifier: gtfs-realtime-sl-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -119,6 +129,7 @@ datasets:
 - identifier: gtfs-realtime-ul-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/ul/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -129,6 +140,7 @@ datasets:
 - identifier: gtfs-realtime-otraf-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/otraf/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -139,6 +151,7 @@ datasets:
 - identifier: gtfs-realtime-klt-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/klt/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -149,6 +162,7 @@ datasets:
 - identifier: gtfs-realtime-skane-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/skane/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -159,6 +173,7 @@ datasets:
 - identifier: gtfs-realtime-dt-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/dt/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -169,6 +184,7 @@ datasets:
 - identifier: gtfs-realtime-varm-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/varm/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -179,6 +195,7 @@ datasets:
 - identifier: gtfs-realtime-xt-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/xt/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY
@@ -189,6 +206,7 @@ datasets:
 - identifier: gtfs-realtime-vastmanland-alerts
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/vastmanland/ServiceAlertsSweden.pb"
+  refreshinterval: 1800s
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY

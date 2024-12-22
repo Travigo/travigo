@@ -2,6 +2,7 @@ package datasets
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/adjust/rmq/v5"
 )
@@ -16,7 +17,8 @@ type DataSet struct {
 	Source               string
 	SourceAuthentication SourceAuthentication `json:"-"`
 
-	DatasetSize string
+	DatasetSize     string
+	RefreshInterval time.Duration
 
 	UnpackBundle      BundleFormat `json:"-"`
 	SupportedObjects  SupportedObjects

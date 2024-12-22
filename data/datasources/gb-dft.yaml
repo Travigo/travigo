@@ -51,6 +51,7 @@ datasets:
 - identifier: bods-sirivm-all
   format: eu-siri-vm
   source: "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"
+  refreshinterval: 30s
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
@@ -62,6 +63,7 @@ datasets:
 - identifier: bods-gtfs-realtime
   format: gtfs-realtime
   source: "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"
+  refreshinterval: 10s
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
@@ -73,6 +75,7 @@ datasets:
 - identifier: bods-sirisx-all
   format: eu-siri-sx
   source: "https://data.bus-data.dft.gov.uk/disruptions/download/bulk_archive"
+  refreshinterval: 5m
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
