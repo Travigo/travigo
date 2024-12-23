@@ -186,7 +186,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 	case datasets.BundleFormatZIP:
 		archive, err := zip.OpenReader(source)
 		if err != nil {
-			panic(err)
+			return err
 		}
 		defer archive.Close()
 
