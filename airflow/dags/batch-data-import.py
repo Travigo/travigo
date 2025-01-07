@@ -1,11 +1,7 @@
-"""
-This is an example dag for using the KubernetesPodOperator.
-"""
-
 from kubernetes.client import models as k8s
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
-from airflow.providers.cncf.kubernetes.operators.job import KubernetesJobOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
 from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
@@ -45,7 +41,7 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
 
         container_resources = k8s.V1ResourceRequirements(requests={"memory": "4Gi"})
 
-    k = KubernetesJobOperator(
+    k = KubernetesPodOperator(
       namespace='default',
       image='ghcr.io/travigo/travigo:main',
       image_pull_policy='Always',
@@ -60,9 +56,6 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
       trigger_rule="all_done",
       task_group=taskgroup,
       startup_timeout_seconds=7200,
-      backoff_limit=1,
-      wait_until_job_complete=True,
-      ttl_seconds_after_finished=43200,
     #   on_success_callback=[
     #     send_slack_webhook_notification(
     #         slack_webhook_conn_id="slack-dataimport",
