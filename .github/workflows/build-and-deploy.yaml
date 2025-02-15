@@ -18,7 +18,7 @@ jobs:
     name: Build travigo binary
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
@@ -26,7 +26,7 @@ jobs:
     - name: Build
       run: go build -v ./cmd/travigo
     - name: Upload travigo
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: travigo
         path: ./travigo
@@ -42,16 +42,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: travigo
           path: ./
       
       - name: Log in to the Container registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -59,7 +59,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -69,7 +69,7 @@ jobs:
             type=sha,format=long
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
@@ -92,12 +92,12 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Helm tool installer
-      uses: Azure/setup-helm@v3
+      uses: Azure/setup-helm@v4
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v4
 
     - name: Get GCP Auth
       uses: 'google-github-actions/auth@v2'
