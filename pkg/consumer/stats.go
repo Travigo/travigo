@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	_ "net/http/pprof"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/database"
