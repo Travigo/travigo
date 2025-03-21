@@ -107,7 +107,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 
 	log.Info().Int("length", len(g.Agencies)).Msg("Starting Operators")
-	agenciesQueue := NewDatabaseBatchProcessingQueue("operators", 1*time.Second, 10*time.Second, 500)
+	agenciesQueue := NewDatabaseBatchProcessingQueue("operators", 1*time.Second, 10*time.Second, 1000)
 
 	if dataset.SupportedObjects.Operators {
 		agenciesQueue.Process()
@@ -142,7 +142,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	// Stops
 	log.Info().Int("length", len(g.Stops)).Msg("Starting Stops")
-	stopsQueue := NewDatabaseBatchProcessingQueue("stops_raw", 1*time.Second, 10*time.Second, 500)
+	stopsQueue := NewDatabaseBatchProcessingQueue("stops_raw", 1*time.Second, 10*time.Second, 5000)
 
 	if dataset.SupportedObjects.Stops {
 		stopsQueue.Process()
@@ -203,7 +203,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	// Routes / Services
 	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
-	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 500)
+	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 1000)
 
 	if dataset.SupportedObjects.Services {
 		servicesQueue.Process()
@@ -268,7 +268,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	// fullJourneyTracks := map[string][]ctdf.Location{}
 
 	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 5000)
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
