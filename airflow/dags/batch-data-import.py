@@ -101,6 +101,10 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
             name = "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY",
             value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-trafiklab-sweden-realtime", key="api_key"))
         ),
+        k8s.V1EnvVar(
+            name = "TRAVIGO_JP_ODTP_API_KEY",
+            value_from = k8s.V1EnvVarSource(secret_key_ref=k8s.V1SecretKeySelector(name="travigo-odtp-japan-gtfs", key="api_key"))
+        ),
 
         k8s.V1EnvVar(
             name = "TRAVIGO_MONGODB_CONNECTION",

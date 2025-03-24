@@ -27,6 +27,9 @@ se_trafiklab:
   staticSecret: travigo-trafiklab-sweden-static
   realtimeSecret: travigo-trafiklab-sweden-realtime
 
+jp_odtp:
+  apiKeySecret: travigo-odtp-japan-gtfs
+
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials
