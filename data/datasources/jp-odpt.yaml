@@ -25,3 +25,30 @@ datasets:
     stops:     true
     services:  true
     journeys:  true
+- identifier: schedule-tokyo-metro
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip"
+  datasetsize: large
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: schedule-yokohama-train
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Train-GTFS.zip"
+  datasetsize: large
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: schedule-yokohama-bus
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Bus-GTFS.zip"
+  datasetsize: large
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
