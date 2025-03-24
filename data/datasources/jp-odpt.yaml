@@ -10,7 +10,7 @@ datasets:
 - identifier: schedule-toei-bus
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
-  datasetsize: large
+  datasetsize: small
   supportedobjects:
     operators: true
     stops:     true
@@ -19,7 +19,7 @@ datasets:
 - identifier: schedule-toei-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
-  datasetsize: large
+  datasetsize: small
   supportedobjects:
     operators: true
     stops:     true
@@ -28,7 +28,7 @@ datasets:
 - identifier: schedule-tokyo-metro
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip"
-  datasetsize: large
+  datasetsize: small
   supportedobjects:
     operators: true
     stops:     true
@@ -37,7 +37,7 @@ datasets:
 - identifier: schedule-yokohama-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Train-GTFS.zip"
-  datasetsize: large
+  datasetsize: small
   supportedobjects:
     operators: true
     stops:     true
@@ -46,7 +46,7 @@ datasets:
 - identifier: schedule-yokohama-bus
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Bus-GTFS.zip"
-  datasetsize: large
+  datasetsize: small
   supportedobjects:
     operators: true
     stops:     true
