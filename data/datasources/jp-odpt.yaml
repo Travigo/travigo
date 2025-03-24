@@ -1,0 +1,27 @@
+identifier: jp-odpt
+region: jp
+provider:
+  name: ODPT
+  website: "https://odpt.org"
+sourceauthentication:
+  query:
+    "acl:consumerKey": TRAVIGO_JP_ODPT_API_KEY
+datasets:
+- identifier: schedule-toei-bus
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
+  datasetsize: large
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: schedule-toei-train
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
+  datasetsize: large
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true

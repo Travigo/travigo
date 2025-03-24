@@ -91,10 +91,10 @@ spec:
                       name: {{ $.Values.se_trafiklab.realtimeSecret }}
                       key: api_key
                       optional: false
-                - name: TRAVIGO_JP_ODTP_API_KEY
+                - name: TRAVIGO_JP_ODPT_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ $.Values.jp_odtp.realtimeSecret }}
+                      name: {{ $.Values.jp_odpt.realtimeSecret }}
                       key: api_key
                       optional: false
                 - name: TRAVIGO_MONGODB_CONNECTION
