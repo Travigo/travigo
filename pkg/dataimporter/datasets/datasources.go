@@ -5,4 +5,6 @@ type DataSource struct {
 	Region     string
 	Provider   Provider
 	Datasets   []DataSet
+
+	SourceAuthentication *SourceAuthentication
 }

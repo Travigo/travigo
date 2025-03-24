@@ -66,6 +66,10 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			dataset.DataSourceRef = datasource.Identifier
 			dataset.Provider = datasource.Provider
 
+			if dataset.SourceAuthentication == nil && datasource.SourceAuthentication != nil {
+				dataset.SourceAuthentication = datasource.SourceAuthentication
+			}
+
 			registeredDatasets = append(registeredDatasets, dataset)
 		}
 	}

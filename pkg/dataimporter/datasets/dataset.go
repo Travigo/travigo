@@ -15,7 +15,7 @@ type DataSet struct {
 	Provider Provider
 
 	Source               string
-	SourceAuthentication SourceAuthentication `json:"-"`
+	SourceAuthentication *SourceAuthentication `json:"-"`
 
 	DatasetSize     string
 	RefreshInterval time.Duration
