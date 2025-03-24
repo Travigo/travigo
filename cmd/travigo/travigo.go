@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/urfave/cli/v2"
 
+	_ "net/http/pprof"
 	_ "time/tzdata"
 )
 
@@ -32,6 +34,9 @@ func main() {
 
 	if os.Getenv("TRAVIGO_DEBUG") == "YES" {
 		log.Logger = log.Logger.Level(zerolog.DebugLevel)
+		go func() {
+			http.ListenAndServe(":7148", nil)
+		}()
 	} else {
 		log.Logger = log.Logger.Level(zerolog.InfoLevel)
 	}
