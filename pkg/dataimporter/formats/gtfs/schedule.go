@@ -32,6 +32,7 @@ type Schedule struct {
 	CalendarDates []CalendarDate
 	Frequencies   []Frequency
 	Shapes        []Shape
+	Translations  []Translation
 }
 
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
@@ -51,7 +52,8 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 		"calendar.txt":       &gtfs.Calendars,
 		"calendar_dates.txt": &gtfs.CalendarDates,
 		// "frequencies.txt":    &gtfs.Frequencies,
-		"shapes.txt": &gtfs.Shapes,
+		"shapes.txt":       &gtfs.Shapes,
+		"translations.txt": &gtfs.Translations,
 	}
 
 	// TODO this uses a load of ram :(
@@ -121,7 +123,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
-			PrimaryName:          gtfsAgency.Name,
+			PrimaryName:          g.GetTranslation("agency", "agency_name", "en", gtfsAgency.Name),
 			Website:              gtfsAgency.URL,
 		}
 
@@ -161,7 +163,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
-			PrimaryName:          gtfsStop.Name,
+			PrimaryName:          g.GetTranslation("stops", "stop_name", "en", gtfsStop.Name),
 			Location: &ctdf.Location{
 				Type:        "Point",
 				Coordinates: []float64{gtfsStop.Longitude, gtfsStop.Latitude},
@@ -215,9 +217,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		routeMap[gtfsRoute.ID] = gtfsRoute
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, gtfsRoute.ID)
 
-		serviceName := gtfsRoute.ShortName
+		serviceName := g.GetTranslation("routes", "route_short_name", "en", gtfsRoute.ShortName)
 		if serviceName == "" {
-			serviceName = gtfsRoute.LongName
+			serviceName = g.GetTranslation("routes", "route_long_name", "en", gtfsRoute.LongName)
 		}
 
 		operatorRef := agencyNOCMapping[gtfsRoute.AgencyID]
@@ -336,7 +338,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ServiceRef:           serviceID,
 			OperatorRef:          operatorRef,
 			// Direction:            trip.DirectionID,
-			DestinationDisplay: trip.Headsign,
+			DestinationDisplay: g.GetTranslation("trips", "trip_headsign", "en", trip.Headsign),
 			DepartureTimezone:  agenciesMap[routeMap[trip.RouteID].AgencyID].Timezone,
 			Availability:       availability,
 			Path:               []*ctdf.JourneyPathItem{},
@@ -485,6 +487,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	return nil
 }
 
+func (gtfs *Schedule) GetTranslation(table string, field string, language string, originalValue string) string {
+	for _, translation := range gtfs.Translations {
+		if translation.TableName == table && translation.FieldName == field && translation.Language == language && translation.FieldValue == originalValue {
+			return translation.Translation
+		}
+	}
+
+	return originalValue
+}
+
 func convertTransportType(intType int) ctdf.TransportType {
 	routeTypeMapping := map[int]ctdf.TransportType{
 		0:    ctdf.TransportTypeTram,
@@ -547,48 +559,3 @@ func fixTimestamp(timestamp string) string {
 		return timestamp
 	}
 }
-
-/////// THE DEAD ZONE ////////
-// r := csv.NewReader(fileReader)
-// 				r.FieldsPerRecord = -1
-// 				if _, err := r.Read(); err != nil { //read header
-// 					log.Fatal().Err(err).Msg("csv header read")
-// 				}
-// 				for {
-// 					rec, err := r.Read()
-// 					if err != nil {
-// 						if err == io.EOF {
-// 							break
-// 						}
-// 						log.Fatal().Err(err).Msg("csv row read")
-
-// 					}
-
-// 					stopSequence, _ := strconv.Atoi(rec[4])
-
-// 					var stopHeadsign string
-// 					if len(rec) >= 6 {
-// 						stopHeadsign = rec[5]
-// 					}
-
-// 					var pickupType int
-// 					if len(rec) >= 7 {
-// 						pickupType, _ = strconv.Atoi(rec[6])
-// 					}
-// 					var dropOffType int
-// 					if len(rec) >= 8 {
-// 						dropOffType, _ = strconv.Atoi(rec[7])
-// 					}
-
-// 					gtfs.StopTimes = append(gtfs.StopTimes, &StopTime{
-// 						// trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint,stop_direction_name
-// 						TripID:        rec[0],
-// 						ArrivalTime:   rec[1],
-// 						DepartureTime: rec[2],
-// 						StopID:        rec[3],
-// 						StopSequence:  stopSequence,
-// 						StopHeadsign:  stopHeadsign,
-// 						PickupType:    pickupType,
-// 						DropOffType:   dropOffType,
-// 					})
-// 				}
