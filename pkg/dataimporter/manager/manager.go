@@ -282,41 +282,43 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 	}
 
 	//// Handle authentication ////
-	env := util.GetEnvironmentVariables()
-	// Query paramaters
-	for queryKey, queryValue := range dataset.SourceAuthentication.Query {
-		if env[queryValue] == "" {
-			log.Fatal().Msgf("%s must be set", queryValue)
-		}
+	if dataset.SourceAuthentication != nil {
+		env := util.GetEnvironmentVariables()
+		// Query paramaters
+		for queryKey, queryValue := range dataset.SourceAuthentication.Query {
+			if env[queryValue] == "" {
+				log.Fatal().Msgf("%s must be set", queryValue)
+			}
 
-		q := req.URL.Query()
-		q.Add(queryKey, env[queryValue])
-		req.URL.RawQuery = q.Encode()
-	}
-	// Basic auth
-	if dataset.SourceAuthentication.Basic.Username != "" && dataset.SourceAuthentication.Basic.Password != "" {
-		if env[dataset.SourceAuthentication.Basic.Username] == "" {
-			log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Username)
+			q := req.URL.Query()
+			q.Add(queryKey, env[queryValue])
+			req.URL.RawQuery = q.Encode()
 		}
-		if env[dataset.SourceAuthentication.Basic.Password] == "" {
-			log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Password)
-		}
+		// Basic auth
+		if dataset.SourceAuthentication.Basic.Username != "" && dataset.SourceAuthentication.Basic.Password != "" {
+			if env[dataset.SourceAuthentication.Basic.Username] == "" {
+				log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Username)
+			}
+			if env[dataset.SourceAuthentication.Basic.Password] == "" {
+				log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Password)
+			}
 
-		req.SetBasicAuth(env[dataset.SourceAuthentication.Basic.Username], env[dataset.SourceAuthentication.Basic.Password])
-	}
-	// Headers
-	for headerKey, headerValue := range dataset.SourceAuthentication.Header {
-		if env[headerValue] == "" {
-			log.Fatal().Msgf("%s must be set", headerValue)
+			req.SetBasicAuth(env[dataset.SourceAuthentication.Basic.Username], env[dataset.SourceAuthentication.Basic.Password])
 		}
+		// Headers
+		for headerKey, headerValue := range dataset.SourceAuthentication.Header {
+			if env[headerValue] == "" {
+				log.Fatal().Msgf("%s must be set", headerValue)
+			}
 
-		req.Header.Set(headerKey, env[headerValue])
-	}
-	// Customs
-	switch dataset.SourceAuthentication.Custom {
-	case "gb-nationalrail-login":
-		token := customAuthNationalRailLogin()
-		req.Header.Set("X-Auth-Token", token)
+			req.Header.Set(headerKey, env[headerValue])
+		}
+		// Customs
+		switch dataset.SourceAuthentication.Custom {
+		case "gb-nationalrail-login":
+			token := customAuthNationalRailLogin()
+			req.Header.Set("X-Auth-Token", token)
+		}
 	}
 
 	// TODO delete me later
