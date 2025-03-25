@@ -84,7 +84,7 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 
 func importObject[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
 	log.Info().Str("table", tableName).Msg("Processing Table")
-	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 1000)
+	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 5000)
 	if toProcess {
 		processingQueue.Process()
 	}
