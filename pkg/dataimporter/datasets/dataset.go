@@ -1,7 +1,6 @@
 package datasets
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -28,8 +27,6 @@ type DataSet struct {
 	CustomConfig map[string]string
 
 	LinkedDataset string
-
-	DownloadHandler func(*http.Request) `json:"-"`
 
 	// Internal only
 	Queue *rmq.Queue `json:"-"`

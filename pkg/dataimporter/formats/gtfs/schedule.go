@@ -2,67 +2,55 @@ package gtfs
 
 import (
 	"archive/zip"
-	"bytes"
-	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gocarina/gocsv"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
+	"github.com/trimmer-io/go-csv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/maps"
 )
 
 type Schedule struct {
-	Agencies      []Agency
-	Stops         []Stop
-	Routes        []Route
-	Trips         []Trip
-	StopTimes     []StopTime
-	Calendars     []Calendar
-	CalendarDates []CalendarDate
-	Frequencies   []Frequency
-	Shapes        []Shape
-	Translations  []Translation
+	fileMap map[string]string
+
+	Agencies []Agency
+
+	calendarMapping     map[string]*Calendar
+	calendarDateMapping map[string][]*CalendarDate
+
+	ctdfServices map[string]*ctdf.Service
+	routeMap     map[string]Route
+
+	ctdfJourneys map[string]*ctdf.Journey
+
+	tripStopSequenceMap map[string]map[int]*StopTime
+
+	Shapes       []Shape
+	Translations []Translation
 }
 
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
-	// Allow us to ignore those naughty records that have missing columns
-	gocsv.SetCSVReader(func(in io.Reader) gocsv.CSVReader {
-		r := csv.NewReader(in)
-		r.FieldsPerRecord = -1
-		return r
-	})
+	gtfs.fileMap = map[string]string{}
 
-	fileMap := map[string]interface{}{
-		"agency.txt":         &gtfs.Agencies,
-		"stops.txt":          &gtfs.Stops,
-		"routes.txt":         &gtfs.Routes,
-		"trips.txt":          &gtfs.Trips,
-		"stop_times.txt":     &gtfs.StopTimes,
-		"calendar.txt":       &gtfs.Calendars,
-		"calendar_dates.txt": &gtfs.CalendarDates,
-		// "frequencies.txt":    &gtfs.Frequencies,
-		"shapes.txt":       &gtfs.Shapes,
-		"translations.txt": &gtfs.Translations,
-	}
-
-	// TODO this uses a load of ram :(
-	body, err := io.ReadAll(reader)
+	// TODO HACK as we end up with 2 copies of the file
+	tmpZipFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-gtfs-zip-")
 	if err != nil {
-		return err
+		log.Fatal().Err(err).Msg("Cannot create temporary file")
 	}
+	io.Copy(tmpZipFile, reader)
 
-	archive, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	archive, err := zip.OpenReader(tmpZipFile.Name())
 	if err != nil {
 		return err
 	}
@@ -75,21 +63,77 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 		defer file.Close()
 
 		fileName := zipFile.Name
-		if destination, exists := fileMap[fileName]; exists {
-			log.Info().Str("file", fileName).Msg("Loading file")
+		fileReader, _ := zipFile.Open()
+		defer fileReader.Close()
 
-			fileReader, _ := zipFile.Open()
-			defer fileReader.Close()
+		// copy each file to a temporary location so it can be parsed later outside of the zip reader
+		tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-gtfs-file-")
+		defer tmpFile.Close()
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot create temporary file")
+		}
+		io.Copy(tmpFile, fileReader)
+		log.Info().Str("file", fileName).Str("tmp", tmpFile.Name()).Msg("Extracting file")
+		gtfs.fileMap[fileName] = tmpFile.Name()
+	}
 
-			err = gocsv.Unmarshal(fileReader, destination)
-			if err != nil {
-				log.Error().Str("file", fileName).Err(err).Msg("Failed to parse csv file")
-				return err
-			}
-		} else {
-			log.Error().Str("file", fileName).Msg("Unknown gtfs file")
+	os.Remove(tmpZipFile.Name())
+
+	return nil
+}
+
+func importObject[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
+	log.Info().Str("table", tableName).Msg("Processing Table")
+	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 1000)
+	if toProcess {
+		processingQueue.Process()
+	}
+
+	file, _ := os.Open(g.fileMap[fileName])
+	defer file.Close()
+	decoder := csv.NewDecoder(file)
+
+	line, err := decoder.ReadLine()
+	if err != nil {
+		return err
+	}
+	if _, err = decoder.DecodeHeader(line); err != nil {
+		return err
+	}
+
+	for {
+		line, err = decoder.ReadLine()
+		if err != nil {
+			return err
+		}
+		if line == "" {
+			break
+		}
+
+		var v T
+		if err = decoder.DecodeRecord(&v, line); err != nil {
+			return err
+		}
+		parsedObject, parsedObjectIdentifier := parser(v)
+
+		if toProcess && parsedObject != nil && parsedObjectIdentifier != "" {
+			// Insert
+			bsonRep, _ := bson.Marshal(bson.M{"$set": parsedObject})
+			updateModel := mongo.NewUpdateOneModel()
+			updateModel.SetFilter(bson.M{"primaryidentifier": parsedObjectIdentifier})
+			updateModel.SetUpdate(bsonRep)
+			updateModel.SetUpsert(true)
+			processingQueue.Add(updateModel)
 		}
 	}
+
+	if toProcess {
+		processingQueue.Wait()
+	}
+
+	log.Info().Str("table", tableName).Msg("Finished Table")
+
+	os.Remove(g.fileMap[fileName])
 
 	return nil
 }
@@ -97,10 +141,36 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
-	// Agencies / Operators
+	//// Translations ////
+	importObject[Translation](g, "translations.txt", "translations", false, func(t Translation) (any, string) {
+		g.Translations = append(g.Translations, t)
+
+		return nil, ""
+	})
+
+	//// Agencies / Operators ////
+	importObject[Agency](g, "agency.txt", "operators", dataset.SupportedObjects.Operators, func(a Agency) (any, string) {
+		operatorID := fmt.Sprintf("%s-operator-%s", dataset.Identifier, a.ID)
+		ctdfOperator := &ctdf.Operator{
+			PrimaryIdentifier:    operatorID,
+			CreationDateTime:     time.Now(),
+			ModificationDateTime: time.Now(),
+			DataSource:           datasource,
+			PrimaryName:          g.GetTranslation("agency", "agency_name", "en", a.Name),
+			Website:              a.URL,
+		}
+
+		g.Agencies = append(g.Agencies, a)
+
+		return ctdfOperator, operatorID
+	})
+
 	// TODO this mapping is hardcoding for the 1 UK datset and will need replacing later on to be more generic
 	agencyNOCMapping := map[string]string{}
+	agenciesMap := map[string]*Agency{}
 	for _, agency := range g.Agencies {
+		agenciesMap[agency.ID] = &agency
+
 		if agency.NOC == "" {
 			log.Debug().Str("agency", agency.ID).Msg("has no NOC mapping")
 			continue
@@ -108,133 +178,79 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		agencyNOCMapping[agency.ID] = fmt.Sprintf("gb-noc-%s", agency.NOC)
 	}
 
-	log.Info().Int("length", len(g.Agencies)).Msg("Starting Operators")
-	agenciesQueue := NewDatabaseBatchProcessingQueue("operators", 1*time.Second, 10*time.Second, 1000)
-
-	if dataset.SupportedObjects.Operators {
-		agenciesQueue.Process()
-	}
-	agenciesMap := map[string]*Agency{}
-	for _, gtfsAgency := range g.Agencies {
-		agenciesMap[gtfsAgency.ID] = &gtfsAgency
-		operatorID := fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsAgency.ID)
-		ctdfOperator := &ctdf.Operator{
-			PrimaryIdentifier:    operatorID,
-			CreationDateTime:     time.Now(),
-			ModificationDateTime: time.Now(),
-			DataSource:           datasource,
-			PrimaryName:          g.GetTranslation("agency", "agency_name", "en", gtfsAgency.Name),
-			Website:              gtfsAgency.URL,
-		}
-
-		if dataset.SupportedObjects.Operators {
-			// Insert
-			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfOperator})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": operatorID})
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
-			agenciesQueue.Add(updateModel)
-		}
-	}
-	log.Info().Msg("Finished Operators")
-	if dataset.SupportedObjects.Operators {
-		agenciesQueue.Wait()
-	}
-
-	// Stops
-	log.Info().Int("length", len(g.Stops)).Msg("Starting Stops")
-	stopsQueue := NewDatabaseBatchProcessingQueue("stops_raw", 1*time.Second, 10*time.Second, 5000)
-
-	if dataset.SupportedObjects.Stops {
-		stopsQueue.Process()
-	}
-	for _, gtfsStop := range g.Stops {
-		timezone := gtfsStop.Timezone
+	//// Stops ////
+	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
+		timezone := s.Timezone
 
 		if timezone == "" {
 			timezone = g.Agencies[0].Timezone
 		}
 
-		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, gtfsStop.ID)
+		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, s.ID)
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier:    stopID,
 			OtherIdentifiers:     []string{stopID},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
-			PrimaryName:          g.GetTranslation("stops", "stop_name", "en", gtfsStop.Name),
+			PrimaryName:          g.GetTranslation("stops", "stop_name", "en", s.Name),
 			Location: &ctdf.Location{
 				Type:        "Point",
-				Coordinates: []float64{gtfsStop.Longitude, gtfsStop.Latitude},
+				Coordinates: []float64{s.Longitude, s.Latitude},
 			},
 			Active:   true,
 			Timezone: timezone,
 		}
 
-		if dataset.SupportedObjects.Stops {
-			// Insert
-			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfStop})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": stopID})
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
-			stopsQueue.Add(updateModel)
-		}
-	}
-	log.Info().Msg("Finished Stops")
-	if dataset.SupportedObjects.Stops {
-		stopsQueue.Wait()
-	}
+		return ctdfStop, stopID
+	})
 
-	// Calendars
-	calendarMapping := map[string]*Calendar{}
-	calendarDateMapping := map[string][]*CalendarDate{}
-	for _, calendar := range g.Calendars {
-		calendarMapping[calendar.ServiceID] = &calendar
-	}
-	for _, calendarDate := range g.CalendarDates {
-		calendarDateMapping[calendarDate.ServiceID] = append(calendarDateMapping[calendarDate.ServiceID], &calendarDate)
-	}
+	//// Calendars ////
+	g.calendarMapping = map[string]*Calendar{}
+	g.calendarDateMapping = map[string][]*CalendarDate{}
+	importObject[Calendar](g, "calendars.txt", "calendars", false, func(c Calendar) (any, string) {
+		g.calendarMapping[c.ServiceID] = &c
 
-	// Shapes
+		return nil, ""
+	})
+	importObject[CalendarDate](g, "calendar_dates.txt", "calendar_dates", false, func(c CalendarDate) (any, string) {
+		g.calendarDateMapping[c.ServiceID] = append(g.calendarDateMapping[c.ServiceID], &c)
+
+		return nil, ""
+	})
+
+	//// Shapes ////
+	////// TODO RE-ADD SHAPES
 	shapsMapping := map[string][]*Shape{}
-	for _, shape := range g.Shapes {
-		shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
-	}
+	// for _, shape := range g.Shapes {
+	// 	shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
+	// }
 
-	// Routes / Services
-	log.Info().Int("length", len(g.Routes)).Msg("Starting Services")
-	servicesQueue := NewDatabaseBatchProcessingQueue("services", 1*time.Second, 10*time.Second, 1000)
+	//// Routes / Services ////
+	g.ctdfServices = map[string]*ctdf.Service{}
+	g.routeMap = map[string]Route{}
+	importObject[Route](g, "routes.txt", "services", dataset.SupportedObjects.Services, func(r Route) (any, string) {
+		g.routeMap[r.ID] = r
+		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, r.ID)
 
-	if dataset.SupportedObjects.Services {
-		servicesQueue.Process()
-	}
-
-	ctdfServices := map[string]*ctdf.Service{}
-	routeMap := map[string]Route{}
-	for _, gtfsRoute := range g.Routes {
-		routeMap[gtfsRoute.ID] = gtfsRoute
-		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, gtfsRoute.ID)
-
-		serviceName := g.GetTranslation("routes", "route_short_name", "en", gtfsRoute.ShortName)
+		serviceName := g.GetTranslation("routes", "route_short_name", "en", r.ShortName)
 		if serviceName == "" {
-			serviceName = g.GetTranslation("routes", "route_long_name", "en", gtfsRoute.LongName)
+			serviceName = g.GetTranslation("routes", "route_long_name", "en", r.LongName)
 		}
 
-		operatorRef := agencyNOCMapping[gtfsRoute.AgencyID]
+		operatorRef := agencyNOCMapping[r.AgencyID]
 		if operatorRef == "" {
-			operatorRef = fmt.Sprintf("%s-operator-%s", dataset.Identifier, gtfsRoute.AgencyID)
+			operatorRef = fmt.Sprintf("%s-operator-%s", dataset.Identifier, r.AgencyID)
 		}
 
 		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
-			continue
+			return nil, ""
 		}
 
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
 			OtherIdentifiers: []string{
-				fmt.Sprintf("gtfs-route-%s", gtfsRoute.ID),
+				fmt.Sprintf("gtfs-route-%s", r.ID),
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
@@ -242,58 +258,40 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ServiceName:          serviceName,
 			OperatorRef:          operatorRef,
 			Routes:               []ctdf.Route{},
-			BrandColour:          gtfsRoute.Colour,
-			SecondaryBrandColour: gtfsRoute.TextColour,
-			TransportType:        convertTransportType(gtfsRoute.Type),
+			BrandColour:          r.Colour,
+			SecondaryBrandColour: r.TextColour,
+			TransportType:        convertTransportType(r.Type),
 		}
 
 		transforms.Transform(ctdfService, 1, "gb-dft-bods-gtfs-schedule")
 
-		ctdfServices[gtfsRoute.ID] = ctdfService
+		g.ctdfServices[r.ID] = ctdfService
 
-		if dataset.SupportedObjects.Services {
-			// Insert
-			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfService})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": serviceID})
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
-			servicesQueue.Add(updateModel)
-		}
-	}
-	log.Info().Msg("Finished Services")
-	if dataset.SupportedObjects.Services {
-		servicesQueue.Wait()
-	}
+		return ctdfService, serviceID
+	})
 
-	ctdfJourneys := map[string]*ctdf.Journey{}
+	//// Journeys / Trips ////
+	g.ctdfJourneys = map[string]*ctdf.Journey{}
 	// fullJourneyTracks := map[string][]ctdf.Location{}
 
-	// Journeys
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 5000)
-	if dataset.SupportedObjects.Journeys {
-		journeysQueue.Process()
-	}
+	importObject[Trip](g, "trips.txt", "journeys", false, func(t Trip) (any, string) {
+		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, t.ID)
+		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, t.RouteID)
 
-	log.Info().Int("length", len(g.Trips)).Msg("Starting Journeys")
-	for _, trip := range g.Trips {
-		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, trip.ID)
-		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, trip.RouteID)
-
-		if ctdfServices[trip.RouteID] == nil {
-			log.Debug().Str("trip", trip.ID).Str("route", trip.RouteID).Msg("Cannot find service for this trip")
-			continue
+		if g.ctdfServices[t.RouteID] == nil {
+			log.Debug().Str("trip", t.ID).Str("route", t.RouteID).Msg("Cannot find service for this trip")
+			return nil, ""
 		}
 
-		operatorRef := ctdfServices[trip.RouteID].OperatorRef
+		operatorRef := g.ctdfServices[t.RouteID].OperatorRef
 
 		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
-			continue
+			return nil, ""
 		}
 
 		availability := &ctdf.Availability{}
 		// Calendar availability
-		calendar, exists := calendarMapping[trip.ServiceID]
+		calendar, exists := g.calendarMapping[t.ServiceID]
 		if exists {
 			for _, day := range calendar.GetRunningDays() {
 				availability.Match = append(availability.Match, ctdf.AvailabilityRule{
@@ -311,7 +309,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			})
 		}
 		// Calendar dates availability
-		for _, calendarDate := range calendarDateMapping[trip.ServiceID] {
+		for _, calendarDate := range g.calendarDateMapping[t.ServiceID] {
 			date, _ := time.Parse("20060102", calendarDate.Date)
 			rule := ctdf.AvailabilityRule{
 				Type:  ctdf.AvailabilityDate,
@@ -326,11 +324,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		// Put it all together again
-		ctdfJourneys[trip.ID] = &ctdf.Journey{
+		g.ctdfJourneys[t.ID] = &ctdf.Journey{
 			PrimaryIdentifier: journeyID,
 			OtherIdentifiers: map[string]string{
-				"GTFS-TripID":  trip.ID,
-				"GTFS-RouteID": trip.RouteID,
+				"GTFS-TripID":  t.ID,
+				"GTFS-RouteID": t.RouteID,
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
@@ -338,20 +336,20 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ServiceRef:           serviceID,
 			OperatorRef:          operatorRef,
 			// Direction:            trip.DirectionID,
-			DestinationDisplay: g.GetTranslation("trips", "trip_headsign", "en", trip.Headsign),
-			DepartureTimezone:  agenciesMap[routeMap[trip.RouteID].AgencyID].Timezone,
+			DestinationDisplay: g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
+			DepartureTimezone:  agenciesMap[g.routeMap[t.RouteID].AgencyID].Timezone,
 			Availability:       availability,
 			Path:               []*ctdf.JourneyPathItem{},
 		}
 
-		if trip.BlockID != "" {
-			ctdfJourneys[trip.ID].OtherIdentifiers["BlockNumber"] = trip.BlockID
+		if t.BlockID != "" {
+			g.ctdfJourneys[t.ID].OtherIdentifiers["BlockNumber"] = t.BlockID
 		}
 
-		if trip.ShapeID != "" {
+		if t.ShapeID != "" {
 			journeyTrack := []ctdf.Location{}
 
-			shapes := shapsMapping[trip.ShapeID]
+			shapes := shapsMapping[t.ShapeID]
 
 			// Make sure its in order
 			sort.Slice(shapes, func(i, j int) bool {
@@ -366,22 +364,31 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 
 			// fullJourneyTracks[trip.ID] = journeyTrack
-			ctdfJourneys[trip.ID].Track = journeyTrack
+			g.ctdfJourneys[t.ID].Track = journeyTrack
 		}
+
+		return nil, ""
+	})
+
+	//// Stop Times ////
+	g.tripStopSequenceMap = map[string]map[int]*StopTime{}
+	importObject[StopTime](g, "stop_times.txt", "stop_times", false, func(stopTime StopTime) (any, string) {
+		if _, exists := g.tripStopSequenceMap[stopTime.TripID]; !exists {
+			g.tripStopSequenceMap[stopTime.TripID] = map[int]*StopTime{}
+		}
+		g.tripStopSequenceMap[stopTime.TripID][stopTime.StopSequence] = &stopTime
+
+		return nil, ""
+	})
+
+	log.Info().Msg("Importing Finished Journeys")
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 5000)
+	if dataset.SupportedObjects.Journeys {
+		journeysQueue.Process()
 	}
 
-	// Stop Times
-	// Build the actual path of the journeys
-	tripStopSequenceMap := map[string]map[int]*StopTime{}
-	for _, stopTime := range g.StopTimes {
-		if _, exists := tripStopSequenceMap[stopTime.TripID]; !exists {
-			tripStopSequenceMap[stopTime.TripID] = map[int]*StopTime{}
-		}
-		tripStopSequenceMap[stopTime.TripID][stopTime.StopSequence] = &stopTime
-	}
-
-	for tripID, tripSequencyMap := range tripStopSequenceMap {
-		if ctdfJourneys[tripID] == nil {
+	for tripID, tripSequencyMap := range g.tripStopSequenceMap {
+		if g.ctdfJourneys[tripID] == nil {
 			log.Debug().Str("trip", tripID).Msg("Cannot find journey for this trip")
 			continue
 		}
@@ -445,44 +452,45 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
 			}
 
-			ctdfJourneys[tripID].Path = append(ctdfJourneys[tripID].Path, journeyPathItem)
+			g.ctdfJourneys[tripID].Path = append(g.ctdfJourneys[tripID].Path, journeyPathItem)
 
 			if index == 1 {
-				ctdfJourneys[tripID].DepartureTime = originDeparturelTime
+				g.ctdfJourneys[tripID].DepartureTime = originDeparturelTime
 			}
 		}
 
 		// TODO fix transforms here
-		// transforms.Transform(ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
+		// transforms.Transform(g.ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
 		if util.ContainsString([]string{
 			"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
 			"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
 			"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
 			"gb-noc-MTLN", "gb-noc-SULV",
-		}, ctdfJourneys[tripID].OperatorRef) || (ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
+		}, g.ctdfJourneys[tripID].OperatorRef) || (g.ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
 			"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
-		}, ctdfJourneys[tripID].ServiceRef)) {
-			ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
+		}, g.ctdfJourneys[tripID].ServiceRef)) {
+			g.ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
 		}
 
 		// Insert
 		if dataset.SupportedObjects.Journeys {
-			bsonRep, _ := bson.Marshal(bson.M{"$set": ctdfJourneys[tripID]})
+			bsonRep, _ := bson.Marshal(bson.M{"$set": g.ctdfJourneys[tripID]})
 			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourneys[tripID].PrimaryIdentifier})
+			updateModel.SetFilter(bson.M{"primaryidentifier": g.ctdfJourneys[tripID].PrimaryIdentifier})
 			updateModel.SetUpdate(bsonRep)
 			updateModel.SetUpsert(true)
 
 			journeysQueue.Add(updateModel)
 		}
 
-		ctdfJourneys[tripID] = nil
+		g.ctdfJourneys[tripID] = nil
 	}
-	log.Info().Msg("Finished Journeys")
 
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Wait()
 	}
+
+	log.Info().Msg("Finished Journeys")
 
 	return nil
 }

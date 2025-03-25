@@ -41,6 +41,10 @@ func RegisterCLI() *cli.Command {
 						Name:  "force",
 						Usage: "Force the import of the dataset",
 					},
+					&cli.BoolFlag{
+						Name:  "skip-cleanup",
+						Usage: "Skip cleaning up of old records",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -52,6 +56,7 @@ func RegisterCLI() *cli.Command {
 
 					datasetid := c.String("id")
 					forceImport := c.Bool("force")
+					skipCleanup := c.Bool("skip-cleanup")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
@@ -73,7 +78,7 @@ func RegisterCLI() *cli.Command {
 					for {
 						startTime := time.Now()
 
-						err := manager.ImportDataset(&dataset, forceImport)
+						err := manager.ImportDataset(&dataset, forceImport, skipCleanup)
 
 						if err != nil {
 							return err
@@ -130,7 +135,7 @@ func RegisterCLI() *cli.Command {
 							for {
 								startTime := time.Now()
 
-								err := manager.ImportDataset(&dataset, false)
+								err := manager.ImportDataset(&dataset, false, true)
 
 								if err != nil {
 									// TODO report failure here

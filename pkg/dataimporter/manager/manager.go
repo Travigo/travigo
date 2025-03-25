@@ -111,7 +111,7 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 	return format, nil
 }
 
-func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
+func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool) error {
 	datasetVersionCollection := database.GetCollection("dataset_versions")
 
 	var existingDatasetVersion *ctdf.DatasetVersion
@@ -224,23 +224,25 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool) error {
 		}
 	}
 
-	if dataset.SupportedObjects.Stops {
-		cleanupOldRecords("stops_raw", datasource)
-	}
-	if dataset.SupportedObjects.StopGroups {
-		cleanupOldRecords("stop_groups", datasource)
-	}
-	if dataset.SupportedObjects.Operators {
-		cleanupOldRecords("operators", datasource)
-	}
-	if dataset.SupportedObjects.OperatorGroups {
-		cleanupOldRecords("operator_groups", datasource)
-	}
-	if dataset.SupportedObjects.Services {
-		cleanupOldRecords("services", datasource)
-	}
-	if dataset.SupportedObjects.Journeys {
-		cleanupOldRecords("journeys", datasource)
+	if !skipCleanup {
+		if dataset.SupportedObjects.Stops {
+			cleanupOldRecords("stops_raw", datasource)
+		}
+		if dataset.SupportedObjects.StopGroups {
+			cleanupOldRecords("stop_groups", datasource)
+		}
+		if dataset.SupportedObjects.Operators {
+			cleanupOldRecords("operators", datasource)
+		}
+		if dataset.SupportedObjects.OperatorGroups {
+			cleanupOldRecords("operator_groups", datasource)
+		}
+		if dataset.SupportedObjects.Services {
+			cleanupOldRecords("services", datasource)
+		}
+		if dataset.SupportedObjects.Journeys {
+			cleanupOldRecords("journeys", datasource)
+		}
 	}
 
 	// Update dataset version
@@ -319,11 +321,6 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 			token := customAuthNationalRailLogin()
 			req.Header.Set("X-Auth-Token", token)
 		}
-	}
-
-	// TODO delete me later
-	if dataset.DownloadHandler != nil {
-		dataset.DownloadHandler(req)
 	}
 
 	client := &http.Client{}
