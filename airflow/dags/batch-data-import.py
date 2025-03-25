@@ -28,15 +28,11 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
         # node_selector = {"cloud.google.com/gke-nodepool": "large-batch-burst"}
         # tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
 
-        if instance_size == "medium":
-            memory_requests = "20Gi"
-        elif instance_size == "large":
-            memory_requests = "40Gi"
 
         if instance_size == "medium":
-            memory_requests = "10Gi"
+            memory_requests = "5Gi"
         elif instance_size == "large":
-            memory_requests = "20Gi"
+            memory_requests = "10Gi"
 
         container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
 
