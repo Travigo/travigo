@@ -25,21 +25,26 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
     node_selector = None
     container_resources = None
     if instance_size == "medium" or instance_size == "large":
-        node_selector = {"cloud.google.com/gke-nodepool": "large-batch-burst"}
-        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
+        # node_selector = {"cloud.google.com/gke-nodepool": "large-batch-burst"}
+        # tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
 
         if instance_size == "medium":
             memory_requests = "20Gi"
         elif instance_size == "large":
             memory_requests = "40Gi"
 
+        if instance_size == "medium":
+            memory_requests = "10Gi"
+        elif instance_size == "large":
+            memory_requests = "20Gi"
+
         container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
 
-    if instance_size == "index_small":
-        node_selector = {"cloud.google.com/gke-nodepool": "small-batch-burst"}
-        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="SMALL_BATCH_BURST", operator="Equal", value="true"))
+    # if instance_size == "index_small":
+    #     node_selector = {"cloud.google.com/gke-nodepool": "small-batch-burst"}
+    #     tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="SMALL_BATCH_BURST", operator="Equal", value="true"))
 
-        container_resources = k8s.V1ResourceRequirements(requests={"memory": "4Gi"})
+    #     container_resources = k8s.V1ResourceRequirements(requests={"memory": "4Gi"})
 
     k = KubernetesPodOperator(
       namespace='default',
