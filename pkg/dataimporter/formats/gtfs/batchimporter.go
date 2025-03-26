@@ -28,14 +28,15 @@ type DatabaseBatchProcessingQueue struct {
 	EmptyTimeout time.Duration
 
 	items             chan (mongo.WriteModel)
-	itemsWriteLock    sync.WaitGroup
+	itemsWriteLock    sync.RWMutex
 	lastItemProcessed time.Time
 	ticker            *time.Ticker
 }
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
-	b.itemsWriteLock.Wait()
+	b.itemsWriteLock.RLock()
 	b.items <- item
+	b.itemsWriteLock.RUnlock()
 }
 
 func (b *DatabaseBatchProcessingQueue) Process() {
@@ -48,7 +49,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 			batchItems := []mongo.WriteModel{}
 
 
-			b.itemsWriteLock.Add(1)
+			b.itemsWriteLock.Lock()
 			running := true
 
 			for running {
@@ -70,7 +71,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 			}
 
 			runtime.GC()
-			b.itemsWriteLock.Done()
+			b.itemsWriteLock.Unlock()
 		}
 	}(b)
 }
