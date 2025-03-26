@@ -83,6 +83,15 @@ datasets:
     realtimejourneys: true
   linkeddataset: jp-odpt-yokohama-train
   importdestination: realtime-queue
+- identifier: realtime-yokohama-train-location
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_vehicle"
+  supportedobjects:
+    realtimejourneys: true
+  customconfig:
+    locationonly: true
+  linkeddataset: jp-odpt-yokohama-train
+  importdestination: realtime-queue
 - identifier: realtime-yokohama-train-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
@@ -96,6 +105,15 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
   supportedobjects:
     realtimejourneys: true
+  linkeddataset: jp-odpt-yokohama-bus
+  importdestination: realtime-queue
+- identifier: realtime-yokohama-bus-location
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_vehicle"
+  supportedobjects:
+    realtimejourneys: true
+  customconfig:
+    locationonly: true
   linkeddataset: jp-odpt-yokohama-bus
   importdestination: realtime-queue
 - identifier: realtime-yokohama-bus-alert

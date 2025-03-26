@@ -96,11 +96,17 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			}
 		}
 
-		if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
+		if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip || vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
 			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
 
 			if identifiedJourneyID != "" {
-				writeModel, _ := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+				var writeModel mongo.WriteModel
+
+				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
+					writeModel, _ = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+				} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
+					writeModel, _ = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+				}
 
 				if writeModel != nil {
 					realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)

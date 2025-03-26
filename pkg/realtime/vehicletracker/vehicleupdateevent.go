@@ -24,6 +24,7 @@ type VehicleUpdateEventType string
 
 const (
 	VehicleUpdateEventTypeTrip         VehicleUpdateEventType = "Trip"
+	VehicleUpdateEventTypeLocationOnly                        = "LocationOnly"
 	VehicleUpdateEventTypeServiceAlert                        = "ServiceAlert"
 )
 

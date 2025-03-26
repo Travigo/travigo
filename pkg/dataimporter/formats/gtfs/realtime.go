@@ -51,6 +51,11 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return errors.New("This format requires realtimejourneys to be enabled")
 	}
 
+	locationEventType := vehicletracker.VehicleUpdateEventTypeTrip
+	if dataset.CustomConfig["locationonly"] == "true" {
+		locationEventType = vehicletracker.VehicleUpdateEventTypeLocationOnly
+	}
+
 	body, err := io.ReadAll(r.reader)
 	if err != nil {
 		return err
@@ -201,7 +206,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
 			locationEvent := vehicletracker.VehicleUpdateEvent{
-				MessageType: vehicletracker.VehicleUpdateEventTypeTrip,
+				MessageType: locationEventType,
 				LocalID:     fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
 				SourceType:  "GTFS-RT",
 				VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
