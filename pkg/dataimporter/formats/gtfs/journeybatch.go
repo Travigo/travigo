@@ -33,7 +33,7 @@ type DatabaseBatchProcessingQueue struct {
 }
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
-	lastItemProcessed.Wait()
+	b.lastItemProcessed.Wait()
 	b.items <- item
 }
 
@@ -47,7 +47,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 			batchItems := []mongo.WriteModel{}
 
 
-			itemsWriteLock.Add(1)
+			b.itemsWriteLock.Add(1)
 			running := true
 
 			for running {
@@ -68,7 +68,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 				}
 			}
 
-			itemsWriteLock.Done()
+			b.itemsWriteLock.Done()
 		}
 	}(b)
 }
