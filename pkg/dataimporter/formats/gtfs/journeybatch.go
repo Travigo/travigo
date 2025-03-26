@@ -3,6 +3,7 @@ package gtfs
 import (
 	"context"
 	"time"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
@@ -26,11 +27,13 @@ type DatabaseBatchProcessingQueue struct {
 	EmptyTimeout time.Duration
 
 	items             chan (mongo.WriteModel)
+	itemsWriteLock    sync.WaitGroup
 	lastItemProcessed time.Time
 	ticker            *time.Ticker
 }
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
+	lastItemProcessed.Wait()
 	b.items <- item
 }
 
@@ -43,6 +46,8 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 		for range b.ticker.C {
 			batchItems := []mongo.WriteModel{}
 
+
+			itemsWriteLock.Add(1)
 			running := true
 
 			for running {
@@ -62,6 +67,8 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
 				}
 			}
+
+			itemsWriteLock.Done()
 		}
 	}(b)
 }
