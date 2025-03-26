@@ -53,6 +53,15 @@ datasets:
     services:  true
     journeys:  true
 
+- identifier: realtime-tokyo-metro-alert
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-tokyo-metro-schedule
+  importdestination: realtime-queue
+  refreshinterval: 1800s
+
 - identifier: realtime-toei-train-trip-update
   format: gtfs-realtime
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_trip_update"
@@ -81,7 +90,7 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_trip_update"
   supportedobjects:
     realtimejourneys: true
-  linkeddataset: jp-odpt-yokohama-train
+  linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
 - identifier: realtime-yokohama-train-location
   format: gtfs-realtime
@@ -90,14 +99,14 @@ datasets:
     realtimejourneys: true
   customconfig:
     locationonly: true
-  linkeddataset: jp-odpt-yokohama-train
+  linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
 - identifier: realtime-yokohama-train-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
   supportedobjects:
     realtimejourneys: true
-  linkeddataset: jp-odpt-yokohama-train
+  linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
   refreshinterval: 1800s
 - identifier: realtime-yokohama-bus-update
@@ -105,7 +114,7 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
   supportedobjects:
     realtimejourneys: true
-  linkeddataset: jp-odpt-yokohama-bus
+  linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
 - identifier: realtime-yokohama-bus-location
   format: gtfs-realtime
@@ -114,13 +123,13 @@ datasets:
     realtimejourneys: true
   customconfig:
     locationonly: true
-  linkeddataset: jp-odpt-yokohama-bus
+  linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
 - identifier: realtime-yokohama-bus-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_alert"
   supportedobjects:
     realtimejourneys: true
-  linkeddataset: jp-odpt-yokohama-bus
+  linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
   refreshinterval: 1800s
