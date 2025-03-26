@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 	"sync"
+	"runtime"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
@@ -33,7 +34,7 @@ type DatabaseBatchProcessingQueue struct {
 }
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
-	b.lastItemProcessed.Wait()
+	b.itemsWriteLock.Wait()
 	b.items <- item
 }
 
@@ -68,6 +69,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 				}
 			}
 
+			runtime.GC()
 			b.itemsWriteLock.Done()
 		}
 	}(b)
