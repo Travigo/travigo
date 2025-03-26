@@ -52,13 +52,49 @@ datasets:
     stops:     true
     services:  true
     journeys:  true
+- identifier: schedule-twr-train
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/TWR/data/TWR-Train-GTFS.zip"
+  datasetsize: small
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+- identifier: schedule-tama-monorail
+  format: gtfs-schedule
+  source: "https://api.odpt.org/api/v4/files/TamaMonorail/data/TamaMonorail-Train-GTFS.zip"
+  datasetsize: small
+  supportedobjects:
+    operators: true
+    stops:     true
+    services:  true
+    journeys:  true
+
+- identifier: realtime-twr-train-alert
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/twr_odpt_train_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-schedule-twr-train
+  importdestination: realtime-queue
+  refreshinterval: 1800s
+
+- identifier: realtime-tama-monorail-alert
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/tamamonorail_odpt_train_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-schedule-tama-monorail
+  importdestination: realtime-queue
+  refreshinterval: 1800s
 
 - identifier: realtime-tokyo-metro-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert"
   supportedobjects:
     realtimejourneys: true
-  linkeddataset: jp-odpt-tokyo-metro-schedule
+  linkeddataset: jp-odpt-schedule-tokyo-metro
   importdestination: realtime-queue
   refreshinterval: 1800s
 
