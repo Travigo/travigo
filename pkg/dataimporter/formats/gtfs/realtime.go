@@ -79,7 +79,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		var trip *gtfs.TripDescriptor
 		var recordedAtTime time.Time
 
-		if vehiclePosition != nil {
+		if vehiclePosition != nil && vehiclePosition.Timestamp != nil {
 			trip = vehiclePosition.GetTrip()
 			recordedAtTime = time.Unix(int64(*vehiclePosition.Timestamp), 0)
 
