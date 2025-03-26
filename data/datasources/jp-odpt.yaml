@@ -75,3 +75,34 @@ datasets:
     realtimejourneys: true
   linkeddataset: jp-odpt-schedule-toei-bus
   importdestination: realtime-queue
+
+- identifier: realtime-yokohama-train-update
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_trip_update"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-yokohama-train
+  importdestination: realtime-queue
+- identifier: realtime-yokohama-train-alert
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-yokohama-train
+  importdestination: realtime-queue
+  refreshinterval: 1800s
+- identifier: realtime-yokohama-bus-update
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-yokohama-bus
+  importdestination: realtime-queue
+- identifier: realtime-yokohama-bus-alert
+  format: gtfs-realtime
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-yokohama-bus
+  importdestination: realtime-queue
+  refreshinterval: 1800s
