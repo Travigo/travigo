@@ -52,3 +52,26 @@ datasets:
     stops:     true
     services:  true
     journeys:  true
+
+- identifier: realtime-toei-train-trip-update
+  format: gtfs-realtime
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_trip_update"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-schedule-toei-train
+  importdestination: realtime-queue
+- identifier: realtime-toei-train-trip-alert
+  format: gtfs-realtime
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_alert"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-schedule-toei-train
+  importdestination: realtime-queue
+  refreshinterval: 1800s
+- identifier: realtime-toei-bus-trip-position
+  format: gtfs-realtime
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: jp-odpt-schedule-toei-bus
+  importdestination: realtime-queue
