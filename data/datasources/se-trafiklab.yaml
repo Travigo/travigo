@@ -10,7 +10,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://opendata.samtrafiken.se/gtfs-sweden/sweden.zip"
-  datasetsize: large
+  datasetsize: medium
   sourceauthentication:
     query:
       key: TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY

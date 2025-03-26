@@ -10,20 +10,20 @@ datasets:
   supportedobjects:
     stops:      true
     stopgroups: true
-# - identifier: bods-gtfs-schedule
-#   format: gtfs-schedule
-#   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
-#   datasetsize: large
-#   supportedobjects:
-#     services: true
-#     journeys: true
-#   ignoreobjects:
-#     services:
-#       byoperator:
-#       - gb-noc-NATX
-#     journeys:
-#       byoperator:
-#       - gb-noc-NATX
+- identifier: bods-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
 - identifier: bods-transxchange-coach
   format: gb-transxchange
   source: "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip"
@@ -48,39 +48,39 @@ datasets:
       - gb-noc-MEGA
       - gb-noc-SCLK
       - gb-noc-ULSL
-# - identifier: bods-sirivm-all
-#   format: eu-siri-vm
-#   source: "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"
-#   refreshinterval: 30s
-#   sourceauthentication:
-#     query:
-#       api_key: TRAVIGO_BODS_API_KEY
-#   supportedobjects:
-#     realtimejourneys: true
-#   linkeddataset: gb-dft-bods-gtfs-schedule
-#   unpackbundle: zip
-#   importdestination: realtime-queue
-# - identifier: bods-gtfs-realtime
-#   format: gtfs-realtime
-#   source: "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"
-#   refreshinterval: 10s
-#   sourceauthentication:
-#     query:
-#       api_key: TRAVIGO_BODS_API_KEY
-#   supportedobjects:
-#     realtimejourneys: true
-#   linkeddataset: gb-dft-bods-gtfs-schedule
-#   unpackbundle: zip
-#   importdestination: realtime-queue
-# - identifier: bods-sirisx-all
-#   format: eu-siri-sx
-#   source: "https://data.bus-data.dft.gov.uk/disruptions/download/bulk_archive"
-#   refreshinterval: 5m
-#   sourceauthentication:
-#     query:
-#       api_key: TRAVIGO_BODS_API_KEY
-#   supportedobjects:
-#     servicealerts: true
-#   linkeddataset: gb-dft-bods-gtfs-schedule
-#   unpackbundle: zip
-#   importdestination: realtime-queue
+- identifier: bods-sirivm-all
+  format: eu-siri-vm
+  source: "https://data.bus-data.dft.gov.uk/avl/download/bulk_archive"
+  refreshinterval: 30s
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: gb-dft-bods-gtfs-schedule
+  unpackbundle: zip
+  importdestination: realtime-queue
+- identifier: bods-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"
+  refreshinterval: 10s
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: gb-dft-bods-gtfs-schedule
+  unpackbundle: zip
+  importdestination: realtime-queue
+- identifier: bods-sirisx-all
+  format: eu-siri-sx
+  source: "https://data.bus-data.dft.gov.uk/disruptions/download/bulk_archive"
+  refreshinterval: 5m
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    servicealerts: true
+  linkeddataset: gb-dft-bods-gtfs-schedule
+  unpackbundle: zip
+  importdestination: realtime-queue

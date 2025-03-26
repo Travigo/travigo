@@ -94,7 +94,7 @@ spec:
                 - name: TRAVIGO_JP_ODPT_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: {{ $.Values.jp_odpt.realtimeSecret }}
+                      name: {{ $.Values.jp_odpt.apiKeySecret }}
                       key: api_key
                       optional: false
                 - name: TRAVIGO_MONGODB_CONNECTION
