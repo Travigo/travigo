@@ -3,20 +3,20 @@ region: de
 provider:
   name: GTFS.de
   website: "https://gtfs.de"
-datasets:
-- identifier: gtfs-schedule
-  format: gtfs-schedule
-  source: "https://download.gtfs.de/germany/free/latest.zip"
-  datasetsize: medium
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
-- identifier: gtfs-realtime
-  format: gtfs-realtime
-  source: "https://realtime.gtfs.de/realtime-free.pb"
-  supportedobjects:
-    realtimejourneys: true
-  linkeddataset: de-gtfs-gtfs-schedule
-  importdestination: realtime-queue
+datasets: []
+# - identifier: gtfs-schedule
+#   format: gtfs-schedule
+#   source: "https://download.gtfs.de/germany/free/latest.zip"
+#   datasetsize: medium
+#   supportedobjects:
+#     operators: true
+#     stops:     true
+#     services:  true
+#     journeys:  true
+# - identifier: gtfs-realtime
+#   format: gtfs-realtime
+#   source: "https://realtime.gtfs.de/realtime-free.pb"
+#   supportedobjects:
+#     realtimejourneys: true
+#   linkeddataset: de-gtfs-gtfs-schedule
+#   importdestination: realtime-queue

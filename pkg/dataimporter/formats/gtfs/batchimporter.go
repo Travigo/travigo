@@ -2,8 +2,6 @@ package gtfs
 
 import (
 	"context"
-	"runtime"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -19,8 +17,6 @@ func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Durati
 		EmptyTimeout:      emptyTimeout,
 		items:             make(chan mongo.WriteModel, batchSize),
 		lastItemProcessed: time.Now(),
-
-		itemsWriteLock: sync.RWMutex{},
 	}
 }
 
@@ -30,15 +26,11 @@ type DatabaseBatchProcessingQueue struct {
 	EmptyTimeout time.Duration
 
 	items             chan (mongo.WriteModel)
-	itemsWriteLock    sync.RWMutex
 	lastItemProcessed time.Time
 	ticker            *time.Ticker
 }
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
-	b.itemsWriteLock.RLock()
-	b.itemsWriteLock.RUnlock()
-
 	b.items <- item
 }
 
@@ -51,7 +43,6 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 		for range b.ticker.C {
 			batchItems := []mongo.WriteModel{}
 
-			b.itemsWriteLock.Lock()
 			running := true
 
 			for running {
@@ -71,9 +62,6 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
 				}
 			}
-
-			runtime.GC()
-			b.itemsWriteLock.Unlock()
 		}
 	}(b)
 }
