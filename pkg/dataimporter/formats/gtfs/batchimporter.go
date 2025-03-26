@@ -2,9 +2,9 @@ package gtfs
 
 import (
 	"context"
-	"time"
-	"sync"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
@@ -19,6 +19,8 @@ func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Durati
 		EmptyTimeout:      emptyTimeout,
 		items:             make(chan mongo.WriteModel, batchSize),
 		lastItemProcessed: time.Now(),
+
+		itemsWriteLock: sync.RWMutex{},
 	}
 }
 
@@ -35,8 +37,9 @@ type DatabaseBatchProcessingQueue struct {
 
 func (b *DatabaseBatchProcessingQueue) Add(item mongo.WriteModel) {
 	b.itemsWriteLock.RLock()
-	b.items <- item
 	b.itemsWriteLock.RUnlock()
+
+	b.items <- item
 }
 
 func (b *DatabaseBatchProcessingQueue) Process() {
@@ -47,7 +50,6 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 
 		for range b.ticker.C {
 			batchItems := []mongo.WriteModel{}
-
 
 			b.itemsWriteLock.Lock()
 			running := true
