@@ -31,7 +31,7 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
             memory_requests = "5Gi"
             node_selector = {"kube.travigo.app/batch-burst-size": "medium"}
         elif instance_size == "large":
-            memory_requests = "10Gi"
+            memory_requests = "20Gi"
             node_selector = {"kube.travigo.app/batch-burst-size": "large"}
 
         container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
