@@ -382,7 +382,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 1000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 4000)
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
