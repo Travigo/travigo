@@ -157,8 +157,6 @@ with DAG(
         "large": TaskGroup("large"),
     }
 
-    stop_linker >> stop_indexer
-
     pathlist = Path("/opt/airflow/dags/repo/data/datasources").glob('**/*.yaml')
     for path in pathlist:
         # because path is object not string
