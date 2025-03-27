@@ -25,14 +25,14 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
     node_selector = None
     container_resources = None
     if instance_size == "medium" or instance_size == "large":
-        # node_selector = {"cloud.google.com/gke-nodepool": "large-batch-burst"}
-        # tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="BATCH_BURST", operator="Equal", value="true"))
-
+        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="kube.travigo.app/batch-burst", operator="Equal", value="true"))
 
         if instance_size == "medium":
             memory_requests = "5Gi"
+            node_selector = {"kube.travigo.app/batch-burst-size": "medium"}
         elif instance_size == "large":
             memory_requests = "10Gi"
+            node_selector = {"kube.travigo.app/batch-burst-size": "large"}
 
         container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
 
@@ -143,7 +143,7 @@ with DAG(
     start_date=days_ago(2),
     catchup=False,
     max_active_runs=1,
-    concurrency=1, #2
+    concurrency=2,
 ) as dag:
     start = DummyOperator(task_id="start")
     end = DummyOperator(task_id="end")
