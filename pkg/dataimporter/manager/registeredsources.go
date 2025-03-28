@@ -70,6 +70,20 @@ func GetRegisteredDataSets() []datasets.DataSet {
 				dataset.SourceAuthentication = datasource.SourceAuthentication
 			}
 
+			if (dataset.SupportedObjects == datasets.SupportedObjects{}) {
+				dataset.SupportedObjects = datasets.SupportedObjects{
+					Operators:      true,
+					OperatorGroups: true,
+					Stops:          true,
+					StopGroups:     true,
+					Services:       true,
+					Journeys:       true,
+
+					RealtimeJourneys: true,
+					ServiceAlerts:    true,
+				}
+			}
+
 			registeredDatasets = append(registeredDatasets, dataset)
 		}
 	}

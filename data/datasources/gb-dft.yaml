@@ -7,9 +7,6 @@ datasets:
 - identifier: naptan
   format: gb-naptan
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
-  supportedobjects:
-    stops:      true
-    stopgroups: true
 - identifier: bods-gtfs-schedule
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
@@ -55,8 +52,6 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule
   unpackbundle: zip
   importdestination: realtime-queue
@@ -67,8 +62,6 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule
   unpackbundle: zip
   importdestination: realtime-queue
@@ -79,8 +72,6 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
-  supportedobjects:
-    servicealerts: true
   linkeddataset: gb-dft-bods-gtfs-schedule
   unpackbundle: zip
   importdestination: realtime-queue

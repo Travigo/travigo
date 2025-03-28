@@ -11,6 +11,4 @@ datasets:
     basic:
       username: TRAVIGO_NETWORKRAIL_USERNAME
       password: TRAVIGO_NETWORKRAIL_PASSWORD
-  supportedobjects:
-    stops: true
   unpackbundle: gz

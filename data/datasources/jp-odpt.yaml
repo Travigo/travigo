@@ -11,71 +11,34 @@ datasets:
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-toei-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-tokyo-metro
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-yokohama-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Train-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-yokohama-bus
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Bus-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-twr-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TWR/data/TWR-Train-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 - identifier: schedule-tama-monorail
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TamaMonorail/data/TamaMonorail-Train-GTFS.zip"
   datasetsize: small
-  supportedobjects:
-    operators: true
-    stops:     true
-    services:  true
-    journeys:  true
 
 - identifier: realtime-twr-train-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/twr_odpt_train_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-twr-train
   importdestination: realtime-queue
   refreshinterval: 1800s
@@ -83,8 +46,6 @@ datasets:
 - identifier: realtime-tama-monorail-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tamamonorail_odpt_train_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-tama-monorail
   importdestination: realtime-queue
   refreshinterval: 1800s
@@ -92,8 +53,6 @@ datasets:
 - identifier: realtime-tokyo-metro-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-tokyo-metro
   importdestination: realtime-queue
   refreshinterval: 1800s
@@ -101,38 +60,28 @@ datasets:
 - identifier: realtime-toei-train-trip-update
   format: gtfs-realtime
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_trip_update"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-toei-train
   importdestination: realtime-queue
 - identifier: realtime-toei-train-trip-alert
   format: gtfs-realtime
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-toei-train
   importdestination: realtime-queue
   refreshinterval: 1800s
 - identifier: realtime-toei-bus-trip-position
   format: gtfs-realtime
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-toei-bus
   importdestination: realtime-queue
 
 - identifier: realtime-yokohama-train-update
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_trip_update"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
 - identifier: realtime-yokohama-train-location
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_vehicle"
-  supportedobjects:
-    realtimejourneys: true
   customconfig:
     locationonly: true
   linkeddataset: jp-odpt-schedule-yokohama-train
@@ -140,23 +89,17 @@ datasets:
 - identifier: realtime-yokohama-train-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
   refreshinterval: 1800s
 - identifier: realtime-yokohama-bus-update
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
 - identifier: realtime-yokohama-bus-location
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_vehicle"
-  supportedobjects:
-    realtimejourneys: true
   customconfig:
     locationonly: true
   linkeddataset: jp-odpt-schedule-yokohama-bus
@@ -164,8 +107,6 @@ datasets:
 - identifier: realtime-yokohama-bus-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_alert"
-  supportedobjects:
-    realtimejourneys: true
   linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
   refreshinterval: 1800s
