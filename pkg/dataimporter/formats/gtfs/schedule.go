@@ -86,6 +86,8 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 	log.Info().Str("table", tableName).Msg("Processing Table")
 	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 5000)
 	if toProcess {
+		// TODO no? make a size param
+		processingQueue.Process()
 		processingQueue.Process()
 	}
 
@@ -382,8 +384,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 4000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 2*time.Second, 1*time.Minute, 1000)
 	if dataset.SupportedObjects.Journeys {
+		// TODO no? make a size param
+		journeysQueue.Process()
+		journeysQueue.Process()
+		journeysQueue.Process()
 		journeysQueue.Process()
 	}
 
