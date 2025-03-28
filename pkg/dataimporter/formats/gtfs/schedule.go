@@ -391,6 +391,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Process()
 		journeysQueue.Process()
 		journeysQueue.Process()
+		journeysQueue.Process()
+		journeysQueue.Process()
 	}
 
 	for tripID, tripSequencyMap := range g.tripStopSequenceMap {
