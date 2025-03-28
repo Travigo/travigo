@@ -231,6 +231,7 @@ jobs:
     - uses: azure/aks-set-context@v4
       with:
         resource-group: 'travigo'
+        admin: true
         cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
@@ -271,6 +272,7 @@ jobs:
     - uses: azure/aks-set-context@v4
       with:
         resource-group: 'travigo'
+        admin: true
         cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
@@ -311,6 +313,7 @@ jobs:
     - uses: azure/aks-set-context@v4
       with:
         resource-group: 'travigo'
+        admin: true
         cluster-name: 'travigo-aks'
   
     - name: Helm upgrade
@@ -350,6 +353,7 @@ jobs:
     - uses: azure/aks-set-context@v4
       with:
         resource-group: 'travigo'
+        admin: true
         cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
