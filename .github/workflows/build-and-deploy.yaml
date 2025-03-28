@@ -274,13 +274,11 @@ jobs:
         client-id: ${{ secrets.AZURE_CLIENT_ID }}
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - name: Azure CLI script
-      uses: azure/cli@v2
+
+    - uses: azure/aks-set-context@v4
       with:
-        azcliversion: latest
-        inlineScript: |
-          az aks get-credentials --admin --name travigo-aks --resource-group travigo
+        resource-group: 'travigo'
+        cluster-name: 'tavigo-aks'
 
     - name: Helm upgrade
       run: |-
@@ -317,13 +315,11 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   
-    - name: Azure CLI script
-      uses: azure/cli@v2
+    - uses: azure/aks-set-context@v4
       with:
-        azcliversion: latest
-        inlineScript: |
-          az aks get-credentials --admin --name travigo-aks --resource-group travigo
-
+        resource-group: 'travigo'
+        cluster-name: 'tavigo-aks'
+  
     - name: Helm upgrade
       run: |-
         helm upgrade -i travigo-notify ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml
@@ -358,12 +354,10 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
   
-    - name: Azure CLI script
-      uses: azure/cli@v2
+    - uses: azure/aks-set-context@v4
       with:
-        azcliversion: latest
-        inlineScript: |
-          az aks get-credentials --admin --name travigo-aks --resource-group travigo
+        resource-group: 'travigo'
+        cluster-name: 'tavigo-aks'
 
     - name: Helm upgrade
       run: |-
