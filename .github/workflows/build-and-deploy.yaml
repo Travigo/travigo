@@ -333,16 +333,19 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Get GCP Auth
-      uses: 'google-github-actions/auth@v2'
+    - name: Azure CLI Login
+      uses: azure/login@v2
       with:
-        workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-        service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-    - name: Get GKE Cluster
-      uses: 'google-github-actions/get-gke-credentials@v2'
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  
+    - name: Azure CLI script
+      uses: azure/cli@v2
       with:
-        cluster_name: ${{ env.GKE_CLUSTER }}
-        location: ${{ env.GCP_ZONE }}
+        azcliversion: latest
+        inlineScript: |
+          az aks get-credentials --admin --name travigo-aks --resource-group travigo
 
     - name: Helm upgrade
       run: |-
