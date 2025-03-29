@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
-	"github.com/trimmer-io/go-csv"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/exp/maps"
