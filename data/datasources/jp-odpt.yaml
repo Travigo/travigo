@@ -41,21 +41,18 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/twr_odpt_train_alert"
   linkeddataset: jp-odpt-schedule-twr-train
   importdestination: realtime-queue
-  refreshinterval: 1800s
 
 - identifier: realtime-tama-monorail-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tamamonorail_odpt_train_alert"
   linkeddataset: jp-odpt-schedule-tama-monorail
   importdestination: realtime-queue
-  refreshinterval: 1800s
 
 - identifier: realtime-tokyo-metro-alert
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert"
   linkeddataset: jp-odpt-schedule-tokyo-metro
   importdestination: realtime-queue
-  refreshinterval: 1800s
 
 - identifier: realtime-toei-train-trip-update
   format: gtfs-realtime
@@ -67,7 +64,6 @@ datasets:
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_alert"
   linkeddataset: jp-odpt-schedule-toei-train
   importdestination: realtime-queue
-  refreshinterval: 1800s
 - identifier: realtime-toei-bus-trip-position
   format: gtfs-realtime
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus"
@@ -91,7 +87,6 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
   linkeddataset: jp-odpt-schedule-yokohama-train
   importdestination: realtime-queue
-  refreshinterval: 1800s
 - identifier: realtime-yokohama-bus-update
   format: gtfs-realtime
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
@@ -109,4 +104,3 @@ datasets:
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_alert"
   linkeddataset: jp-odpt-schedule-yokohama-bus
   importdestination: realtime-queue
-  refreshinterval: 1800s

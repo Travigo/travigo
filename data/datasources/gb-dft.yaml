@@ -58,7 +58,7 @@ datasets:
 - identifier: bods-gtfs-realtime
   format: gtfs-realtime
   source: "https://data.bus-data.dft.gov.uk/avl/download/gtfsrt"
-  refreshinterval: 20s
+  refreshinterval: 15s
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
