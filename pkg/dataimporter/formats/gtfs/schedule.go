@@ -208,7 +208,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	//// Calendars ////
 	g.calendarMapping = map[string]*Calendar{}
 	g.calendarDateMapping = map[string][]*CalendarDate{}
-	importObject[Calendar](g, "calendars.txt", "calendars", false, func(c Calendar) (any, string) {
+	importObject[Calendar](g, "calendar.txt", "calendars", false, func(c Calendar) (any, string) {
 		g.calendarMapping[c.ServiceID] = &c
 
 		return nil, ""
