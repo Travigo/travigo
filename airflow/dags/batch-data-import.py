@@ -139,7 +139,7 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
 with DAG(
     dag_id='batch-data-import',
     default_args=default_args,
-    schedule_interval="0 7 * * *",
+    schedule_interval="0 6 * * *",
     start_date=days_ago(2),
     catchup=False,
     max_active_runs=1,
