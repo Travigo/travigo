@@ -43,67 +43,52 @@ Match:
   OperatorRef: "gb-noc-TRAM"
 Data:
   OperatorRef: "gb-noc-TFLO"
-# River Bus
----
-Type: ctdf.Service
-Group: gb-dft-bods-gtfs-schedule
-Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
-Data:
-  OperatorRef: "gb-noc-TFLO"
----
-Type: ctdf.Journey
-Group: gb-dft-bods-gtfs-schedule
-Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP454"
-Data:
-  OperatorRef: "gb-noc-TFLO"
 
 # Woolwich Ferry
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5823"
+  OperatorRef: "gb-noc-NWFF"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5823"
+  OperatorRef: "gb-noc-NWFF"
 Data:
   OperatorRef: "gb-noc-TFLO"
 
-# Thames River Services
+# Thames Clippers
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5820"
+  OperatorRef: "gb-noc-NTHC"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5820"
+  OperatorRef: "gb-noc-NTHC"
 Data:
   OperatorRef: "gb-noc-TFLO"
 
 # Cable Car
 ---
-Type: ctdf.Journey
-Group: gb-dft-bods-gtfs-schedule
-Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
-Data:
-  OperatorRef: "gb-noc-TFLO"
----
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3565"
+  OperatorRef: "gb-noc-IFSC"
 Data:
   OperatorRef: "gb-noc-TFLO"
-  # TransportType: CableCar
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-noc-IFSC"
+Data:
+  OperatorRef: "gb-noc-TFLO"
+
