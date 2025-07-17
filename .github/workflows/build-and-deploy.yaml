@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.claydonlee.com/realtime-stats/queue
+      url: https://api-travigo.claydonlee.com/realtime-stats/queue
 
     needs: travigo-docker
 
@@ -164,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.claydonlee.com/core
+      url: https://api-travigo.claydonlee.com/core
 
     needs: travigo-docker
 
@@ -206,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.claydonlee.com/stats
+      url: https://api-travigo.claydonlee.com/stats
 
     needs: travigo-docker
 
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.claydonlee.com/events-queue/stats
+      url: https://api-travigo.claydonlee.com/events-queue/stats
 
     needs: travigo-docker
 
@@ -288,7 +288,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: 
       name: production
-      url: https://api.travigo.claydonlee.com/notify-queue/stats
+      url: https://api-travigo.claydonlee.com/notify-queue/stats
 
     needs: travigo-docker
 
