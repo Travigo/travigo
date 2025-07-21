@@ -21,7 +21,7 @@ datasets:
   datasetsize: small
 - identifier: schedule-yokohama-train
   format: gtfs-schedule
-  source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Train-GTFS.zip"
+  source: "https://api.odpt.org/api/v4/files/odpt/YokohamaMunicipal/Train.zip?date=20241227"
   datasetsize: small
 - identifier: schedule-yokohama-bus
   format: gtfs-schedule
