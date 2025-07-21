@@ -104,6 +104,20 @@ Data:
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
+  OperatorRef: "gb-noc-AVLO"
+Data:
+  OperatorRef: "gb-noc-TFLO"
+---
+Type: ctdf.Service
+Group: gb-dft-bods-gtfs-schedule
+Match:
+  OperatorRef: "gb-noc-AVLO"
+Data:
+  OperatorRef: "gb-noc-TFLO"
+---
+Type: ctdf.Journey
+Group: gb-dft-bods-gtfs-schedule
+Match:
   OperatorRef: "gb-noc-ALSO"
 Data:
   OperatorRef: "gb-noc-TFLO"
