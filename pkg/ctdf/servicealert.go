@@ -26,17 +26,17 @@ type ServiceAlertType string
 
 const (
 	ServiceAlertTypeInformation               ServiceAlertType = "Information"
-	ServiceAlertTypeWarning                                    = "Warning"
-	ServiceAlertTypeStopClosed                                 = "StopClosed"
-	ServiceAlertTypeServiceSuspended                           = "ServiceSuspended"
-	ServiceAlertTypeServicePartSuspended                       = "ServicePartSuspended"
-	ServiceAlertTypeSevereDelays                               = "SevereDelays"
-	ServiceAlertTypeDelays                                     = "Delays"
-	ServiceAlertTypeMinorDelays                                = "MinorDelays"
-	ServiceAlertTypePlanned                                    = "Planned"
-	ServiceAlertTypeJourneyDelayed                             = "JourneyDelayed"
-	ServiceAlertTypeJourneyPartiallyCancelled                  = "JourneyPartiallyCancelled"
-	ServiceAlertTypeJourneyCancelled                           = "JourneyCancelled"
+	ServiceAlertTypeWarning                   ServiceAlertType = "Warning"
+	ServiceAlertTypeStopClosed                ServiceAlertType = "StopClosed"
+	ServiceAlertTypeServiceSuspended          ServiceAlertType = "ServiceSuspended"
+	ServiceAlertTypeServicePartSuspended      ServiceAlertType = "ServicePartSuspended"
+	ServiceAlertTypeSevereDelays              ServiceAlertType = "SevereDelays"
+	ServiceAlertTypeDelays                    ServiceAlertType = "Delays"
+	ServiceAlertTypeMinorDelays               ServiceAlertType = "MinorDelays"
+	ServiceAlertTypePlanned                   ServiceAlertType = "Planned"
+	ServiceAlertTypeJourneyDelayed            ServiceAlertType = "JourneyDelayed"
+	ServiceAlertTypeJourneyPartiallyCancelled ServiceAlertType = "JourneyPartiallyCancelled"
+	ServiceAlertTypeJourneyCancelled          ServiceAlertType = "JourneyCancelled"
 )
 
 func (a *ServiceAlert) IsValid(checkTime time.Time) bool {

@@ -37,8 +37,8 @@ type JourneyDetailedRailSeating string
 
 const (
 	JourneyDetailedRailSeatingFirst    JourneyDetailedRailSeating = "First"
-	JourneyDetailedRailSeatingStandard                            = "Standard"
-	JourneyDetailedRailSeatingUnknown                             = "Unknown"
+	JourneyDetailedRailSeatingStandard JourneyDetailedRailSeating = "Standard"
+	JourneyDetailedRailSeatingUnknown  JourneyDetailedRailSeating = "Unknown"
 )
 
 type RailCarriage struct {

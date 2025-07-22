@@ -33,8 +33,8 @@ type TravelineData struct {
 
 func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 	emailRegex, _ := regexp.Compile("^[^@]+@[^@]+.[^@]+$")
-	phoneRegex, _ := regexp.Compile("^[\\d ]+$")
-	addressRegex, _ := regexp.Compile("^[a-zA-Z\\d ,]+$")
+	phoneRegex, _ := regexp.Compile(`^[\d ]+$`)
+	addressRegex, _ := regexp.Compile(`^[a-zA-Z\d ,]+$`)
 
 	if emailRegex.MatchString(value) {
 		ctdfOperator.Email = value

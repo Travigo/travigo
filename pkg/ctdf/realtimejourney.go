@@ -72,12 +72,12 @@ type RealtimeJourneyReliabilityType string
 
 const (
 	RealtimeJourneyReliabilityExternalProvided     RealtimeJourneyReliabilityType = "ExternalProvided"
-	RealtimeJourneyReliabilityLocationWithTrack                                   = "LocationWithTrack"
-	RealtimeJourneyReliabilityLocationWithoutTrack                                = "LocationWithoutTrack"
+	RealtimeJourneyReliabilityLocationWithTrack    RealtimeJourneyReliabilityType = "LocationWithTrack"
+	RealtimeJourneyReliabilityLocationWithoutTrack RealtimeJourneyReliabilityType = "LocationWithoutTrack"
 )
 
 func (r *RealtimeJourney) IsActive() bool {
-	timedOut := (time.Now().Sub(r.ModificationDateTime)).Minutes() > float64(r.TimeoutDurationMinutes)
+	timedOut := (time.Since(r.ModificationDateTime)).Minutes() > float64(r.TimeoutDurationMinutes)
 
 	if timedOut {
 		return false
@@ -141,7 +141,7 @@ type RealtimeJourneyStopTimeType string
 const (
 	// Unknown         RealtimeJourneyStopTimeType = "Unknown"
 	RealtimeJourneyStopTimeHistorical      RealtimeJourneyStopTimeType = "Historical"
-	RealtimeJourneyStopTimeEstimatedFuture                             = "EstimatedFuture"
+	RealtimeJourneyStopTimeEstimatedFuture RealtimeJourneyStopTimeType = "EstimatedFuture"
 )
 
 func GetShortActiveRealtimeJourneyCutOffDate() time.Time {

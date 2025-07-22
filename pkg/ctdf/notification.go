@@ -12,5 +12,5 @@ type NotificationType string
 
 const (
 	NotificationTypePush  NotificationType = "Push"
-	NotificationTypeEmail                  = "Email"
+	NotificationTypeEmail NotificationType = "Email"
 )

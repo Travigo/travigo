@@ -63,9 +63,9 @@ type AvailabilityRecordType string
 
 const (
 	AvailabilityDayOfWeek AvailabilityRecordType = "DayOfWeek"
-	AvailabilityDate                             = "Date"
-	AvailabilityDateRange                        = "DateRange"
-	AvailabilityMatchAll                         = "MatchAll"
+	AvailabilityDate      AvailabilityRecordType = "Date"
+	AvailabilityDateRange AvailabilityRecordType = "DateRange"
+	AvailabilityMatchAll  AvailabilityRecordType = "MatchAll"
 )
 
 const YearMonthDayFormat = "2006-01-02"

@@ -46,7 +46,7 @@ type Journey struct {
 
 	Path []*JourneyPathItem `groups:"detailed,departureboard-cache" bson:",omitempty"`
 
-	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-" bson:",omitempty"`
+	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
 
 	// Detailed journey information
 	DetailedRailInformation *JourneyDetailedRail `groups:"detailed" bson:",omitempty"`
