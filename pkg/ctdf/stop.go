@@ -52,6 +52,19 @@ type StopEntrance struct {
 	Location *Location `groups:"detailed"`
 }
 
+func (stop *Stop) GetPrimaryIdentifier() string {
+	return stop.PrimaryIdentifier
+}
+func (stop *Stop) GetCreationDateTime() time.Time {
+	return stop.CreationDateTime
+}
+func (stop *Stop) SetPrimaryIdentifier(id string) {
+	stop.PrimaryIdentifier = id
+}
+func (stop *Stop) SetOtherIdentifiers(ids []string) {
+	stop.OtherIdentifiers = ids
+}
+
 func (stop *Stop) GetAllStopIDs() []string {
 	allStopIDs := []string{
 		stop.PrimaryIdentifier,
