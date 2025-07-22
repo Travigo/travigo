@@ -84,7 +84,7 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 
 func importObject[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
 	log.Info().Str("table", tableName).Msg("Processing Table")
-	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 2000)
+	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 3000)
 	if toProcess {
 		processingQueue.Process()
 	}
@@ -382,7 +382,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 2000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 3000)
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
