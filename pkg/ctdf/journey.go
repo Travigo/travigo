@@ -29,7 +29,7 @@ type Journey struct {
 	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
-	Service    *Service `groups:"basic,departures-llm" bson:"-"` // TODO json:",omitempty"
+	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
 	OperatorRef string    `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
