@@ -91,7 +91,7 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 
 	// Tables
 	operatorsCollection := database.GetCollection("operators")
-	servicesCollection := database.GetCollection("services")
+	servicesCollection := database.GetCollection("services_raw")
 
 	// Import operators
 	log.Info().Msg("Importing CTDF Operators into Mongo")

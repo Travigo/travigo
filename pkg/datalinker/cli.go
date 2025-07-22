@@ -43,11 +43,9 @@ func RegisterCLI() *cli.Command {
 
 					dataType := c.String("type")
 
-					var linker Linker[*ctdf.Stop]
-
 					switch dataType {
 					case "stops":
-						linker = NewLinker[*ctdf.Stop]("stop", mongo.Pipeline{
+						linker := NewLinker[*ctdf.Stop]("stop", mongo.Pipeline{
 							bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
 							bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
 							bson.D{
@@ -76,38 +74,38 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
-					// case "services":
-					// 	linker = NewLinker[*ctdf.Service]("service", mongo.Pipeline{
-					// 		bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
-					// 		bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
-					// 		bson.D{
-					// 			{
-					// 				Key: "$match",
-					// 				Value: bson.M{
-					// 					"$or": bson.A{
-					// 						// Identical values of these we will be merging by
-					// 						bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
-					// 					},
-					// 				},
-					// 			},
-					// 		},
-					// 		bson.D{
-					// 			{Key: "$group",
-					// 				Value: bson.D{
-					// 					{Key: "_id", Value: "$otheridentifier"},
-					// 					{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
-					// 					{Key: "records", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
-					// 				},
-					// 			},
-					// 		},
-					// 		bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
-					// 		bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
-					// 	})
+						linker.Run()
+					case "services":
+						linker := NewLinker[*ctdf.Service]("service", mongo.Pipeline{
+							bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
+							bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
+							bson.D{
+								{
+									Key: "$match",
+									Value: bson.M{
+										"$or": bson.A{
+											// Identical values of these we will be merging by
+											bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
+										},
+									},
+								},
+							},
+							bson.D{
+								{Key: "$group",
+									Value: bson.D{
+										{Key: "_id", Value: "$otheridentifier"},
+										{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+										{Key: "records", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
+									},
+								},
+							},
+							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
+							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
+						})
+						linker.Run()
 					default:
 						return errors.New("Unknown type")
 					}
-
-					linker.Run()
 
 					return nil
 				},

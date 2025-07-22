@@ -229,7 +229,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	//// Routes / Services ////
 	g.ctdfServices = map[string]*ctdf.Service{}
 	g.routeMap = map[string]Route{}
-	importObject[Route](g, "routes.txt", "services", dataset.SupportedObjects.Services, func(r Route) (any, string) {
+	importObject[Route](g, "routes.txt", "services_raw", dataset.SupportedObjects.Services, func(r Route) (any, string) {
 		g.routeMap[r.ID] = r
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, r.ID)
 

@@ -238,7 +238,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			cleanupOldRecords("operator_groups", datasource)
 		}
 		if dataset.SupportedObjects.Services {
-			cleanupOldRecords("services", datasource)
+			cleanupOldRecords("services_raw", datasource)
 		}
 		if dataset.SupportedObjects.Journeys {
 			cleanupOldRecords("journeys", datasource)

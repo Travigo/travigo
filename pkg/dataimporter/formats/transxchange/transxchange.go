@@ -70,7 +70,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
 
-	servicesCollection := database.GetCollection("services")
+	servicesCollection := database.GetCollection("services_raw")
 	journeysCollection := database.GetCollection("journeys")
 
 	// Map the local operator references to globally unique operator codes based on NOC
