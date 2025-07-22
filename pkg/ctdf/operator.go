@@ -29,7 +29,7 @@ type Operator struct {
 	OperatorGroupRef string         `groups:"internal" bson:",omitempty"`
 	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
 
-	TransportType string `groups:"detailed" bson:",omitempty"`
+	TransportType TransportType `groups:"detailed" bson:",omitempty"`
 
 	Licence string `groups:"internal" bson:",omitempty"`
 

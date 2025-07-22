@@ -123,7 +123,7 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 			operator.PrimaryName = nocLineRecord.PublicName
 			operator.OtherNames = append(operator.OtherNames, nocLineRecord.PublicName, nocLineRecord.ReferenceName)
 			operator.Licence = nocLineRecord.Licence
-			operator.TransportType = nocLineRecord.Mode
+			operator.TransportType = ctdf.TransportType(nocLineRecord.Mode)
 
 			if nocLineRecord.London != "" {
 				operator.Regions = append(operator.Regions, "UK:REGION:LONDON")

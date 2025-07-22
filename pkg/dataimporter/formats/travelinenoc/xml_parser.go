@@ -24,7 +24,8 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 
 		switch ty := tok.(type) {
 		case xml.StartElement:
-			if ty.Name.Local == "travelinedata" {
+			switch ty.Name.Local {
+			case "travelinedata":
 				for i := 0; i < len(ty.Attr); i++ {
 					attr := ty.Attr[i]
 
@@ -33,7 +34,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 						t.GenerationDate = attr.Value
 					}
 				}
-			} else if ty.Name.Local == "NOCLinesRecord" {
+			case "NOCLinesRecord":
 				var NOCLinesRecord NOCLinesRecord
 
 				if err = d.DecodeElement(&NOCLinesRecord, &ty); err != nil {
@@ -41,7 +42,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 				} else {
 					t.NOCLinesRecords = append(t.NOCLinesRecords, NOCLinesRecord)
 				}
-			} else if ty.Name.Local == "NOCTableRecord" {
+			case "NOCTableRecord":
 				var NOCTableRecord NOCTableRecord
 
 				if err = d.DecodeElement(&NOCTableRecord, &ty); err != nil {
@@ -49,7 +50,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 				} else {
 					t.NOCTableRecords = append(t.NOCTableRecords, NOCTableRecord)
 				}
-			} else if ty.Name.Local == "OperatorsRecord" {
+			case "OperatorsRecord":
 				var operatorRecord OperatorsRecord
 
 				if err = d.DecodeElement(&operatorRecord, &ty); err != nil {
@@ -57,7 +58,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 				} else {
 					t.OperatorsRecords = append(t.OperatorsRecords, operatorRecord)
 				}
-			} else if ty.Name.Local == "GroupsRecord" {
+			case "GroupsRecord":
 				var groupRecord GroupsRecord
 
 				if err = d.DecodeElement(&groupRecord, &ty); err != nil {
@@ -65,7 +66,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 				} else {
 					t.GroupsRecords = append(t.GroupsRecords, groupRecord)
 				}
-			} else if ty.Name.Local == "ManagementDivisionsRecord" {
+			case "ManagementDivisionsRecord":
 				var managementRecord ManagementDivisionsRecord
 
 				if err = d.DecodeElement(&managementRecord, &ty); err != nil {
@@ -73,7 +74,7 @@ func (t *TravelineData) ParseFile(reader io.Reader) error {
 				} else {
 					t.ManagementDivisionsRecords = append(t.ManagementDivisionsRecords, managementRecord)
 				}
-			} else if ty.Name.Local == "PublicNameRecord" {
+			case "PublicNameRecord":
 				var publicNameRecord PublicNameRecord
 
 				if err = d.DecodeElement(&publicNameRecord, &ty); err != nil {
