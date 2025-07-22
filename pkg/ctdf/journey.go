@@ -29,7 +29,7 @@ type Journey struct {
 	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
-	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
+	Service    *Service `groups:"basic,departures-llm" bson:"-"` // TODO json:",omitempty"
 
 	OperatorRef string    `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
@@ -71,7 +71,10 @@ func (j *Journey) GetService() {
 	}
 
 	servicesCollection := database.GetCollection("services")
-	servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": j.ServiceRef}).Decode(&j.Service)
+	servicesCollection.FindOne(context.Background(), bson.M{"$or": bson.A{
+		bson.M{"primaryidentifier": j.ServiceRef},
+		bson.M{"otheridentifiers": j.ServiceRef},
+	}}).Decode(&j.Service)
 }
 func (j *Journey) GetDeepReferences() {
 	wg := sync.WaitGroup{}
