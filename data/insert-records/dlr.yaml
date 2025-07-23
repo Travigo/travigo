@@ -1,0 +1,112 @@
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: - "gb-atco-9400ZZDLBNK2"
+Data:
+  otheridentifiers:
+    - "gb-atco-9400ZZDLBNK"
+    - "gb-atco-9400ZZDLBNK1"
+    - "gb-atco-9400ZZDLBNK2"
+  platforms:
+  - primaryidentifier: "gb-atco-9400ZZDLBNK1"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLBNK1"
+    primaryname: "Bank DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.08791080098
+      - 51.5121708265
+  - primaryidentifier: "gb-atco-9400ZZDLBNK2"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLBNK2"
+    primaryname: "Bank DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.08791080098
+      - 51.5121708265
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: "gb-atco-9400ZZDLCUT2"
+Data:
+  otheridentifiers:
+    - "gb-atco-9400ZZLUCAR"
+    - "gb-atco-9400ZZDLCUT1"
+    - "gb-atco-9400ZZDLCUT2"
+  platforms:
+  - primaryidentifier: "gb-atco-9400ZZDLCUT1"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLCUT1"
+    primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01065381926
+      - 51.48161464854
+  - primaryidentifier: "gb-atco-9400ZZDLCUT2"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLCUT2"
+    primaryname: "Cutty Sark (for Maritime Greenwich) DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01065381926
+      - 51.48161464854
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: "gb-atco-9400ZZDLISL2"
+Data:
+  otheridentifiers:
+    - "gb-atco-9400ZZDLISL"
+    - "gb-atco-9400ZZDLISL1"
+    - "gb-atco-9400ZZDLISL2"
+  platforms:
+  - primaryidentifier: "gb-atco-9400ZZDLISL1"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLISL1"
+    primaryname: "Island Gardens DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512
+  - primaryidentifier: "gb-atco-9400ZZDLISL2"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLISL2"
+    primaryname: "Island Gardens DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512
+---
+Collection: stops_raw
+Match:
+  primaryidentifier: "gb-atco-9400ZZDLISL2"
+Data:
+  otheridentifiers:
+    - "gb-atco-9400ZZDLISL"
+    - "gb-atco-9400ZZDLISL1"
+    - "gb-atco-9400ZZDLISL2"
+  platforms:
+  - primaryidentifier: "gb-atco-9400ZZDLISL1"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLISL1"
+    primaryname: "Island Gardens DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512
+  - primaryidentifier: "gb-atco-9400ZZDLISL2"
+    otheridentifiers:
+      - "gb-atco-9400ZZDLISL2"
+    primaryname: "Island Gardens DLR Station"
+    location:
+      type: "Point"
+      coordinates:
+      - -0.01002191651
+      - 51.48719738512

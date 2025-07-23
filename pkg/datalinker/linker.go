@@ -67,6 +67,8 @@ func (l Linker[T]) Run() {
 			log.Error().Err(err).Msg("Failed to decode aggregatedRecords")
 		}
 
+		// pretty.Println(aggregatedRecords)
+
 		var identifiers []string
 
 		for _, record := range aggregatedRecords.Records {
