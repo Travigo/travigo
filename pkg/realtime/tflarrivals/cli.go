@@ -43,7 +43,7 @@ func RegisterCLI() *cli.Command {
 							},
 							{
 								ModeID:                "dlr",
-								TransportType:         ctdf.TransportTypeTram,
+								TransportType:         ctdf.TransportTypeRail,
 								TrackArrivals:         true,
 								TrackDisruptions:      true,
 								ArrivalRefreshRate:    15 * time.Second,
