@@ -48,21 +48,21 @@ func RegisterCLI() *cli.Command {
 						linker := NewLinker[*ctdf.Stop]("stop", mongo.Pipeline{
 							bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
 							bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
-							// bson.D{
-							// 	{
-							// 		Key: "$match",
-							// 		Value: bson.M{
-							// 			"$or": bson.A{
-							// 				// Identical values of these we will be merging by
-							// 				bson.M{"otheridentifier": bson.M{"$regex": "^gb-crs-"}},
-							// 				bson.M{"otheridentifier": bson.M{"$regex": "^gb-tiploc-"}},
-							// 				bson.M{"otheridentifier": bson.M{"$regex": "^gb-stanox-"}},
-							// 				bson.M{"otheridentifier": bson.M{"$regex": "^gb-atco-"}},
-							// 				bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
-							// 			},
-							// 		},
-							// 	},
-							// },
+							bson.D{
+								{
+									Key: "$match",
+									Value: bson.M{
+										"$or": bson.A{
+											// Identical values of these we will be merging by
+											bson.M{"otheridentifier": bson.M{"$regex": "^gb-crs-"}},
+											bson.M{"otheridentifier": bson.M{"$regex": "^gb-tiploc-"}},
+											bson.M{"otheridentifier": bson.M{"$regex": "^gb-stanox-"}},
+											bson.M{"otheridentifier": bson.M{"$regex": "^gb-atco-"}},
+											bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
+										},
+									},
+								},
+							},
 							bson.D{
 								{Key: "$group",
 									Value: bson.D{
@@ -72,8 +72,8 @@ func RegisterCLI() *cli.Command {
 									},
 								},
 							},
-							// bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
-							// bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
+							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
+							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
 						linker.Run()
 					case "services":
