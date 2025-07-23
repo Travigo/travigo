@@ -77,15 +77,20 @@ func RegisterCLI() *cli.Command {
 						linker.Run()
 					case "services":
 						linker := NewLinker[*ctdf.Service]("service", mongo.Pipeline{
-							bson.D{{Key: "$addFields", Value: bson.D{{Key: "otheridentifier", Value: "$otheridentifiers"}}}},
-							bson.D{{Key: "$unwind", Value: bson.D{{Key: "path", Value: "$otheridentifier"}}}},
 							bson.D{
-								{
-									Key: "$match",
-									Value: bson.M{
-										"$or": bson.A{
-											// Identical values of these we will be merging by
-											bson.M{"otheridentifier": bson.M{"$regex": "^travigo-internalmerge-"}},
+								{Key: "$addFields",
+									Value: bson.D{
+										{Key: "servicenameoperatorconcat",
+											Value: bson.D{
+												{Key: "$concat",
+													Value: bson.A{
+														"$servicename",
+														"$operatorref",
+														"$transporttype",
+														"$brandcolour",
+													},
+												},
+											},
 										},
 									},
 								},
@@ -93,7 +98,7 @@ func RegisterCLI() *cli.Command {
 							bson.D{
 								{Key: "$group",
 									Value: bson.D{
-										{Key: "_id", Value: "$otheridentifier"},
+										{Key: "_id", Value: "$servicenameoperatorconcat"},
 										{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
 										{Key: "records", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}},
 									},
