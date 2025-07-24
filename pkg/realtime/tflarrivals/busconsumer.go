@@ -3,7 +3,6 @@ package tflarrivals
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -123,7 +122,7 @@ func (c *BusBatchConsumer) IdentifyBus(event BusMonitorEvent) (string, error) {
 		}
 	}
 
-	return "", errors.New(fmt.Sprintf("Could not be identified. Count: %d", len(groupedLineArrivals)))
+	return "", fmt.Errorf("Could not be identified. Count: %d", len(groupedLineArrivals))
 }
 
 func (c *BusBatchConsumer) Test() {

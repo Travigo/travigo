@@ -139,11 +139,11 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	}
 
 	realtimeJourneyUpdateOperations := p.Wait()
-	util.InPlaceFilter[mongo.WriteModel](&realtimeJourneyUpdateOperations, func(x mongo.WriteModel) bool {
+	util.InPlaceFilter(&realtimeJourneyUpdateOperations, func(x mongo.WriteModel) bool {
 		return x != nil
 	})
 
-	processingTime := time.Now().Sub(startTime)
+	processingTime := time.Since(startTime)
 	startTime = time.Now()
 
 	if len(realtimeJourneyUpdateOperations) > 0 {
@@ -157,7 +157,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	log.Info().
 		Str("id", l.Mode.ModeID).
 		Str("processing", processingTime.String()).
-		Str("bulkwrite", time.Now().Sub(startTime).String()).
+		Str("bulkwrite", time.Since(startTime).String()).
 		Int("length", len(realtimeJourneyUpdateOperations)).
 		Msg("update mode arrivals")
 
@@ -243,7 +243,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add new predictions to the realtime journey
-	platformMatchRegex, _ := regexp.Compile("(\\w+) (?:- )?Platform (\\d+)")
+	platformMatchRegex, _ := regexp.Compile(`(\w+) (?:- )?Platform (\d+)`)
 	updatedStops := map[string]bool{}
 	for _, prediction := range predictions {
 		stop := getStopFromTfLStop(prediction.NaptanID)
@@ -339,13 +339,13 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				continue
 			}
 			tflFormattedNaptanID := stop.PrimaryIdentifier
-			if slices.Contains[[]string](journeyOrderedNaptanIDs, tflFormattedNaptanID) {
+			if slices.Contains(journeyOrderedNaptanIDs, tflFormattedNaptanID) {
 				reducedRouteOrderedNaptanIDs = append(reducedRouteOrderedNaptanIDs, tflFormattedNaptanID)
 			}
 		}
 
 		// If the slices equal then we have a potential match
-		if slices.Equal[[]string](journeyOrderedNaptanIDs, reducedRouteOrderedNaptanIDs) {
+		if slices.Equal(journeyOrderedNaptanIDs, reducedRouteOrderedNaptanIDs) {
 			potentialOrderLineRouteMatches = append(potentialOrderLineRouteMatches, route)
 		}
 	}

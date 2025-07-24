@@ -1,7 +1,7 @@
 ---
 Collection: stops_raw
 Match:
-  primaryidentifier: - "gb-atco-9400ZZDLBNK2"
+  primaryidentifier: "gb-atco-9400ZZDLBNK2"
 Data:
   otheridentifiers:
     - "gb-atco-9400ZZDLBNK"
