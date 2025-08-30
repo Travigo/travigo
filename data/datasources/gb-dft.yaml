@@ -7,20 +7,6 @@ datasets:
 - identifier: naptan
   format: gb-naptan
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
-- identifier: bods-gtfs-schedule-england
-  format: gtfs-schedule
-  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/england/"
-  datasetsize: medium
-  supportedobjects:
-    services: true
-    journeys: true
-  ignoreobjects:
-    services:
-      byoperator:
-      - gb-noc-NATX
-    journeys:
-      byoperator:
-      - gb-noc-NATX
 - identifier: bods-gtfs-schedule-east-anglia
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/"
