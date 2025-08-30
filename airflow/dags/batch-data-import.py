@@ -22,19 +22,8 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
     name = f"data-import-{name}"
 
     tolerations = []
-    node_selector = None
+    # node_selector = None
     container_resources = None
-    if instance_size == "medium" or instance_size == "large":
-        tolerations.append(k8s.V1Toleration(effect="NoSchedule", key="kube.travigo.app/batch-burst", operator="Equal", value="true"))
-
-        if instance_size == "medium":
-            memory_requests = "5Gi"
-            node_selector = {"kube.travigo.app/batch-burst-size": "medium"}
-        elif instance_size == "large":
-            memory_requests = "20Gi"
-            node_selector = {"kube.travigo.app/batch-burst-size": "large"}
-
-        container_resources = k8s.V1ResourceRequirements(requests={"memory": memory_requests})
 
     # if instance_size == "index_small":
     #     node_selector = {"cloud.google.com/gke-nodepool": "small-batch-burst"}
@@ -51,9 +40,9 @@ def generate_job(name : str, command : str, instance_size : str = "small", taskg
       task_id=name,
       is_delete_operator_pod=True,
       hostnetwork=False,
-      tolerations=tolerations,
-      node_selector=node_selector,
-      container_resources=container_resources,
+    #   tolerations=tolerations,
+    #   node_selector=node_selector,
+    #   container_resources=container_resources,
       trigger_rule="all_done",
       task_group=taskgroup,
       startup_timeout_seconds=7200,
