@@ -173,3 +173,5 @@ with DAG(
                 print(exc)
 
     start >> taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> services_linker >> stop_indexer >> end
+    taskgroups["medium"] >>stop_linker
+    taskgroups["small"] >> stop_linker
