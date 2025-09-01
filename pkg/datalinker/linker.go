@@ -47,6 +47,8 @@ func (l Linker[T]) Run() {
 
 	copyCollection(rawCollectionName, stagingCollectionName)
 
+	log.Info().Msg("Fetching aggregate records started")
+
 	// Get matching records
 	cursor, err := rawCollection.Aggregate(context.Background(), l.aggregation)
 	if err != nil {
@@ -80,6 +82,10 @@ func (l Linker[T]) Run() {
 
 		mergeGroups = append(mergeGroups, identifiers)
 	}
+
+	log.Info().Msg("Fetching aggregate records finished")
+
+	log.Info().Msg("Data linking started")
 
 	for i := 0; i < len(mergeGroups); i++ {
 		for j := i + 1; j < len(mergeGroups); j++ {
@@ -156,6 +162,10 @@ func (l Linker[T]) Run() {
 		pretty.Println(mergeGroupFiltered)
 		pretty.Println(len(primaryRecords))
 	}
+
+	log.Info().Msg("Data linking finished")
+
+	log.Info().Msg("Writing linked records")
 
 	if len(operations) > 0 {
 		_, err := stagingCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
