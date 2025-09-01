@@ -87,6 +87,7 @@ func (l Linker[T]) Run() {
 
 	log.Info().Msg("Data linking started")
 
+	pretty.Println(len(mergeGroups))
 	for i := 0; i < len(mergeGroups); i++ {
 		for j := i + 1; j < len(mergeGroups); j++ {
 			if util.SlicesOverlap(mergeGroups[i], mergeGroups[j]) {

@@ -181,7 +181,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 	primaryIdentifier := fmt.Sprintf(ctdf.GBStopIDFormat, orig.AtcoCode)
 	ctdfStop := ctdf.Stop{
 		PrimaryIdentifier: primaryIdentifier,
-		OtherIdentifiers:  []string{primaryIdentifier},
+		OtherIdentifiers:  []string{},
 		PrimaryName:       orig.Descriptor.CommonName,
 		Descriptor:        strings.Join(descriptor, " "),
 
