@@ -99,19 +99,6 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v4
 
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
-
     - name: Helm upgrade
       run: |-
         helm -n default upgrade -i travigo-data-importer ./deploy/charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
@@ -139,19 +126,6 @@ jobs:
 
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
-
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
       run: |-
@@ -182,19 +156,6 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
-
     - name: Helm upgrade
       run: |-
         helm -n default upgrade -i travigo-web-api ./deploy/charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
@@ -222,19 +183,6 @@ jobs:
 
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
-
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
       run: |-
@@ -264,19 +212,6 @@ jobs:
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
 
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
-
     - name: Helm upgrade
       run: |-
         helm -n default upgrade -i travigo-events ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
@@ -304,19 +239,6 @@ jobs:
 
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
-
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
   
     - name: Helm upgrade
       run: |-
@@ -344,19 +266,6 @@ jobs:
 
     - name: Kubectl tool installer
       uses: Azure/setup-kubectl@v3
-
-    - name: Azure CLI Login
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  
-    - uses: azure/aks-set-context@v4
-      with:
-        resource-group: 'travigo'
-        admin: true
-        cluster-name: 'travigo-aks'
 
     - name: Helm upgrade
       run: |-
