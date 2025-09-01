@@ -81,7 +81,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy data-importer to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: production
 
     needs: travigo-docker
@@ -114,13 +114,13 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-data-importer ./deploy/charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
+        helm -n default upgrade -i travigo-data-importer ./deploy/charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
 
   realtime-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy realtime to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
       url: https://api-travigo.claydonlee.com/realtime-stats/queue
@@ -155,13 +155,13 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-realtime ./deploy/charts/travigo-realtime --set image.tag=sha-${{ github.sha }}
+        helm -n default upgrade -i travigo-realtime ./deploy/charts/travigo-realtime --set image.tag=sha-${{ github.sha }}
 
   web-api-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy web-api to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
       url: https://api-travigo.claydonlee.com/core
@@ -197,13 +197,13 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-web-api ./deploy/charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
+        helm -n default upgrade -i travigo-web-api ./deploy/charts/travigo-web-api --set image.tag=sha-${{ github.sha }}
 
   stats-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy stats to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
       url: https://api-travigo.claydonlee.com/stats
@@ -238,13 +238,13 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-stats ./deploy/charts/travigo-stats --set image.tag=sha-${{ github.sha }}
+        helm -n default upgrade -i travigo-stats ./deploy/charts/travigo-stats --set image.tag=sha-${{ github.sha }}
 
   events-deploy-helm:
     if: github.ref == 'refs/heads/main'
   
     name: Deploy events to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
       url: https://api-travigo.claydonlee.com/events-queue/stats
@@ -279,13 +279,13 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-events ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
+        helm -n default upgrade -i travigo-events ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/events.yaml
 
   notify-deploy-helm:
     if: github.ref == 'refs/heads/main'
 
     name: Deploy notify to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
       url: https://api-travigo.claydonlee.com/notify-queue/stats
@@ -320,13 +320,13 @@ jobs:
   
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-notify ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml
+        helm -n default upgrade -i travigo-notify ./deploy/charts/travigo-consumer --set image.tag=sha-${{ github.sha }} -f ./deploy/notify.yaml
 
   dbwatch-deploy-helm:
     if: github.ref == 'refs/heads/main'
 
     name: Deploy dbwatch to Kubernetes
-    runs-on: ubuntu-latest
+    runs-on: arc
     environment: 
       name: production
 
@@ -360,4 +360,4 @@ jobs:
 
     - name: Helm upgrade
       run: |-
-        helm upgrade -i travigo-dbwatch ./deploy/charts/travigo-dbwatch --set image.tag=sha-${{ github.sha }}
+        helm -n default upgrade -i travigo-dbwatch ./deploy/charts/travigo-dbwatch --set image.tag=sha-${{ github.sha }}
