@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -34,7 +37,7 @@ type Schedule struct {
 
 	ctdfJourneys map[string]*ctdf.Journey
 
-	tripStopSequenceMap map[string]map[int]*StopTime
+	tripStopSequenceMap map[string]map[int8]*StopTime
 
 	Shapes       []Shape
 	Translations []Translation
@@ -101,7 +104,15 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 		return err
 	}
 
+	count := 0
+
 	for {
+		if count == 1500000 {
+			runtime.GC()
+			count = 0
+			pretty.Println("GC")
+		}
+
 		line, err = decoder.ReadLine()
 		if err != nil {
 			return err
@@ -125,6 +136,8 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 			updateModel.SetUpsert(true)
 			processingQueue.Add(updateModel)
 		}
+
+		count += 1
 	}
 
 	if toProcess {
@@ -371,10 +384,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Stop Times ////
-	g.tripStopSequenceMap = map[string]map[int]*StopTime{}
+	g.tripStopSequenceMap = map[string]map[int8]*StopTime{}
 	importObject[StopTime](g, "stop_times.txt", "stop_times", false, func(stopTime StopTime) (any, string) {
 		if _, exists := g.tripStopSequenceMap[stopTime.TripID]; !exists {
-			g.tripStopSequenceMap[stopTime.TripID] = map[int]*StopTime{}
+			g.tripStopSequenceMap[stopTime.TripID] = map[int8]*StopTime{}
 		}
 		g.tripStopSequenceMap[stopTime.TripID][stopTime.StopSequence] = &stopTime
 
@@ -394,7 +407,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		sequenceIDs := maps.Keys(tripSequencyMap)
-		sort.Ints(sequenceIDs)
+		slices.Sort(sequenceIDs)
 
 		for index := 1; index < len(sequenceIDs); index += 1 {
 			sequenceID := sequenceIDs[index]

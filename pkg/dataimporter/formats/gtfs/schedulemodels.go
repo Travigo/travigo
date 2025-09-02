@@ -54,8 +54,8 @@ type Trip struct {
 	Name                 string `csv:"trip_short_name"`
 	BlockID              string `csv:"block_id"`
 	ShapeID              string `csv:"shape_id"`
-	WheelchairAccessible int32  `csv:"wheelchair_accessible"`
-	BikesAllowed         int32  `csv:"bikes_allowed"`
+	WheelchairAccessible int8   `csv:"wheelchair_accessible"`
+	BikesAllowed         int8   `csv:"bikes_allowed"`
 	DirectionID          bool   `csv:"direction_id"`
 }
 
@@ -65,9 +65,9 @@ type StopTime struct {
 	DepartureTime string `csv:"departure_time"`
 	StopID        string `csv:"stop_id"`
 	StopHeadsign  string `csv:"stop_headsign"`
-	StopSequence  int    `csv:"stop_sequence"`
-	PickupType    int    `csv:"pickup_type"`
-	DropOffType   int    `csv:"drop_off_type"`
+	StopSequence  int8   `csv:"stop_sequence"`
+	PickupType    int8   `csv:"pickup_type"`
+	DropOffType   int8   `csv:"drop_off_type"`
 	// ContinuousPickup       string  `csv:"continuous_pickup"`
 	// ContinuousDropOff      string  `csv:"continuous_drop_off"`
 	// ShapeDistanceTravelled float64 `csv:"shape_dist_traveled"`
