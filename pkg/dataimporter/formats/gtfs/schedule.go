@@ -37,7 +37,7 @@ type Schedule struct {
 
 	ctdfJourneys map[string]*ctdf.Journey
 
-	tripStopSequenceMap map[string]map[int8]*StopTime
+	tripStopSequenceMap map[string]map[int]*StopTime
 
 	Shapes       []Shape
 	Translations []Translation
@@ -384,10 +384,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Stop Times ////
-	g.tripStopSequenceMap = map[string]map[int8]*StopTime{}
+	g.tripStopSequenceMap = map[string]map[int]*StopTime{}
 	importObject[StopTime](g, "stop_times.txt", "stop_times", false, func(stopTime StopTime) (any, string) {
 		if _, exists := g.tripStopSequenceMap[stopTime.TripID]; !exists {
-			g.tripStopSequenceMap[stopTime.TripID] = map[int8]*StopTime{}
+			g.tripStopSequenceMap[stopTime.TripID] = map[int]*StopTime{}
 		}
 		g.tripStopSequenceMap[stopTime.TripID][stopTime.StopSequence] = &stopTime
 

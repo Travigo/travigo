@@ -65,7 +65,7 @@ type StopTime struct {
 	DepartureTime string `csv:"departure_time"`
 	StopID        string `csv:"stop_id"`
 	StopHeadsign  string `csv:"stop_headsign"`
-	StopSequence  int8   `csv:"stop_sequence"`
+	StopSequence  int    `csv:"stop_sequence"`
 	PickupType    int8   `csv:"pickup_type"`
 	DropOffType   int8   `csv:"drop_off_type"`
 	// ContinuousPickup       string  `csv:"continuous_pickup"`
