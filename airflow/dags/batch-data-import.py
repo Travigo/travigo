@@ -2,8 +2,6 @@ from kubernetes.client import models as k8s
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-# from airflow.utils.dates import days_ago
-from airflow.hooks.base_hook import BaseHook
 from airflow.providers.slack.notifications.slack_webhook import send_slack_webhook_notification
 from airflow.utils.task_group import TaskGroup
 
