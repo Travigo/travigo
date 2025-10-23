@@ -130,7 +130,7 @@ with DAG(
     # start_date=days_ago(2),
     catchup=False,
     max_active_runs=1,
-    concurrency=1,
+    max_active_tasks=1,
 ) as dag:
     start = EmptyOperator(task_id="start")
     end = EmptyOperator(task_id="end")
