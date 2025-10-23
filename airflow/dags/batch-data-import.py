@@ -1,6 +1,6 @@
 from kubernetes.client import models as k8s
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.utils.dates import days_ago
 from airflow.hooks.base_hook import BaseHook
@@ -134,8 +134,8 @@ with DAG(
     max_active_runs=1,
     concurrency=1,
 ) as dag:
-    start = DummyOperator(task_id="start")
-    end = DummyOperator(task_id="end")
+    start = EmptyOperator(task_id="start")
+    end = EmptyOperator(task_id="end")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
     services_linker = generate_job("service-linker", [ "data-linker", "run", "--type", "services" ])
