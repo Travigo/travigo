@@ -93,7 +93,7 @@ datasets:
       - gb-noc-NATX
 - identifier: bods-gtfs-schedule-south-east
   format: gtfs-schedule
-  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file//"
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/south_east/"
   datasetsize: large
   supportedobjects:
     services: true
