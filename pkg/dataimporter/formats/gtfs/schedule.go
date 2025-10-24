@@ -433,7 +433,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			var destinationStopRef string
 
 			// TODO no hardocded nonsense!!
-			if dataset.Identifier == "gb-dft-bods-gtfs-schedule" {
+			if strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-") {
 				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
 				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
 			} else {
@@ -474,16 +474,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 		// TODO fix transforms here
 		// transforms.Transform(g.ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
-		if util.ContainsString([]string{
-			"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
-			"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
-			"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
-			"gb-noc-MTLN", "gb-noc-SULV",
-		}, g.ctdfJourneys[tripID].OperatorRef) || (g.ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
-			"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
-		}, g.ctdfJourneys[tripID].ServiceRef)) {
-			g.ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
-		}
+		// if util.ContainsString([]string{
+		// 	"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
+		// 	"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
+		// 	"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
+		// 	"gb-noc-MTLN", "gb-noc-SULV",
+		// }, g.ctdfJourneys[tripID].OperatorRef) || (g.ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
+		// 	"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
+		// }, g.ctdfJourneys[tripID].ServiceRef)) {
+		// 	g.ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
+		// }
 
 		// Insert
 		if dataset.SupportedObjects.Journeys {

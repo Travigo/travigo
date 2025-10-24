@@ -7,21 +7,161 @@ datasets:
 - identifier: naptan
   format: gb-naptan
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
-# - identifier: bods-gtfs-schedule
-#   format: gtfs-schedule
-#   # source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/all/"
-#   # source: "/Users/aaronclaydon/Downloads/itm_all_gtfs.zip"
-#   datasetsize: large
-#   supportedobjects:
-#     services: true
-#     journeys: true
-#   ignoreobjects:
-#     services:
-#       byoperator:
-#       - gb-noc-NATX
-#     journeys:
-#       byoperator:
-#       - gb-noc-NATX
+- identifier: bods-gtfs-schedule-east-anglia
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-east-midlands
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_midlands/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-london
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/london/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-north-east
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/north_east/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-north-west
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/north_west/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-scotland
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/scotland/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-south-east
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file//"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-south-west
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/south_west/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-wales
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/wales/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-west-midlands
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/west_midlands/"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
+- identifier: bods-gtfs-schedule-yorkshire
+  format: gtfs-schedule
+  source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/yorkshire/"
+  # source: "/Users/aaronclaydon/Downloads/itm_yorkshire_gtfs.zip"
+  datasetsize: large
+  supportedobjects:
+    services: true
+    journeys: true
+  ignoreobjects:
+    services:
+      byoperator:
+      - gb-noc-NATX
+    journeys:
+      byoperator:
+      - gb-noc-NATX
 - identifier: bods-transxchange-coach
   format: gb-transxchange
   source: "https://coach.bus-data.dft.gov.uk/TxC-2.4.zip"
