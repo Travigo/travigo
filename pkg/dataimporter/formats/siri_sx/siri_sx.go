@@ -104,7 +104,7 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 					"LineRef":         line.LineRef,
 					"PubishedLineRef": line.PublishedLineRef,
 					"OperatorRef":     line.OperatorRef,
-					"LinkedDataset":   "gb-dft-bods-gtfs-schedule", // not always going to be true in future
+					"LinkedDataset":   "gb-dft-bods-gtfs-schedule*", // not always going to be true in future
 				})
 			}
 		}

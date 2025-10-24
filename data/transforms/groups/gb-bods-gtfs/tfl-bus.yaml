@@ -18,49 +18,49 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP12046"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP12046"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5816"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5816"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5825"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5825"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5835"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5835"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5819"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5819"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3104"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3104"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP12046"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP12046"
 Data:
   OperatorRef: "gb-noc-TFLO"
 # Arriva London North
@@ -126,14 +126,14 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP450"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OPTEMP450"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP450"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OPTEMP450"
 Data:
   OperatorRef: "gb-noc-TFLO"
 # Docklands Buses
@@ -141,14 +141,14 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP11684"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP11684"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP11684"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP11684"
 Data:
   OperatorRef: "gb-noc-TFLO"
 # East London Bus & Coach Company
@@ -172,14 +172,14 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP456"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OPTEMP456"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OPTEMP456"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OPTEMP456"
 Data:
   OperatorRef: "gb-noc-TFLO"
 # London General Transport
@@ -187,14 +187,14 @@ Data:
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3039"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3039"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3039"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3039"
 Data:
   OperatorRef: "gb-noc-TFLO"
 # London Sovereign
@@ -301,7 +301,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-56435"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-56435"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -317,7 +317,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-14023"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-14023"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -333,7 +333,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-13950"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-13950"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -349,7 +349,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-14053"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-14053"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -365,7 +365,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-13966"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-13966"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -381,7 +381,7 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-13968"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-13968"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
@@ -397,69 +397,69 @@ Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
   OperatorRef: "gb-noc-UNIB"
-  ServiceRef: "gb-dft-bods-gtfs-schedule-service-82178"
+  ServiceRef: "gb-dft-bods-gtfs-schedule-london-service-82178"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5816"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5816"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5825"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5825"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5835"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5835"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP5819"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP5819"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3104"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3104"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3037"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3037"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP3037"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP3037"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Journey
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP6569"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP6569"
 Data:
   OperatorRef: "gb-noc-TFLO"
 ---
 Type: ctdf.Service
 Group: gb-dft-bods-gtfs-schedule
 Match:
-  OperatorRef: "gb-dft-bods-gtfs-schedule-operator-OP6569"
+  OperatorRef: "gb-dft-bods-gtfs-schedule-london-operator-OP6569"
 Data:
   OperatorRef: "gb-noc-TFLO"

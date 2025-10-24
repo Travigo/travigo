@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -31,13 +32,19 @@ func (r *SiriSX) IdentifyStop() (string, error) {
 
 	formatedStopID := fmt.Sprintf("gb-atco-%s", stopID)
 
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{
+	stopsQuery := bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": formatedStopID},
 			bson.M{"otheridentifiers": formatedStopID},
 		},
 		"datasource.datasetid": linkedDataset,
-	})
+	}
+
+	if strings.Contains(linkedDataset, "*") {
+		stopsQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+	}
+
+	cursor, _ := stopsCollection.Find(context.Background(), stopsQuery)
 	cursor.All(context.Background(), &potentialStops)
 
 	if len(potentialStops) == 0 {
@@ -69,11 +76,17 @@ func (r *SiriSX) IdentifyService() (string, error) {
 
 	var potentialServices []ctdf.Stop
 
-	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
+	servicesQuery := bson.M{
 		"servicename":          lineRef,
 		"operatorref":          fmt.Sprintf("gb-noc-%s", operatorRef),
 		"datasource.datasetid": linkedDataset,
-	})
+	}
+
+	if strings.Contains(linkedDataset, "*") {
+		servicesQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+	}
+
+	cursor, _ := servicesCollection.Find(context.Background(), servicesQuery)
 	cursor.All(context.Background(), &potentialServices)
 
 	if len(potentialServices) == 0 {

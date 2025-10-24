@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -31,13 +32,19 @@ func (r *GTFSRT) IdentifyStop() (string, error) {
 
 	formatedStopID := fmt.Sprintf("%s-stop-%s", linkedDataset, stopID)
 
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{
+	stopsQuery := bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": formatedStopID},
 			bson.M{"otheridentifiers": formatedStopID},
 		},
 		"datasource.datasetid": linkedDataset,
-	})
+	}
+
+	if strings.Contains(linkedDataset, "*") {
+		stopsQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+	}
+
+	cursor, _ := stopsCollection.Find(context.Background(), stopsQuery)
 	cursor.All(context.Background(), &potentialStops)
 
 	if len(potentialStops) == 0 {
@@ -66,13 +73,19 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 
 	formatedServiceID := fmt.Sprintf("%s-service-%s", linkedDataset, routeID)
 
-	cursor, _ := servicesCollection.Find(context.Background(), bson.M{
+	servicesQuery := bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": formatedServiceID},
 			bson.M{"otheridentifiers": formatedServiceID},
 		},
 		"datasource.datasetid": linkedDataset,
-	})
+	}
+
+	if strings.Contains(linkedDataset, "*") {
+		servicesQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+	}
+
+	cursor, _ := servicesCollection.Find(context.Background(), servicesQuery)
 	cursor.All(context.Background(), &potentialServices)
 
 	if len(potentialServices) == 0 {
@@ -99,10 +112,16 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 
 	var potentialJourneys []ctdf.Journey
 
-	cursor, _ := journeysCollection.Find(context.Background(), bson.M{
+	journeysQuery := bson.M{
 		"otheridentifiers.GTFS-TripID": tripID,
 		"datasource.datasetid":         linkedDataset,
-	})
+	}
+
+	if strings.Contains(linkedDataset, "*") {
+		journeysQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+	}
+
+	cursor, _ := journeysCollection.Find(context.Background(), journeysQuery)
 	cursor.All(context.Background(), &potentialJourneys)
 
 	if len(potentialJourneys) == 0 {
