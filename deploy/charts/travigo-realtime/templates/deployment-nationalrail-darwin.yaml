@@ -6,7 +6,7 @@ metadata:
     {{- include "travigo-realtime.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: 1
+  replicas: 0 # TODO set back to 0
   {{- end }}
   selector:
     matchLabels:
