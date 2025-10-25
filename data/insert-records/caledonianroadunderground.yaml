@@ -7,6 +7,7 @@ Data:
     - "gb-atco-9400ZZLUCAR"
     - "gb-atco-9400ZZLUCAR1"
     - "gb-atco-9400ZZLUCAR2"
+    - "gb-atco-940GZZLUCAR"
   platforms:
   - primaryidentifier: "gb-atco-9400ZZLUCAR1"
     otheridentifiers:
