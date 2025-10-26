@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"time"
 
 	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
@@ -139,7 +140,9 @@ func (l Linker[T]) Run() {
 		// Sort them by creation date and for now we'll just base it on the oldest record
 		// TODO some actual deep merging
 		sort.SliceStable(primaryRecords, func(i, j int) bool {
-			return primaryRecords[i].GetCreationDateTime().Before(primaryRecords[j].GetCreationDateTime())
+			iTime := primaryRecords[i].GetCreationDateTime()
+			jTime := primaryRecords[j].GetCreationDateTime()
+			return (iTime != time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC)) && iTime.Before(jTime)
 		})
 
 		// Create new record
