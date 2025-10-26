@@ -41,14 +41,14 @@ func RegisterCLI() *cli.Command {
 								TrackDisruptions:      true,
 								DisruptionRefreshRate: 2 * time.Minute,
 							},
-							// {
-							// 	ModeID:                "dlr",
-							// 	TransportType:         ctdf.TransportTypeRail,
-							// 	TrackArrivals:         true,
-							// 	TrackDisruptions:      true,
-							// 	ArrivalRefreshRate:    15 * time.Second,
-							// 	DisruptionRefreshRate: 2 * time.Minute,
-							// },
+							{
+								ModeID:                "dlr",
+								TransportType:         ctdf.TransportTypeRail,
+								TrackArrivals:         true,
+								TrackDisruptions:      true,
+								ArrivalRefreshRate:    15 * time.Second,
+								DisruptionRefreshRate: 2 * time.Minute,
+							},
 							{
 								ModeID:                "river-bus",
 								TransportType:         ctdf.TransportTypeFerry,

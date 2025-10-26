@@ -4,9 +4,10 @@ Match:
   primaryidentifier: "travigo-internalmerge-gb-atco-9400ZZDLCUT"
 Data:
   otheridentifiers:
-    - "gb-atco-9400ZZLUCAR"
+    - "gb-atco-9400ZZDLCUT"
     - "gb-atco-9400ZZDLCUT1"
     - "gb-atco-9400ZZDLCUT2"
+    - "gb-atco-940GZZDLCUT"
   platforms:
   - primaryidentifier: "gb-atco-9400ZZDLCUT1"
     otheridentifiers:
