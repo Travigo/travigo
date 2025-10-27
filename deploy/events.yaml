@@ -6,7 +6,7 @@ image:
 ingress:
   enabled: true
   hosts:
-    - host: api-travigo.claydonlee.com
+    - host: api.travigo.app
       paths:
         - path: /events-queue
           pathType: ImplementationSpecific

@@ -26,9 +26,9 @@ web_api:
     annotations:
       kubernetes.io/ingress.class: nginx
       nginx.ingress.kubernetes.io/enable-cors: "true"
-      nginx.ingress.kubernetes.io/cors-allow-origin: "https://travigo.claydonlee.com,https://www-travigo.claydonlee.com,https://web-travigo.claydonlee.com"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "https://travigo.app,https://www.travigo.app"
     hosts:
-      - host: api-travigo.claydonlee.com
+      - host: api.travigo.app
         paths:
           - path: /stats
             pathType: ImplementationSpecific
