@@ -2,9 +2,12 @@ package databaselookup
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -14,11 +17,11 @@ import (
 func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
 	var services []*ctdf.Service
 	// Load from cache
-	// cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
-	// services, err := cachedresults.Get[[]*ctdf.Service](s.CachedResults, cacheItemPath)
-	// if err == nil {
-	// 	return services, nil
-	// }
+	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
+	services, err := cachedresults.Get[[]*ctdf.Service](s.CachedResults, cacheItemPath)
+	if err == nil {
+		return services, nil
+	}
 
 	// If not in cache then fallback to lookup
 	servicesCollection := database.GetCollection("services")
@@ -61,8 +64,10 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		}
 	}
 
-	// Save into cache
-	// cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
+	// Save into cache only if not zero
+	if len(services) > 0 {
+		cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
+	}
 
 	return services, nil
 }
