@@ -60,7 +60,19 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 
 		if service != nil {
 			transforms.Transform(service, 1)
-			services = append(services, service)
+
+			primaryExists := false
+
+			for _, existingService := range services {
+				if existingService.PrimaryIdentifier == service.PrimaryIdentifier {
+					primaryExists = true
+					break
+				}
+			}
+
+			if !primaryExists {
+				services = append(services, service)
+			}
 		}
 	}
 
