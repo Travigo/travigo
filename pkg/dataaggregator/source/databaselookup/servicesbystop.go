@@ -52,7 +52,11 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 
 	for _, serviceRef := range serviceRefs {
 		var service *ctdf.Service
-		servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": serviceRef}, serviceOpts).Decode(&service)
+		servicesCollection.FindOne(context.Background(), bson.M{
+			"$or": bson.A{
+				bson.M{"primaryidentifier": serviceRef},
+				bson.M{"otheridentifiers": serviceRef},
+			}}, serviceOpts).Decode(&service)
 
 		if service != nil {
 			transforms.Transform(service, 1)
