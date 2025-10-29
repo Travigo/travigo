@@ -104,7 +104,7 @@ jobs:
         helm -n default upgrade -i travigo-data-importer ./deploy/charts/travigo-data-importer --set image.tag=sha-${{ github.sha }}
 
   realtime-deploy-helm:
-    if: github.ref == 'refs/heads/main'
+    #if: github.ref == 'refs/heads/main'
   
     name: Deploy realtime to Kubernetes
     runs-on: arc
