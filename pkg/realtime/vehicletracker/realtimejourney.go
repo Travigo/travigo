@@ -16,9 +16,13 @@ import (
 
 func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
 	currentTime := vehicleUpdateEvent.RecordedAt
+	ctx := context.Background()
 
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
+
+	// Try to get cached journey state first
+	cachedState, _ := GetCachedJourneyState(ctx, realtimeJourneyIdentifier)
 
 	var realtimeJourney *ctdf.RealtimeJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
@@ -31,7 +35,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	})
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
+	realtimeJourneysCollection.FindOne(ctx, searchQuery, opts).Decode(&realtimeJourney)
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
@@ -299,13 +303,68 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		return nil, errors.New("unable to find next journeypath")
 	}
 
+	// Prepare new state for change detection
+	newLocation := vehicleUpdateEvent.VehicleLocationUpdate.Location
+	newBearing := vehicleUpdateEvent.VehicleLocationUpdate.Bearing
+	newOccupancy := vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
+	newNextStopRef := closestDistanceJourneyPath.DestinationStopRef
+	newDepartedStopRef := closestDistanceJourneyPath.OriginStopRef
+
+	// Check if we should write to database based on change detection
+	shouldWrite, reason := cachedState.ShouldWriteToDatabase(
+		newLocation,
+		newBearing,
+		newOccupancy,
+		newNextStopRef,
+		newDepartedStopRef,
+		offset,
+		currentTime,
+		consumer.changeDetectionConfig,
+	)
+
+	// Always update cache with latest state
+	newCachedState := &CachedRealtimeJourney{
+		PrimaryIdentifier: realtimeJourneyIdentifier,
+		NextStopRef:       newNextStopRef,
+		DepartedStopRef:   newDepartedStopRef,
+		Offset:            offset,
+		LastLocation:      newLocation,
+		LastBearing:       newBearing,
+		LastOccupancy:     newOccupancy,
+		LastUpdate:        currentTime,
+		IsNew:             newRealtimeJourney,
+	}
+
+	if shouldWrite {
+		newCachedState.LastDBWrite = currentTime
+		log.Debug().
+			Str("journey", realtimeJourneyIdentifier).
+			Str("reason", reason).
+			Msg("Writing to database")
+	} else {
+		// Preserve the last DB write time if we're not writing
+		if cachedState != nil {
+			newCachedState.LastDBWrite = cachedState.LastDBWrite
+		}
+		// Update cache but skip database write
+		SetCachedJourneyState(ctx, realtimeJourneyIdentifier, newCachedState)
+		log.Debug().
+			Str("journey", realtimeJourneyIdentifier).
+			Str("reason", reason).
+			Msg("Skipping database write")
+		return nil, nil
+	}
+
+	// Update cache before database write
+	SetCachedJourneyState(ctx, realtimeJourneyIdentifier, newCachedState)
+
 	// Update database
 	updateMap := bson.M{
 		"modificationdatetime": currentTime,
-		"vehiclebearing":       vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
-		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
-		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
-		"occupancy":            vehicleUpdateEvent.VehicleLocationUpdate.Occupancy,
+		"vehiclebearing":       newBearing,
+		"departedstopref":      newDepartedStopRef,
+		"nextstopref":          newNextStopRef,
+		"occupancy":            newOccupancy,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 	}
 	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {

@@ -40,8 +40,9 @@ func CreateIdentificationCache() {
 	identificationCache = cache.New[string](redisStore)
 }
 func StartConsumers() {
-	// Create Cache
+	// Create Caches
 	CreateIdentificationCache()
+	CreateJourneyStateCache()
 
 	// Run the background consumers
 	log.Info().Msg("Starting realtime consumers")
@@ -67,8 +68,9 @@ func startRealtimeConsumer(queue rmq.Queue, id int) {
 }
 
 type BatchConsumer struct {
-	id          int
-	TfLBusQueue rmq.Queue
+	id                  int
+	TfLBusQueue         rmq.Queue
+	changeDetectionConfig ChangeDetectionConfig
 }
 
 func NewBatchConsumer(id int) *BatchConsumer {
@@ -77,7 +79,20 @@ func NewBatchConsumer(id int) *BatchConsumer {
 		log.Fatal().Err(err).Msg("Failed to start notify queue")
 	}
 
-	return &BatchConsumer{id: id, TfLBusQueue: tfLBusQueue}
+	config := GetChangeDetectionConfig()
+	log.Info().
+		Int("consumer_id", id).
+		Float64("min_location_change_m", config.MinLocationChangeMeters).
+		Float64("min_bearing_change_deg", config.MinBearingChangeDegrees).
+		Dur("max_time_between_writes", config.MaxTimeBetweenWrites).
+		Dur("min_time_between_updates", config.MinTimeBetweenUpdates).
+		Msg("Initialized consumer with change detection config")
+
+	return &BatchConsumer{
+		id:                    id,
+		TfLBusQueue:           tfLBusQueue,
+		changeDetectionConfig: config,
+	}
 }
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
@@ -85,6 +100,15 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 	var realtimeJourneyOperations []mongo.WriteModel
 	var serviceAlertOperations []mongo.WriteModel
+
+	// Track metrics for this batch
+	batchMetrics := struct {
+		totalEvents     int
+		skippedWrites   int
+		performedWrites int
+	}{
+		totalEvents: len(payloads),
+	}
 
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
@@ -110,6 +134,9 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 				if writeModel != nil {
 					realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
+					batchMetrics.performedWrites++
+				} else {
+					batchMetrics.skippedWrites++
 				}
 			} else {
 				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
@@ -144,11 +171,29 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 		startTime := time.Now()
 		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), realtimeJourneyOperations, &options.BulkWriteOptions{})
-		log.Info().Int("Length", len(realtimeJourneyOperations)).Str("Time", time.Now().Sub(startTime).String()).Msg("Bulk write realtime_journeys")
+
+		skipRate := 0.0
+		if batchMetrics.totalEvents > 0 {
+			skipRate = float64(batchMetrics.skippedWrites) / float64(batchMetrics.totalEvents) * 100
+		}
+
+		log.Info().
+			Int("Length", len(realtimeJourneyOperations)).
+			Int("TotalEvents", batchMetrics.totalEvents).
+			Int("SkippedWrites", batchMetrics.skippedWrites).
+			Int("PerformedWrites", batchMetrics.performedWrites).
+			Float64("SkipRate%", skipRate).
+			Str("Time", time.Now().Sub(startTime).String()).
+			Msg("Bulk write realtime_journeys")
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
+	} else if batchMetrics.totalEvents > 0 {
+		log.Info().
+			Int("TotalEvents", batchMetrics.totalEvents).
+			Int("SkippedWrites", batchMetrics.skippedWrites).
+			Msg("No database writes needed - all updates skipped due to change detection")
 	}
 
 	if len(serviceAlertOperations) > 0 {
