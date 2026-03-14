@@ -22,13 +22,83 @@ jobs:
           pip install pyyaml
           python .github/scripts/discover_datasets.py
 
-  import-dataset:
-    needs: discover
+  build-binary:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+
+      - name: Build travigo binary
+        run: go build -o travigo ./cmd/travigo
+
+      - name: Upload travigo binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: travigo-binary
+          path: travigo
+
+  import-dataset:
+    needs:
+      - discover
+      - build-binary
+    runs-on: arc
     strategy:
       matrix:
         dataset: ${{ fromJSON(needs.discover.outputs.datasets) }}
       max-parallel: 1
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download travigo binary
+        uses: actions/download-artifact@v4
+        with:
+          name: travigo-binary
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get k8s secrets into env
+        run: |
+          MONGO_CONN=$(kubectl get secret travigo-mongodb-admin-travigo -n default -o jsonpath='{.data.connectionString\.standard}' | base64 --decode)
+          REDIS_PASSWORD=$(kubectl get secret redis-password -n default -o jsonpath='{.data.password}' | base64 --decode)
+          ES_USERNAME=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.username}' | base64 --decode)
+          ES_PASSWORD=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.password}' | base64 --decode)
+          BODS_API_KEY=$(kubectl get secret travigo-bods-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          IE_NATIONAL_API_KEY=$(kubectl get secret travigo-ie-nationaltransport-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          NR_USER=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
+          NR_PASS=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
+          NWR_USER=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
+          NWR_PASS=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
+          SE_STATIC_KEY=$(kubectl get secret travigo-trafiklab-sweden-static -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          SE_REALTIME_KEY=$(kubectl get secret travigo-trafiklab-sweden-realtime -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          JP_ODPT_KEY=$(kubectl get secret travigo-odtp-japan-gtfs -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_BODS_API_KEY=$BODS_API_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_IE_NATIONALTRANSPORT_API_KEY=$IE_NATIONAL_API_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_NATIONALRAIL_USERNAME=$NR_USER" >> $GITHUB_ENV
+          echo "TRAVIGO_NATIONALRAIL_PASSWORD=$NR_PASS" >> $GITHUB_ENV
+          echo "TRAVIGO_NETWORKRAIL_USERNAME=$NWR_USER" >> $GITHUB_ENV
+          echo "TRAVIGO_NETWORKRAIL_PASSWORD=$NWR_PASS" >> $GITHUB_ENV
+          echo "TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY=$SE_STATIC_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY=$SE_REALTIME_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_JP_ODPT_API_KEY=$JP_ODPT_KEY" >> $GITHUB_ENV
+
+      - name: Run data-importer dataset
+        run: |
+          echo "=== Importing dataset: ${{ matrix.dataset }} ==="
+          ./travigo data-importer dataset --id "${{ matrix.dataset }}"
+
+  postprocess:
+    needs: import-dataset
+    runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - name: Checkout repository
@@ -66,64 +136,10 @@ jobs:
           echo "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY=$SE_REALTIME_KEY" >> $GITHUB_ENV
           echo "TRAVIGO_JP_ODPT_API_KEY=$JP_ODPT_KEY" >> $GITHUB_ENV
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-
-      - name: Build travigo binary
-        run: go build -o travigo ./cmd/travigo
-
-      - name: Run data-importer dataset
-        run: |
-          echo "=== Importing dataset: ${{ matrix.dataset }} ==="
-          ./travigo data-importer dataset --id "${{ matrix.dataset }}"
-
-  postprocess:
-    needs: import-dataset
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      GOFLAGS: '-mod=vendor'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-
-      - name: Get k8s secrets into env
-        run: |
-          MONGO_CONN=$(kubectl get secret travigo-mongodb-admin-travigo -n default -o jsonpath='{.data.connectionString\.standard}' | base64 --decode)
-          REDIS_PASSWORD=$(kubectl get secret redis-password -n default -o jsonpath='{.data.password}' | base64 --decode)
-          ES_USERNAME=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.username}' | base64 --decode)
-          ES_PASSWORD=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.password}' | base64 --decode)
-          BODS_API_KEY=$(kubectl get secret travigo-bods-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
-          IE_NATIONAL_API_KEY=$(kubectl get secret travigo-ie-nationaltransport-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
-          NR_USER=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
-          NR_PASS=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
-          NWR_USER=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
-          NWR_PASS=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
-          SE_STATIC_KEY=$(kubectl get secret travigo-trafiklab-sweden-static -n default -o jsonpath='{.data.api_key}' | base64 --decode)
-          SE_REALTIME_KEY=$(kubectl get secret travigo-trafiklab-sweden-realtime -n default -o jsonpath='{.data.api_key}' | base64 --decode)
-          JP_ODPT_KEY=$(kubectl get secret travigo-odtp-japan-gtfs -n default -o jsonpath='{.data.api_key}' | base64 --decode)
-          echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
-          echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
-          echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
-          echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
-          echo "TRAVIGO_BODS_API_KEY=$BODS_API_KEY" >> $GITHUB_ENV
-          echo "TRAVIGO_IE_NATIONALTRANSPORT_API_KEY=$IE_NATIONAL_API_KEY" >> $GITHUB_ENV
-          echo "TRAVIGO_NATIONALRAIL_USERNAME=$NR_USER" >> $GITHUB_ENV
-          echo "TRAVIGO_NATIONALRAIL_PASSWORD=$NR_PASS" >> $GITHUB_ENV
-          echo "TRAVIGO_NETWORKRAIL_USERNAME=$NWR_USER" >> $GITHUB_ENV
-          echo "TRAVIGO_NETWORKRAIL_PASSWORD=$NWR_PASS" >> $GITHUB_ENV
-          echo "TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY=$SE_STATIC_KEY" >> $GITHUB_ENV
-          echo "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY=$SE_REALTIME_KEY" >> $GITHUB_ENV
-          echo "TRAVIGO_JP_ODPT_API_KEY=$JP_ODPT_KEY" >> $GITHUB_ENV
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-
-      - name: Build travigo binary
-        run: go build -o travigo ./cmd/travigo
+      - name: Download travigo binary
+        uses: actions/download-artifact@v4
+        with:
+          name: travigo-binary
 
       - name: Run data-linker stops
         run: ./travigo data-linker run --type stops
