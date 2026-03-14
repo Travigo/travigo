@@ -29,7 +29,9 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Build travigo binary
         run: go build -o travigo ./cmd/travigo
@@ -98,7 +100,9 @@ jobs:
           add_mask "$JP_ODPT_KEY"
 
           echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_ADDRESS=redis-headless.redis:6379" >> $GITHUB_ENV
           echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_ADDRESS=http://primary-es-http.elastic:9200" >> $GITHUB_ENV
           echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
           echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
           echo "TRAVIGO_BODS_API_KEY=$BODS_API_KEY" >> $GITHUB_ENV
