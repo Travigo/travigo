@@ -28,6 +28,7 @@ jobs:
     strategy:
       matrix:
         dataset: ${{ fromJSON(needs.discover.outputs.datasets) }}
+      max-parallel: 1
     timeout-minutes: 180
     steps:
       - name: Checkout repository
