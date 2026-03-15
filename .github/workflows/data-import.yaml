@@ -1,5 +1,9 @@
 name: Batch data import
 
+concurrency:
+  group: batch-data-import
+  cancel-in-progress: false
+
 on:
   schedule:
     - cron: '0 5 * * *'
@@ -116,6 +120,7 @@ jobs:
           echo "TRAVIGO_JP_ODPT_API_KEY=$JP_ODPT_KEY" >> $GITHUB_ENV
 
       - name: Run data-importer dataset
+        continue-on-error: true
         run: |
           echo "=== Importing dataset: ${{ matrix.dataset }} ==="
           ./travigo data-importer dataset --id "${{ matrix.dataset }}"
@@ -156,13 +161,17 @@ jobs:
           name: travigo-binary
 
       - name: Make binary executable
+        continue-on-error: true
         run: chmod +x travigo
 
       - name: Run data-linker stops
+        continue-on-error: true
         run: ./travigo data-linker run --type stops
 
       - name: Run data-linker services
+        continue-on-error: true
         run: ./travigo data-linker run --type services
 
       - name: Run indexer stops
+        continue-on-error: true
         run: ./travigo indexer stops
