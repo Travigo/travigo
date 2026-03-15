@@ -1,0 +1,176 @@
+name: Batch data import
+
+concurrency:
+  group: batch-data-import
+  cancel-in-progress: false
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      datasets: ${{ steps.discover.outputs.datasets }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Discover dataset IDs
+        id: discover
+        run: |
+          set -euo pipefail
+          pip install pyyaml
+          python .github/scripts/discover_datasets.py
+
+  build-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build travigo binary
+        run: go build -o travigo ./cmd/travigo
+
+      - name: Upload travigo binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: travigo-binary
+          path: travigo
+
+  import-dataset:
+    needs:
+      - discover
+      - build-binary
+    runs-on: arc
+    strategy:
+      matrix:
+        dataset: ${{ fromJSON(needs.discover.outputs.datasets) }}
+      max-parallel: 1
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download travigo binary
+        uses: actions/download-artifact@v4
+        with:
+          name: travigo-binary
+
+      - name: Make binary executable
+        run: chmod +x travigo
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get k8s secrets into env
+        run: |
+          add_mask() { echo "::add-mask::$1"; }
+
+          MONGO_CONN=$(kubectl get secret travigo-mongodb-admin-travigo -n default -o jsonpath='{.data.connectionString\.standard}' | base64 --decode)
+          REDIS_PASSWORD=$(kubectl get secret redis-password -n default -o jsonpath='{.data.password}' | base64 --decode)
+          ES_USERNAME=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.username}' | base64 --decode)
+          ES_PASSWORD=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.password}' | base64 --decode)
+          BODS_API_KEY=$(kubectl get secret travigo-bods-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          IE_NATIONAL_API_KEY=$(kubectl get secret travigo-ie-nationaltransport-api -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          NR_USER=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
+          NR_PASS=$(kubectl get secret travigo-nationalrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
+          NWR_USER=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.username}' | base64 --decode)
+          NWR_PASS=$(kubectl get secret travigo-networkrail-credentials -n default -o jsonpath='{.data.password}' | base64 --decode)
+          SE_STATIC_KEY=$(kubectl get secret travigo-trafiklab-sweden-static -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          SE_REALTIME_KEY=$(kubectl get secret travigo-trafiklab-sweden-realtime -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+          JP_ODPT_KEY=$(kubectl get secret travigo-odtp-japan-gtfs -n default -o jsonpath='{.data.api_key}' | base64 --decode)
+
+          add_mask "$MONGO_CONN"
+          add_mask "$REDIS_PASSWORD"
+          add_mask "$ES_USERNAME"
+          add_mask "$ES_PASSWORD"
+          add_mask "$BODS_API_KEY"
+          add_mask "$IE_NATIONAL_API_KEY"
+          add_mask "$NR_USER"
+          add_mask "$NR_PASS"
+          add_mask "$NWR_USER"
+          add_mask "$NWR_PASS"
+          add_mask "$SE_STATIC_KEY"
+          add_mask "$SE_REALTIME_KEY"
+          add_mask "$JP_ODPT_KEY"
+
+          echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_ADDRESS=redis-headless.redis:6379" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_ADDRESS=http://primary-es-http.elastic:9200" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_BODS_API_KEY=$BODS_API_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_IE_NATIONALTRANSPORT_API_KEY=$IE_NATIONAL_API_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_NATIONALRAIL_USERNAME=$NR_USER" >> $GITHUB_ENV
+          echo "TRAVIGO_NATIONALRAIL_PASSWORD=$NR_PASS" >> $GITHUB_ENV
+          echo "TRAVIGO_NETWORKRAIL_USERNAME=$NWR_USER" >> $GITHUB_ENV
+          echo "TRAVIGO_NETWORKRAIL_PASSWORD=$NWR_PASS" >> $GITHUB_ENV
+          echo "TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY=$SE_STATIC_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_SE_TRAFIKLAB_REALTIME_API_KEY=$SE_REALTIME_KEY" >> $GITHUB_ENV
+          echo "TRAVIGO_JP_ODPT_API_KEY=$JP_ODPT_KEY" >> $GITHUB_ENV
+
+      - name: Run data-importer dataset
+        continue-on-error: true
+        run: |
+          echo "=== Importing dataset: ${{ matrix.dataset }} ==="
+          ./travigo data-importer dataset --id "${{ matrix.dataset }}"
+
+  postprocess:
+    needs: import-dataset
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Get k8s secrets into env
+        run: |
+          add_mask() { echo "::add-mask::$1"; }
+
+          MONGO_CONN=$(kubectl get secret travigo-mongodb-admin-travigo -n default -o jsonpath='{.data.connectionString\.standard}' | base64 --decode)
+          REDIS_PASSWORD=$(kubectl get secret redis-password -n default -o jsonpath='{.data.password}' | base64 --decode)
+          ES_USERNAME=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.username}' | base64 --decode)
+          ES_PASSWORD=$(kubectl get secret travigo-elasticsearch-user -n default -o jsonpath='{.data.password}' | base64 --decode)
+
+          add_mask "$MONGO_CONN"
+          add_mask "$REDIS_PASSWORD"
+          add_mask "$ES_USERNAME"
+          add_mask "$ES_PASSWORD"
+
+          echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
+
+      - name: Download travigo binary
+        uses: actions/download-artifact@v4
+        with:
+          name: travigo-binary
+
+      - name: Make binary executable
+        continue-on-error: true
+        run: chmod +x travigo
+
+      - name: Run data-linker stops
+        continue-on-error: true
+        run: ./travigo data-linker run --type stops
+
+      - name: Run data-linker services
+        continue-on-error: true
+        run: ./travigo data-linker run --type services
+
+      - name: Run indexer stops
+        continue-on-error: true
+        run: ./travigo indexer stops
