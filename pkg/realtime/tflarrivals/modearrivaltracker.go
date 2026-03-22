@@ -400,9 +400,16 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		}
 	}
 
-	// Add to redis
+	// Add realtime journey to redis
 	realtimeJourneyJson, _ := json.Marshal(realtimeJourney)
 	redis_client.Client.Set(context.Background(), realtimeJourneyID, realtimeJourneyJson, time.Hour*6)
+
+	// Add stop mapping for each stop in the realtime journey
+	for stopID, realtimeStop := range realtimeJourney.Stops {
+		if realtimeStop.TimeType != ctdf.RealtimeJourneyStopTimeHistorical {
+			redis_client.Client.Set(context.Background(), fmt.Sprintf("tfl-realtime-stop-mapping-%s-%s", stopID, realtimeJourneyID), realtimeJourneyID, time.Minute*10)
+		}
+	}
 }
 
 // TODO convert to proper cache
