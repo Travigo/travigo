@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -172,10 +173,8 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	var realtimeJourney *ctdf.RealtimeJourney
-	redisOutput := redis_client.Client.Get(context.Background(), realtimeJourneyID)
-	if redisOutput.Val() != "" {
-		json.Unmarshal([]byte(redisOutput.Val()), &realtimeJourney)
-	} else {
+	realtimeJourney, _ = realtimestore.GetRealtimeJourney(context.Background(), realtimeJourneyID)
+	if realtimeJourney == nil {
 		journeyDate := time.Now() // TODO may not always be correct?
 
 		realtimeJourney = &ctdf.RealtimeJourney{
@@ -401,8 +400,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add realtime journey to redis
-	realtimeJourneyJson, _ := json.Marshal(realtimeJourney)
-	redis_client.Client.Set(context.Background(), realtimeJourneyID, realtimeJourneyJson, time.Hour*6)
+	realtimestore.SetRealtimeJourney(context.Background(), realtimeJourney)
 
 	// Add stop mapping for each stop in the realtime journey
 	for stopID, realtimeStop := range realtimeJourney.Stops {

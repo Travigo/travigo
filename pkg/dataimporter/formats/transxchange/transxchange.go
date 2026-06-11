@@ -18,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -660,6 +661,8 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					log.Error().Msgf("Journey %s has a nil path", ctdfJourney.PrimaryIdentifier)
 				}
 
+				materializeTransXChangeJourneyRealtimeLookups(context.Background(), &ctdfJourney, service, txcJourney)
+
 				bsonRep, _ := bson.Marshal(ctdfJourney)
 
 				var existingCtdfJourney *ctdf.Journey
@@ -704,4 +707,43 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	log.Info().Msgf("Successfully imported into MongoDB")
 
 	return nil
+}
+
+func materializeTransXChangeJourneyRealtimeLookups(ctx context.Context, journey *ctdf.Journey, service *Service, txcJourney *VehicleJourney) {
+	if journey == nil || service == nil || txcJourney == nil {
+		return
+	}
+
+	lineRefs := []string{txcJourney.LineRef}
+	for _, line := range service.Lines {
+		if line.ID == txcJourney.LineRef && line.LineName != "" && line.LineName != txcJourney.LineRef {
+			lineRefs = append(lineRefs, line.LineName)
+			break
+		}
+	}
+
+	for _, lineRef := range lineRefs {
+		if ticketMachineJourneyCode := journey.OtherIdentifiers["TicketMachineJourneyCode"]; ticketMachineJourneyCode != "" {
+			realtimestore.SetJourneyLookup(ctx, realtimestore.SIRIJourneyRefLookupKey(journey.OperatorRef, lineRef, ticketMachineJourneyCode), journey.PrimaryIdentifier)
+		}
+
+		if journeyCode := journey.OtherIdentifiers["JourneyCode"]; journeyCode != "" {
+			realtimestore.SetJourneyLookup(ctx, realtimestore.SIRIJourneyRefLookupKey(journey.OperatorRef, lineRef, journeyCode), journey.PrimaryIdentifier)
+		}
+
+		if blockNumber := journey.OtherIdentifiers["BlockNumber"]; blockNumber != "" {
+			realtimestore.SetJourneyLookup(ctx, realtimestore.SIRIBlockLookupKey(journey.OperatorRef, lineRef, blockNumber), journey.PrimaryIdentifier)
+		}
+
+		if len(journey.Path) > 0 {
+			firstPath := journey.Path[0]
+			lastPath := journey.Path[len(journey.Path)-1]
+			departureHHMM := firstPath.OriginDepartureTime.Format("15:04")
+			realtimestore.SetJourneyLookup(
+				ctx,
+				realtimestore.SIRIOriginDestinationTimeLookupKey(journey.OperatorRef, lineRef, firstPath.OriginStopRef, lastPath.DestinationStopRef, departureHHMM),
+				journey.PrimaryIdentifier,
+			)
+		}
+	}
 }

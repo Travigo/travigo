@@ -9,9 +9,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
@@ -23,31 +23,22 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	var realtimeJourney *ctdf.RealtimeJourney
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 
-	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "journey.path", Value: 1},
-		{Key: "journey.departuretimezone", Value: 1},
-		{Key: "nextstopref", Value: 1},
-		{Key: "offset", Value: 1},
-	})
-
+	ctx := context.Background()
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
+	realtimeJourney, _ = realtimestore.GetRealtimeJourney(ctx, realtimeJourneyIdentifier)
+	if realtimeJourney == nil {
+		realtimeJourneysCollection.FindOne(ctx, searchQuery).Decode(&realtimeJourney)
+		if realtimeJourney != nil {
+			realtimestore.SetRealtimeJourney(ctx, realtimeJourney)
+		}
+	}
 
 	newRealtimeJourney := false
 	if realtimeJourney == nil {
-		var journey *ctdf.Journey
-		journeysCollection := database.GetCollection("journeys")
-		err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}).Decode(&journey)
-
+		journey, err := loadJourneyForRealtime(ctx, journeyID)
 		if err != nil {
 			return nil, err
 		}
-
-		for _, pathItem := range journey.Path {
-			pathItem.GetDestinationStop()
-		}
-
-		journey.GetService()
 
 		journeyDate, _ := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 
@@ -69,7 +60,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 	if realtimeJourney.Journey == nil {
 		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
-		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
+		realtimeJourneysCollection.DeleteOne(ctx, searchQuery)
 		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
 	}
 
@@ -352,6 +343,30 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 	}
 
+	realtimeJourney.ModificationDateTime = currentTime
+	realtimeJourney.VehicleBearing = vehicleUpdateEvent.VehicleLocationUpdate.Bearing
+	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
+	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
+	realtimeJourney.DataSource = vehicleUpdateEvent.DataSource
+	realtimeJourney.Reliability = realtimeJourneyReliability
+	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
+		realtimeJourney.VehicleLocation = vehicleUpdateEvent.VehicleLocationUpdate.Location
+	}
+	if (offset.Seconds() != realtimeJourney.Offset.Seconds()) || newRealtimeJourney {
+		realtimeJourney.Offset = offset
+	}
+	if realtimeJourney.Stops == nil {
+		realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
+	}
+	for key, stopUpdate := range journeyStopUpdates {
+		if key != "" {
+			realtimeJourney.Stops[key] = stopUpdate
+		}
+	}
+
+	realtimestore.SetRealtimeJourney(ctx, realtimeJourney)
+
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
 	updateModel := mongo.NewUpdateOneModel()
 	updateModel.SetFilter(searchQuery)
@@ -359,4 +374,26 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	updateModel.SetUpsert(true)
 
 	return updateModel, nil
+}
+
+func loadJourneyForRealtime(ctx context.Context, journeyID string) (*ctdf.Journey, error) {
+	journey, err := realtimestore.GetJourneySnapshot(ctx, journeyID)
+	if err == nil {
+		return journey, nil
+	}
+
+	journeysCollection := database.GetCollection("journeys")
+	err = journeysCollection.FindOne(ctx, bson.M{"primaryidentifier": journeyID}).Decode(&journey)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pathItem := range journey.Path {
+		pathItem.GetDestinationStop()
+	}
+
+	journey.GetService()
+	realtimestore.SetJourneySnapshot(ctx, journey)
+
+	return journey, nil
 }
