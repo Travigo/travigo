@@ -16,8 +16,8 @@ import (
 
 const (
 	ActiveJourneyTTL   = 4 * time.Hour
-	JourneyLookupTTL   = 48 * time.Hour
-	JourneySnapshotTTL = 48 * time.Hour
+	JourneyLookupTTL   = 4 * time.Hour
+	JourneySnapshotTTL = 4 * time.Hour
 
 	ambiguousLookupValue = "AMBIGUOUS"
 
