@@ -12,7 +12,7 @@ import (
 
 func (s Source) RealtimeJourneyQuery(q query.RealtimeJourney) (*ctdf.RealtimeJourney, error) {
 	realtimeJourney, err := realtimestore.GetRealtimeJourney(context.Background(), q.PrimaryIdentifier)
-	if err == nil {
+	if err == nil && realtimeJourney.Journey != nil {
 		return realtimeJourney, nil
 	}
 

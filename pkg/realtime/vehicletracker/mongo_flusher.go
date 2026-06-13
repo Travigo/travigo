@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/runtimestats"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -25,6 +26,7 @@ var (
 func StartRealtimeMongoFlusher() {
 	realtimeMongoFlushOnce.Do(func() {
 		realtimeMongoFlushQueue = make(chan mongo.WriteModel, realtimeMongoQueueSize)
+		runtimestats.RecordMongoFlusherQueue(0, realtimeMongoQueueSize)
 
 		go runRealtimeMongoFlusher()
 	})
@@ -36,6 +38,7 @@ func enqueueRealtimeJourneyOperations(operations []mongo.WriteModel) {
 	}
 
 	if realtimeMongoFlushQueue == nil {
+		runtimestats.RecordMongoDirectWrite(len(operations))
 		writeRealtimeJourneyOperations(operations)
 		return
 	}
@@ -43,6 +46,7 @@ func enqueueRealtimeJourneyOperations(operations []mongo.WriteModel) {
 	for _, operation := range operations {
 		realtimeMongoFlushQueue <- operation
 	}
+	runtimestats.RecordMongoEnqueued(len(operations), len(realtimeMongoFlushQueue), cap(realtimeMongoFlushQueue))
 }
 
 func runRealtimeMongoFlusher() {
@@ -54,6 +58,7 @@ func runRealtimeMongoFlusher() {
 	for {
 		select {
 		case operation := <-realtimeMongoFlushQueue:
+			runtimestats.RecordMongoFlusherQueue(len(realtimeMongoFlushQueue), cap(realtimeMongoFlushQueue))
 			pending = append(pending, operation)
 			if len(pending) >= realtimeMongoFlushSize {
 				writeRealtimeJourneyOperations(pending)
@@ -77,7 +82,9 @@ func writeRealtimeJourneyOperations(operations []mongo.WriteModel) {
 
 	startTime := time.Now()
 	_, err := realtimeJourneysCollection.BulkWrite(context.Background(), operations, options.BulkWrite().SetOrdered(false))
-	log.Info().Int("Length", len(operations)).Str("Time", time.Since(startTime).String()).Msg("Bulk write realtime_journeys")
+	duration := time.Since(startTime)
+	runtimestats.RecordMongoFlush(len(operations), duration, err)
+	log.Info().Int("Length", len(operations)).Str("Time", duration.String()).Msg("Bulk write realtime_journeys")
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")

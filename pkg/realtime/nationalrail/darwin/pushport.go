@@ -198,6 +198,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		updateModel.SetUpsert(true)
 
 		queue.Add(updateModel)
+		railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 	}
 
 	// Schedules
@@ -370,6 +371,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		updateModel.SetUpsert(true)
 
 		queue.Add(updateModel)
+		railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 
 		log.Info().
 			Str("realtimejourneyid", realtimeJourneyID).
@@ -495,6 +497,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
 
 			updateMap := bson.M{}
+			updateMap["modificationdatetime"] = now
 			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
 
 			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
@@ -504,6 +507,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateModel.SetUpsert(true)
 
 			queue.Add(updateModel)
+			railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 		}
 	}
 
@@ -562,6 +566,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			updateMap := bson.M{}
+			updateMap["modificationdatetime"] = now
 			updateMap["occupancy"] = realtimeJourney.Occupancy
 			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
 
@@ -572,6 +577,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			updateModel.SetUpsert(true)
 
 			queue.Add(updateModel)
+			railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 		}
 	}
 }

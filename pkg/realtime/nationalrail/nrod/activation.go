@@ -2,14 +2,13 @@ package nrod
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -143,9 +142,7 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 	stompClient.Queue.Add(updateModel)
 
-	// Add to Redis
-	realtimeJourneyJson, _ := json.Marshal(realtimeJourney)
-	redis_client.Client.Set(context.Background(), realtimeJourneyID, realtimeJourneyJson, time.Hour*12)
+	railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 
 	log.Info().
 		Str("trainid", a.TrainID).

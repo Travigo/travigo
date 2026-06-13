@@ -2,7 +2,6 @@ package tfl
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/transforms"
 )
@@ -59,16 +59,12 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		for keysIter.Next(context.Background()) {
 			mappingKey := keysIter.Val()
 			realtimeJourneyID := redis_client.Client.Get(context.Background(), mappingKey)
-			realtimeJourneyJSON := redis_client.Client.Get(context.Background(), realtimeJourneyID.Val())
-			if realtimeJourneyJSON.Val() != "" {
-				var realtimeJourney ctdf.RealtimeJourney
-				err := json.Unmarshal([]byte(realtimeJourneyJSON.Val()), &realtimeJourney)
-				if err != nil {
-					log.Error().Err(err).Msg("Error unmarshalling realtime journey")
-					continue
-				}
-				realtimeJourneys = append(realtimeJourneys, realtimeJourney)
+			realtimeJourney, err := realtimestore.GetRealtimeJourney(context.Background(), realtimeJourneyID.Val())
+			if err != nil || realtimeJourney == nil || realtimeJourney.Journey == nil {
+				continue
 			}
+
+			realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
 		}
 	}
 

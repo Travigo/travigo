@@ -16,6 +16,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
+	"github.com/travigo/travigo/pkg/realtime/runtimestats"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -90,23 +91,31 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	var serviceAlertOperations []mongo.WriteModel
 	latestVehicleEvents := map[string]*VehicleUpdateEvent{}
 	var serviceAlertEvents []*VehicleUpdateEvent
+	decodeErrors := 0
+	nilEvents := 0
+	vehicleEvents := 0
+	skippedVehicleEvents := 0
 
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil {
 			log.Error().Err(err).Msg("Failed to decode realtime event")
+			decodeErrors++
 			continue
 		}
 
 		if vehicleUpdateEvent == nil {
+			nilEvents++
 			continue
 		}
 
 		if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip || vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
 			if vehicleUpdateEvent.VehicleLocationUpdate == nil {
+				skippedVehicleEvents++
 				continue
 			}
 
+			vehicleEvents++
 			coalesceKey := vehicleUpdateEvent.LocalID
 			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
 				coalesceKey = fmt.Sprintf("%s/%s", vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier)
@@ -121,22 +130,46 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		}
 	}
 
+	runtimestats.RecordRealtimeBatch(
+		len(payloads),
+		decodeErrors,
+		nilEvents,
+		vehicleEvents,
+		len(latestVehicleEvents),
+		len(serviceAlertEvents),
+		skippedVehicleEvents+(vehicleEvents-len(latestVehicleEvents)),
+	)
+
 	for _, vehicleUpdateEvent := range latestVehicleEvents {
 		identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
 
 		if identifiedJourneyID != "" {
+			runtimestats.RecordVehicleIdentified()
 			var writeModel mongo.WriteModel
+			var err error
 
 			if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
-				writeModel, _ = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+				writeModel, err = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+				if writeModel != nil {
+					runtimestats.RecordRealtimeJourneyUpdate()
+				}
 			} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
-				writeModel, _ = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+				writeModel, err = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+				if writeModel != nil {
+					runtimestats.RecordLocationOnlyUpdate()
+				}
+			}
+
+			if err != nil {
+				runtimestats.RecordRealtimeProcessingError()
+				log.Debug().Err(err).Str("journey", identifiedJourneyID).Msg("Failed to process realtime vehicle update")
 			}
 
 			if writeModel != nil {
 				realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
 			}
 		} else {
+			runtimestats.RecordVehicleUnidentified()
 			log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
 		}
 	}

@@ -400,6 +400,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add realtime journey to redis
+	realtimestore.SetJourneySnapshot(context.Background(), realtimeJourney.Journey)
 	realtimestore.SetRealtimeJourney(context.Background(), realtimeJourney)
 
 	// Add stop mapping for each stop in the realtime journey

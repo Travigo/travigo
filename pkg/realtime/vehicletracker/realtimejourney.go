@@ -59,9 +59,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	}
 
 	if realtimeJourney.Journey == nil {
-		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
-		realtimeJourneysCollection.DeleteOne(ctx, searchQuery)
-		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
+		journey, err := loadJourneyForRealtime(ctx, journeyID)
+		if err != nil {
+			log.Error().Err(err).Str("journey", journeyID).Msg("Failed to hydrate realtime journey")
+			return nil, errors.New("failed to hydrate realtime journey")
+		}
+
+		realtimeJourney.Journey = journey
+		realtimeJourney.Service = journey.Service
 	}
 
 	var offset time.Duration
