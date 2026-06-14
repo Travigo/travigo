@@ -33,8 +33,15 @@ const (
 )
 
 func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool) []*DepartureBoard {
+	return GenerateDepartureBoardFromJourneysWithRealtimeFinder(journeys, stopRefs, dateTime, doEstimates, findRealtimeJourneyInDatabase)
+}
+
+func GenerateDepartureBoardFromJourneysWithRealtimeFinder(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, findRealtimeJourney RealtimeJourneyFinder) []*DepartureBoard {
+	if findRealtimeJourney == nil {
+		findRealtimeJourney = findRealtimeJourneyInDatabase
+	}
+
 	journeysCollection := database.GetCollection("journeys")
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
 	realtimeJourneyOptions := options.FindOne().SetProjection(bson.D{
@@ -79,7 +86,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
-				journey.GetRealtimeJourney(realtimeJourneyOptions)
+				journey.GetRealtimeJourneyWithFinder(findRealtimeJourney, realtimeJourneyOptions)
 
 				for _, path := range journey.Path {
 					if slices.Contains(stopRefs, path.OriginStopRef) {
@@ -176,14 +183,12 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
 					}
 
-					var blockRealtimeJourney *RealtimeJourney
-					realtimeJourneysCollection.FindOne(context.Background(),
-						bson.M{
-							"journeyref": bson.M{
-								"$in": blockJourneys,
-							},
-							"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-						}, &options.FindOneOptions{}).Decode(&blockRealtimeJourney)
+					blockRealtimeJourney, _ := findRealtimeJourney(context.Background(), bson.M{
+						"journeyref": bson.M{
+							"$in": blockJourneys,
+						},
+						"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
+					}, &options.FindOneOptions{})
 
 					if blockRealtimeJourney != nil {
 						// Ignore negative offsets as we assume bus will right itself when turning over

@@ -11,7 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
-	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -57,13 +57,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		stopQueries = append(stopQueries, bson.M{fmt.Sprintf("stops.%s.timetype", stopID): ctdf.RealtimeJourneyStopTimeEstimatedFuture})
 	}
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
+	realtimeJourneys, err := realtimestore.Find(context.Background(), bson.M{
 		"$or": stopQueries,
 	})
-
-	var realtimeJourneys []ctdf.RealtimeJourney
-	if err := cursor.All(context.Background(), &realtimeJourneys); err != nil {
+	if err != nil {
 		log.Error().Err(err).Msg("Failed to decode Realtime Journeys")
 	}
 
@@ -72,6 +69,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	generateDeparteBoardStart := time.Now()
 
 	for _, realtimeJourney := range realtimeJourneys {
+		if realtimeJourney == nil {
+			continue
+		}
+
 		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {

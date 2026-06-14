@@ -89,16 +89,31 @@ func (j *Journey) GetDeepReferences() {
 
 	wg.Wait()
 }
-func (j *Journey) GetRealtimeJourney(opts *options.FindOneOptions) {
-	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
+type RealtimeJourneyFinder func(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (*RealtimeJourney, error)
+
+func findRealtimeJourneyInDatabase(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (*RealtimeJourney, error) {
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 	var realtimeJourney *RealtimeJourney
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
+	err := realtimeJourneysCollection.FindOne(ctx, filter, opts...).Decode(&realtimeJourney)
+	return realtimeJourney, err
+}
+
+func (j *Journey) GetRealtimeJourney(opts *options.FindOneOptions) {
+	j.GetRealtimeJourneyWithFinder(findRealtimeJourneyInDatabase, opts)
+}
+func (j *Journey) GetRealtimeJourneyWithFinder(findOne RealtimeJourneyFinder, opts *options.FindOneOptions) {
+	if findOne == nil {
+		findOne = findRealtimeJourneyInDatabase
+	}
+
+	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
+
+	realtimeJourney, _ := findOne(context.Background(), bson.M{
 		"journey.primaryidentifier": j.PrimaryIdentifier,
 		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-	}, opts).Decode(&realtimeJourney)
+	}, opts)
 
 	if realtimeJourney != nil && realtimeJourney.IsActive() {
 		j.RealtimeJourney = realtimeJourney
