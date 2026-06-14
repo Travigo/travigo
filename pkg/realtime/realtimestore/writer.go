@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
@@ -64,6 +65,11 @@ func UpdateFieldsModel(identifier string, fields bson.M, opts ...Option) (mongo.
 
 func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64, modificationDateTime time.Time, opts ...Option) (*mongo.UpdateResult, error) {
 	return UpdateFields(ctx, identifier, LocationFields(location, bearing, modificationDateTime), opts...)
+}
+
+func UpdateLocationDescription(ctx context.Context, identifier string, description string) error {
+	redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier), description, 12*time.Hour)
+	return nil
 }
 
 func UpdateLocationModel(identifier string, location ctdf.Location, bearing float64, modificationDateTime time.Time, opts ...Option) (mongo.WriteModel, error) {

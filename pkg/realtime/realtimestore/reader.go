@@ -2,8 +2,10 @@ package realtimestore
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/redis_client"
 	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -36,6 +38,11 @@ func FindOne(ctx context.Context, filter interface{}, opts ...Option) (*ctdf.Rea
 		return nil, err
 	}
 
+	locationDescription, err := GetLocationDescription(ctx, realtimeJourney.PrimaryIdentifier)
+	if err != nil {
+		realtimeJourney.VehicleLocationDescription = locationDescription
+	}
+
 	return realtimeJourney, nil
 }
 
@@ -54,4 +61,12 @@ func Find(ctx context.Context, filter interface{}, opts ...Option) ([]*ctdf.Real
 	}
 
 	return realtimeJourneys, nil
+}
+
+func GetLocationDescription(ctx context.Context, identifier string) (string, error) {
+	description := redis_client.Client.Get(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier))
+	if description.Err() != nil {
+		return "", description.Err()
+	}
+	return description.Val(), nil
 }

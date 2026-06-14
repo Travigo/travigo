@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -91,12 +92,12 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			}
 		}
 
-		updateMap["vehiclelocationdescription"] = fmt.Sprintf("Departed %s", locationStop.PrimaryName)
+		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Departed %s", locationStop.PrimaryName))
 	} else if m.EventType == "ARRIVAL" {
 		updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
 		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
 
-		updateMap["vehiclelocationdescription"] = fmt.Sprintf("Arrived at %s", locationStop.PrimaryName)
+		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Arrived at %s", locationStop.PrimaryName))
 
 		// If we've arrived at the end, then it's not actively tracked anymore
 		if locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {

@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -461,7 +462,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 	updateMap["journey"] = realtimeJourney.Journey
 
-	updateMap["vehiclelocationdescription"] = realtimeJourney.VehicleLocationDescription
+	realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription)
 
 	// Create update
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
