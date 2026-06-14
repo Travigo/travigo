@@ -97,7 +97,7 @@ jobs:
       uses: Azure/setup-helm@v4
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v4
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
@@ -125,7 +125,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
@@ -154,7 +154,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
@@ -182,7 +182,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
@@ -210,7 +210,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
@@ -238,7 +238,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
   
     - name: Helm upgrade
       run: |-
@@ -265,7 +265,7 @@ jobs:
       uses: Azure/setup-helm@v3
 
     - name: Kubectl tool installer
-      uses: Azure/setup-kubectl@v3
+      uses: Azure/setup-kubectl@v5
 
     - name: Helm upgrade
       run: |-
