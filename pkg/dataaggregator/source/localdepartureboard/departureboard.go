@@ -14,16 +14,11 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 
 	// "github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-func findRealtimeJourney(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (*ctdf.RealtimeJourney, error) {
-	return realtimestore.FindOne(ctx, filter, realtimestore.WithFindOneOptions(opts...))
-}
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	var departureBoard []*ctdf.DepartureBoard
@@ -61,7 +56,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - today")
 
 	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneysWithRealtimeFinder(journeysToday, allStopIDs, q.StartDateTime, true, findRealtimeJourney)
+	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true)
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 
 	// If not enough journeys in todays departure board then look into tomorrows
@@ -73,7 +68,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - tomorrow")
 		currentTime = time.Now()
 
-		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneysWithRealtimeFinder(journeysTomorrow, allStopIDs, dayAfterDateTime, false, findRealtimeJourney)
+		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false)
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation tomorrow")
 
 		departureBoard = append(departureBoardToday, departureBoardTomorrow...)

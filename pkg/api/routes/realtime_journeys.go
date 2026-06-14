@@ -9,7 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/realtime/realtimestore"
+	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -59,22 +59,25 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 
 	var realtimeJourneys []realtimeJourneyMinimised
 
+	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
 
-	realtimeJourneyResults, err := realtimestore.Find(context.Background(), bson.M{
-		"$and": bson.A{
-			bson.M{"vehiclelocation.coordinates": boundsQuery},
-			bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
+	cursor, _ := realtimeJourneysCollection.Find(context.Background(),
+		bson.M{
+			"$and": bson.A{
+				bson.M{"vehiclelocation.coordinates": boundsQuery},
+				bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
+			},
 		},
-	})
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to decode Realtime Journeys")
-	}
+	)
 
-	for _, realtimeJourney := range realtimeJourneyResults {
-		if realtimeJourney == nil {
-			continue
+	for cursor.Next(context.Background()) {
+		var realtimeJourney *ctdf.RealtimeJourney
+		err := cursor.Decode(&realtimeJourney)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode Stop")
 		}
+
 		if realtimeJourney.IsActive() {
 			realtimeJourney.Journey.GetService()
 			realtimeJourney.Journey.GetOperator()

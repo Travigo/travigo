@@ -1,16 +1,12 @@
 package routes
 
 import (
-	"context"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 func JourneysRouter(router fiber.Router) {
@@ -34,14 +30,7 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-
-		realtimeJourney, _ := realtimestore.FindOne(context.Background(), bson.M{
-			"journey.primaryidentifier": journey.PrimaryIdentifier,
-			"modificationdatetime":      bson.M{"$gt": ctdf.GetActiveRealtimeJourneyCutOffDate()},
-		})
-		if realtimeJourney != nil && realtimeJourney.IsActive() {
-			journey.RealtimeJourney = realtimeJourney
-		}
+		journey.GetRealtimeJourney(nil)
 
 		var journeyReduced interface{}
 
