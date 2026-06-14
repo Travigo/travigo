@@ -3,6 +3,7 @@ package databaselookup
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -11,9 +12,12 @@ import (
 )
 
 func (s Source) RealtimeJourneyQuery(q query.RealtimeJourney) (*ctdf.RealtimeJourney, error) {
-	realtimeJourney, err := realtimestore.GetRealtimeJourney(context.Background(), q.PrimaryIdentifier)
-	if err == nil && realtimeJourney.Journey != nil {
-		return realtimeJourney, nil
+	var realtimeJourney *ctdf.RealtimeJourney
+	if !strings.HasPrefix(q.PrimaryIdentifier, "gb-nationalrailrealtime-") {
+		redisRealtimeJourney, err := realtimestore.GetRealtimeJourney(context.Background(), q.PrimaryIdentifier)
+		if err == nil && redisRealtimeJourney.Journey != nil {
+			return redisRealtimeJourney, nil
+		}
 	}
 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
