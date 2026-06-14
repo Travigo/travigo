@@ -13,7 +13,6 @@ func SetupServer(listen string) error {
 	group := webApp.Group("/core")
 
 	group.Get("version", routes.APIVersion)
-	group.Get("realtime_stats", routes.RealtimeStats)
 
 	routes.StopsRouter(group.Group("/stops"))
 	routes.StopGroupsRouter(group.Group("/stop_groups"))

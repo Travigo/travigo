@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -46,7 +45,6 @@ func (r *TrustReinstatement) Process(stompClient *StompClient) {
 	updateModel.SetUpsert(true)
 
 	stompClient.Queue.Add(updateModel)
-	railutils.CacheRealtimeJourney(context.Background(), realtimeJourney, updateMap)
 
 	// Also delete the service alert for it
 	// TODO this doesnt seem to delete anything

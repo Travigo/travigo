@@ -2,7 +2,6 @@ package gtfs
 
 import (
 	"archive/zip"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -18,7 +17,6 @@ import (
 	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
-	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -489,9 +487,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 		// Insert
 		if dataset.SupportedObjects.Journeys {
-			routeID := g.ctdfJourneys[tripID].OtherIdentifiers["GTFS-RouteID"]
-			materializeGTFSJourneyRealtimeLookups(context.Background(), dataset, tripID, g.ctdfJourneys[tripID], g.ctdfServices[routeID])
-
 			bsonRep, _ := bson.Marshal(bson.M{"$set": g.ctdfJourneys[tripID]})
 			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": g.ctdfJourneys[tripID].PrimaryIdentifier})
@@ -511,43 +506,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	log.Info().Msg("Finished Journeys")
 
 	return nil
-}
-
-func materializeGTFSJourneyRealtimeLookups(ctx context.Context, dataset datasets.DataSet, tripID string, journey *ctdf.Journey, service *ctdf.Service) {
-	if journey == nil {
-		return
-	}
-
-	realtimestore.SetJourneyLookup(ctx, realtimestore.GTFSJourneyLookupKey(dataset.Identifier, tripID), journey.PrimaryIdentifier)
-	realtimestore.SetJourneyLookup(ctx, realtimestore.GTFSAnyJourneyLookupKey(tripID), journey.PrimaryIdentifier)
-
-	if service == nil {
-		return
-	}
-
-	lineRefs := []string{service.ServiceName}
-	if routeID := journey.OtherIdentifiers["GTFS-RouteID"]; routeID != "" && routeID != service.ServiceName {
-		lineRefs = append(lineRefs, routeID)
-	}
-
-	for _, lineRef := range lineRefs {
-		realtimestore.SetJourneyLookup(ctx, realtimestore.SIRIJourneyRefLookupKey(journey.OperatorRef, lineRef, tripID), journey.PrimaryIdentifier)
-
-		if blockNumber := journey.OtherIdentifiers["BlockNumber"]; blockNumber != "" {
-			realtimestore.SetJourneyLookup(ctx, realtimestore.SIRIBlockLookupKey(journey.OperatorRef, lineRef, blockNumber), journey.PrimaryIdentifier)
-		}
-
-		if len(journey.Path) > 0 {
-			firstPath := journey.Path[0]
-			lastPath := journey.Path[len(journey.Path)-1]
-			departureHHMM := firstPath.OriginDepartureTime.Format("15:04")
-			realtimestore.SetJourneyLookup(
-				ctx,
-				realtimestore.SIRIOriginDestinationTimeLookupKey(journey.OperatorRef, lineRef, firstPath.OriginStopRef, lastPath.DestinationStopRef, departureHHMM),
-				journey.PrimaryIdentifier,
-			)
-		}
-	}
 }
 
 func (gtfs *Schedule) GetTranslation(table string, field string, language string, originalValue string) string {

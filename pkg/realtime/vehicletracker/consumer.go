@@ -12,11 +12,8 @@ import (
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"github.com/travigo/travigo/pkg/realtime/runtimestats"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -45,7 +42,6 @@ func CreateIdentificationCache() {
 func StartConsumers() {
 	// Create Cache
 	CreateIdentificationCache()
-	StartRealtimeMongoFlusher()
 
 	// Run the background consumers
 	log.Info().Msg("Starting realtime consumers")
@@ -89,121 +85,70 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 	var realtimeJourneyOperations []mongo.WriteModel
 	var serviceAlertOperations []mongo.WriteModel
-	latestVehicleEvents := map[string]*VehicleUpdateEvent{}
-	var serviceAlertEvents []*VehicleUpdateEvent
-	decodeErrors := 0
-	nilEvents := 0
-	vehicleEvents := 0
-	skippedVehicleEvents := 0
 
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil {
-			log.Error().Err(err).Msg("Failed to decode realtime event")
-			decodeErrors++
-			continue
-		}
-
-		if vehicleUpdateEvent == nil {
-			nilEvents++
-			continue
+			if batchErrors := batch.Reject(); len(batchErrors) > 0 {
+				for _, err := range batchErrors {
+					log.Error().Err(err).Msg("Failed to reject realtime event")
+				}
+			}
 		}
 
 		if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip || vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
-			if vehicleUpdateEvent.VehicleLocationUpdate == nil {
-				skippedVehicleEvents++
-				continue
-			}
-
-			vehicleEvents++
-			coalesceKey := vehicleUpdateEvent.LocalID
-			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
-				coalesceKey = fmt.Sprintf("%s/%s", vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier)
-			}
-
-			existingEvent := latestVehicleEvents[coalesceKey]
-			if existingEvent == nil || vehicleUpdateEvent.RecordedAt.After(existingEvent.RecordedAt) {
-				latestVehicleEvents[coalesceKey] = vehicleUpdateEvent
-			}
-		} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeServiceAlert {
-			serviceAlertEvents = append(serviceAlertEvents, vehicleUpdateEvent)
-		}
-	}
-
-	runtimestats.RecordRealtimeBatch(
-		len(payloads),
-		decodeErrors,
-		nilEvents,
-		vehicleEvents,
-		len(latestVehicleEvents),
-		len(serviceAlertEvents),
-		skippedVehicleEvents+(vehicleEvents-len(latestVehicleEvents)),
-	)
-
-	for _, vehicleUpdateEvent := range latestVehicleEvents {
-		identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
-
-		if identifiedJourneyID != "" {
-			runtimestats.RecordVehicleIdentified()
-			var writeModel mongo.WriteModel
-			var err error
-
-			if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
-				writeModel, err = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
-				if writeModel != nil {
-					runtimestats.RecordRealtimeJourneyUpdate()
-				}
-			} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
-				writeModel, err = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
-				if writeModel != nil {
-					runtimestats.RecordLocationOnlyUpdate()
-				}
-			}
-
-			if err != nil {
-				runtimestats.RecordRealtimeProcessingError()
-				log.Debug().Err(err).Str("journey", identifiedJourneyID).Msg("Failed to process realtime vehicle update")
-			}
-
-			if writeModel != nil {
-				realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
-			}
-		} else {
-			runtimestats.RecordVehicleUnidentified()
-			log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
-		}
-	}
-
-	for _, vehicleUpdateEvent := range serviceAlertEvents {
-		if vehicleUpdateEvent.ServiceAlertUpdate == nil {
-			continue
-		}
-
-		var matchedIdentifiers []string
-		for _, identifyingInformation := range vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation {
-			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, identifyingInformation)
-			identifiedStopID := consumer.identifyStop(vehicleUpdateEvent.SourceType, identifyingInformation)
-			identifiedServiceID := consumer.identifyService(vehicleUpdateEvent.SourceType, identifyingInformation)
+			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
 
 			if identifiedJourneyID != "" {
-				matchedIdentifiers = append(matchedIdentifiers, identifiedJourneyID)
-			}
-			if identifiedStopID != "" {
-				matchedIdentifiers = append(matchedIdentifiers, identifiedStopID)
-			}
-			if identifiedServiceID != "" {
-				matchedIdentifiers = append(matchedIdentifiers, identifiedServiceID)
-			}
-		}
+				var writeModel mongo.WriteModel
 
-		writeModel, _ := consumer.updateServiceAlert(matchedIdentifiers, vehicleUpdateEvent)
-		if writeModel != nil {
-			serviceAlertOperations = append(serviceAlertOperations, writeModel)
+				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
+					writeModel, _ = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+				} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
+					writeModel, _ = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+				}
+
+				if writeModel != nil {
+					realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
+				}
+			} else {
+				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
+			}
+		} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeServiceAlert {
+			var matchedIdentifiers []string
+			for _, identifyingInformation := range vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation {
+				identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, identifyingInformation)
+				identifiedStopID := consumer.identifyStop(vehicleUpdateEvent.SourceType, identifyingInformation)
+				identifiedServiceID := consumer.identifyService(vehicleUpdateEvent.SourceType, identifyingInformation)
+
+				if identifiedJourneyID != "" {
+					matchedIdentifiers = append(matchedIdentifiers, identifiedJourneyID)
+				}
+				if identifiedStopID != "" {
+					matchedIdentifiers = append(matchedIdentifiers, identifiedStopID)
+				}
+				if identifiedServiceID != "" {
+					matchedIdentifiers = append(matchedIdentifiers, identifiedServiceID)
+				}
+			}
+
+			writeModel, _ := consumer.updateServiceAlert(matchedIdentifiers, vehicleUpdateEvent)
+			if writeModel != nil {
+				serviceAlertOperations = append(serviceAlertOperations, writeModel)
+			}
 		}
 	}
 
 	if len(realtimeJourneyOperations) > 0 {
-		enqueueRealtimeJourneyOperations(realtimeJourneyOperations)
+		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
+
+		startTime := time.Now()
+		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), realtimeJourneyOperations, &options.BulkWriteOptions{})
+		log.Info().Int("Length", len(realtimeJourneyOperations)).Str("Time", time.Now().Sub(startTime).String()).Msg("Bulk write realtime_journeys")
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
+		}
 	}
 
 	if len(serviceAlertOperations) > 0 {
@@ -300,39 +245,27 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 		// TODO use an interface here to reduce duplication
 		if sourceType == "siri-vm" {
-			journey, err = identifySiriVehicleFromRedis(vehicleUpdateEvent, identifyingInformation)
-			if err == nil {
-				journeyID = journey
-			}
-
-			vehicleIdentifier := ""
-			if vehicleUpdateEvent.VehicleLocationUpdate != nil {
-				vehicleIdentifier = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
-			}
-
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
-			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleIdentifier))
-			if journeyID == "" && vehicleIdentifier != "" && successVehicleID != "" {
+			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
 				identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
 				return ""
 			}
 
 			// TODO only exists here if siri-vm only comes from the 1 source
-			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleIdentifier))
-			if journeyID == "" && vehicleIdentifier != "" && failedVehicleID == "" {
+			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
+			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && failedVehicleID == "" {
 				return ""
 			}
 
 			// perform the actual sirivm
-			if journeyID == "" {
-				journeyIdentifier := identifiers.SiriVM{
-					IdentifyingInformation: identifyingInformation,
-				}
-				journey, err = journeyIdentifier.IdentifyJourney()
+			journeyIdentifier := identifiers.SiriVM{
+				IdentifyingInformation: identifyingInformation,
 			}
+			journey, err = journeyIdentifier.IdentifyJourney()
 
 			// TODO yet another special TfL only thing that shouldn't be here
-			if journeyID == "" && err != nil && identifyingInformation["OperatorRef"] == "gb-noc-TFLO" && vehicleUpdateEvent.VehicleLocationUpdate != nil {
+			if err != nil && identifyingInformation["OperatorRef"] == "gb-noc-TFLO" {
 				tflEventBytes, _ := json.Marshal(map[string]string{
 					"Line":                     identifyingInformation["PublishedLineName"],
 					"DirectionRef":             identifyingInformation["DirectionRef"],
@@ -344,17 +277,10 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
 			}
 		} else if sourceType == "GTFS-RT" {
-			journey, err = identifyGTFSVehicleFromRedis(identifyingInformation)
-			if err == nil {
-				journeyID = journey
+			journeyIdentifier := identifiers.GTFSRT{
+				IdentifyingInformation: identifyingInformation,
 			}
-
-			if journeyID == "" {
-				journeyIdentifier := identifiers.GTFSRT{
-					IdentifyingInformation: identifyingInformation,
-				}
-				journey, err = journeyIdentifier.IdentifyJourney()
-			}
+			journey, err = journeyIdentifier.IdentifyJourney()
 		} else if sourceType == "siri-sx" {
 			return "" // TODO not now
 		} else {
@@ -362,7 +288,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			return ""
 		}
 
-		if journeyID == "" && err != nil {
+		if err != nil {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
 
@@ -407,9 +333,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 			return ""
 		}
-		if journeyID == "" {
-			journeyID = journey
-		}
+		journeyID = journey
 
 		journeyMapJson, _ := json.Marshal(localJourneyIDMap{
 			JourneyID:   journeyID,
@@ -459,73 +383,4 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 	}
 
 	return journeyID
-}
-
-func identifyGTFSVehicleFromRedis(identifyingInformation map[string]string) (string, error) {
-	linkedDataset := identifyingInformation["LinkedDataset"]
-	tripID := identifyingInformation["TripID"]
-
-	if tripID == "" {
-		return "", realtimestore.ErrNotFound
-	}
-
-	return realtimestore.GetJourneyLookup(
-		context.Background(),
-		realtimestore.GTFSJourneyLookupKey(linkedDataset, tripID),
-		realtimestore.GTFSAnyJourneyLookupKey(tripID),
-	)
-}
-
-func identifySiriVehicleFromRedis(vehicleUpdateEvent *VehicleUpdateEvent, identifyingInformation map[string]string) (string, error) {
-	operatorRef := identifyingInformation["OperatorRef"]
-	lineRef := identifyingInformation["PublishedLineName"]
-	if lineRef == "" {
-		lineRef = identifyingInformation["ServiceNameRef"]
-	}
-
-	var keys []string
-	if vehicleJourneyRef := identifyingInformation["VehicleJourneyRef"]; vehicleJourneyRef != "" {
-		keys = append(keys, realtimestore.SIRIJourneyRefLookupKey(operatorRef, lineRef, vehicleJourneyRef))
-	}
-	if blockRef := identifyingInformation["BlockRef"]; blockRef != "" {
-		keys = append(keys, realtimestore.SIRIBlockLookupKey(operatorRef, lineRef, blockRef))
-	}
-	if originRef := identifyingInformation["OriginRef"]; originRef != "" {
-		if destinationRef := identifyingInformation["DestinationRef"]; destinationRef != "" {
-			for _, departureHHMM := range siriOriginDepartureCandidates(vehicleUpdateEvent, identifyingInformation) {
-				keys = append(keys, realtimestore.SIRIOriginDestinationTimeLookupKey(operatorRef, lineRef, originRef, destinationRef, departureHHMM))
-			}
-		}
-	}
-
-	return realtimestore.GetJourneyLookup(context.Background(), keys...)
-}
-
-func siriOriginDepartureCandidates(vehicleUpdateEvent *VehicleUpdateEvent, identifyingInformation map[string]string) []string {
-	originAimedDepartureTimeString := identifyingInformation["OriginAimedDepartureTime"]
-	if originAimedDepartureTimeString == "" {
-		return nil
-	}
-
-	originAimedDepartureTime, err := time.Parse(ctdf.XSDDateTimeFormat, originAimedDepartureTimeString)
-	if err != nil {
-		return nil
-	}
-
-	location := time.Local
-	if vehicleUpdateEvent != nil && vehicleUpdateEvent.RecordedAt.Location() != nil {
-		location = vehicleUpdateEvent.RecordedAt.Location()
-	}
-
-	originAimedDepartureTime = originAimedDepartureTime.In(location)
-
-	return []string{
-		originAimedDepartureTime.Format("15:04"),
-		originAimedDepartureTime.Add(-1 * time.Minute).Format("15:04"),
-		originAimedDepartureTime.Add(1 * time.Minute).Format("15:04"),
-		originAimedDepartureTime.Add(-2 * time.Minute).Format("15:04"),
-		originAimedDepartureTime.Add(2 * time.Minute).Format("15:04"),
-		originAimedDepartureTime.Add(-5 * time.Minute).Format("15:04"),
-		originAimedDepartureTime.Add(5 * time.Minute).Format("15:04"),
-	}
 }

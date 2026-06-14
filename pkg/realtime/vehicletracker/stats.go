@@ -2,24 +2,20 @@ package vehicletracker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/realtime/runtimestats"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
 
 func StartStatsServer() {
 	http.Handle("/realtime-stats/queue", NewStatsHandler(redis_client.QueueConnection))
-	http.Handle("/realtime-stats/runtime", NewRuntimeStatsHandler())
 	http.Handle("/health", NewHealthHandler())
 
-	log.Info().Msg("Stats server listening on http://localhost:3333/realtime-stats")
+	log.Info().Msg("Stats server listening on http://localhost:3333/realtime-stats/queue")
 	if err := http.ListenAndServe(":3333", nil); err != nil {
 		panic(err)
 	}
@@ -48,23 +44,6 @@ func (handler *StatsServerHandler) ServeHTTP(writer http.ResponseWriter, request
 	}
 
 	fmt.Fprint(writer, stats.GetHtml(layout, refresh))
-}
-
-type RuntimeStatsHandler struct{}
-
-func NewRuntimeStatsHandler() *RuntimeStatsHandler {
-	return &RuntimeStatsHandler{}
-}
-
-func (handler *RuntimeStatsHandler) ServeHTTP(writer http.ResponseWriter, _ *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	writer.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(writer).Encode(runtimestats.GetSnapshot(ctx)); err != nil {
-		writer.WriteHeader(http.StatusInternalServerError)
-		fmt.Fprint(writer, err)
-	}
 }
 
 type HealthHandler struct {
