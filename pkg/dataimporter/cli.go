@@ -45,6 +45,10 @@ func RegisterCLI() *cli.Command {
 						Name:  "skip-cleanup",
 						Usage: "Skip cleaning up of old records",
 					},
+					&cli.BoolFlag{
+						Name:  "mem-stats",
+						Usage: "Report memory & GC usage after each import (for benchmarking)",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -57,6 +61,7 @@ func RegisterCLI() *cli.Command {
 					datasetid := c.String("id")
 					forceImport := c.Bool("force")
 					skipCleanup := c.Bool("skip-cleanup")
+					memStats := c.Bool("mem-stats")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
@@ -78,7 +83,17 @@ func RegisterCLI() *cli.Command {
 					for {
 						startTime := time.Now()
 
+						var profiler *memoryProfiler
+						if memStats {
+							profiler = startMemoryProfiler(1 * time.Second)
+						}
+
 						err := manager.ImportDataset(&dataset, forceImport, skipCleanup)
+
+						executionDuration := time.Since(startTime)
+						if profiler != nil {
+							profiler.Report(executionDuration)
+						}
 
 						if err != nil {
 							return err
@@ -87,7 +102,6 @@ func RegisterCLI() *cli.Command {
 							break
 						}
 
-						executionDuration := time.Since(startTime)
 						log.Info().Msgf("Operation took %s", executionDuration.String())
 
 						waitTime := repeatDuration - executionDuration
