@@ -66,6 +66,9 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		timeframe = currentTime.Format("2006-01-02")
 	}
 
+	// PERF(low-risk): the fixed-format fmt.Sprintf calls below (GBStopIDFormat, OperatorNOCFormat,
+	// LOCALJOURNEYID) are left as-is. They are simple single-substitution formats; replacing them
+	// with string concatenation would gain little and reduce readability, so not worth changing.
 	originRef := fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef)
 	localJourneyID := fmt.Sprintf(
 		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
@@ -149,8 +152,20 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		}
 	}
 
-	locationEventJson, _ := json.Marshal(locationEvent)
+	// PERF(low-risk): handle the previously-discarded Marshal error. On failure, log and
+	// skip publishing rather than pushing empty/garbage bytes onto the queue (which
+	// downstream consumers would fail to parse). Returns false so it isn't counted as submitted.
+	locationEventJson, err := json.Marshal(locationEvent)
+	if err != nil {
+		log.Error().Err(err).Str("localID", localJourneyID).Msg("Failed to marshal SIRI-VM location event, skipping")
+		return false
+	}
 
+	// PERF(high-risk, NOT APPLIED): a pooled *bytes.Buffer + json.NewEncoder from a sync.Pool
+	// would cut per-vehicle buffer allocations, but json.Encoder.Encode appends a trailing
+	// newline whereas json.Marshal does not. Downstream consumers parse these bytes, so
+	// byte-identical output cannot be guaranteed without trimming/extra handling; deferred to
+	// avoid any risk of altering the published payload.
 	queue.PublishBytes(locationEventJson)
 
 	return true
@@ -215,13 +230,21 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 }
 
 func checkQueueSize() {
-	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
-	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
+	// PERF(medium-risk): converted from self-recursion to an iterative loop. The recursive
+	// version re-collected stats and re-checked the threshold on every call, with the base
+	// case being inQueue < 40000 (return). The loop re-collects stats, sleeps with the same
+	// backoff (30 + rand[0,20)s) while inQueue >= 40000, and exits once below the threshold.
+	// Behaviour and sleep semantics are identical, but it avoids growing the call stack
+	// during prolonged queue backpressure.
+	for {
+		stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
+		inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue >= 40000 {
+		if inQueue < 40000 {
+			break
+		}
+
 		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
 		time.Sleep(time.Duration(30+rand.IntN(20)) * time.Second)
-
-		checkQueueSize()
 	}
 }

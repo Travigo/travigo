@@ -10,6 +10,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// PERF(medium-risk): upper bound on how many write models we accumulate in memory
+// before forcing a flush, so a large backlog can't grow the batch slice / BulkWrite
+// payload without limit.
+const maxBatchItems = 10000
+
+// flushBatch writes a batch of accumulated write models and records the flush time.
+// Extracted so the accumulation loop can flush both at the size cap and at end of tick
+// without duplicating the BulkWrite logic.
+func flushBatch(collection *mongo.Collection, b *DatabaseBatchProcessingQueue, batchItems []mongo.WriteModel) {
+	b.lastItemProcessed = time.Now()
+	log.Info().Str("collection", b.Collection).Int("Length", len(batchItems)).Msg("Bulk write")
+	_, err := collection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
+	if err != nil {
+		log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
+	}
+}
+
 func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Duration, emptyTimeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
 	return DatabaseBatchProcessingQueue{
 		Collection:        collection,
@@ -49,18 +66,25 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 				select {
 				case i := <-b.items:
 					batchItems = append(batchItems, i)
+
+					// PERF(medium-risk): cap the in-memory batch size. Previously a
+					// single tick drained the entire channel into one slice with no
+					// upper bound, so a large backlog could grow batchItems (and the
+					// BulkWrite payload) without limit. When we hit the cap we flush
+					// immediately and keep draining the rest of the channel in further
+					// batches within the same tick. No items are dropped - they are
+					// just written in bounded chunks instead of one unbounded slice.
+					if len(batchItems) >= maxBatchItems {
+						flushBatch(realtimeJourneysCollection, b, batchItems)
+						batchItems = []mongo.WriteModel{}
+					}
 				default: // Stop when no more values in chInternal
 					running = false
 				}
 			}
 
 			if len(batchItems) > 0 {
-				b.lastItemProcessed = time.Now()
-				log.Info().Str("collection", b.Collection).Int("Length", len(batchItems)).Msg("Bulk write")
-				_, err := realtimeJourneysCollection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
-				if err != nil {
-					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
-				}
+				flushBatch(realtimeJourneysCollection, b, batchItems)
 			}
 		}
 	}(b)

@@ -72,7 +72,8 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		}
 	}
 
-	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
+	// PERF(low-risk): fixed incorrect log message — this is the SIRI-SX parse path, not SIRI-VM.
+	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-SX response")
 
 	return nil
 }
@@ -86,6 +87,13 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	validityPeriodEnd, err := time.Parse(time.RFC3339, situationElement.ValidityPeriod.EndTime)
 	versionedAtTime, _ := time.Parse(time.RFC3339, situationElement.VersionedAtTime)
 
+	// PERF/NOTE(needs-review): this expiry guard looks logically suspect. When time.Parse fails
+	// (err != nil), validityPeriodEnd is the zero time, so validityPeriodEnd.Before(currentTime)
+	// is always true and the record is dropped — meaning any element with an unparseable EndTime
+	// is silently discarded. Conversely, an element with a valid-but-past EndTime (err == nil)
+	// is NOT dropped because the err != nil arm short-circuits. The intent was likely
+	// "err == nil && validityPeriodEnd.Before(currentTime)" (drop genuinely expired alerts).
+	// Behaviour left unchanged pending user decision.
 	if err != nil && validityPeriodEnd.Before(currentTime) {
 		return false
 	}
@@ -96,7 +104,19 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		alertType = ctdf.ServiceAlertTypeWarning
 	}
 
-	var identifyingInformation []map[string]string
+	// PERF(low-risk): pre-size identifyingInformation to the exact number of entries the append
+	// loops below will produce (one per affected line plus one per affected stop point, across
+	// all consequences/networks). This avoids the repeated slice re-allocations/growth that
+	// append would otherwise incur. Output contents and ordering are unchanged.
+	identifyingInformationCount := 0
+	for _, consequence := range situationElement.Consequence {
+		for _, network := range consequence.AffectedNetworks {
+			identifyingInformationCount += len(network.AffectedLine)
+		}
+		identifyingInformationCount += len(consequence.AffectedStopPoints)
+	}
+
+	identifyingInformation := make([]map[string]string, 0, identifyingInformationCount)
 	for _, consequence := range situationElement.Consequence {
 		for _, network := range consequence.AffectedNetworks {
 			for _, line := range network.AffectedLine {
@@ -120,6 +140,10 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	title := situationElement.Summary
 	description := situationElement.Description
 
+	// PERF(high-risk, NOT APPLIED): a cheaper non-cryptographic hash (e.g. fnv/xxhash) would
+	// reduce per-record CPU here, but the resulting hex digest is embedded in the alert's
+	// LocalID. Changing the hash changes generated IDs, which alters downstream identity and
+	// dedup behaviour — left unchanged.
 	hash := sha256.New()
 	hash.Write([]byte(alertType))
 	hash.Write([]byte(title))
@@ -145,7 +169,14 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		RecordedAt: versionedAtTime,
 	}
 
-	updateEventJson, _ := json.Marshal(updateEvent)
+	// PERF(low-risk): handle the previously-discarded Marshal error. On failure, log and skip
+	// publishing rather than pushing empty/garbage bytes onto the queue. Returns false so it
+	// isn't counted as submitted.
+	updateEventJson, marshalErr := json.Marshal(updateEvent)
+	if marshalErr != nil {
+		log.Error().Err(marshalErr).Str("localID", updateEvent.LocalID).Msg("Failed to marshal SIRI-SX update event, skipping")
+		return false
+	}
 	queue.PublishBytes(updateEventJson)
 
 	return true

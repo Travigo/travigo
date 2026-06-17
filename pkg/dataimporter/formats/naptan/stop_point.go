@@ -6,8 +6,12 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/util"
 )
+
+// PERF(low-risk): package-level set replaces per-stop util.ContainsString over a static slice
+// when filtering descriptor parts. Map membership avoids the linear scan + slice allocation per
+// stop, and ToLower is called once per field. Filtering semantics are unchanged.
+var excludedDescriptorValues = map[string]bool{"": true, "-": true, "--": true, "unknown": true}
 
 type StopPoint struct {
 	CreationDateTime     string `xml:",attr"`
@@ -164,24 +168,25 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		}
 	}
 
-	var descriptor []string
+	// PERF(low-risk): pre-size descriptor (at most Indicator + Landmark) to avoid reallocation.
+	descriptor := make([]string, 0, 2)
 
-	if !util.ContainsString([]string{
-		"", "-", "--", "unknown",
-	}, strings.ToLower(orig.Descriptor.Indicator)) {
+	// PERF(low-risk): single ToLower + map lookup replaces util.ContainsString over a static slice.
+	if !excludedDescriptorValues[strings.ToLower(orig.Descriptor.Indicator)] {
 		descriptor = append(descriptor, orig.Descriptor.Indicator)
 	}
 
-	if !util.ContainsString([]string{
-		"", "-", "--", "unknown",
-	}, strings.ToLower(orig.Descriptor.Landmark)) {
+	// PERF(low-risk): single ToLower + map lookup replaces util.ContainsString over a static slice.
+	if !excludedDescriptorValues[strings.ToLower(orig.Descriptor.Landmark)] {
 		descriptor = append(descriptor, orig.Descriptor.Landmark)
 	}
 
 	primaryIdentifier := fmt.Sprintf(ctdf.GBStopIDFormat, orig.AtcoCode)
 	ctdfStop := ctdf.Stop{
 		PrimaryIdentifier: primaryIdentifier,
-		OtherIdentifiers:  []string{},
+		// PERF(low-risk): pre-size OtherIdentifiers; at most 4 are appended below
+		// (atco, naptan, tiploc, crs), avoiding incremental slice growth.
+		OtherIdentifiers: make([]string, 0, 4),
 		PrimaryName:       orig.Descriptor.CommonName,
 		Descriptor:        strings.Join(descriptor, " "),
 
@@ -210,6 +215,9 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 		ctdfStop.OtherIdentifiers = append(ctdfStop.OtherIdentifiers, fmt.Sprintf("gb-crs-%s", orig.StopClassification.OffStreet.Rail.AnnotatedRailRef.CrsRef))
 	}
 
+	// PERF(low-risk): pre-size Associations to the number of StopAreas so the loop below
+	// appends without reallocating.
+	ctdfStop.Associations = make([]*ctdf.Association, 0, len(orig.StopAreas))
 	for i := 0; i < len(orig.StopAreas); i++ {
 		stopArea := orig.StopAreas[i]
 

@@ -11,6 +11,19 @@ import (
 func (transXChange *TransXChange) ParseFile(reader io.Reader) error {
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel
+
+	// PERF(low-risk): pre-size the slices appended to during XML parsing so repeated
+	// append() calls don't reallocate/copy the backing array as they grow from nil.
+	// No element count is available up front, so use modest capacity hints.
+	transXChange.StopPoints = make([]*StopPoint, 0, 64)
+	transXChange.Operators = make([]*Operator, 0, 4)
+	transXChange.Routes = make([]*Route, 0, 16)
+	transXChange.Services = make([]*Service, 0, 4)
+	transXChange.JourneyPatternSections = make([]*JourneyPatternSection, 0, 64)
+	transXChange.RouteSections = make([]*RouteSection, 0, 16)
+	transXChange.VehicleJourneys = make([]*VehicleJourney, 0, 256)
+	transXChange.ServicedOrganisations = make([]*ServicedOrganisation, 0, 4)
+
 	for {
 		tok, err := d.Token()
 		if tok == nil || err == io.EOF {

@@ -15,6 +15,9 @@ type Location struct {
 }
 
 func (l *Location) UpdateCoordinates() {
+	// PERF(high-risk, NOT APPLIED): the zero-coordinate check below (l.Latitude == 0 ||
+	// l.Longitude == 0) is a correctness concern (out of scope) and is intentionally left
+	// unchanged — altering it could change which records get OSGridRef-converted.
 	// Only bother converting the OSGridRef if lat/lon isnt set and easting/northing is set
 	if l.GridType == "UKOS" && l.Easting != "" && l.Northing != "" && (l.Latitude == 0 || l.Longitude == 0) {
 		gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", l.Easting, l.Northing))

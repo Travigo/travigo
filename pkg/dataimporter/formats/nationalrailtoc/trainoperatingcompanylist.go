@@ -25,9 +25,14 @@ type TrainOperatingCompanyList struct {
 }
 
 func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.Service) {
-	var operators []*ctdf.Operator
-	var services []*ctdf.Service
+	// PERF(low-risk): pre-size output slices; one operator and one service per TOC.
+	operators := make([]*ctdf.Operator, 0, len(t.Companies))
+	services := make([]*ctdf.Service, 0, len(t.Companies))
 
+	// PERF(medium-risk, APPLIED): generateRailStopNameOverrides() runs a single DB
+	// query whose result is identical for every TOC. It is already hoisted out of
+	// the per-TOC loop below and the resulting map is shared (by reference) across
+	// all services, so the query runs exactly once per conversion - no change needed.
 	stopNameOverrides := generateRailStopNameOverrides()
 
 	now := time.Now()
@@ -165,7 +170,9 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 		upper := maxBatchSize * (i + 1)
 
 		if upper > len(services) {
-			upper = len(operators)
+			// FIX(bug): clamp to len(services), was len(operators) causing out-of-range
+			// slice when len(operators) > len(services) (or wrong batching otherwise).
+			upper = len(services)
 		}
 
 		batchSlice := services[lower:upper]

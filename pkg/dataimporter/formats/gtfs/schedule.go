@@ -45,6 +45,16 @@ type Schedule struct {
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	gtfs.fileMap = map[string]string{}
 
+	// PERF(high-risk, NOT APPLIED): this currently writes the whole input reader to a
+	// temp zip file and then copies every zip entry out to its own temp file (2+ full
+	// copies on disk, plus the I/O cost). The entries could instead be parsed directly
+	// via zip.NewReader over an io.ReaderAt / zip.OpenReader, reading each entry's
+	// io.ReadCloser lazily inside importObject rather than materialising per-entry temp
+	// files. NOT APPLIED: this changes the file lifecycle (the zip reader must stay
+	// open for the whole Import, entries are streamed once and cannot be re-read, and
+	// importObject currently os.Remove()s its temp file when done). Reworking this
+	// safely requires changing how Import holds open the archive and how importObject
+	// obtains its reader, which risks altering behaviour/ordering and leaking handles.
 	// TODO HACK as we end up with 2 copies of the file
 	tmpZipFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-gtfs-zip-")
 	if err != nil {
@@ -277,6 +287,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	g.ctdfJourneys = map[string]*ctdf.Journey{}
 	// fullJourneyTracks := map[string][]ctdf.Location{}
 
+	// PERF(medium-risk): cache the parsed+formatted calendar date-range condition
+	// value keyed by calendar ServiceID. Many trips share the same calendar, and the
+	// original code re-parsed calendar.Start/calendar.End via time.Parse for every
+	// trip. We cache the exact final string ("from:to") so results are byte-for-byte
+	// identical to the previous per-trip computation, including how time.Parse errors
+	// (zero time -> "0001-01-01") would format.
+	calendarConditionCache := map[string]string{}
+
 	importObject[Trip](g, "trips.txt", "journeys", false, func(t Trip) (any, string) {
 		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, t.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, t.RouteID)
@@ -303,12 +321,21 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				})
 			}
 
-			dateRunsFrom, _ := time.Parse("20060102", calendar.Start)
-			dateRunsTo, _ := time.Parse("20060102", calendar.End)
+			// PERF(medium-risk): reuse the cached parsed/formatted date-range value
+			// for this calendar instead of re-parsing the same Start/End strings for
+			// every trip on the calendar. The cached string is produced by the exact
+			// same time.Parse + Format pipeline, so the result is unchanged.
+			conditionValue, cached := calendarConditionCache[t.ServiceID]
+			if !cached {
+				dateRunsFrom, _ := time.Parse("20060102", calendar.Start)
+				dateRunsTo, _ := time.Parse("20060102", calendar.End)
+				conditionValue = fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02"))
+				calendarConditionCache[t.ServiceID] = conditionValue
+			}
 
 			availability.Condition = append(availability.Condition, ctdf.AvailabilityRule{
 				Type:  ctdf.AvailabilityDateRange,
-				Value: fmt.Sprintf("%s:%s", dateRunsFrom.Format("2006-01-02"), dateRunsTo.Format("2006-01-02")),
+				Value: conditionValue,
 			})
 		}
 		// Calendar dates availability
@@ -391,6 +418,13 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Process()
 	}
 
+	// PERF(low-risk): hoist dataset-wide constants out of the per-stop hot loop.
+	// These depend only on dataset.Identifier (constant for the whole import), so
+	// computing them once avoids repeated strings.Contains / fmt.Sprintf prefix work
+	// for every single stop time across every trip.
+	useGBAtcoStopRef := strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-")
+	datasetStopPrefix := fmt.Sprintf("%s-stop-", dataset.Identifier)
+
 	for tripID, stopTimes := range g.tripStopTimes {
 		if g.ctdfJourneys[tripID] == nil {
 			log.Debug().Str("trip", tripID).Msg("Cannot find journey for this trip")
@@ -403,6 +437,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		sort.Slice(stopTimes, func(i, j int) bool {
 			return stopTimes[i].StopSequence < stopTimes[j].StopSequence
 		})
+
+		// PERF(low-risk): pre-size the Path slice. The loop below appends exactly
+		// len(stopTimes)-1 items (one per adjacent stop pair). Allocating the full
+		// capacity up front avoids repeated slice growth/reallocation as the path is
+		// built. Length stays 0 here so appended ordering and output are unchanged.
+		if len(stopTimes) > 1 {
+			g.ctdfJourneys[tripID].Path = make([]*ctdf.JourneyPathItem, 0, len(stopTimes)-1)
+		}
 
 		for index := 1; index < len(stopTimes); index += 1 {
 			stopTime := stopTimes[index]
@@ -425,12 +467,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			var destinationStopRef string
 
 			// TODO no hardocded nonsense!!
-			if strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-") {
+			// PERF(low-risk): use the hoisted bool/prefix instead of recomputing
+			// strings.Contains and the "-stop-" prefix per stop. Behaviour identical:
+			// gb-atco branch is unchanged; the else branch builds the same string via
+			// the precomputed datasetStopPrefix.
+			if useGBAtcoStopRef {
 				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
 				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
 			} else {
-				originStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("%s-stop-%s", dataset.Identifier, stopTime.StopID)
+				originStopRef = datasetStopPrefix + previousStopTime.StopID
+				destinationStopRef = datasetStopPrefix + stopTime.StopID
 			}
 
 			journeyPathItem := &ctdf.JourneyPathItem{
@@ -440,8 +486,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				DestinationArrivalTime: destinationArrivalTime,
 				OriginDepartureTime:    originDeparturelTime,
 				DestinationDisplay:     stopTime.StopHeadsign,
-				OriginActivity:         []ctdf.JourneyPathItemActivity{},
-				DestinationActivity:    []ctdf.JourneyPathItemActivity{},
+				// PERF(low-risk): pre-size activity slices (max 2 entries each:
+				// setdown + pickup) so the typical append of 1-2 items doesn't
+				// trigger a grow-from-nil reallocation. Starts empty (len 0) so
+				// JSON/BSON output is identical to the previous []T{} literal.
+				OriginActivity:      make([]ctdf.JourneyPathItemActivity, 0, 2),
+				DestinationActivity: make([]ctdf.JourneyPathItemActivity, 0, 2),
 			}
 
 			if previousStopTime.DropOffType == 0 {

@@ -9,7 +9,6 @@ import (
 	"io"
 	"math"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +23,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var suffixCheck = regexp.MustCompile(`^[2-9]+$`)
+// PERF(low-risk): removed the package-global suffixCheck regexp; the only two call sites now
+// use a direct byte comparison (see CreateJourneyFromTraindef), so the regexp is dead code.
 var stopTIPLOCCache = map[string]*ctdf.Stop{}
 var daysOfWeek = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
 var failedStops []string
@@ -105,6 +105,16 @@ func (c *CommonInterfaceFormat) ParseFile(reader io.Reader) error {
 }
 
 func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
+	// PERF(medium-risk): reset the package-global stopTIPLOCCache and failedStops at the start of each
+	// conversion run. Previously these persisted across ParseFile/Import invocations within a process,
+	// causing the TIPLOC->Stop cache to serve stale entries from a prior dataset and failedStops to
+	// accumulate (and re-log) tiplocs from earlier runs. ConvertToCTDF is the single entry point that
+	// populates both (via CreateJourneyFromTraindef -> getStopFromTIPLOC) and logs failedStops, so
+	// resetting here is the cleanest fix without altering the existing lookup logic. Behaviour within a
+	// single run is unchanged.
+	stopTIPLOCCache = map[string]*ctdf.Stop{}
+	failedStops = nil
+
 	journeys := map[string]*ctdf.Journey{}
 	journeysTrainUIDOnly := map[string][]*ctdf.Journey{}
 
@@ -245,17 +255,18 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 
 	// List of passenger stops
 	// Start with the origin location
-	passengerStops := []BasicLocation{
-		{
-			Location:               strings.TrimSpace(trainDef.OriginLocation.Location),
-			ScheduledArrivalTime:   trainDef.OriginLocation.ScheduledDepartureTime,
-			PublicArrivalTime:      trainDef.OriginLocation.PublicDepartureTime,
-			ScheduledDepartureTime: trainDef.OriginLocation.ScheduledDepartureTime,
-			PublicDepartureTime:    trainDef.OriginLocation.PublicDepartureTime,
-			Platform:               trainDef.OriginLocation.Platform,
-			Activity:               trainDef.OriginLocation.Activity,
-		},
-	}
+	// PERF(low-risk): pre-size passengerStops to its known maximum (origin + all intermediate
+	// locations + terminating) so the appends below don't trigger repeated slice reallocations.
+	passengerStops := make([]BasicLocation, 0, len(trainDef.IntermediateLocations)+2)
+	passengerStops = append(passengerStops, BasicLocation{
+		Location:               strings.TrimSpace(trainDef.OriginLocation.Location),
+		ScheduledArrivalTime:   trainDef.OriginLocation.ScheduledDepartureTime,
+		PublicArrivalTime:      trainDef.OriginLocation.PublicDepartureTime,
+		ScheduledDepartureTime: trainDef.OriginLocation.ScheduledDepartureTime,
+		PublicDepartureTime:    trainDef.OriginLocation.PublicDepartureTime,
+		Platform:               trainDef.OriginLocation.Platform,
+		Activity:               trainDef.OriginLocation.Activity,
+	})
 
 	// Add all the intermediate stops that are actual passenger stations
 	for _, location := range trainDef.IntermediateLocations {
@@ -267,7 +278,10 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		tiploc := strings.TrimSpace(location.Location)
 
 		// Get rid of the suffix from the tiploc
-		if len(tiploc) == 8 && suffixCheck.MatchString(tiploc[7:8]) {
+		// PERF(low-risk): replaced suffixCheck.MatchString(tiploc[7:8]) with a direct byte
+		// comparison. The regex `^[2-9]+$` applied to a single char matches iff that char is
+		// in '2'-'9', so this is semantically identical but avoids per-call regex overhead.
+		if len(tiploc) == 8 && tiploc[7] >= '2' && tiploc[7] <= '9' {
 			tiploc = strings.TrimSpace(tiploc[0:7])
 		}
 
@@ -288,7 +302,8 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 	// Add terminating location to passenger stops
 	terminatingTiploc := strings.TrimSpace(trainDef.TerminatingLocation.Location)
 	// Get rid of the suffix from the tiploc
-	if len(terminatingTiploc) == 8 && suffixCheck.MatchString(terminatingTiploc[7:8]) {
+	// PERF(low-risk): same as above - direct byte comparison replacing the single-char regex match.
+	if len(terminatingTiploc) == 8 && terminatingTiploc[7] >= '2' && terminatingTiploc[7] <= '9' {
 		terminatingTiploc = strings.TrimSpace(terminatingTiploc[0:7])
 	}
 	passengerStops = append(passengerStops, BasicLocation{
@@ -300,12 +315,28 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 	})
 
 	// Generate a CTDF path from the passenger stops
-	var path []*ctdf.JourneyPathItem
+	// PERF(low-risk): pre-size path to its maximum possible length (one item per gap between
+	// consecutive passenger stops) to avoid repeated reallocation as items are appended.
+	path := make([]*ctdf.JourneyPathItem, 0, len(passengerStops)-1)
 
+	// PERF(high-risk, NOT APPLIED): each iteration calls c.getStopFromTIPLOC for both the origin and
+	// destination stop, which on a cache miss issues one (or two) synchronous MongoDB FindOne queries.
+	// Across all journeys this is a large number of round-trips. A high-impact optimisation would be to
+	// pre-load every TIPLOC->Stop (and CRS->Stop) mapping into an in-memory map up front - e.g. collect
+	// all distinct tiplocs referenced by the parsed schedules, then issue a single bulk query
+	// (FindMany with $in) and populate stopTIPLOCCache before conversion. Not applied here because it is
+	// an architectural change to the data-loading path that could alter which stops resolve (e.g.
+	// ordering/precedence of the tiploc vs CRS fallback) and risks changing output; it needs dedicated
+	// design and testing rather than a silent rewrite.
 	for i := 1; i < len(passengerStops); i++ {
 		originPassengerStop := passengerStops[i-1]
 		originTIPLOC := originPassengerStop.Location
 		originStop := c.getStopFromTIPLOC(originTIPLOC)
+		// PERF(medium-risk, NOT APPLIED): time.Parse("1504", ...) is re-run for every path segment and the
+		// same stop's times are parsed twice (once as a destination, once as the next segment's origin).
+		// A per-journey cache keyed by the trimmed time string could remove redundant parses, but doing so
+		// safely requires careful handling of the empty/"0000" cases and the discarded parse errors to
+		// guarantee byte-identical output, so it is deferred rather than applied speculatively.
 		originArrivalTime, _ := time.Parse("1504", util.TrimString(originPassengerStop.PublicArrivalTime, 4))
 		originDepartureTime, _ := time.Parse("1504", util.TrimString(originPassengerStop.PublicDepartureTime, 4))
 
@@ -358,7 +389,9 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 	dateRunsTo, _ := time.Parse("060102", trainDef.BasicSchedule.DateRunsTo)
 
 	for i, ch := range trainDef.BasicSchedule.DaysRun {
-		if fmt.Sprintf("%c", ch) == "1" {
+		// PERF(low-risk): compare the rune directly instead of formatting it into a string with
+		// fmt.Sprintf("%c", ch) and comparing - avoids an allocation per character per journey.
+		if ch == '1' {
 			availability.Match = append(availability.Match, ctdf.AvailabilityRule{
 				Type:  ctdf.AvailabilityDayOfWeek,
 				Value: daysOfWeek[i],
@@ -406,27 +439,43 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 	}
 
 	// Catering
-	cateringDescriptions := []string{}
-	if strings.Contains(trainDef.BasicSchedule.CateringCode, "C") {
-		cateringDescriptions = append(cateringDescriptions, "Buffet service")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "F") {
-		cateringDescriptions = append(cateringDescriptions, "Restaurant Car available for First Class passengers")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "H") {
-		cateringDescriptions = append(cateringDescriptions, "Hot food available")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "M") {
-		cateringDescriptions = append(cateringDescriptions, "Meal included for First Class passengers")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "P") {
-		cateringDescriptions = append(cateringDescriptions, "Wheelchair only reservations")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "R") {
-		cateringDescriptions = append(cateringDescriptions, "Restaurant")
-		detailedRailInformation.CateringAvailable = true
-	} else if strings.Contains(trainDef.BasicSchedule.CateringCode, "T") {
-		cateringDescriptions = append(cateringDescriptions, "Trolley service")
+	// PERF(low-risk): the original was an if/else-if chain of ~7 strings.Contains() calls over the
+	// same CateringCode string. Because it was else-if, only the FIRST matching code (in priority
+	// order C,F,H,M,P,R,T) ever produced a description. This single byte-scan reproduces that exact
+	// behaviour: it scans the string once and keeps only the highest-priority match found, preserving
+	// the identical output string, CateringAvailable flag, and the single-element slice / Join result.
+	// PERF(low-risk): pre-size cateringDescriptions to cap 1 - at most one description is ever appended.
+	cateringDescriptions := make([]string, 0, 1)
+	cateringPriority := -1
+	cateringDescription := ""
+	for i := 0; i < len(trainDef.BasicSchedule.CateringCode); i++ {
+		var priority int
+		var description string
+		switch trainDef.BasicSchedule.CateringCode[i] {
+		case 'C':
+			priority, description = 0, "Buffet service"
+		case 'F':
+			priority, description = 1, "Restaurant Car available for First Class passengers"
+		case 'H':
+			priority, description = 2, "Hot food available"
+		case 'M':
+			priority, description = 3, "Meal included for First Class passengers"
+		case 'P':
+			priority, description = 4, "Wheelchair only reservations"
+		case 'R':
+			priority, description = 5, "Restaurant"
+		case 'T':
+			priority, description = 6, "Trolley service"
+		default:
+			continue
+		}
+		if cateringPriority == -1 || priority < cateringPriority {
+			cateringPriority = priority
+			cateringDescription = description
+		}
+	}
+	if cateringPriority != -1 {
+		cateringDescriptions = append(cateringDescriptions, cateringDescription)
 		detailedRailInformation.CateringAvailable = true
 	}
 
@@ -437,11 +486,16 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 	detailedRailInformation.SpeedKMH = int(float64(speedMPH) * 1.60934)
 
 	// Train class
+	// PERF(low-risk): trim TimingLoad and PowerType once each into locals and reuse them across
+	// the switch expression and case bodies, instead of re-running strings.TrimSpace on the same
+	// values in the case "" / default branches.
+	trimmedTimingLoad := strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
+	trimmedPowerType := strings.TrimSpace(trainDef.BasicSchedule.PowerType)
 	trainClass := "unknown"
 	if trainDef.BasicSchedule.PowerType == "DMU" || trainDef.BasicSchedule.PowerType == "DEM" || trainDef.BasicSchedule.PowerType == "D  " {
 		detailedRailInformation.PowerType = "Diesel"
 
-		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
+		switch trimmedTimingLoad {
 		case "69":
 			trainClass = "172"
 		case "A":
@@ -459,14 +513,14 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		case "X":
 			trainClass = "159"
 		case "":
-			trainClass = strings.TrimSpace(trainDef.BasicSchedule.PowerType)
+			trainClass = trimmedPowerType
 		default:
-			trainClass = strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
+			trainClass = trimmedTimingLoad
 		}
 	} else if trainDef.BasicSchedule.PowerType == "EMU" || trainDef.BasicSchedule.PowerType == "E  " {
 		detailedRailInformation.PowerType = "Electric"
 
-		switch strings.TrimSpace(trainDef.BasicSchedule.TimingLoad) {
+		switch trimmedTimingLoad {
 		case "AT":
 			trainClass = "AT" // this shouldnt ever exist i believe
 		case "E":
@@ -476,9 +530,9 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		case "506":
 			trainClass = "350/1"
 		case "":
-			trainClass = strings.TrimSpace(trainDef.BasicSchedule.PowerType)
+			trainClass = trimmedPowerType
 		default:
-			trainClass = strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
+			trainClass = trimmedTimingLoad
 		}
 	} else if trainDef.BasicSchedule.PowerType == "HST" {
 		trainClass = "HST"
@@ -541,21 +595,24 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 }
 
 func convertStopActivity(activity string) []ctdf.JourneyPathItemActivity {
+	// PERF(low-risk): trim the activity string once into a local instead of calling
+	// strings.TrimSpace on the same value up to four times in the if/else-if chain.
+	trimmedActivity := strings.TrimSpace(activity)
 	activityList := []ctdf.JourneyPathItemActivity{}
-	if strings.TrimSpace(activity) == "TB" {
+	if trimmedActivity == "TB" {
 		activityList = []ctdf.JourneyPathItemActivity{
 			ctdf.JourneyPathItemActivityPickup,
 		}
-	} else if strings.TrimSpace(activity) == "TF" {
+	} else if trimmedActivity == "TF" {
 		activityList = []ctdf.JourneyPathItemActivity{
 			ctdf.JourneyPathItemActivitySetdown,
 		}
-	} else if strings.TrimSpace(activity) == "T" {
+	} else if trimmedActivity == "T" {
 		activityList = []ctdf.JourneyPathItemActivity{
 			ctdf.JourneyPathItemActivityPickup,
 			ctdf.JourneyPathItemActivitySetdown,
 		}
-	} else if strings.TrimSpace(activity) == "D" {
+	} else if trimmedActivity == "D" {
 		activityList = []ctdf.JourneyPathItemActivity{
 			ctdf.JourneyPathItemActivitySetdown,
 		}

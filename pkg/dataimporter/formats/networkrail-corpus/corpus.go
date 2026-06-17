@@ -39,7 +39,9 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 
 	stopsCollection := database.GetCollection("stops_raw")
 
-	var updateOperations []mongo.WriteModel
+	// PERF(low-risk): pre-size the write-model slice (one model per TIPLOC at most)
+	// to avoid repeated slice growth/reallocation during append.
+	updateOperations := make([]mongo.WriteModel, 0, len(c.TiplocData))
 
 	for _, tiplocData := range c.TiplocData {
 		tiploc := strings.TrimSpace(tiplocData.TIPLOC)
@@ -75,11 +77,16 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 
 		updateOperations = append(updateOperations, updateModel)
 
-		log.Info().
+		// PERF(low-risk): per-record log.Info() (~2500 lines per import) replaced with
+		// a single summary log.Info() after the loop. Use Debug for per-record detail.
+		log.Debug().
 			Str("tiploc", tiplocID).
 			Str("stanox", stanoxID).
 			Msg("Added STANOX Stop")
 	}
+
+	// PERF(low-risk): single summary log instead of one Info line per TIPLOC.
+	log.Info().Int("count", len(updateOperations)).Msg("Prepared STANOX Stops")
 
 	if len(updateOperations) > 0 {
 		_, err := stopsCollection.BulkWrite(context.Background(), updateOperations, &options.BulkWriteOptions{})

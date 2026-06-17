@@ -22,6 +22,17 @@ type StationAlias struct {
 }
 
 func (c *CommonInterfaceFormat) ParseMSN(reader io.Reader) {
+	// PERF(low-risk): pre-size the destination slices. The MSN file lists every GB station (~2.5-3k
+	// physical stations plus aliases) and no count is available while streaming, so cap 3000 covers
+	// the typical case and avoids repeated reallocations as records are appended. Only pre-size when
+	// empty so re-parsing into an already-populated struct keeps appending as before.
+	if c.PhysicalStations == nil {
+		c.PhysicalStations = make([]PhysicalStation, 0, 3000)
+	}
+	if c.StationAliases == nil {
+		c.StationAliases = make([]StationAlias, 0, 3000)
+	}
+
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()

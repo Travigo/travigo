@@ -9,8 +9,11 @@ import (
 )
 
 func (n *NaPTAN) ParseFile(reader io.Reader) error {
-	n.StopPoints = []*StopPoint{}
-	n.StopAreas = []*StopArea{}
+	// PERF(low-risk): pre-size the top-level whole-document slices to avoid repeated
+	// slice growth/reallocation during append. NaPTAN has ~300k stops and ~50k stop areas,
+	// so generous caps keep the slices from reallocating many times while parsing.
+	n.StopPoints = make([]*StopPoint, 0, 350000)
+	n.StopAreas = make([]*StopArea, 0, 60000)
 
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel

@@ -158,7 +158,14 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 				c.TrainDefinitionSets = append(c.TrainDefinitionSets, currentTrainDef)
 			}
 
-			currentTrainDef = &TrainDefinitionSet{}
+			currentTrainDef = &TrainDefinitionSet{
+				// PERF(low-risk): pre-size IntermediateLocations and ChangesEnRoute. No exact count
+				// is available while streaming the file, but typical schedules have on the order of a
+				// few dozen intermediate locations, so cap 50 / cap 5 avoids most append reallocations
+				// without meaningfully over-allocating. These remain ordinary append-grown slices.
+				IntermediateLocations: make([]*IntermediateLocation, 0, 50),
+				ChangesEnRoute:        make([]*ChangesEnRoute, 0, 5),
+			}
 
 			currentTrainDef.BasicSchedule = BasicSchedule{
 				TransactionType:    line[2:3],

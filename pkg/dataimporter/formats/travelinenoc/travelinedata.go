@@ -31,11 +31,22 @@ type TravelineData struct {
 	PublicNameRecords          []PublicNameRecord
 }
 
-func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
-	emailRegex, _ := regexp.Compile("^[^@]+@[^@]+.[^@]+$")
-	phoneRegex, _ := regexp.Compile(`^[\d ]+$`)
-	addressRegex, _ := regexp.Compile(`^[a-zA-Z\d ,]+$`)
+// PERF(low-risk): compile contact-detail regexes once at package init instead of
+// on every extractContactDetails() call (called 5x per public name record).
+var (
+	emailRegex   = regexp.MustCompile("^[^@]+@[^@]+.[^@]+$")
+	phoneRegex   = regexp.MustCompile(`^[\d ]+$`)
+	addressRegex = regexp.MustCompile(`^[a-zA-Z\d ,]+$`)
+)
 
+// PERF(low-risk): compile group/website regexes once at package init instead of
+// recompiling them on every import inside convertToCTDF().
+var (
+	noGroupRegex = regexp.MustCompile("NoGroup_*")
+	websiteRegex = regexp.MustCompile("#(.+)#")
+)
+
+func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 	if emailRegex.MatchString(value) {
 		ctdfOperator.Email = value
 	} else if phoneRegex.MatchString(value) {
@@ -46,8 +57,10 @@ func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 }
 
 func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup) {
-	var operators []*ctdf.Operator
-	var operatorGroups []*ctdf.OperatorGroup
+	// PERF(low-risk): pre-size output slices to avoid repeated slice re-allocation
+	// during append. Upper bounds are the source record counts.
+	operators := make([]*ctdf.Operator, 0, len(t.OperatorsRecords))
+	operatorGroups := make([]*ctdf.OperatorGroup, 0, len(t.GroupsRecords))
 
 	groupExists := map[string]bool{}
 	mgmtDivisionGroupIDs := map[string]string{}
@@ -56,7 +69,6 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	publicNameIDRef := map[string]*ctdf.Operator{}
 
 	// GroupsRecords
-	noGroupRegex, _ := regexp.Compile("NoGroup_*")
 	for _, groupRecord := range t.GroupsRecords {
 		if !noGroupRegex.Match([]byte(groupRecord.GroupName)) {
 			ctdfRecord := &ctdf.OperatorGroup{
@@ -165,7 +177,6 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	}
 
 	// PublicNameRecords
-	websiteRegex, _ := regexp.Compile("#(.+)#")
 	for _, publicNameRecord := range t.PublicNameRecords {
 		operator := publicNameIDRef[publicNameRecord.PublicNameID]
 

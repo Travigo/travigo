@@ -56,6 +56,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		locationEventType = vehicletracker.VehicleUpdateEventTypeLocationOnly
 	}
 
+	// PERF(low-risk): reading the whole body before proto.Unmarshal is inherent to
+	// protobuf - the wire format is not self-framing per-entity, so the full FeedMessage
+	// must be in memory to decode. A LimitedReader safety cap is intentionally NOT added
+	// here: feed sizes are externally determined and a hard cap would truncate the bytes,
+	// producing a corrupt/partial protobuf (Unmarshal error or silently dropped entities)
+	// rather than a clean failure, which would change behaviour.
 	body, err := io.ReadAll(r.reader)
 	if err != nil {
 		return err
