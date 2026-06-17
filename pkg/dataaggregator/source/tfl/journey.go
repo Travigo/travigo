@@ -12,9 +12,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (s Source) JourneyQuery(journeyQuery query.Journey) (*ctdf.Journey, error) {
-	tflJourneyRegex, _ := regexp.Compile("realtime-tfl-.*")
+// PERF(low-risk): compile the journey-identifier regex once at package load instead of on
+// every JourneyQuery call. The pattern is a constant, so MustCompile is safe and behaviour
+// is identical (the previous code ignored the compile error anyway).
+var tflJourneyRegex = regexp.MustCompile("realtime-tfl-.*")
 
+func (s Source) JourneyQuery(journeyQuery query.Journey) (*ctdf.Journey, error) {
 	if !tflJourneyRegex.MatchString(journeyQuery.PrimaryIdentifier) {
 		return nil, source.UnsupportedSourceError
 	}

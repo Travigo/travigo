@@ -3,10 +3,10 @@ package localdepartureboard
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
@@ -35,9 +35,21 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	// Load from cache
 
-	filterHash := sha256.New()
-	filterHash.Write([]byte(pretty.Sprint(q.Filter)))
-	filterHashString := fmt.Sprintf("%x", filterHash.Sum(nil))
+	// PERF(low-risk): the common path has q.Filter == nil, so avoid the expensive
+	// reflection-based pretty.Sprint + sha256 on every request and use a constant
+	// suffix instead. When a filter is present, hash json.Marshal of it (deterministic
+	// and far cheaper than pretty.Sprint). NOTE: this changes the cache-key format so
+	// existing entries are invalidated, which is acceptable as they expire (<=18h).
+	// today/tomorrow still share the same baseCacheItemPath logic below.
+	var filterHashString string
+	if q.Filter == nil {
+		filterHashString = "nofilter"
+	} else {
+		filterBytes, _ := json.Marshal(q.Filter)
+		filterHash := sha256.New()
+		filterHash.Write(filterBytes)
+		filterHashString = fmt.Sprintf("%x", filterHash.Sum(nil))
+	}
 
 	currentTime := time.Now()
 
@@ -119,6 +131,15 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
 	currentTime = time.Now()
 
+	// PERF(low-risk): no up-front count is available from the cursor, so a meaningful
+	// preallocation of `journeys` is not possible here. Left as-is intentionally.
+	// PERF(medium-risk, NOT APPLIED): every journey is decoded and then filtered in Go
+	// via journey.Availability.MatchDate(dateTime). This could be pushed into the Mongo
+	// query (e.g. matching on availability conditions/exclusions for dateTime, or by
+	// maintaining and querying an indexed `availableDates` field), which would avoid
+	// decoding journeys that don't run on the date. Not applied: it changes query
+	// semantics and risks diverging from MatchDate's behaviour, so it needs careful
+	// equivalence verification and an index migration first.
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)

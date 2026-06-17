@@ -3,6 +3,7 @@ package tfl
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,25 @@ import (
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// PERF(medium-risk): reuse a single localdepartureboard.Source for the backfill instead of
+// constructing one and calling Setup() (which builds a fresh gocache+redis store) on every
+// request. The source only holds a *cachedresults.Cache, which wraps the concurrency-safe
+// shared redis client and stores no per-request state, and its Lookup/DepartureBoardQuery
+// use value receivers with only local variables - so a single shared instance is safe for
+// concurrent requests. Initialised lazily via sync.Once so Setup() (and its redis client
+// dependency) still runs on first use rather than at package init.
+var (
+	backfillSource     localdepartureboard.Source
+	backfillSourceOnce sync.Once
+)
+
+func getBackfillSource() *localdepartureboard.Source {
+	backfillSourceOnce.Do(func() {
+		backfillSource.Setup()
+	})
+	return &backfillSource
+}
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	tflOperator := &ctdf.Operator{
@@ -72,7 +92,11 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	generateDeparteBoardStart := time.Now()
 
 	for _, realtimeJourney := range realtimeJourneys {
-		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
+		// PERF(low-risk): use the loop-invariant `now` (captured just before this loop) for
+		// the staleness check instead of calling time.Now() per iteration. The loop does no
+		// blocking work, so the wall-clock drift across iterations is negligible and the
+		// timed-out classification is effectively unchanged, while saving a syscall per item.
+		timedOut := (now.Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
 			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime.In(stopTimezone)
@@ -116,8 +140,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	remainingCount := q.Count - len(departureBoard)
 
 	if remainingCount > 0 {
-		localSource := localdepartureboard.Source{}
-		localSource.Setup() //TODO maybe not
+		// PERF(medium-risk): use the shared, lazily-initialised backfill source instead of
+		// constructing a new localdepartureboard.Source and calling Setup() (new redis cache
+		// store) per request. See getBackfillSource above for the concurrency-safety rationale.
+		localSource := getBackfillSource()
 
 		q.StartDateTime = latestDepartureTime
 		q.Count = remainingCount

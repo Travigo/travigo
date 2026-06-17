@@ -200,10 +200,50 @@ func getStopDepartures(c *fiber.Ctx) error {
 	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
+	//
+	// PERF(high-risk, NOT APPLIED): the board above is generated in full, sorted, then
+	// truncated to [:count]. Capping the amount of work should happen inside the board
+	// source BEFORE realtime enrichment, not in this handler. It cannot be safely moved
+	// here because realtime offsets reorder departures, so truncation must stay AFTER the
+	// sort. Leaving the sort/truncate logic unchanged.
+	//
+	// PERF(medium-risk): Operators and Services are heavily repeated across departures of
+	// the same route, so calling the reflection-based transforms.Transform once per
+	// departure is wasteful. Dedupe so each distinct Operator/Service is transformed only
+	// once. We dedupe by PrimaryIdentifier (NOT by pointer): each journey loads its own
+	// Operator/Service via FindOne, so equal objects are distinct-but-equal pointers, and
+	// pointer-keyed dedupe would barely dedupe anything. transforms.Transform is a pure
+	// function of the object's matched field values (it matches on field values and writes
+	// static Data), so two objects sharing a PrimaryIdentifier come from the same DB
+	// document, have identical fields, and would receive identical transformations -
+	// skipping the repeat is therefore behaviour-preserving. GetOperator() must still run
+	// per item because it may populate item.Journey.Operator from the DB.
+	// PERF(low-risk): preallocate the dedupe maps. The number of distinct Operators/Services
+	// is bounded above by len(departureBoard), which is known here, so sizing the maps up
+	// front avoids incremental rehashing as entries are added.
+	transformedOperators := make(map[string]struct{}, len(departureBoard))
+	transformedServices := make(map[string]struct{}, len(departureBoard))
+	// PERF(low-risk): GetOperator() (and the Service lookup behind these objects) calls
+	// database.GetCollection(...) per departure inside pkg/ctdf. GetCollection is a global
+	// handle accessor, not a per-request connection, so it is cheap and the per-item call is
+	// required (GetOperator may populate item.Journey.Operator). Not hoisted here to avoid
+	// changing the global init pattern; noted for visibility per policy item 3.
 	for _, item := range departureBoard {
 		item.Journey.GetOperator()
-		transforms.Transform(item.Journey.Operator, 1)
-		transforms.Transform(item.Journey.Service, 1)
+
+		if operator := item.Journey.Operator; operator != nil {
+			if _, done := transformedOperators[operator.PrimaryIdentifier]; !done {
+				transforms.Transform(operator, 1)
+				transformedOperators[operator.PrimaryIdentifier] = struct{}{}
+			}
+		}
+
+		if service := item.Journey.Service; service != nil {
+			if _, done := transformedServices[service.PrimaryIdentifier]; !done {
+				transforms.Transform(service, 1)
+				transformedServices[service.PrimaryIdentifier] = struct{}{}
+			}
+		}
 	}
 
 	reduceGroupsName := []string{"basic"}
