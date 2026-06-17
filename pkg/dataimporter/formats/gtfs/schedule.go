@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -21,7 +18,6 @@ import (
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"golang.org/x/exp/maps"
 )
 
 type Schedule struct {
@@ -37,10 +33,13 @@ type Schedule struct {
 
 	ctdfJourneys map[string]*ctdf.Journey
 
-	tripStopSequenceMap map[string]map[int]*StopTime
+	tripStopTimes map[string][]StopTime
 
-	Shapes       []Shape
-	Translations []Translation
+	Shapes []Shape
+
+	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
+	// for O(1) lookups instead of a linear scan of every translation per record.
+	translationIndex map[string]string
 }
 
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
@@ -104,15 +103,7 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 		return err
 	}
 
-	count := 0
-
 	for {
-		if count == 1500000 {
-			runtime.GC()
-			count = 0
-			pretty.Println("GC")
-		}
-
 		line, err = decoder.ReadLine()
 		if err != nil {
 			return err
@@ -136,8 +127,6 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 			updateModel.SetUpsert(true)
 			processingQueue.Add(updateModel)
 		}
-
-		count += 1
 	}
 
 	if toProcess {
@@ -155,8 +144,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	//// Translations ////
+	g.translationIndex = map[string]string{}
 	importObject[Translation](g, "translations.txt", "translations", false, func(t Translation) (any, string) {
-		g.Translations = append(g.Translations, t)
+		g.translationIndex[t.TableName+"\x00"+t.FieldName+"\x00"+t.Language+"\x00"+t.FieldValue] = t.Translation
 
 		return nil, ""
 	})
@@ -384,12 +374,13 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Stop Times ////
-	g.tripStopSequenceMap = map[string]map[int]*StopTime{}
+	// Store stop times as flat value slices per trip rather than a nested
+	// map[int]*StopTime. stop_times.txt is by far the largest table, so avoiding
+	// a per-row heap allocation and an inner map per trip massively cuts memory
+	// and GC pressure. Ordering is restored by sorting on StopSequence at use.
+	g.tripStopTimes = map[string][]StopTime{}
 	importObject[StopTime](g, "stop_times.txt", "stop_times", false, func(stopTime StopTime) (any, string) {
-		if _, exists := g.tripStopSequenceMap[stopTime.TripID]; !exists {
-			g.tripStopSequenceMap[stopTime.TripID] = map[int]*StopTime{}
-		}
-		g.tripStopSequenceMap[stopTime.TripID][stopTime.StopSequence] = &stopTime
+		g.tripStopTimes[stopTime.TripID] = append(g.tripStopTimes[stopTime.TripID], stopTime)
 
 		return nil, ""
 	})
@@ -400,21 +391,22 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Process()
 	}
 
-	for tripID, tripSequencyMap := range g.tripStopSequenceMap {
+	for tripID, stopTimes := range g.tripStopTimes {
 		if g.ctdfJourneys[tripID] == nil {
 			log.Debug().Str("trip", tripID).Msg("Cannot find journey for this trip")
+			// Free this trip's stop times now that we're done with it
+			delete(g.tripStopTimes, tripID)
 			continue
 		}
 
-		sequenceIDs := maps.Keys(tripSequencyMap)
-		slices.Sort(sequenceIDs)
+		// Make sure stops are in sequence order
+		sort.Slice(stopTimes, func(i, j int) bool {
+			return stopTimes[i].StopSequence < stopTimes[j].StopSequence
+		})
 
-		for index := 1; index < len(sequenceIDs); index += 1 {
-			sequenceID := sequenceIDs[index]
-			stopTime := tripSequencyMap[sequenceID]
-
-			previousSequenceID := sequenceIDs[index-1]
-			previousStopTime := tripSequencyMap[previousSequenceID]
+		for index := 1; index < len(stopTimes); index += 1 {
+			stopTime := stopTimes[index]
+			previousStopTime := stopTimes[index-1]
 
 			originArrivalTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.ArrivalTime))
 			if err != nil {
@@ -497,6 +489,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		g.ctdfJourneys[tripID] = nil
+		// Free this trip's stop times as we go so peak memory stays bounded
+		delete(g.tripStopTimes, tripID)
 	}
 
 	if dataset.SupportedObjects.Journeys {
@@ -509,34 +503,32 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 }
 
 func (gtfs *Schedule) GetTranslation(table string, field string, language string, originalValue string) string {
-	for _, translation := range gtfs.Translations {
-		if translation.TableName == table && translation.FieldName == field && translation.Language == language && translation.FieldValue == originalValue {
-			return translation.Translation
-		}
+	if translation, exists := gtfs.translationIndex[table+"\x00"+field+"\x00"+language+"\x00"+originalValue]; exists {
+		return translation
 	}
 
 	return originalValue
 }
 
-func convertTransportType(intType int) ctdf.TransportType {
-	routeTypeMapping := map[int]ctdf.TransportType{
-		0:    ctdf.TransportTypeTram,
-		1:    ctdf.TransportTypeMetro,
-		2:    ctdf.TransportTypeRail,
-		3:    ctdf.TransportTypeBus,
-		4:    ctdf.TransportTypeFerry,
-		5:    ctdf.TransportTypeTram,
-		6:    ctdf.TransportTypeCableCar,
-		7:    ctdf.TransportTypeFunicular,
-		11:   ctdf.TransportTypeTram,
-		12:   ctdf.TransportTypeRail, // Monorail
-		200:  ctdf.TransportTypeCoach,
-		1000: ctdf.TransportTypeFerry,
-		// 1100: ctdf.TransportTypeAir,
-		1200: ctdf.TransportTypeFerry,
-		1400: ctdf.TransportTypeFunicular,
-	}
+var routeTypeMapping = map[int]ctdf.TransportType{
+	0:    ctdf.TransportTypeTram,
+	1:    ctdf.TransportTypeMetro,
+	2:    ctdf.TransportTypeRail,
+	3:    ctdf.TransportTypeBus,
+	4:    ctdf.TransportTypeFerry,
+	5:    ctdf.TransportTypeTram,
+	6:    ctdf.TransportTypeCableCar,
+	7:    ctdf.TransportTypeFunicular,
+	11:   ctdf.TransportTypeTram,
+	12:   ctdf.TransportTypeRail, // Monorail
+	200:  ctdf.TransportTypeCoach,
+	1000: ctdf.TransportTypeFerry,
+	// 1100: ctdf.TransportTypeAir,
+	1200: ctdf.TransportTypeFerry,
+	1400: ctdf.TransportTypeFunicular,
+}
 
+func convertTransportType(intType int) ctdf.TransportType {
 	transportType := routeTypeMapping[intType]
 	if transportType != "" {
 		return transportType
