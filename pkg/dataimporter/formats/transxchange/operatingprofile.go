@@ -32,6 +32,14 @@ type DateRange struct {
 func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*ServicedOrganisation) (*ctdf.Availability, error) {
 	ctdfAvailability := ctdf.Availability{}
 
+	// build a single OrganisationCode -> *ServicedOrganisation lookup map
+	servicedOrganisationLookup := make(map[string]*ServicedOrganisation, len(servicedOrganisations))
+	for _, org := range servicedOrganisations {
+		if _, exists := servicedOrganisationLookup[org.OrganisationCode]; !exists {
+			servicedOrganisationLookup[org.OrganisationCode] = org
+		}
+	}
+
 	operatingProfile.RegularDayType = []string{}
 	operatingProfile.BankHolidayOperation = []string{}
 	operatingProfile.BankHolidayNonOperation = []string{}
@@ -191,11 +199,13 @@ func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*Servic
 						log.Fatal().Msgf("Error decoding item: %s", err)
 					}
 
-					operationHolidays := findServicedOrganisation(servicedOrganisationDayType.DaysOfOperation.Holidays, servicedOrganisations)
-					operationWorkingDays := findServicedOrganisation(servicedOrganisationDayType.DaysOfOperation.WorkingDays, servicedOrganisations)
+					// O(1) map lookups (see servicedOrganisationLookup above)
+					// replacing findServicedOrganisation linear scans; nil/not-found semantics preserved.
+					operationHolidays := servicedOrganisationLookup[servicedOrganisationDayType.DaysOfOperation.Holidays]
+					operationWorkingDays := servicedOrganisationLookup[servicedOrganisationDayType.DaysOfOperation.WorkingDays]
 
-					nonOperationHolidays := findServicedOrganisation(servicedOrganisationDayType.DaysOfNonOperation.Holidays, servicedOrganisations)
-					nonOperationWorkingDays := findServicedOrganisation(servicedOrganisationDayType.DaysOfNonOperation.WorkingDays, servicedOrganisations)
+					nonOperationHolidays := servicedOrganisationLookup[servicedOrganisationDayType.DaysOfNonOperation.Holidays]
+					nonOperationWorkingDays := servicedOrganisationLookup[servicedOrganisationDayType.DaysOfNonOperation.WorkingDays]
 
 					if operationHolidays != nil {
 						// If the referenced object is empty then just kill off this journey

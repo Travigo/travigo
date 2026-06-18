@@ -30,6 +30,8 @@ const DateTimeFormat = "2006-01-02T15:04:05"
 const DateTimeFormatWithTimezoneRegex = ".+[+-]\\d{2}:\\d{2}"
 const DateTimeFormatWithTimezone = "2006-01-02T15:04:05-07:00"
 
+var dateTimeFormatWithTimezoneRegex = regexp.MustCompile(DateTimeFormatWithTimezoneRegex)
+
 type TransXChange struct {
 	FileName             string `xml:",attr"`
 	CreationDateTime     string `xml:",attr"`
@@ -67,8 +69,6 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 	var transportType ctdf.TransportType
 	transportType = ctdf.TransportTypeCoach
-
-	dateTimeFormatWithTimezoneRegex, _ := regexp.Compile(DateTimeFormatWithTimezoneRegex)
 
 	servicesCollection := database.GetCollection("services_raw")
 	journeysCollection := database.GetCollection("journeys")
@@ -111,6 +111,13 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	servicesReferences := map[string]*Service{}
 
 	ignoredServices := map[string]bool{}
+
+	stopNameOverrides := make(map[string]string, len(doc.StopPoints))
+	for _, stopPoint := range doc.StopPoints {
+		if stopPoint.CommonName != "" {
+			stopNameOverrides[fmt.Sprintf(ctdf.GBStopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
+		}
+	}
 
 	// There should be so few services (probably just 1) services defined per document that there is no point of batch processing them
 	for _, txcService := range doc.Services {
@@ -160,15 +167,8 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 			}
 			modificationTime, _ := time.Parse(modificationDateTimeFormat, modificationDateTimeString)
 
-			stopNameOverrides := map[string]string{}
-			for _, stopPoint := range doc.StopPoints {
-				if stopPoint.CommonName != "" {
-					stopNameOverrides[fmt.Sprintf(ctdf.GBStopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
-				}
-			}
-
 			// Generate the routes
-			var routes []ctdf.Route
+			routes := make([]ctdf.Route, 0, len(doc.Routes))
 			for _, txcRoute := range doc.Routes {
 				routes = append(routes, ctdf.Route{
 					Description: txcRoute.Description,
@@ -226,6 +226,14 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 			// Check if we want to add this service to the list of MongoDB operations
 			bsonRep, _ := bson.Marshal(ctdfService)
 
+			// TODO(high-risk, NOT APPLIED): this issues one MongoDB FindOne round-trip per
+			// service+line record (network latency dominates for large documents). To fix,
+			// prefetch existing services for this document in a single query before the loop
+			// (e.g. find all services_raw whose primaryidentifier is in the set of identifiers
+			// this document will produce) into a map[primaryidentifier]*ctdf.Service, then look
+			// up locally here. Left as-is because it is an architectural change to the DB access
+			// pattern and the existing insert-vs-replace decision logic below must be preserved
+			// exactly (including the ModificationDateTime/Year()==0/DataSource.Timestamp checks).
 			var existingCtdfService *ctdf.Service
 			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfService.PrimaryIdentifier}).Decode(&existingCtdfService)
 
@@ -268,6 +276,18 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 			interval, _ := iso8601.ParseISO8601(txcJourney.Frequency.Interval.ScheduledFrequency)
 
 			for newDepartureTime := interval.Shift(departureTime); newDepartureTime.Sub(endTime) <= 0; newDepartureTime = interval.Shift(newDepartureTime) {
+				// TODO(high-risk, NOT APPLIED): replace the reflection-based copier.CopyWithOption
+				// with a hand-written deep copy. Deferred because the existing call combines
+				// IgnoreEmpty:true with DeepCopy:true, and reproducing copier's exact field-by-field
+				// semantics by hand is risky: VehicleJourney contains a *Frequency pointer (with a
+				// further nested *Interval pointer), nested anonymous structs (Operational), an
+				// OperatingProfile value whose ToCTDF uses a pointer receiver and mutates its own
+				// slices, and a VehicleJourneyTimingLinks slice that MUST be deep-copied (a shallow
+				// `copiedJourney := *txcJourney` would alias the backing array). To apply safely:
+				// allocate a fresh VehicleJourney, copy all scalar fields, deep-copy *Frequency and
+				// its *Interval, deep-copy the VehicleJourneyTimingLinks slice element-by-element,
+				// and copy OperatingProfile, then verify byte-identical bson output against the
+				// copier-based version on real BODS data before switching.
 				var copiedJourney VehicleJourney
 				err := copier.CopyWithOption(&copiedJourney, *txcJourney, copier.Option{IgnoreEmpty: true, DeepCopy: true})
 
@@ -369,7 +389,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 				// A Route can have many RouteSectionRefs
 				// Create an array of references to all the RouteSections for iterating over later
-				var routeSections []*RouteSection
+				routeSections := make([]*RouteSection, 0, len(route.RouteSectionRef))
 
 				for _, routeSectionRef := range route.RouteSectionRef {
 					routeSection := routeSectionReferences[routeSectionRef]
@@ -383,6 +403,16 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				if len(routeSections) == 0 {
 					log.Error().Msgf("Failed to find any referenced routeSections for route %s in vehicle journey %s", journeyPattern.RouteRef, txcJourney.VehicleJourneyCode)
 					continue
+				}
+
+				routeLinkReferences := make(map[string]*RouteLink)
+				for _, routeSection := range routeSections {
+					for i := range routeSection.RouteLinks {
+						routeLink := &routeSection.RouteLinks[i]
+						if _, exists := routeLinkReferences[routeLink.ID]; !exists {
+							routeLinkReferences[routeLink.ID] = routeLink
+						}
+					}
 				}
 
 				departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
@@ -499,15 +529,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					vehicleJourneyTimingLink := txcJourney.GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(journeyPatternTimingLink.ID)
 
 					// Search for the RouteLink in the many RouteSections assigned with the Route
-					var routeLink *RouteLink
-					for _, routeSection := range routeSections {
-						checkRouteLink, _ := routeSection.GetRouteLink(journeyPatternTimingLink.RouteLinkRef)
-
-						if checkRouteLink != nil {
-							routeLink = checkRouteLink
-							break
-						}
-					}
+					routeLink := routeLinkReferences[journeyPatternTimingLink.RouteLinkRef]
 
 					if routeLink == nil {
 						log.Error().Msgf("Failed to find referenced routeLink %s for JPTL %s in vehicle journey %s", journeyPatternTimingLink.RouteLinkRef, journeyPatternTimingLink.ID, txcJourney.VehicleJourneyCode)
@@ -662,6 +684,14 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 				bsonRep, _ := bson.Marshal(ctdfJourney)
 
+				// TODO(high-risk): one MongoDB FindOne round-trip per journey record,
+				// run concurrently across batch goroutines but still one query per journey. To fix,
+				// prefetch the existing journeys for this document in a single query (all journeys
+				// whose primaryidentifier is in the set this document produces) into a shared
+				// map[primaryidentifier]*ctdf.Journey before launching the batch goroutines, then do
+				// local map lookups here. Left as-is because it is an architectural change to the DB
+				// access pattern and the insert-vs-replace decision logic below (the
+				// ModificationDateTime/Year()==0/DataSource.Timestamp checks) must be preserved exactly.
 				var existingCtdfJourney *ctdf.Journey
 				journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier}).Decode(&existingCtdfJourney)
 
