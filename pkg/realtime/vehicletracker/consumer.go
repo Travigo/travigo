@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -67,8 +68,12 @@ func startRealtimeConsumer(queue rmq.Queue, id int) {
 }
 
 type BatchConsumer struct {
-	id          int
-	TfLBusQueue rmq.Queue
+	id              int
+	TfLBusQueue     rmq.Queue
+	journeyCacheMu  sync.RWMutex
+	journeyCache    map[string]*cachedTrackedJourney
+	locationCacheMu sync.RWMutex
+	locationCache   map[string]*time.Location
 }
 
 func NewBatchConsumer(id int) *BatchConsumer {
@@ -77,14 +82,19 @@ func NewBatchConsumer(id int) *BatchConsumer {
 		log.Fatal().Err(err).Msg("Failed to start notify queue")
 	}
 
-	return &BatchConsumer{id: id, TfLBusQueue: tfLBusQueue}
+	return &BatchConsumer{
+		id:            id,
+		TfLBusQueue:   tfLBusQueue,
+		journeyCache:  map[string]*cachedTrackedJourney{},
+		locationCache: map[string]*time.Location{},
+	}
 }
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
-	var realtimeJourneyOperations []mongo.WriteModel
-	var serviceAlertOperations []mongo.WriteModel
+	realtimeJourneyOperations := make([]mongo.WriteModel, 0, len(payloads))
+	serviceAlertOperations := make([]mongo.WriteModel, 0, len(payloads))
 
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
@@ -94,6 +104,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 					log.Error().Err(err).Msg("Failed to reject realtime event")
 				}
 			}
+			continue
 		}
 
 		if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip || vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {

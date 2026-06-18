@@ -24,8 +24,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 
 	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "journey.path", Value: 1},
-		{Key: "journey.departuretimezone", Value: 1},
+		{Key: "journey.primaryidentifier", Value: 1},
 		{Key: "nextstopref", Value: 1},
 		{Key: "offset", Value: 1},
 	})
@@ -34,30 +33,27 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
 
 	newRealtimeJourney := false
+	if realtimeJourney != nil && realtimeJourney.Journey == nil {
+		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
+		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
+		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
+	}
+
+	cachedJourney, err := consumer.getCachedTrackedJourney(journeyID, currentTime)
+	if err != nil {
+		return nil, err
+	}
+
 	if realtimeJourney == nil {
-		var journey *ctdf.Journey
-		journeysCollection := database.GetCollection("journeys")
-		err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}).Decode(&journey)
-
-		if err != nil {
-			return nil, err
-		}
-
-		for _, pathItem := range journey.Path {
-			pathItem.GetDestinationStop()
-		}
-
-		journey.GetService()
-
 		journeyDate, _ := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
 			ActivelyTracked:        true,
 			TimeoutDurationMinutes: 10,
-			Journey:                journey,
+			Journey:                cachedJourney.Journey,
 			JourneyRunDate:         journeyDate,
-			Service:                journey.Service,
+			Service:                cachedJourney.Journey.Service,
 
 			CreationDateTime: currentTime,
 
@@ -65,12 +61,9 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
 		}
 		newRealtimeJourney = true
-	}
-
-	if realtimeJourney.Journey == nil {
-		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
-		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
-		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
+	} else {
+		realtimeJourney.Journey = cachedJourney.Journey
+		realtimeJourney.Service = cachedJourney.Journey.Service
 	}
 
 	var offset time.Duration
@@ -156,7 +149,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			return nil, errors.New("nil closestdistancejourneypath")
 		}
 
-		journeyTimezone, _ := time.LoadLocation(realtimeJourney.Journey.DepartureTimezone)
+		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
 
 		// Get the arrival & departure times with date of the journey
 		destinationArrivalTimeWithDate := time.Date(
@@ -235,19 +228,15 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			departureTime := stopUpdate.DepartureTime
 
 			if arrivalTime.Year() == 1970 {
-				for _, path := range realtimeJourney.Journey.Path {
-					if path.OriginStopRef == stopUpdate.StopID {
-						arrivalTime = path.OriginArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
-						break
-					}
+				path := cachedJourney.PathByOriginStopRef[stopUpdate.StopID]
+				if path != nil {
+					arrivalTime = path.OriginArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
 				}
 			}
 			if departureTime.Year() == 1970 {
-				for _, path := range realtimeJourney.Journey.Path {
-					if path.OriginStopRef == stopUpdate.StopID {
-						departureTime = path.OriginDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
-						break
-					}
+				path := cachedJourney.PathByOriginStopRef[stopUpdate.StopID]
+				if path != nil {
+					departureTime = path.OriginDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
 				}
 			}
 
@@ -264,7 +253,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		now := time.Now()
 		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
 
-		journeyTimezone, _ := time.LoadLocation(realtimeJourney.Journey.DepartureTimezone)
+		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
 
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to parse realtime time frame")

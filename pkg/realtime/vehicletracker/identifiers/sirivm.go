@@ -10,7 +10,10 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+var serviceNameNumberSuffixRegex = regexp.MustCompile("^\\D+(\\d+)$")
 
 type SiriVM struct {
 	IdentifyingInformation map[string]string
@@ -38,16 +41,20 @@ func (i *SiriVM) getServices() []string {
 	}
 
 	servicesCollection := database.GetCollection("services")
+	opts := options.Find().SetProjection(bson.D{
+		bson.E{Key: "primaryidentifier", Value: 1},
+	})
 
 	cursor, err := servicesCollection.Find(context.Background(), bson.M{
 		"$and": bson.A{bson.M{"servicename": serviceName},
 			bson.M{"operatorref": bson.M{"$in": i.Operator.OtherIdentifiers}},
 		},
-	})
+	}, opts)
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to perform query")
 	}
+	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
 		var service *ctdf.Service
@@ -59,16 +66,19 @@ func (i *SiriVM) getServices() []string {
 		services = append(services, service.PrimaryIdentifier)
 	}
 
-	serviceNameRegex, _ := regexp.Compile("^\\D+(\\d+)$")
 	if len(services) == 0 {
-		serviceNameMatch := serviceNameRegex.FindStringSubmatch(serviceName)
+		serviceNameMatch := serviceNameNumberSuffixRegex.FindStringSubmatch(serviceName)
 
 		if len(serviceNameMatch) == 2 {
-			cursor, _ := servicesCollection.Find(context.Background(), bson.M{
+			cursor, err := servicesCollection.Find(context.Background(), bson.M{
 				"$and": bson.A{bson.M{"servicename": serviceNameMatch[1]},
 					bson.M{"operatorref": bson.M{"$in": i.Operator.OtherIdentifiers}},
 				},
-			})
+			}, opts)
+			if err != nil {
+				log.Fatal().Err(err).Msg("Failed to perform query")
+			}
+			defer cursor.Close(context.Background())
 
 			for cursor.Next(context.Background()) {
 				var service *ctdf.Service
@@ -196,12 +206,11 @@ func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCon
 		return journeys[0], nil
 	} else {
 		var timeFilteredJourneys []*ctdf.Journey
+		originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
+		originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(i.CurrentTime.Location())
 
 		// Filter based on exact time
 		for _, journey := range journeys {
-			originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
-			originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(i.CurrentTime.Location())
-
 			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)
 			}
@@ -219,9 +228,6 @@ func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCon
 				if !(journey.Path[0].OriginStopRef == i.IdentifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == i.IdentifyingInformation["DestinationRef"]) {
 					continue
 				}
-
-				originAimedDepartureTimeNoOffset, _ := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
-				originAimedDepartureTime := originAimedDepartureTimeNoOffset.In(i.CurrentTime.Location())
 
 				originAimedDepartureTimeDayMinutes := (originAimedDepartureTime.Hour() * 60) + originAimedDepartureTime.Minute()
 				journeyDepartureTimeDayMinutes := (journey.DepartureTime.Hour() * 60) + journey.DepartureTime.Minute()

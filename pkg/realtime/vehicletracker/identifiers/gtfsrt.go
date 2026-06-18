@@ -1,12 +1,10 @@
 package identifiers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -28,8 +26,6 @@ func (r *GTFSRT) IdentifyStop() (string, error) {
 		return "", errors.New("Missing field linkedDataset")
 	}
 
-	var potentialStops []ctdf.Stop
-
 	formatedStopID := fmt.Sprintf("%s-stop-%s", linkedDataset, stopID)
 
 	stopsQuery := bson.M{
@@ -44,13 +40,15 @@ func (r *GTFSRT) IdentifyStop() (string, error) {
 		stopsQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
 	}
 
-	cursor, _ := stopsCollection.Find(context.Background(), stopsQuery)
-	cursor.All(context.Background(), &potentialStops)
+	potentialStops, err := findPrimaryIdentifiers(stopsCollection, stopsQuery, 2)
+	if err != nil {
+		return "", err
+	}
 
 	if len(potentialStops) == 0 {
 		return "", errors.New("Could not find referenced stop")
 	} else if len(potentialStops) == 1 {
-		return potentialStops[0].PrimaryIdentifier, nil
+		return potentialStops[0], nil
 	} else {
 		return "", errors.New("Could not find referenced stop")
 	}
@@ -69,8 +67,6 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 		return "", errors.New("Missing field linkedDataset")
 	}
 
-	var potentialServices []ctdf.Stop
-
 	formatedServiceID := fmt.Sprintf("%s-service-%s", linkedDataset, routeID)
 
 	servicesQuery := bson.M{
@@ -85,13 +81,15 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 		servicesQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
 	}
 
-	cursor, _ := servicesCollection.Find(context.Background(), servicesQuery)
-	cursor.All(context.Background(), &potentialServices)
+	potentialServices, err := findPrimaryIdentifiers(servicesCollection, servicesQuery, 2)
+	if err != nil {
+		return "", err
+	}
 
 	if len(potentialServices) == 0 {
 		return "", errors.New("Could not find referenced service")
 	} else if len(potentialServices) == 1 {
-		return potentialServices[0].PrimaryIdentifier, nil
+		return potentialServices[0], nil
 	} else {
 		return "", errors.New("Could not find referenced service")
 	}
@@ -110,8 +108,6 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		return "", errors.New("Missing field linkedDataset")
 	}
 
-	var potentialJourneys []ctdf.Journey
-
 	journeysQuery := bson.M{
 		"otheridentifiers.GTFS-TripID": tripID,
 		"datasource.datasetid":         linkedDataset,
@@ -121,13 +117,15 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		journeysQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
 	}
 
-	cursor, _ := journeysCollection.Find(context.Background(), journeysQuery)
-	cursor.All(context.Background(), &potentialJourneys)
+	potentialJourneys, err := findPrimaryIdentifiers(journeysCollection, journeysQuery, 2)
+	if err != nil {
+		return "", err
+	}
 
 	if len(potentialJourneys) == 0 {
 		return "", errors.New("Could not find referenced trip")
 	} else if len(potentialJourneys) == 1 {
-		return potentialJourneys[0].PrimaryIdentifier, nil
+		return potentialJourneys[0], nil
 	} else {
 		return "", errors.New("Could not find referenced trip")
 	}
