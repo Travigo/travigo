@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -288,17 +289,22 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		return nil, errors.New("unable to find next journeypath")
 	}
 
+	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
+		_ = realtimestore.UpdateLocation(
+			context.Background(),
+			realtimeJourney.PrimaryIdentifier,
+			vehicleUpdateEvent.VehicleLocationUpdate.Location,
+			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
+		)
+	}
+
 	// Update database
 	updateMap := bson.M{
 		"modificationdatetime": currentTime,
-		"vehiclebearing":       vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
 		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
 		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
 		"occupancy":            vehicleUpdateEvent.VehicleLocationUpdate.Occupancy,
 		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
-	}
-	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
-		updateMap["vehiclelocation"] = vehicleUpdateEvent.VehicleLocationUpdate.Location
 	}
 	if newRealtimeJourney {
 		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
@@ -316,6 +322,11 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		updateMap["datasource"] = vehicleUpdateEvent.DataSource
 
 		updateMap["reliability"] = realtimeJourneyReliability
+
+		if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
+			updateMap["vehiclelocation"] = vehicleUpdateEvent.VehicleLocationUpdate.Location
+			updateMap["vehiclebearing"] = vehicleUpdateEvent.VehicleLocationUpdate.Bearing
+		}
 	} else {
 		updateMap["datasource.timestamp"] = vehicleUpdateEvent.DataSource.Timestamp
 	}

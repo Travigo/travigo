@@ -7,6 +7,7 @@ Already centralised in `realtimestore`:
 - `GET /realtime_journeys`
 - `GET /realtime_journeys/:identifier`
 - `GET /journeys/:identifier` current realtime journey lookup
+- Redis overlays for `vehiclelocation`, `vehiclebearing`, and `vehiclelocationdescription`
 
 ## Departure Boards
 
@@ -58,4 +59,5 @@ Already centralised in `realtimestore`:
 ## Notes
 
 - `pkg/realtime/realtimestore/reader.go` still reads Mongo by design. That is currently the central reader layer, not a remaining direct-read migration target.
+- `GET /realtime_journeys` still uses Mongo `vehiclelocation.coordinates` for the bounds query, then overlays the returned live location from Redis.
 - `pkg/realtime/nationalrail/railutils/queue.go` and `pkg/realtime/vehicletracker/consumer.go` get the collection for bulk writes only, so they are not listed above.

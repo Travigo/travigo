@@ -1,9 +1,11 @@
 package vehicletracker
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -13,10 +15,17 @@ func (consumer *BatchConsumer) updateRealtimeJourneyLocationOnly(journeyID strin
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
 	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
+	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
+		_ = realtimestore.UpdateLocation(
+			context.Background(),
+			realtimeJourneyIdentifier,
+			vehicleUpdateEvent.VehicleLocationUpdate.Location,
+			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
+		)
+	}
+
 	updateMap := bson.M{
 		"modificationdatetime": currentTime,
-		"vehiclelocation":      vehicleUpdateEvent.VehicleLocationUpdate.Location,
-		"vehiclebearing":       vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
 	}
 
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})

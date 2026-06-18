@@ -2,6 +2,7 @@ package realtimestore
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -21,7 +22,7 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 		return nil, err
 	}
 
-	ApplyLocationDescription(ctx, realtimeJourney)
+	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
 	return realtimeJourney, nil
 }
 
@@ -40,11 +41,12 @@ func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.Realtim
 		return nil, err
 	}
 
+	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
+
 	if !realtimeJourney.IsActive() {
 		return nil, nil
 	}
 
-	ApplyLocationDescription(ctx, realtimeJourney)
 	return realtimeJourney, nil
 }
 
@@ -71,11 +73,28 @@ func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.Re
 			return nil, err
 		}
 
-		ApplyLocationDescription(ctx, realtimeJourney)
+		ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
 		realtimeJourneys = append(realtimeJourneys, realtimeJourney)
 	}
 
 	return realtimeJourneys, cursor.Err()
+}
+
+func ApplyRealtimeJourneyOverlays(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
+	ApplyLocation(ctx, realtimeJourney)
+	ApplyLocationDescription(ctx, realtimeJourney)
+}
+
+func ApplyLocation(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
+	if realtimeJourney == nil {
+		return
+	}
+
+	location, bearing, err := GetLocation(ctx, realtimeJourney.PrimaryIdentifier)
+	if err == nil {
+		realtimeJourney.VehicleLocation = location
+		realtimeJourney.VehicleBearing = bearing
+	}
 }
 
 func ApplyLocationDescription(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
@@ -95,4 +114,18 @@ func GetLocationDescription(ctx context.Context, identifier string) (string, err
 		return "", description.Err()
 	}
 	return description.Val(), nil
+}
+
+func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64, error) {
+	locationResult := redis_client.Client.Get(ctx, fmt.Sprintf("realtime-journey:%s/location", identifier))
+	if locationResult.Err() != nil {
+		return ctdf.Location{}, 0, locationResult.Err()
+	}
+
+	var vehicleLocation storedVehicleLocation
+	if err := json.Unmarshal([]byte(locationResult.Val()), &vehicleLocation); err != nil {
+		return ctdf.Location{}, 0, err
+	}
+
+	return vehicleLocation.Location, vehicleLocation.Bearing, nil
 }

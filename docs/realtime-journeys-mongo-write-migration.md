@@ -6,6 +6,7 @@ Already moved out of Mongo:
 
 - `pkg/realtime/realtimestore/writer.go`
   - `UpdateLocationDescription` writes vehicle location descriptions to Redis.
+  - `UpdateLocation` writes live vehicle location and bearing to Redis.
 
 ## Actual Mongo Write Sinks
 
@@ -25,12 +26,15 @@ Already moved out of Mongo:
 
 - `pkg/realtime/vehicletracker/realtimejourney.go`
   - Builds an upsert `UpdateOneModel` by realtime journey `primaryidentifier`.
-  - Updates volatile vehicle fields such as `vehiclelocation`, `vehiclebearing`, stop progress, occupancy, offset, stop estimates, and datasource timestamp.
+  - Writes live `vehiclelocation` and `vehiclebearing` to Redis.
+  - Seeds `vehiclelocation` and `vehiclebearing` into Mongo only when creating a new realtime journey so the current Mongo bounds query can still discover the document.
+  - Still updates Mongo fields such as stop progress, occupancy, offset, stop estimates, datasource timestamp, and modification time.
   - Also performs a direct `DeleteOne` if a corrupt realtime journey document exists without a journey.
 
 - `pkg/realtime/vehicletracker/locationonly.go`
   - Builds a non-upsert `UpdateOneModel` by realtime journey `primaryidentifier`.
-  - Updates only `modificationdatetime`, `vehiclelocation`, and `vehiclebearing`.
+  - Writes live `vehiclelocation` and `vehiclebearing` to Redis.
+  - Updates only `modificationdatetime` in Mongo.
 
 ## TfL Arrival Write Producers
 
@@ -69,4 +73,4 @@ Already moved out of Mongo:
 - `pkg/realtime/realtimestore/reader.go` still reads Mongo by design; it is not a write path.
 - `pkg/database/collections.go` creates indexes on `realtime_journeys`; it is not a realtime data write path.
 - Service alert, journey, retry record, and stats writes are not included here because they do not write to `realtime_journeys`.
-- Highest-volume Mongo write candidates are likely vehicle tracker bulk writes and TfL arrival bulk writes/deletes.
+- Highest-volume remaining Mongo write candidates are likely vehicle tracker state/modification writes and TfL arrival bulk writes/deletes.
