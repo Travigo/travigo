@@ -10,7 +10,6 @@ import (
 
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
@@ -89,21 +88,7 @@ func (j *Journey) GetDeepReferences() {
 
 	wg.Wait()
 }
-func (j *Journey) GetRealtimeJourney(opts *options.FindOneOptions) {
-	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-	var realtimeJourney *RealtimeJourney
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{
-		"journey.primaryidentifier": j.PrimaryIdentifier,
-		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-	}, opts).Decode(&realtimeJourney)
-
-	if realtimeJourney != nil && realtimeJourney.IsActive() {
-		j.RealtimeJourney = realtimeJourney
-	}
-}
 func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }

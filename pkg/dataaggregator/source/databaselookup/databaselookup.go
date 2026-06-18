@@ -27,7 +27,6 @@ func (s Source) Supports() []reflect.Type {
 		reflect.TypeOf(ctdf.Stop{}),
 		reflect.TypeOf(ctdf.StopGroup{}),
 		reflect.TypeOf(ctdf.Journey{}),
-		reflect.TypeOf(ctdf.RealtimeJourney{}),
 		reflect.TypeOf(ctdf.Operator{}),
 		reflect.TypeOf(ctdf.OperatorGroup{}),
 		reflect.TypeOf(ctdf.Service{}),
@@ -52,8 +51,6 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.ServiceQuery(q.(query.Service))
 	case query.ServicesByStop:
 		return s.ServicesByStopQuery(q.(query.ServicesByStop))
-	case query.RealtimeJourney:
-		return s.RealtimeJourneyQuery(q.(query.RealtimeJourney))
 	case query.ServiceAlertsForMatchingIdentifiers:
 		return s.ServiceAlertsForMatchingIdentifiersQuery(q.(query.ServiceAlertsForMatchingIdentifiers))
 	}

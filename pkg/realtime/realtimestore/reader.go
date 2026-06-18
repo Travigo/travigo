@@ -2,65 +2,91 @@ package realtimestore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
-	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func WithFindOneOptions(findOptions ...*mongooptions.FindOneOptions) Option {
-	return func(opts *options) {
-		opts.findOneOptions = append(opts.findOneOptions, findOptions...)
-	}
-}
-
-func WithFindOptions(findOptions ...*mongooptions.FindOptions) Option {
-	return func(opts *options) {
-		opts.findOptions = append(opts.findOptions, findOptions...)
-	}
-}
-
-func GetByIdentifier(ctx context.Context, identifier string, opts ...Option) (*ctdf.RealtimeJourney, error) {
+func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
 	if err := validateIdentifier(identifier); err != nil {
 		return nil, err
 	}
 
-	return FindOne(ctx, FilterByIdentifier(identifier), opts...)
+	realtimeJourney := &ctdf.RealtimeJourney{}
+	if err := collectionOrDefault(nil).FindOne(ctx, FilterByIdentifier(identifier)).Decode(realtimeJourney); err != nil {
+		return nil, err
+	}
+
+	ApplyLocationDescription(ctx, realtimeJourney)
+	return realtimeJourney, nil
 }
 
-func FindOne(ctx context.Context, filter interface{}, opts ...Option) (*ctdf.RealtimeJourney, error) {
-	cfg := applyOptions(opts...)
+func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.RealtimeJourney, error) {
+	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 
-	var realtimeJourney *ctdf.RealtimeJourney
-	err := collectionOrDefault(cfg.collection).FindOne(ctx, filter, cfg.findOneOptions...).Decode(&realtimeJourney)
+	realtimeJourney := &ctdf.RealtimeJourney{}
+	err := collectionOrDefault(nil).FindOne(ctx, bson.M{
+		"journey.primaryidentifier": journeyID,
+		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
+	}).Decode(realtimeJourney)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	locationDescription, err := GetLocationDescription(ctx, realtimeJourney.PrimaryIdentifier)
-	if err != nil {
-		realtimeJourney.VehicleLocationDescription = locationDescription
+	if !realtimeJourney.IsActive() {
+		return nil, nil
 	}
 
+	ApplyLocationDescription(ctx, realtimeJourney)
 	return realtimeJourney, nil
 }
 
-func Find(ctx context.Context, filter interface{}, opts ...Option) ([]*ctdf.RealtimeJourney, error) {
-	cfg := applyOptions(opts...)
+func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.RealtimeJourney, error) {
+	realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
 
-	cursor, err := collectionOrDefault(cfg.collection).Find(ctx, filter, cfg.findOptions...)
+	cursor, err := collectionOrDefault(nil).Find(ctx,
+		bson.M{
+			"$and": bson.A{
+				bson.M{"vehiclelocation.coordinates": boundsQuery},
+				bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
+			},
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
 	var realtimeJourneys []*ctdf.RealtimeJourney
-	if err := cursor.All(ctx, &realtimeJourneys); err != nil {
-		return nil, err
+	for cursor.Next(ctx) {
+		realtimeJourney := &ctdf.RealtimeJourney{}
+		if err := cursor.Decode(realtimeJourney); err != nil {
+			return nil, err
+		}
+
+		ApplyLocationDescription(ctx, realtimeJourney)
+		realtimeJourneys = append(realtimeJourneys, realtimeJourney)
 	}
 
-	return realtimeJourneys, nil
+	return realtimeJourneys, cursor.Err()
+}
+
+func ApplyLocationDescription(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
+	if realtimeJourney == nil {
+		return
+	}
+
+	locationDescription, err := GetLocationDescription(ctx, realtimeJourney.PrimaryIdentifier)
+	if err == nil {
+		realtimeJourney.VehicleLocationDescription = locationDescription
+	}
 }
 
 func GetLocationDescription(ctx context.Context, identifier string) (string, error) {

@@ -1,11 +1,15 @@
 package routes
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/liip/sheriff"
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
 )
 
@@ -30,7 +34,12 @@ func getJourney(c *fiber.Ctx) error {
 	} else {
 		journey.GetReferences()
 		journey.GetDeepReferences()
-		journey.GetRealtimeJourney(nil)
+
+		realtimeJourney, realtimeErr := realtimestore.FindCurrentForJourney(context.Background(), journey.PrimaryIdentifier)
+		if realtimeErr != nil {
+			log.Error().Err(realtimeErr).Str("journey", journey.PrimaryIdentifier).Msg("Failed to query realtime journey")
+		}
+		journey.RealtimeJourney = realtimeJourney
 
 		var journeyReduced interface{}
 

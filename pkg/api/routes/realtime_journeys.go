@@ -7,10 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/dataaggregator"
-	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/database"
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 )
 
 func RealtimeJourneysRouter(router fiber.Router) {
@@ -59,25 +56,16 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 
 	var realtimeJourneys []realtimeJourneyMinimised
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
+	realtimeJourneyResults, err := realtimestore.FindActiveWithinBounds(context.Background(), boundsQuery)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query realtime journeys")
+		c.SendStatus(fiber.StatusInternalServerError)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(),
-		bson.M{
-			"$and": bson.A{
-				bson.M{"vehiclelocation.coordinates": boundsQuery},
-				bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
-			},
-		},
-	)
-
-	for cursor.Next(context.Background()) {
-		var realtimeJourney *ctdf.RealtimeJourney
-		err := cursor.Decode(&realtimeJourney)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode Stop")
-		}
-
+	for _, realtimeJourney := range realtimeJourneyResults {
 		if realtimeJourney.IsActive() {
 			realtimeJourney.Journey.GetService()
 			realtimeJourney.Journey.GetOperator()
@@ -93,11 +81,7 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 func getRealtimeJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 
-	var realtimeJourney *ctdf.RealtimeJourney
-	realtimeJourney, err := dataaggregator.Lookup[*ctdf.RealtimeJourney](query.RealtimeJourney{
-		PrimaryIdentifier: identifier,
-	})
-
+	realtimeJourney, err := realtimestore.FindByIdentifier(context.Background(), identifier)
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
 		return c.JSON(fiber.Map{
