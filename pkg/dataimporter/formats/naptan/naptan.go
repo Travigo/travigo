@@ -9,7 +9,6 @@ import (
 
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
-	"github.com/travigo/travigo/pkg/util"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -24,6 +23,15 @@ const (
 	defaultBulkWriteOrdered          = false
 	defaultStopGroupBatchSize        = 5000
 	defaultStopBatchSize             = 5000
+)
+
+var (
+	// stationStopTypes: stops of these types are deferred to the station-stop generation pass.
+	stationStopTypes = map[string]bool{"MET": true, "RLY": true, "FER": true}
+	// skipStopTypes: stops of these types are skipped entirely during the main import loop.
+	skipStopTypes = map[string]bool{"PLT": true, "RPL": true, "FBT": true, "TMU": true, "RSE": true, "FTD": true}
+	// platformStopTypes: stop types treated as platforms during station/platform assembly.
+	platformStopTypes = map[string]bool{"PLT": true, "RPL": true, "FBT": true}
 )
 
 type NaPTAN struct {
@@ -127,6 +135,13 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	log.Info().Msg("Converting & Importing CTDF Stops into Mongo")
 	var stopOperationInsert uint64
 
+	// TODO(high-risk): stationStopGroupContents and stationStops are appended to
+	// under a mutex from multiple batch goroutines. Local per-goroutine aggregation followed by a
+	// single merge would reduce lock contention, but the final contents of stationStopGroupContents
+	// (slices keyed by association) and stationStops are order-sensitive in the downstream station
+	// assembly pass. A naive merge could reorder elements within a key's slice (changing platform/
+	// OtherIdentifiers ordering on generated station stops). Not confident the merged ordering would
+	// be byte-for-byte identical, so left as-is to preserve output ordering.
 	stationStopGroupContents := map[string][]*StopPoint{}
 	stationStopGroupContentsMutex := sync.RWMutex{}
 	var stationStops []*StopPoint
@@ -166,14 +181,14 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						}
 					}
 
-					if util.ContainsString([]string{"MET", "RLY", "FER"}, naptanStopPoint.StopClassification.StopType) {
+					if stationStopTypes[naptanStopPoint.StopClassification.StopType] {
 						stationStopsMutex.Lock()
 						stationStops = append(stationStops, naptanStopPoint)
 						stationStopsMutex.Unlock()
 						continue
 					}
 
-					if util.ContainsString([]string{"PLT", "RPL", "FBT", "TMU", "RSE", "FTD"}, naptanStopPoint.StopClassification.StopType) {
+					if skipStopTypes[naptanStopPoint.StopClassification.StopType] {
 						continue
 					}
 
@@ -221,7 +236,7 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 		}
 
 		for _, stopPoint := range stopGroupStops {
-			if stopPoint.StopClassification.StopType == "PLT" || stopPoint.StopClassification.StopType == "RPL" || stopPoint.StopClassification.StopType == "FBT" {
+			if platformStopTypes[stopPoint.StopClassification.StopType] {
 				stop := stopPoint.ToCTDF()
 				stationStop.Platforms = append(stationStop.Platforms, &ctdf.StopPlatform{PrimaryIdentifier: stop.PrimaryIdentifier, PrimaryName: stop.PrimaryName, Location: stop.Location})
 				stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)

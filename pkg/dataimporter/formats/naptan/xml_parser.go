@@ -9,8 +9,8 @@ import (
 )
 
 func (n *NaPTAN) ParseFile(reader io.Reader) error {
-	n.StopPoints = []*StopPoint{}
-	n.StopAreas = []*StopArea{}
+	n.StopPoints = make([]*StopPoint, 0, 450000)
+	n.StopAreas = make([]*StopArea, 0, 100000)
 
 	d := xml.NewDecoder(reader)
 	d.CharsetReader = charset.NewReaderLabel
