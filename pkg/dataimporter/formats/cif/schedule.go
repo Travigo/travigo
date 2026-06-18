@@ -158,7 +158,10 @@ func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
 				c.TrainDefinitionSets = append(c.TrainDefinitionSets, currentTrainDef)
 			}
 
-			currentTrainDef = &TrainDefinitionSet{}
+			currentTrainDef = &TrainDefinitionSet{
+				IntermediateLocations: make([]*IntermediateLocation, 0, 50),
+				ChangesEnRoute:        make([]*ChangesEnRoute, 0, 5),
+			}
 
 			currentTrainDef.BasicSchedule = BasicSchedule{
 				TransactionType:    line[2:3],
