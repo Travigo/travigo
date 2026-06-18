@@ -159,26 +159,16 @@ func (i *SiriVM) IdentifyJourney() (string, error) {
 		}
 	}
 
-	// If we fail with the ID codes then try with the origin & destination stops
-	var journeyQuery []bson.M
-	for _, service := range i.PotentialServices {
-		journeyQuery = append(journeyQuery, bson.M{"$or": bson.A{
-			bson.M{
-				"$and": bson.A{
-					bson.M{"serviceref": service},
-					bson.M{"path.originstopref": i.IdentifyingInformation["OriginRef"]},
-				},
-			},
-			bson.M{
-				"$and": bson.A{
-					bson.M{"serviceref": service},
-					bson.M{"path.destinationstopref": i.IdentifyingInformation["DestinationRef"]},
-				},
-			},
-		}})
-	}
-
-	journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{"$or": journeyQuery})
+	// If we fail with the ID codes then try with the origin & destination stops.
+	journeys = getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+		"$and": bson.A{
+			bson.M{"serviceref": bson.M{"$in": i.PotentialServices}},
+			bson.M{"$or": bson.A{
+				bson.M{"path.originstopref": i.IdentifyingInformation["OriginRef"]},
+				bson.M{"path.destinationstopref": i.IdentifyingInformation["DestinationRef"]},
+			}},
+		},
+	})
 
 	identifiedJourney, err := i.narrowJourneys(journeys, true)
 
