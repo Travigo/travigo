@@ -1,12 +1,13 @@
 package siri_sx
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -72,7 +73,7 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		}
 	}
 
-	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
+	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-SX response")
 
 	return nil
 }
@@ -86,6 +87,13 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	validityPeriodEnd, err := time.Parse(time.RFC3339, situationElement.ValidityPeriod.EndTime)
 	versionedAtTime, _ := time.Parse(time.RFC3339, situationElement.VersionedAtTime)
 
+	// TODO(needs-review): this expiry guard looks logically suspect. When time.Parse fails
+	// (err != nil), validityPeriodEnd is the zero time, so validityPeriodEnd.Before(currentTime)
+	// is always true and the record is dropped — meaning any element with an unparseable EndTime
+	// is silently discarded. Conversely, an element with a valid-but-past EndTime (err == nil)
+	// is NOT dropped because the err != nil arm short-circuits. The intent was likely
+	// "err == nil && validityPeriodEnd.Before(currentTime)" (drop genuinely expired alerts).
+	// Behaviour left unchanged pending user decision.
 	if err != nil && validityPeriodEnd.Before(currentTime) {
 		return false
 	}
@@ -96,7 +104,15 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		alertType = ctdf.ServiceAlertTypeWarning
 	}
 
-	var identifyingInformation []map[string]string
+	identifyingInformationCount := 0
+	for _, consequence := range situationElement.Consequence {
+		for _, network := range consequence.AffectedNetworks {
+			identifyingInformationCount += len(network.AffectedLine)
+		}
+		identifyingInformationCount += len(consequence.AffectedStopPoints)
+	}
+
+	identifyingInformation := make([]map[string]string, 0, identifyingInformationCount)
 	for _, consequence := range situationElement.Consequence {
 		for _, network := range consequence.AffectedNetworks {
 			for _, line := range network.AffectedLine {
@@ -120,11 +136,7 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	title := situationElement.Summary
 	description := situationElement.Description
 
-	hash := sha256.New()
-	hash.Write([]byte(alertType))
-	hash.Write([]byte(title))
-	hash.Write([]byte(description))
-	localIDhash := fmt.Sprintf("%x", hash.Sum(nil))
+	localIDhash := siriSXServiceAlertHash(alertType, title, description)
 
 	updateEvent := vehicletracker.VehicleUpdateEvent{
 		MessageType: vehicletracker.VehicleUpdateEventTypeServiceAlert,
@@ -145,8 +157,21 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		RecordedAt: versionedAtTime,
 	}
 
-	updateEventJson, _ := json.Marshal(updateEvent)
+	updateEventJson, marshalErr := json.Marshal(updateEvent)
+	if marshalErr != nil {
+		log.Error().Err(marshalErr).Str("localID", updateEvent.LocalID).Msg("Failed to marshal SIRI-SX update event, skipping")
+		return false
+	}
 	queue.PublishBytes(updateEventJson)
 
 	return true
+}
+
+func siriSXServiceAlertHash(alertType ctdf.ServiceAlertType, title string, description string) string {
+	hash := fnv.New64a()
+	io.WriteString(hash, string(alertType))
+	io.WriteString(hash, title)
+	io.WriteString(hash, description)
+
+	return strconv.FormatUint(hash.Sum64(), 16)
 }

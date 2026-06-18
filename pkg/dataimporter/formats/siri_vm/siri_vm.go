@@ -149,8 +149,17 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		}
 	}
 
-	locationEventJson, _ := json.Marshal(locationEvent)
+	locationEventJson, err := json.Marshal(locationEvent)
+	if err != nil {
+		log.Error().Err(err).Str("localID", localJourneyID).Msg("Failed to marshal SIRI-VM location event, skipping")
+		return false
+	}
 
+	// TODO(high-risk): a pooled *bytes.Buffer + json.NewEncoder from a sync.Pool
+	// would cut per-vehicle buffer allocations, but json.Encoder.Encode appends a trailing
+	// newline whereas json.Marshal does not. Downstream consumers parse these bytes, so
+	// byte-identical output cannot be guaranteed without trimming/extra handling; deferred to
+	// avoid any risk of altering the published payload.
 	queue.PublishBytes(locationEventJson)
 
 	return true
@@ -215,13 +224,15 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 }
 
 func checkQueueSize() {
-	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
-	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
+	for {
+		stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
+		inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 
-	if inQueue >= 40000 {
+		if inQueue < 40000 {
+			break
+		}
+
 		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
 		time.Sleep(time.Duration(30+rand.IntN(20)) * time.Second)
-
-		checkQueueSize()
 	}
 }
