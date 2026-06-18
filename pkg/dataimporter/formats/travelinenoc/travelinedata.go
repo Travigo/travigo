@@ -31,11 +31,16 @@ type TravelineData struct {
 	PublicNameRecords          []PublicNameRecord
 }
 
-func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
-	emailRegex, _ := regexp.Compile("^[^@]+@[^@]+.[^@]+$")
-	phoneRegex, _ := regexp.Compile(`^[\d ]+$`)
-	addressRegex, _ := regexp.Compile(`^[a-zA-Z\d ,]+$`)
+var (
+	emailRegex   = regexp.MustCompile("^[^@]+@[^@]+.[^@]+$")
+	phoneRegex   = regexp.MustCompile(`^[\d ]+$`)
+	addressRegex = regexp.MustCompile(`^[a-zA-Z\d ,]+$`)
 
+	noGroupRegex = regexp.MustCompile("NoGroup_*")
+	websiteRegex = regexp.MustCompile("#(.+)#")
+)
+
+func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 	if emailRegex.MatchString(value) {
 		ctdfOperator.Email = value
 	} else if phoneRegex.MatchString(value) {
@@ -46,8 +51,8 @@ func extractContactDetails(value string, ctdfOperator *ctdf.Operator) {
 }
 
 func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup) {
-	var operators []*ctdf.Operator
-	var operatorGroups []*ctdf.OperatorGroup
+	operators := make([]*ctdf.Operator, 0, len(t.OperatorsRecords))
+	operatorGroups := make([]*ctdf.OperatorGroup, 0, len(t.GroupsRecords))
 
 	groupExists := map[string]bool{}
 	mgmtDivisionGroupIDs := map[string]string{}
@@ -56,7 +61,6 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	publicNameIDRef := map[string]*ctdf.Operator{}
 
 	// GroupsRecords
-	noGroupRegex, _ := regexp.Compile("NoGroup_*")
 	for _, groupRecord := range t.GroupsRecords {
 		if !noGroupRegex.Match([]byte(groupRecord.GroupName)) {
 			ctdfRecord := &ctdf.OperatorGroup{
@@ -165,7 +169,6 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	}
 
 	// PublicNameRecords
-	websiteRegex, _ := regexp.Compile("#(.+)#")
 	for _, publicNameRecord := range t.PublicNameRecords {
 		operator := publicNameIDRef[publicNameRecord.PublicNameID]
 

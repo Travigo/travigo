@@ -25,8 +25,8 @@ type TrainOperatingCompanyList struct {
 }
 
 func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.Service) {
-	var operators []*ctdf.Operator
-	var services []*ctdf.Service
+	operators := make([]*ctdf.Operator, 0, len(t.Companies))
+	services := make([]*ctdf.Service, 0, len(t.Companies))
 
 	stopNameOverrides := generateRailStopNameOverrides()
 
@@ -165,7 +165,7 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 		upper := maxBatchSize * (i + 1)
 
 		if upper > len(services) {
-			upper = len(operators)
+			upper = len(services)
 		}
 
 		batchSlice := services[lower:upper]
