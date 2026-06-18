@@ -463,6 +463,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	updateMap["journey"] = realtimeJourney.Journey
 
 	realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription)
+	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	// Create update
 	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})

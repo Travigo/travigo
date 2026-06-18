@@ -17,6 +17,11 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 		return nil, err
 	}
 
+	if realtimeJourney, err := GetRealtimeJourney(ctx, identifier); err == nil {
+		ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
+		return realtimeJourney, nil
+	}
+
 	realtimeJourney := &ctdf.RealtimeJourney{}
 	if err := collectionOrDefault(nil).FindOne(ctx, FilterByIdentifier(identifier)).Decode(realtimeJourney); err != nil {
 		return nil, err
@@ -128,4 +133,18 @@ func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64
 	}
 
 	return vehicleLocation.Location, vehicleLocation.Bearing, nil
+}
+
+func GetRealtimeJourney(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+	realtimeJourneyResult := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
+	if realtimeJourneyResult.Err() != nil {
+		return nil, realtimeJourneyResult.Err()
+	}
+
+	realtimeJourney := &ctdf.RealtimeJourney{}
+	if err := json.Unmarshal([]byte(realtimeJourneyResult.Val()), realtimeJourney); err != nil {
+		return nil, err
+	}
+
+	return realtimeJourney, nil
 }
