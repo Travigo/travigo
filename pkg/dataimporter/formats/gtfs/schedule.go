@@ -31,10 +31,6 @@ type Schedule struct {
 	ctdfServices map[string]*ctdf.Service
 	routeMap     map[string]Route
 
-	ctdfJourneys map[string]*ctdf.Journey
-
-	tripStopTimes map[string][]StopTime
-
 	Shapes []Shape
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
@@ -284,7 +280,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Journeys / Trips ////
-	g.ctdfJourneys = map[string]*ctdf.Journey{}
+	gtfsTrips := map[string]Trip{}
 	// fullJourneyTracks := map[string][]ctdf.Location{}
 
 	// PERF(medium-risk): cache the parsed+formatted calendar date-range condition
@@ -295,20 +291,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	// (zero time -> "0001-01-01") would format.
 	calendarConditionCache := map[string]string{}
 
-	importObject[Trip](g, "trips.txt", "journeys", false, func(t Trip) (any, string) {
+	buildJourney := func(t Trip) *ctdf.Journey {
 		journeyID := fmt.Sprintf("%s-journey-%s", dataset.Identifier, t.ID)
 		serviceID := fmt.Sprintf("%s-service-%s", dataset.Identifier, t.RouteID)
-
-		if g.ctdfServices[t.RouteID] == nil {
-			log.Debug().Str("trip", t.ID).Str("route", t.RouteID).Msg("Cannot find service for this trip")
-			return nil, ""
-		}
-
 		operatorRef := g.ctdfServices[t.RouteID].OperatorRef
-
-		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
-			return nil, ""
-		}
 
 		availability := &ctdf.Availability{}
 		// Calendar availability
@@ -354,7 +340,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		// Put it all together again
-		g.ctdfJourneys[t.ID] = &ctdf.Journey{
+		journey := &ctdf.Journey{
 			PrimaryIdentifier: journeyID,
 			OtherIdentifiers: map[string]string{
 				"GTFS-TripID":  t.ID,
@@ -373,7 +359,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		if t.BlockID != "" {
-			g.ctdfJourneys[t.ID].OtherIdentifiers["BlockNumber"] = t.BlockID
+			journey.OtherIdentifiers["BlockNumber"] = t.BlockID
 		}
 
 		if t.ShapeID != "" {
@@ -394,23 +380,35 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 
 			// fullJourneyTracks[trip.ID] = journeyTrack
-			g.ctdfJourneys[t.ID].Track = journeyTrack
+			journey.Track = journeyTrack
 		}
+
+		return journey
+	}
+
+	importObject[Trip](g, "trips.txt", "journeys", false, func(t Trip) (any, string) {
+		if g.ctdfServices[t.RouteID] == nil {
+			log.Debug().Str("trip", t.ID).Str("route", t.RouteID).Msg("Cannot find service for this trip")
+			return nil, ""
+		}
+
+		operatorRef := g.ctdfServices[t.RouteID].OperatorRef
+
+		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
+			return nil, ""
+		}
+
+		gtfsTrips[t.ID] = t
 
 		return nil, ""
 	})
 
 	//// Stop Times ////
-	// Store stop times as flat value slices per trip rather than a nested
-	// map[int]*StopTime. stop_times.txt is by far the largest table, so avoiding
-	// a per-row heap allocation and an inner map per trip massively cuts memory
-	// and GC pressure. Ordering is restored by sorting on StopSequence at use.
-	g.tripStopTimes = map[string][]StopTime{}
-	importObject[StopTime](g, "stop_times.txt", "stop_times", false, func(stopTime StopTime) (any, string) {
-		g.tripStopTimes[stopTime.TripID] = append(g.tripStopTimes[stopTime.TripID], stopTime)
-
-		return nil, ""
-	})
+	stopTimeGroups, err := newSortedStopTimeGroups(g.fileMap["stop_times.txt"])
+	if err != nil {
+		return err
+	}
+	defer stopTimeGroups.Close()
 
 	log.Info().Msg("Importing Finished Journeys")
 	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 3000)
@@ -425,25 +423,21 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	useGBAtcoStopRef := strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-")
 	datasetStopPrefix := fmt.Sprintf("%s-stop-", dataset.Identifier)
 
-	for tripID, stopTimes := range g.tripStopTimes {
-		if g.ctdfJourneys[tripID] == nil {
+	if err := stopTimeGroups.Process(func(tripID string, stopTimes []StopTime) error {
+		trip, exists := gtfsTrips[tripID]
+		if !exists {
 			log.Debug().Str("trip", tripID).Msg("Cannot find journey for this trip")
-			// Free this trip's stop times now that we're done with it
-			delete(g.tripStopTimes, tripID)
-			continue
+			return nil
 		}
 
-		// Make sure stops are in sequence order
-		sort.Slice(stopTimes, func(i, j int) bool {
-			return stopTimes[i].StopSequence < stopTimes[j].StopSequence
-		})
+		journey := buildJourney(trip)
 
 		// PERF(low-risk): pre-size the Path slice. The loop below appends exactly
 		// len(stopTimes)-1 items (one per adjacent stop pair). Allocating the full
 		// capacity up front avoids repeated slice growth/reallocation as the path is
 		// built. Length stays 0 here so appended ordering and output are unchanged.
 		if len(stopTimes) > 1 {
-			g.ctdfJourneys[tripID].Path = make([]*ctdf.JourneyPathItem, 0, len(stopTimes)-1)
+			journey.Path = make([]*ctdf.JourneyPathItem, 0, len(stopTimes)-1)
 		}
 
 		for index := 1; index < len(stopTimes); index += 1 {
@@ -507,41 +501,43 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
 			}
 
-			g.ctdfJourneys[tripID].Path = append(g.ctdfJourneys[tripID].Path, journeyPathItem)
+			journey.Path = append(journey.Path, journeyPathItem)
 
 			if index == 1 {
-				g.ctdfJourneys[tripID].DepartureTime = originDeparturelTime
+				journey.DepartureTime = originDeparturelTime
 			}
 		}
 
 		// TODO fix transforms here
-		// transforms.Transform(g.ctdfJourneys[tripID], 1, "gb-dft-bods-gtfs-schedule")
+		// transforms.Transform(journey, 1, "gb-dft-bods-gtfs-schedule")
 		// if util.ContainsString([]string{
 		// 	"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
 		// 	"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
 		// 	"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
 		// 	"gb-noc-MTLN", "gb-noc-SULV",
-		// }, g.ctdfJourneys[tripID].OperatorRef) || (g.ctdfJourneys[tripID].OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
+		// }, journey.OperatorRef) || (journey.OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
 		// 	"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
-		// }, g.ctdfJourneys[tripID].ServiceRef)) {
-		// 	g.ctdfJourneys[tripID].OperatorRef = "gb-noc-TFLO"
+		// }, journey.ServiceRef)) {
+		// 	journey.OperatorRef = "gb-noc-TFLO"
 		// }
 
 		// Insert
 		if dataset.SupportedObjects.Journeys {
-			bsonRep, _ := bson.Marshal(bson.M{"$set": g.ctdfJourneys[tripID]})
+			bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
 			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": g.ctdfJourneys[tripID].PrimaryIdentifier})
+			updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
 			updateModel.SetUpdate(bsonRep)
 			updateModel.SetUpsert(true)
 
 			journeysQueue.Add(updateModel)
 		}
 
-		g.ctdfJourneys[tripID] = nil
-		// Free this trip's stop times as we go so peak memory stays bounded
-		delete(g.tripStopTimes, tripID)
+		delete(gtfsTrips, tripID)
+		return nil
+	}); err != nil {
+		return err
 	}
+	gtfsTrips = nil
 
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Wait()
