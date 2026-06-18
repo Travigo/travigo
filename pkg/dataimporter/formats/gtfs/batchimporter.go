@@ -10,6 +10,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const maxBatchItems = 5000
+
+func flushBatch(collection *mongo.Collection, b *DatabaseBatchProcessingQueue, batchItems []mongo.WriteModel) {
+	b.lastItemProcessed = time.Now()
+	log.Info().Str("collection", b.Collection).Int("Length", len(batchItems)).Msg("Bulk write")
+	_, err := collection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
+	if err != nil {
+		log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
+	}
+}
+
 func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Duration, emptyTimeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
 	return DatabaseBatchProcessingQueue{
 		Collection:        collection,
@@ -49,18 +60,18 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 				select {
 				case i := <-b.items:
 					batchItems = append(batchItems, i)
+
+					if len(batchItems) >= maxBatchItems {
+						flushBatch(realtimeJourneysCollection, b, batchItems)
+						batchItems = []mongo.WriteModel{}
+					}
 				default: // Stop when no more values in chInternal
 					running = false
 				}
 			}
 
 			if len(batchItems) > 0 {
-				b.lastItemProcessed = time.Now()
-				log.Info().Str("collection", b.Collection).Int("Length", len(batchItems)).Msg("Bulk write")
-				_, err := realtimeJourneysCollection.BulkWrite(context.Background(), batchItems, &options.BulkWriteOptions{})
-				if err != nil {
-					log.Fatal().Str("collection", b.Collection).Err(err).Msg("Failed to bulk write")
-				}
+				flushBatch(realtimeJourneysCollection, b, batchItems)
 			}
 		}
 	}(b)
