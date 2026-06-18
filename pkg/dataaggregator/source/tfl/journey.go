@@ -12,9 +12,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (s Source) JourneyQuery(journeyQuery query.Journey) (*ctdf.Journey, error) {
-	tflJourneyRegex, _ := regexp.Compile("realtime-tfl-.*")
+var tflJourneyRegex = regexp.MustCompile("realtime-tfl-.*")
 
+func (s Source) JourneyQuery(journeyQuery query.Journey) (*ctdf.Journey, error) {
 	if !tflJourneyRegex.MatchString(journeyQuery.PrimaryIdentifier) {
 		return nil, source.UnsupportedSourceError
 	}

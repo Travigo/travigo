@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"io"
 	"time"
 
 	"github.com/eko/gocache/lib/v4/cache"
@@ -37,6 +36,11 @@ func Set(c *Cache, key string, object any, expiration time.Duration) {
 		log.Error().Err(err).Msg("Failed to close gzip")
 	}
 
+	// TODO(low-risk): store []byte to avoid copies. The eko/gocache store
+	// is typed cache.Cache[string], so the value type must be string here; switching to
+	// []byte would require changing the Cache struct's generic type and all call sites
+	// (a wider refactor), so the string(...) copy on Set and the []byte(...) copy on Get
+	// are left as-is.
 	c.Cache.Set(context.Background(), key, string(b.Bytes()), store.WithExpiration(expiration))
 }
 
@@ -53,20 +57,13 @@ func Get[T any](c *Cache, key string) (T, error) {
 	currentTime = time.Now()
 
 	compressedBytes := bytes.NewReader([]byte(cachedObjecString))
-	gzip, err := gzip.NewReader(compressedBytes)
-	if err != nil {
-		return cachedObject, err
-	}
-	uncompressedBytes, err := io.ReadAll(gzip)
+	gzipReader, err := gzip.NewReader(compressedBytes)
 	if err != nil {
 		return cachedObject, err
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - dezip")
-
-	currentTime = time.Now()
-	err = json.Unmarshal(uncompressedBytes, &cachedObject)
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - unmarshall")
+	err = json.NewDecoder(gzipReader).Decode(&cachedObject)
+	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Cache - dezip + unmarshall")
 
 	return cachedObject, err
 }

@@ -3,10 +3,10 @@ package localdepartureboard
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	iso8601 "github.com/senseyeio/duration"
@@ -34,10 +34,15 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	allStopIDs := q.Stop.GetAllStopIDs()
 
 	// Load from cache
-
-	filterHash := sha256.New()
-	filterHash.Write([]byte(pretty.Sprint(q.Filter)))
-	filterHashString := fmt.Sprintf("%x", filterHash.Sum(nil))
+	var filterHashString string
+	if q.Filter == nil {
+		filterHashString = "nofilter"
+	} else {
+		filterBytes, _ := json.Marshal(q.Filter)
+		filterHash := sha256.New()
+		filterHash.Write(filterBytes)
+		filterHashString = fmt.Sprintf("%x", filterHash.Sum(nil))
+	}
 
 	currentTime := time.Now()
 
@@ -80,7 +85,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 }
 
 func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
-	var journeys []*ctdf.Journey
+	journeys := make([]*ctdf.Journey, 0, 50)
 
 	cacheItemPath := fmt.Sprintf("%s/%s", baseCacheItemPath, dateTime.Format("2006-01-02"))
 

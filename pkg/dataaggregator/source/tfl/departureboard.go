@@ -3,6 +3,7 @@ package tfl
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,18 @@ import (
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+var (
+	backfillSource     localdepartureboard.Source
+	backfillSourceOnce sync.Once
+)
+
+func getBackfillSource() *localdepartureboard.Source {
+	backfillSourceOnce.Do(func() {
+		backfillSource.Setup()
+	})
+	return &backfillSource
+}
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	tflOperator := &ctdf.Operator{
@@ -72,7 +85,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	generateDeparteBoardStart := time.Now()
 
 	for _, realtimeJourney := range realtimeJourneys {
-		timedOut := (time.Now().Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
+		timedOut := (now.Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
 			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime.In(stopTimezone)
@@ -116,8 +129,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	remainingCount := q.Count - len(departureBoard)
 
 	if remainingCount > 0 {
-		localSource := localdepartureboard.Source{}
-		localSource.Setup() //TODO maybe not
+		localSource := getBackfillSource()
 
 		q.StartDateTime = latestDepartureTime
 		q.Count = remainingCount

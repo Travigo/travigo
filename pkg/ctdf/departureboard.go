@@ -37,7 +37,20 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
-	realtimeJourneyOptions := options.FindOne().SetProjection(bson.D{
+	journeys = FilterIdenticalJourneys(journeys, true)
+
+	stopRefsSet := make(map[string]struct{}, len(stopRefs))
+	for _, stopRef := range stopRefs {
+		stopRefsSet[stopRef] = struct{}{}
+	}
+
+	// Batch the per-journey realtime_journeys FindOne (previously one
+	// Mongo round-trip per journey via journey.GetRealtimeJourney) into a single Find with
+	// $in over journey.primaryidentifier. The original projection is preserved exactly, with
+	// "journey.primaryidentifier" added (additive only) so results can be keyed back to their
+	// journey. The per-journey IsActive() gate is still applied below to preserve exact
+	// semantics (IsActive has time.Now()/GetDestinationStop side-effects we do not replicate).
+	realtimeJourneyProjection := bson.D{
 		bson.E{Key: "activelytracked", Value: 1},
 		bson.E{Key: "modificationdatetime", Value: 1},
 		bson.E{Key: "timeoutdurationminutes", Value: 1},
@@ -47,14 +60,49 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		// bson.E{Key: "stops.*.departuretime", Value: 1},
 		bson.E{Key: "cancelled", Value: 1},
 		bson.E{Key: "vehiclelocation", Value: 1},
+		bson.E{Key: "journey.primaryidentifier", Value: 1},
 		bson.E{Key: "journey.path.destinationstopref", Value: 1},
 		bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
-	})
+	}
 
-	journeys = FilterIdenticalJourneys(journeys, true)
+	journeyPrimaryIdentifiers := make([]string, 0, len(journeys))
+	for _, journey := range journeys {
+		journeyPrimaryIdentifiers = append(journeyPrimaryIdentifiers, journey.PrimaryIdentifier)
+	}
+
+	realtimeJourneysByJourneyID := map[string]*RealtimeJourney{}
+	if len(journeyPrimaryIdentifiers) > 0 {
+		realtimeCursor, err := realtimeJourneysCollection.Find(context.Background(), bson.M{
+			"journey.primaryidentifier": bson.M{"$in": journeyPrimaryIdentifiers},
+			"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
+		}, options.Find().SetProjection(realtimeJourneyProjection))
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to query realtime journeys")
+		} else {
+			for realtimeCursor.Next(context.Background()) {
+				var realtimeJourney RealtimeJourney
+				if err := realtimeCursor.Decode(&realtimeJourney); err != nil {
+					log.Error().Err(err).Msg("Failed to decode RealtimeJourney")
+					continue
+				}
+
+				if realtimeJourney.Journey != nil {
+					rj := realtimeJourney
+					realtimeJourneysByJourneyID[realtimeJourney.Journey.PrimaryIdentifier] = &rj
+				}
+			}
+		}
+	}
 
 	p := pool.NewWithResults[*DepartureBoard]()
-	p.WithMaxGoroutines(200)
+	maxGoroutines := 200
+	if len(journeys) < maxGoroutines {
+		maxGoroutines = len(journeys)
+	}
+	if maxGoroutines < 1 {
+		maxGoroutines = 1
+	}
+	p.WithMaxGoroutines(maxGoroutines)
 
 	for _, journey := range journeys {
 		p.Go(func() *DepartureBoard {
@@ -65,9 +113,15 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
 			if journey.Availability.MatchDate(dateTime) {
+				// TODO(medium-risk): This 4-hour-cutoff loop and the detail-extraction
+				// loop below both scan journey.Path and break on the first stopRef match. They could
+				// be merged into a single pass, but the realtime-journey assignment currently sits
+				// between them, and the cutoff loop's early `return nil` must run before any detail
+				// work. Merging would reorder the realtime assignment relative to the cutoff check;
+				// left as two passes to preserve identical behaviour and early-return ordering.
 				// Don't even think about it if we're passed 4 hours departure on this stop
 				for _, path := range journey.Path {
-					if slices.Contains(stopRefs, path.OriginStopRef) {
+					if _, ok := stopRefsSet[path.OriginStopRef]; ok {
 						journeyDepMins := (path.OriginDepartureTime.Hour() * 60) + path.OriginDepartureTime.Minute()
 						startMins := (dateTime.Hour() * 60) + dateTime.Minute()
 
@@ -79,10 +133,12 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
-				journey.GetRealtimeJourney(realtimeJourneyOptions)
+				if prefetchedRealtimeJourney := realtimeJourneysByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && prefetchedRealtimeJourney.IsActive() {
+					journey.RealtimeJourney = prefetchedRealtimeJourney
+				}
 
 				for _, path := range journey.Path {
-					if slices.Contains(stopRefs, path.OriginStopRef) {
+					if _, ok := stopRefsSet[path.OriginStopRef]; ok {
 						refTime := path.OriginDepartureTime
 						stopPlatform = path.OriginPlatform
 						stopPlatformType = "ESTIMATED"
@@ -152,6 +208,15 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					stopPlatformType = "ACTUAL"
 				}
 
+				// TODO(high-risk): This block does a Find (block journeys by
+				// serviceref + BlockNumber) plus a FindOne (realtime by journeyref $in) per
+				// qualifying journey. It cannot be cleanly pre-batched because qualification
+				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
+				// stopDepartureTime and departureBoardRecordType which are only known after the
+				// path loop above. A batch approach would be: after a first pass computes which
+				// journeys qualify, group by (serviceRef, BlockNumber) to issue one journeys Find
+				// with $in, then one realtime_journeys Find with $in over all collected journeyrefs,
+				// mapping offsets back per block. Deferred to preserve exact behaviour.
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
 				// We estimate the current vehicle realtime journey based on the Block Number
 				stopDepartureTimeFromNow := stopDepartureTime.Sub(dateTime).Minutes()
@@ -194,6 +259,14 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
+				// TODO(high-risk): GetDestinationStop() and GetService() each issue a
+				// per-journey FindOne. A batch plan would pre-fetch, for every journey's last path
+				// item, the destination stop and the service via two Find($in) calls before the
+				// pool, keyed into maps. This is not cleanly replicable here because both lookups
+				// match on either primaryidentifier OR otheridentifiers (otheridentifiers is an
+				// array, so a simple key->doc map can miss matches), GetService() mutates
+				// journey.Service which is consumed downstream, and UpdateNameFromServiceOverrides
+				// mutates the stop name. Deferred to preserve exact behaviour and output.
 				if destinationDisplay == "" {
 					lastPathItem := journey.Path[len(journey.Path)-1]
 					lastPathItem.GetDestinationStop()
@@ -224,7 +297,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	}
 
 	departureBoardWithNil := p.Wait()
-	var departureBoard []*DepartureBoard
+	departureBoard := make([]*DepartureBoard, 0, len(departureBoardWithNil))
 
 	for _, i := range departureBoardWithNil {
 		if i != nil {
