@@ -14,11 +14,7 @@ import (
 )
 
 func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
-	if err := validateIdentifier(identifier); err != nil {
-		return nil, err
-	}
-
-	if realtimeJourney, err := GetRealtimeJourney(ctx, identifier); err == nil {
+	if realtimeJourney, err := GetRealtimeJourneyFromRedis(ctx, identifier); err == nil {
 		ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
 		return realtimeJourney, nil
 	}
@@ -35,8 +31,15 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.RealtimeJourney, error) {
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 
+	// Try redis first
+	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, journeyID)
+	if err == nil && redisJourneyMapping != "" {
+		return FindByIdentifier(ctx, redisJourneyMapping)
+	}
+
+	// Mongo fallback
 	realtimeJourney := &ctdf.RealtimeJourney{}
-	err := collectionOrDefault(nil).FindOne(ctx, bson.M{
+	err = collectionOrDefault(nil).FindOne(ctx, bson.M{
 		"journey.primaryidentifier": journeyID,
 		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
 	}).Decode(realtimeJourney)
@@ -62,6 +65,21 @@ func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[str
 		return realtimeJourneysByJourneyID, nil
 	}
 
+	remainingJourneyIDs := make([]string, 0, len(journeyIDs))
+	for _, journeyID := range journeyIDs {
+		if realtimeJourney, err := FindCurrentForJourney(ctx, journeyID); err == nil && realtimeJourney != nil {
+			realtimeJourneysByJourneyID[journeyID] = realtimeJourney
+			continue
+		}
+
+		remainingJourneyIDs = append(remainingJourneyIDs, journeyID)
+	}
+
+	if len(remainingJourneyIDs) == 0 {
+		return realtimeJourneysByJourneyID, nil
+	}
+
+	// Mongo fallback
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 	realtimeJourneyProjection := bson.D{
 		bson.E{Key: "primaryidentifier", Value: 1},
@@ -77,7 +95,7 @@ func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[str
 	}
 
 	cursor, err := collectionOrDefault(nil).Find(ctx, bson.M{
-		"journey.primaryidentifier": bson.M{"$in": journeyIDs},
+		"journey.primaryidentifier": bson.M{"$in": remainingJourneyIDs},
 		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
 	}, mongooptions.Find().SetProjection(realtimeJourneyProjection))
 	if err != nil {
@@ -203,7 +221,17 @@ func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64
 	return vehicleLocation.Location, vehicleLocation.Bearing, nil
 }
 
-func GetRealtimeJourney(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+// Temporary name it FromRedis to avoid confusion with the mongo version of this function
+func GetRealtimeJourneyMappingFromRedis(ctx context.Context, identifier string) (string, error) {
+	mappingResult := redis_client.Client.Get(ctx, realtimeJourneyMappingKey(identifier))
+	if mappingResult.Err() != nil {
+		return "", mappingResult.Err()
+	}
+
+	return mappingResult.Val(), nil
+}
+
+func GetRealtimeJourneyFromRedis(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
 	realtimeJourneyResult := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if realtimeJourneyResult.Err() != nil {
 		return nil, realtimeJourneyResult.Err()

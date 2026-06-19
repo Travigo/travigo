@@ -19,12 +19,13 @@ func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:%s/details", identifier)
 }
 
+func realtimeJourneyMappingKey(identifier string) string {
+	return fmt.Sprintf("realtime-journey-mapping:%s", identifier)
+}
+
 func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
 	if realtimeJourney == nil {
 		return ErrEmptyIdentifier
-	}
-	if err := validateIdentifier(realtimeJourney.PrimaryIdentifier); err != nil {
-		return err
 	}
 
 	realtimeJourneyJSON, err := json.Marshal(realtimeJourney)
@@ -32,17 +33,31 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	return redis_client.Client.Set(
+	err = redis_client.Client.Set(
 		ctx,
 		realtimeJourneyDetailsKey(realtimeJourney.PrimaryIdentifier),
 		realtimeJourneyJSON,
 		12*time.Hour,
 	).Err()
+
+	if err != nil {
+		return err
+	}
+
+	// Store all the other identifiers in a mapping to the primary identifier for easy lookup
+	for _, identifier := range realtimeJourney.OtherIdentifiers {
+		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(identifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func UpdateLocationDescription(ctx context.Context, identifier string, description string) error {
-	redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier), description, 12*time.Hour)
-	return nil
+	return redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier), description, 12*time.Hour).Err()
 }
 
 func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64) error {
@@ -54,6 +69,6 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 		return err
 	}
 
-	redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/location", identifier), locationJSON, 12*time.Hour)
-	return nil
+	err = redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/location", identifier), locationJSON, 12*time.Hour).Err()
+	return err
 }

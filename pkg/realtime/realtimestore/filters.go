@@ -13,11 +13,3 @@ func FilterByIdentifier(identifier string) bson.M {
 func FilterByOtherIdentifier(name string, value string) bson.M {
 	return bson.M{fmt.Sprintf("otheridentifiers.%s", name): value}
 }
-
-func validateIdentifier(identifier string) error {
-	if identifier == "" {
-		return ErrEmptyIdentifier
-	}
-
-	return nil
-}
