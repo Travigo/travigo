@@ -14,6 +14,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 
 	// "github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
@@ -61,7 +62,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - today")
 
 	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true)
+	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, s.realtimeLookup(journeysToday))
 	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
 
 	// If not enough journeys in todays departure board then look into tomorrows
@@ -73,7 +74,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - tomorrow")
 		currentTime = time.Now()
 
-		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false)
+		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, s.realtimeLookup(journeysTomorrow))
 		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation tomorrow")
 
 		departureBoard = append(departureBoardToday, departureBoardTomorrow...)
@@ -82,6 +83,30 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	}
 
 	return departureBoard, nil
+}
+
+func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRealtimeLookup {
+	journeyIDs := make([]string, 0, len(journeys))
+	for _, journey := range journeys {
+		journeyIDs = append(journeyIDs, journey.PrimaryIdentifier)
+	}
+
+	realtimeJourneysByJourneyID, err := realtimestore.FindCurrentForJourneyIDs(context.Background(), journeyIDs)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query realtime journeys")
+	}
+
+	return &ctdf.DepartureBoardRealtimeLookup{
+		ByJourneyID: realtimeJourneysByJourneyID,
+		FindByJourneyRefs: func(journeyRefs []string) *ctdf.RealtimeJourney {
+			realtimeJourney, err := realtimestore.FindCurrentByJourneyRefs(context.Background(), journeyRefs)
+			if err != nil {
+				log.Error().Err(err).Msg("Failed to query realtime journey by journey refs")
+			}
+
+			return realtimeJourney
+		},
+	}
 }
 
 func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {

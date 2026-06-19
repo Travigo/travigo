@@ -32,66 +32,24 @@ const (
 	DepartureBoardRecordTypeCancelled       DepartureBoardRecordType = "Cancelled"
 )
 
-func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool) []*DepartureBoard {
+// DepartureBoardRealtimeLookup keeps realtime reads outside ctdf. realtimestore
+// imports ctdf, so ctdf cannot import realtimestore without creating a cycle.
+type DepartureBoardRealtimeLookup struct {
+	ByJourneyID       map[string]*RealtimeJourney
+	FindByJourneyRefs func(journeyRefs []string) *RealtimeJourney
+}
+
+func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup) []*DepartureBoard {
 	journeysCollection := database.GetCollection("journeys")
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeActiveCutoffDate := GetActiveRealtimeJourneyCutOffDate()
 
 	journeys = FilterIdenticalJourneys(journeys, true)
+	if realtimeLookup == nil {
+		realtimeLookup = &DepartureBoardRealtimeLookup{}
+	}
 
 	stopRefsSet := make(map[string]struct{}, len(stopRefs))
 	for _, stopRef := range stopRefs {
 		stopRefsSet[stopRef] = struct{}{}
-	}
-
-	// Batch the per-journey realtime_journeys FindOne (previously one
-	// Mongo round-trip per journey via journey.GetRealtimeJourney) into a single Find with
-	// $in over journey.primaryidentifier. The original projection is preserved exactly, with
-	// "journey.primaryidentifier" added (additive only) so results can be keyed back to their
-	// journey. The per-journey IsActive() gate is still applied below to preserve exact
-	// semantics (IsActive has time.Now()/GetDestinationStop side-effects we do not replicate).
-	realtimeJourneyProjection := bson.D{
-		bson.E{Key: "activelytracked", Value: 1},
-		bson.E{Key: "modificationdatetime", Value: 1},
-		bson.E{Key: "timeoutdurationminutes", Value: 1},
-		bson.E{Key: "stops", Value: 1},
-		// bson.E{Key: "stops.*.cancelled", Value: 1},
-		// bson.E{Key: "stops.*.platform", Value: 1},
-		// bson.E{Key: "stops.*.departuretime", Value: 1},
-		bson.E{Key: "cancelled", Value: 1},
-		bson.E{Key: "vehiclelocation", Value: 1},
-		bson.E{Key: "journey.primaryidentifier", Value: 1},
-		bson.E{Key: "journey.path.destinationstopref", Value: 1},
-		bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
-	}
-
-	journeyPrimaryIdentifiers := make([]string, 0, len(journeys))
-	for _, journey := range journeys {
-		journeyPrimaryIdentifiers = append(journeyPrimaryIdentifiers, journey.PrimaryIdentifier)
-	}
-
-	realtimeJourneysByJourneyID := map[string]*RealtimeJourney{}
-	if len(journeyPrimaryIdentifiers) > 0 {
-		realtimeCursor, err := realtimeJourneysCollection.Find(context.Background(), bson.M{
-			"journey.primaryidentifier": bson.M{"$in": journeyPrimaryIdentifiers},
-			"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-		}, options.Find().SetProjection(realtimeJourneyProjection))
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to query realtime journeys")
-		} else {
-			for realtimeCursor.Next(context.Background()) {
-				var realtimeJourney RealtimeJourney
-				if err := realtimeCursor.Decode(&realtimeJourney); err != nil {
-					log.Error().Err(err).Msg("Failed to decode RealtimeJourney")
-					continue
-				}
-
-				if realtimeJourney.Journey != nil {
-					rj := realtimeJourney
-					realtimeJourneysByJourneyID[realtimeJourney.Journey.PrimaryIdentifier] = &rj
-				}
-			}
-		}
 	}
 
 	p := pool.NewWithResults[*DepartureBoard]()
@@ -133,7 +91,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
-				if prefetchedRealtimeJourney := realtimeJourneysByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && prefetchedRealtimeJourney.IsActive() {
+				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && prefetchedRealtimeJourney.IsActive() {
 					journey.RealtimeJourney = prefetchedRealtimeJourney
 				}
 
@@ -209,13 +167,13 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				}
 
 				// TODO(high-risk): This block does a Find (block journeys by
-				// serviceref + BlockNumber) plus a FindOne (realtime by journeyref $in) per
+				// serviceref + BlockNumber) plus a realtime lookup by journeyref $in per
 				// qualifying journey. It cannot be cleanly pre-batched because qualification
 				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
 				// stopDepartureTime and departureBoardRecordType which are only known after the
 				// path loop above. A batch approach would be: after a first pass computes which
 				// journeys qualify, group by (serviceRef, BlockNumber) to issue one journeys Find
-				// with $in, then one realtime_journeys Find with $in over all collected journeyrefs,
+				// with $in, then one realtime lookup with $in over all collected journeyrefs,
 				// mapping offsets back per block. Deferred to preserve exact behaviour.
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
 				// We estimate the current vehicle realtime journey based on the Block Number
@@ -242,13 +200,9 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 
 					var blockRealtimeJourney *RealtimeJourney
-					realtimeJourneysCollection.FindOne(context.Background(),
-						bson.M{
-							"journeyref": bson.M{
-								"$in": blockJourneys,
-							},
-							"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-						}, &options.FindOneOptions{}).Decode(&blockRealtimeJourney)
+					if realtimeLookup.FindByJourneyRefs != nil && len(blockJourneys) > 0 {
+						blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(blockJourneys)
+					}
 
 					if blockRealtimeJourney != nil {
 						// Ignore negative offsets as we assume bus will right itself when turning over

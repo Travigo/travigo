@@ -7,13 +7,11 @@ Already centralised in `realtimestore`:
 - `GET /realtime_journeys`
 - `GET /realtime_journeys/:identifier`
 - `GET /journeys/:identifier` current realtime journey lookup
+- Local departure board realtime journey lookup
+- Realtime journey stats aggregation
 - Redis overlays for `vehiclelocation`, `vehiclebearing`, and `vehiclelocationdescription`
 
 ## Departure Boards
-
-- `pkg/ctdf/departureboard.go`
-  - Batched `Find` by `journey.primaryidentifier` and active `modificationdatetime`.
-  - Block-based `FindOne` used for offset estimation.
 
 - `pkg/dataaggregator/source/tfl/departureboard.go`
   - `Find` by `stops.<stopID>.timetype` for TfL departure board generation.
@@ -49,9 +47,6 @@ Already centralised in `realtimestore`:
 
 ## Stats And Watchers
 
-- `pkg/stats/calculator/realtimejourneys.go`
-  - Aggregates active realtime journeys for stats.
-
 - `pkg/dbwatch/realtimejourneys.go`
   - Watches `realtime_journeys` with a Mongo change stream.
   - This is not a normal read path, but it still depends on Mongo receiving realtime updates.
@@ -60,4 +55,6 @@ Already centralised in `realtimestore`:
 
 - `pkg/realtime/realtimestore/reader.go` still reads Mongo by design. That is currently the central reader layer, not a remaining direct-read migration target.
 - `GET /realtime_journeys` still uses Mongo `vehiclelocation.coordinates` for the bounds query, then overlays the returned live location from Redis.
+- `pkg/ctdf/departureboard.go` now receives realtime data through `ctdf.DepartureBoardRealtimeLookup`; `pkg/dataaggregator/source/localdepartureboard` builds that lookup via `realtimestore`.
+- `pkg/stats/calculator/realtimejourneys.go` now delegates to `realtimestore.GetRealtimeJourneys`.
 - `pkg/realtime/nationalrail/railutils/queue.go` and `pkg/realtime/vehicletracker/consumer.go` get the collection for bulk writes only, so they are not listed above.
