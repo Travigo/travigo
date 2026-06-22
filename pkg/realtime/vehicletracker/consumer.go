@@ -114,9 +114,15 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 				var writeModel mongo.WriteModel
 
 				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
-					writeModel, _ = consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+					err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
+					if err != nil {
+						log.Error().Err(err).Msg("Failed to update realtime journey")
+					}
 				} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
-					writeModel, _ = consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+					err := consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
+					if err != nil {
+						log.Error().Err(err).Msg("Failed to update realtime journey location only")
+					}
 				}
 
 				if writeModel != nil {

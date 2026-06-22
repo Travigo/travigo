@@ -6,32 +6,19 @@ import (
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func (consumer *BatchConsumer) updateRealtimeJourneyLocationOnly(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
-	currentTime := vehicleUpdateEvent.RecordedAt
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
-	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
+func (consumer *BatchConsumer) updateRealtimeJourneyLocationOnly(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
+	realtimeJourneyID := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
 
 	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
-		_ = realtimestore.UpdateLocation(
+		return realtimestore.UpdateLocation(
 			context.Background(),
-			realtimeJourneyIdentifier,
+			realtimeJourneyID,
 			vehicleUpdateEvent.VehicleLocationUpdate.Location,
 			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
 		)
 	}
 
-	updateMap := bson.M{
-		"modificationdatetime": currentTime,
-	}
-
-	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-	updateModel := mongo.NewUpdateOneModel()
-	updateModel.SetFilter(searchQuery)
-	updateModel.SetUpdate(bsonRep)
-
-	return updateModel, nil
+	return nil
 }

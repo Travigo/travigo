@@ -8,41 +8,27 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) (mongo.WriteModel, error) {
+func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
 	currentTime := vehicleUpdateEvent.RecordedAt
 
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
-	searchQuery := bson.M{"primaryidentifier": realtimeJourneyIdentifier}
 
-	var realtimeJourney *ctdf.RealtimeJourney
+	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyIdentifier)
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
-
-	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "journey.primaryidentifier", Value: 1},
-		{Key: "nextstopref", Value: 1},
-		{Key: "offset", Value: 1},
-	})
-
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
 
 	newRealtimeJourney := false
 	if realtimeJourney != nil && realtimeJourney.Journey == nil {
 		log.Error().Msg("RealtimeJourney without a Journey found, deleting")
-		realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery)
-		return nil, errors.New("RealtimeJourney without a Journey found, deleting")
+		// realtimeJourneysCollection.DeleteOne(context.Background(), searchQuery) TODO
+		return errors.New("RealtimeJourney without a Journey found, deleting")
 	}
 
 	cachedJourney, err := consumer.getCachedTrackedJourney(journeyID, currentTime)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if realtimeJourney == nil {
@@ -108,7 +94,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			closestDistance = 999999999999.0
 			for i, journeyPathItem := range realtimeJourney.Journey.Path {
 				if journeyPathItem.DestinationStop == nil {
-					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
+					return errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
 				}
 
 				distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
@@ -127,7 +113,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 				previousJourneyPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
 
 				if previousJourneyPath.DestinationStop == nil {
-					return nil, errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
+					return errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
 				}
 
 				previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
@@ -147,7 +133,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 
 		if closestDistanceJourneyPath == nil {
-			return nil, errors.New("nil closestdistancejourneypath")
+			return errors.New("nil closestdistancejourneypath")
 		}
 
 		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
@@ -286,7 +272,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	}
 
 	if closestDistanceJourneyPath == nil {
-		return nil, errors.New("unable to find next journeypath")
+		return errors.New("unable to find next journeypath")
 	}
 
 	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
@@ -299,40 +285,17 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	}
 
 	// Update database
-	updateMap := bson.M{
-		"modificationdatetime": currentTime,
-		"departedstopref":      closestDistanceJourneyPath.OriginStopRef,
-		"nextstopref":          closestDistanceJourneyPath.DestinationStopRef,
-		"occupancy":            vehicleUpdateEvent.VehicleLocationUpdate.Occupancy,
-		// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
-	}
-	if newRealtimeJourney {
-		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
-		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
-		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
-
-		updateMap["journey"] = realtimeJourney.Journey
-		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-
-		updateMap["service"] = realtimeJourney.Service
-
-		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-
-		updateMap["vehicleref"] = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
-		updateMap["datasource"] = vehicleUpdateEvent.DataSource
-
-		updateMap["reliability"] = realtimeJourneyReliability
-
-		if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
-			updateMap["vehiclelocation"] = vehicleUpdateEvent.VehicleLocationUpdate.Location
-			updateMap["vehiclebearing"] = vehicleUpdateEvent.VehicleLocationUpdate.Bearing
-		}
-	} else {
-		updateMap["datasource.timestamp"] = vehicleUpdateEvent.DataSource.Timestamp
-	}
+	realtimeJourney.ModificationDateTime = currentTime
+	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
+	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
+	realtimeJourney.Reliability = realtimeJourneyReliability
+	realtimeJourney.VehicleRef = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
+	realtimeJourney.DataSource = vehicleUpdateEvent.DataSource
+	// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
 
 	if (offset.Seconds() != realtimeJourney.Offset.Seconds()) || newRealtimeJourney {
-		updateMap["offset"] = offset
+		realtimeJourney.Offset = offset
 	}
 
 	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
@@ -348,15 +311,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 	for key, stopUpdate := range journeyStopUpdates {
 		if key != "" {
-			updateMap[fmt.Sprintf("stops.%s", key)] = stopUpdate
+			if realtimeJourney.Stops[key] == nil {
+				realtimeJourney.Stops[key] = &ctdf.RealtimeJourneyStops{}
+			}
+			realtimeJourney.Stops[key] = stopUpdate
 		}
 	}
 
-	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-	updateModel := mongo.NewUpdateOneModel()
-	updateModel.SetFilter(searchQuery)
-	updateModel.SetUpdate(bsonRep)
-	updateModel.SetUpsert(true)
+	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
-	return updateModel, nil
+	return nil
 }
