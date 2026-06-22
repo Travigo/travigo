@@ -241,6 +241,9 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if scheduleStop.Cancelled == "true" {
+				if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
+					realtimeJourney.Stops[stop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+				}
 				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = true
 				pretty.Println(realtimeJourneyID, stop.PrimaryIdentifier)
 

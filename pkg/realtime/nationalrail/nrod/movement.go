@@ -79,6 +79,10 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				realtimeJourney.DepartedStop = path.OriginStop
 				realtimeJourney.NextStop = path.DestinationStop
 
+				if realtimeJourney.Stops[locationStop.PrimaryIdentifier] == nil {
+					realtimeJourney.Stops[locationStop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+				}
+
 				realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
 				realtimeJourney.Stops[locationStop.PrimaryIdentifier].DepartureTime = now
 				realtimeJourney.Stops[locationStop.PrimaryIdentifier].TimeType = ctdf.RealtimeJourneyStopTimeHistorical
@@ -89,6 +93,9 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Departed %s", locationStop.PrimaryName))
 	} else if m.EventType == "ARRIVAL" {
+		if realtimeJourney.Stops[locationStop.PrimaryIdentifier] == nil {
+			realtimeJourney.Stops[locationStop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+		}
 		realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
 		realtimeJourney.Stops[locationStop.PrimaryIdentifier].ArrivalTime = now
 
