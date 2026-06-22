@@ -19,8 +19,8 @@ func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:%s/details", identifier)
 }
 
-func realtimeJourneyMappingKey(identifier string) string {
-	return fmt.Sprintf("realtime-journey-mapping:%s", identifier)
+func realtimeJourneyMappingKey(mappingType string, identifier string) string {
+	return fmt.Sprintf("realtime-journey-mapping:%s:%s", mappingType, identifier)
 }
 
 func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
@@ -45,8 +45,10 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 	}
 
 	// Store all the other identifiers in a mapping to the primary identifier for easy lookup
-	for _, identifier := range realtimeJourney.OtherIdentifiers {
-		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(identifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
+	redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
+
+	for mappingType, identifier := range realtimeJourney.OtherIdentifiers {
+		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
 
 		if err != nil {
 			return err

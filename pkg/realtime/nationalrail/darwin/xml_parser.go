@@ -25,7 +25,8 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 
 		switch ty := tok.(type) {
 		case xml.StartElement:
-			if ty.Name.Local == "TS" {
+			switch ty.Name.Local {
+			case "TS":
 				var trainStatus TrainStatus
 
 				if err = d.DecodeElement(&trainStatus, &ty); err != nil {
@@ -33,7 +34,7 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.TrainStatuses = append(pushPortData.TrainStatuses, trainStatus)
 				}
-			} else if ty.Name.Local == "schedule" {
+			case "schedule":
 				var schedule Schedule
 
 				if err = d.DecodeElement(&schedule, &ty); err != nil {
@@ -41,7 +42,7 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.Schedules = append(pushPortData.Schedules, schedule)
 				}
-			} else if ty.Name.Local == "formationLoading" {
+			case "formationLoading":
 				var formationLoading FormationLoading
 
 				if err = d.DecodeElement(&formationLoading, &ty); err != nil {
@@ -49,7 +50,7 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.FormationLoadings = append(pushPortData.FormationLoadings, formationLoading)
 				}
-			} else if ty.Name.Local == "OW" {
+			case "OW":
 				var stationMessage StationMessage
 
 				if err = d.DecodeElement(&stationMessage, &ty); err != nil {
@@ -57,7 +58,7 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.StationMessages = append(pushPortData.StationMessages, stationMessage)
 				}
-			} else if ty.Name.Local == "trainAlert" {
+			case "trainAlert":
 				var trainAlert TrainAlert
 
 				if err = d.DecodeElement(&trainAlert, &ty); err != nil {
@@ -65,7 +66,7 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 				} else {
 					pushPortData.TrainAlerts = append(pushPortData.TrainAlerts, trainAlert)
 				}
-			} else if ty.Name.Local == "scheduleFormations" {
+			case "scheduleFormations":
 				var scheduleFormation ScheduleFormations
 
 				if err = d.DecodeElement(&scheduleFormation, &ty); err != nil {

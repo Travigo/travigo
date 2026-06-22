@@ -12,8 +12,8 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type PushPortData struct {
@@ -35,7 +35,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		Timestamp:      now.String(),
 	}
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 	stopsCollection := database.GetCollection("stops")
 	retryRecordsCollection := database.GetCollection("retry_records")
@@ -43,13 +42,8 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 	// Parse Train Statuses
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", trainStatus.SSD, trainStatus.UID)
-		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
+		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
-		var realtimeJourney *ctdf.RealtimeJourney
-
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-
-		newRealtimeJourney := false
 		if realtimeJourney == nil {
 			// Find the journey for this train
 			var journey *ctdf.Journey
@@ -92,34 +86,14 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
-
-			newRealtimeJourney = true
 		}
 
-		updateMap := bson.M{
-			"modificationdatetime":             now,
-			"otheridentifiers.nationalrailrid": trainStatus.RID,
-		}
+		realtimeJourney.ModificationDateTime = now
+		realtimeJourney.OtherIdentifiers["nationalrailrid"] = trainStatus.RID
 
 		// Update database
-		if newRealtimeJourney {
-			updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
-			updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
-			updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
-
-			updateMap["reliability"] = realtimeJourney.Reliability
-
-			updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-			updateMap["datasource"] = realtimeJourney.DataSource
-
-			updateMap["journey"] = realtimeJourney.Journey
-			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-
-			updateMap["service"] = realtimeJourney.Service
-		} else {
-			updateMap["datasource.timestamp"] = datasource.Timestamp
-			updateMap["activelytracked"] = true
-		}
+		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
+		realtimeJourney.ActivelyTracked = true
 
 		for _, location := range trainStatus.Locations {
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", location.TPL))
@@ -167,7 +141,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if journeyStopUpdated {
-				updateMap[fmt.Sprintf("stops.%s", stop.PrimaryIdentifier)] = journeyStop
+				realtimeJourney.Stops[stop.PrimaryIdentifier] = journeyStop
 			}
 		}
 
@@ -190,26 +164,14 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			})
 		}
 
-		// Create update
-		bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(searchQuery)
-		updateModel.SetUpdate(bsonRep)
-		updateModel.SetUpsert(true)
-
-		queue.Add(updateModel)
+		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 	}
 
 	// Schedules
 	for _, schedule := range p.Schedules {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
-		searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
+		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
-		var realtimeJourney *ctdf.RealtimeJourney
-
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-
-		newRealtimeJourney := false
 		if realtimeJourney == nil {
 			// Find the journey for this train
 			var journey *ctdf.Journey
@@ -252,8 +214,6 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				Stops: map[string]*ctdf.RealtimeJourneyStops{},
 			}
-
-			newRealtimeJourney = true
 		}
 
 		if realtimeJourney.Journey == nil {
@@ -261,9 +221,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			continue
 		}
 
-		updateMap := bson.M{
-			"modificationdatetime": now,
-		}
+		realtimeJourney.ModificationDateTime = now
 
 		// Calculate the new stops
 		scheduleStops := []ScheduleStop{
@@ -283,12 +241,12 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 
 			if scheduleStop.Cancelled == "true" {
-				updateMap[fmt.Sprintf("stops.%s.cancelled", stop.PrimaryIdentifier)] = true
+				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = true
 				pretty.Println(realtimeJourneyID, stop.PrimaryIdentifier)
 
 				cancelCount += 1
 			} else {
-				updateMap[fmt.Sprintf("stops.%s.cancelled", stop.PrimaryIdentifier)] = false
+				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = false
 			}
 		}
 
@@ -311,7 +269,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			})
 			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 
-			updateMap["cancelled"] = true
+			realtimeJourney.Cancelled = true
 
 			log.Info().
 				Str("realtimejourneyid", realtimeJourneyID).
@@ -337,39 +295,15 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		} else {
-			updateMap["cancelled"] = false
+			realtimeJourney.Cancelled = false
 
 			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
 		}
 
 		// Update database
-		if newRealtimeJourney {
-			updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
-			updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
-			updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
-
-			updateMap["reliability"] = realtimeJourney.Reliability
-
-			updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-			updateMap["datasource"] = realtimeJourney.DataSource
-
-			updateMap["journey"] = realtimeJourney.Journey
-			updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-
-			updateMap["service"] = realtimeJourney.Service
-		} else {
-			updateMap["datasource.timestamp"] = datasource.Timestamp
-		}
-
-		// Create update
-		bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-		updateModel := mongo.NewUpdateOneModel()
-		updateModel.SetFilter(searchQuery)
-		updateModel.SetUpdate(bsonRep)
-		updateModel.SetUpsert(true)
-
-		queue.Add(updateModel)
+		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
+		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 		log.Info().
 			Str("realtimejourneyid", realtimeJourneyID).
@@ -451,11 +385,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			continue
 		}
 
-		searchQuery := bson.M{"otheridentifiers.nationalrailrid": scheduleFormation.RID}
-
-		var realtimeJourney *ctdf.RealtimeJourney
-
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+		realtimeJourney, _ := realtimestore.FindByMapping(context.Background(), "nationalrailrid", scheduleFormation.RID)
 
 		if realtimeJourney == nil {
 			log.Error().
@@ -494,26 +424,13 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 			}
 			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
 
-			updateMap := bson.M{}
-			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
-
-			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(searchQuery)
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
-
-			queue.Add(updateModel)
+			realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 		}
 	}
 
 	// Formation Loading
 	for _, formationLoading := range p.FormationLoadings {
-		searchQuery := bson.M{"otheridentifiers.nationalrailrid": formationLoading.RID}
-
-		var realtimeJourney *ctdf.RealtimeJourney
-
-		realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
+		realtimeJourney, _ := realtimestore.FindByMapping(context.Background(), "nationalrailrid", formationLoading.RID)
 
 		if realtimeJourney == nil {
 			log.Error().
@@ -561,17 +478,7 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 				TotalPercentageOccupancy: int((float64(totalOccupancy) / float64(totalCapacity)) * 100),
 			}
 
-			updateMap := bson.M{}
-			updateMap["occupancy"] = realtimeJourney.Occupancy
-			updateMap["detailedrailinformation"] = realtimeJourney.DetailedRailInformation
-
-			bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(searchQuery)
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
-
-			queue.Add(updateModel)
+			realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 		}
 	}
 }

@@ -7,11 +7,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/util"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TrustMovement struct {
@@ -50,11 +47,11 @@ type TrustMovement struct {
 func (m *TrustMovement) Process(stompClient *StompClient) {
 	now := time.Now()
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-	var realtimeJourney *ctdf.RealtimeJourney
-
-	realtimeJourneysCollection.FindOne(context.Background(), bson.M{"otheridentifiers.TrainID": m.TrainID}).Decode(&realtimeJourney)
+	realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "TrainID", m.TrainID)
+	if err != nil {
+		log.Error().Err(err).Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Error finding Realtime Journey for train movement")
+		return
+	}
 	if realtimeJourney == nil {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
@@ -65,10 +62,8 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		return
 	}
 
-	updateMap := bson.M{
-		"modificationdatetime": now,
-		"activelytracked":      m.TrainTerminated != "true",
-	}
+	realtimeJourney.ModificationDateTime = now
+	realtimeJourney.ActivelyTracked = m.TrainTerminated != "true"
 
 	locationStop := stompClient.StopCache.Get(fmt.Sprintf("gb-stanox-%s", m.LocationStanox))
 	if locationStop == nil {
@@ -79,14 +74,14 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	if m.EventType == "DEPARTURE" {
 		for _, path := range realtimeJourney.Journey.Path {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
-				updateMap["departedstopref"] = path.OriginStopRef
-				updateMap["nextstopref"] = path.DestinationStopRef
-				updateMap["departedstop"] = path.OriginStop
-				updateMap["nextstop"] = path.DestinationStop
+				realtimeJourney.DepartedStopRef = path.OriginStopRef
+				realtimeJourney.NextStopRef = path.DestinationStopRef
+				realtimeJourney.DepartedStop = path.OriginStop
+				realtimeJourney.NextStop = path.DestinationStop
 
-				updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
-				updateMap[fmt.Sprintf("stops.%s.departuretime", locationStop.PrimaryIdentifier)] = now
-				updateMap[fmt.Sprintf("stops.%s.timetype", locationStop.PrimaryIdentifier)] = ctdf.RealtimeJourneyStopTimeHistorical
+				realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
+				realtimeJourney.Stops[locationStop.PrimaryIdentifier].DepartureTime = now
+				realtimeJourney.Stops[locationStop.PrimaryIdentifier].TimeType = ctdf.RealtimeJourneyStopTimeHistorical
 
 				break
 			}
@@ -94,26 +89,20 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Departed %s", locationStop.PrimaryName))
 	} else if m.EventType == "ARRIVAL" {
-		updateMap[fmt.Sprintf("stops.%s.stopref", locationStop.PrimaryIdentifier)] = locationStop.PrimaryIdentifier
-		updateMap[fmt.Sprintf("stops.%s.arrivaltime", locationStop.PrimaryIdentifier)] = now
+		realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
+		realtimeJourney.Stops[locationStop.PrimaryIdentifier].ArrivalTime = now
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Arrived at %s", locationStop.PrimaryName))
 
 		// If we've arrived at the end, then it's not actively tracked anymore
 		if locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
-			updateMap["activelytracked"] = false
-			updateMap["timeoutdurationminutes"] = 15
+			realtimeJourney.ActivelyTracked = false
+			realtimeJourney.TimeoutDurationMinutes = 15
 		}
 	}
 
 	// Create update
-	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-	updateModel := mongo.NewUpdateOneModel()
-	updateModel.SetFilter(bson.M{"primaryidentifier": realtimeJourney.PrimaryIdentifier})
-	updateModel.SetUpdate(bsonRep)
-	updateModel.SetUpsert(true)
-
-	stompClient.Queue.Add(updateModel)
+	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	log.Debug().
 		Str("trainid", m.TrainID).

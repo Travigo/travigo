@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type TrustActivation struct {
@@ -45,17 +45,11 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 		Timestamp:      now.String(),
 	}
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 	journeysCollection := database.GetCollection("journeys")
 
 	realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", a.TrainPlannedOriginTimestamp, a.TrainUID)
-	searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
+	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
-	var realtimeJourney *ctdf.RealtimeJourney
-
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-
-	newRealtimeJourney := false
 	if realtimeJourney == nil {
 		// Find the journey for this train
 		var journey *ctdf.Journey
@@ -104,42 +98,17 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
-
-		newRealtimeJourney = true
 	}
 
-	updateMap := bson.M{
-		"modificationdatetime":     now,
-		"otheridentifiers.TrainID": a.TrainID,
+	// TODO remove this at some point probably
+	if realtimeJourney.OtherIdentifiers == nil {
+		realtimeJourney.OtherIdentifiers = map[string]string{}
 	}
+	realtimeJourney.ModificationDateTime = now
+	realtimeJourney.OtherIdentifiers["TrainID"] = a.TrainID
+	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 
-	// Update database
-	if newRealtimeJourney {
-		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
-		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
-		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
-
-		updateMap["reliability"] = realtimeJourney.Reliability
-
-		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-		updateMap["datasource"] = realtimeJourney.DataSource
-
-		updateMap["journey"] = realtimeJourney.Journey
-		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-
-		updateMap["service"] = realtimeJourney.Service
-	} else {
-		updateMap["datasource.timestamp"] = datasource.Timestamp
-	}
-
-	// Create update
-	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-	updateModel := mongo.NewUpdateOneModel()
-	updateModel.SetFilter(searchQuery)
-	updateModel.SetUpdate(bsonRep)
-	updateModel.SetUpsert(true)
-
-	stompClient.Queue.Add(updateModel)
+	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	log.Info().
 		Str("trainid", a.TrainID).

@@ -40,11 +40,12 @@ type VSTPMessage struct {
 }
 
 func (v *VSTPMessage) Process(stompClient *StompClient) {
-	if v.VSTP.Schedule.TransactionType == "Create" {
+	switch v.VSTP.Schedule.TransactionType {
+	case "Create":
 		v.processCreate()
-	} else if v.VSTP.Schedule.TransactionType == "Delete" {
+	case "Delete":
 		v.processDelete()
-	} else {
+	default:
 		log.Error().Str("transaction", v.VSTP.Schedule.TransactionType).Msg("Unhandled VSTP transaction")
 	}
 }

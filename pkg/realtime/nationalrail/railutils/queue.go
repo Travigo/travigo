@@ -19,6 +19,7 @@ func (b *BatchProcessingQueue) Add(item mongo.WriteModel) {
 	b.Items <- item
 }
 
+// TODO no need for this soon
 func (b *BatchProcessingQueue) Process() {
 	go func(b *BatchProcessingQueue) {
 		realtimeJourneysCollection := database.GetCollection("realtime_journeys")

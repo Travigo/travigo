@@ -28,11 +28,19 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 	return realtimeJourney, nil
 }
 
+func FindByMapping(ctx context.Context, mappingType string, identifier string) (*ctdf.RealtimeJourney, error) {
+	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, mappingType, identifier)
+	if err != nil {
+		return nil, err
+	}
+	return FindByIdentifier(ctx, redisJourneyMapping)
+}
+
 func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.RealtimeJourney, error) {
 	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 
 	// Try redis first
-	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, journeyID)
+	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, "travigo-journeyid", journeyID)
 	if err == nil && redisJourneyMapping != "" {
 		return FindByIdentifier(ctx, redisJourneyMapping)
 	}
@@ -222,8 +230,8 @@ func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64
 }
 
 // Temporary name it FromRedis to avoid confusion with the mongo version of this function
-func GetRealtimeJourneyMappingFromRedis(ctx context.Context, identifier string) (string, error) {
-	mappingResult := redis_client.Client.Get(ctx, realtimeJourneyMappingKey(identifier))
+func GetRealtimeJourneyMappingFromRedis(ctx context.Context, mappingType string, identifier string) (string, error) {
+	mappingResult := redis_client.Client.Get(ctx, realtimeJourneyMappingKey(mappingType, identifier))
 	if mappingResult.Err() != nil {
 		return "", mappingResult.Err()
 	}

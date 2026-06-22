@@ -27,18 +27,6 @@ func WithCollection(collection *mongo.Collection) Option {
 	}
 }
 
-func applyOptions(opts ...Option) options {
-	cfg := options{}
-
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&cfg)
-		}
-	}
-
-	return cfg
-}
-
 func collectionOrDefault(collection *mongo.Collection) *mongo.Collection {
 	if collection != nil {
 		return collection

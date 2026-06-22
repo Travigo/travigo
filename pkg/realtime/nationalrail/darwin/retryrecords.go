@@ -5,15 +5,14 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func RetryRecords(queue *railutils.BatchProcessingQueue) {
 	retryRecordsCollection := database.GetCollection("retry_records")
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
 
 	for true {
 		matchingFormations := []ScheduleFormations{}
@@ -28,10 +27,8 @@ func RetryRecords(queue *railutils.BatchProcessingQueue) {
 		for _, retryRecord := range retryRecords {
 			searchQuery := bson.M{"otheridentifiers.nationalrailrid": retryRecord.Record.RID}
 
-			var realtimeJourney *ctdf.RealtimeJourney
-
-			realtimeJourneysCollection.FindOne(context.Background(), searchQuery).Decode(&realtimeJourney)
-			if realtimeJourney != nil {
+			realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "nationalrailrid", retryRecord.Record.RID)
+			if err == nil && realtimeJourney != nil {
 				log.Info().
 					Str("nationalrailrid", retryRecord.Record.RID).
 					Str("realtimejourney", realtimeJourney.PrimaryIdentifier).
