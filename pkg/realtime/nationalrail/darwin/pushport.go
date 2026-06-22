@@ -253,6 +253,9 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 
 				cancelCount += 1
 			} else {
+				if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
+					realtimeJourney.Stops[stop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+				}
 				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = false
 			}
 		}
