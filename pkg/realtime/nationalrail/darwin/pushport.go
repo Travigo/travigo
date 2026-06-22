@@ -89,6 +89,10 @@ func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQu
 		}
 
 		realtimeJourney.ModificationDateTime = now
+
+		if realtimeJourney.OtherIdentifiers == nil {
+			realtimeJourney.OtherIdentifiers = map[string]string{}
+		}
 		realtimeJourney.OtherIdentifiers["nationalrailrid"] = trainStatus.RID
 
 		// Update database
