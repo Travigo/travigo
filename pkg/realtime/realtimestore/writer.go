@@ -33,11 +33,13 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
+	timeoutDuration := time.Duration(realtimeJourney.TimeoutDurationMinutes) * time.Minute
+
 	err = redis_client.Client.Set(
 		ctx,
 		realtimeJourneyDetailsKey(realtimeJourney.PrimaryIdentifier),
 		realtimeJourneyJSON,
-		time.Duration(realtimeJourney.TimeoutDurationMinutes)*time.Minute,
+		timeoutDuration,
 	).Err()
 
 	if err != nil {
@@ -45,10 +47,10 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 	}
 
 	// Store all the other identifiers in a mapping to the primary identifier for easy lookup
-	redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
+	redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
 
 	for mappingType, identifier := range realtimeJourney.OtherIdentifiers {
-		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, 12*time.Hour).Err()
+		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
 
 		if err != nil {
 			return err
