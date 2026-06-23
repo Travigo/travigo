@@ -56,6 +56,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
+	realtimestore.LoadStaticJourney(context.Background(), realtimeJourney)
 
 	if realtimeJourney.Journey == nil {
 		log.Error().Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).Msg("Somehow realtime journey had no journey attached?")

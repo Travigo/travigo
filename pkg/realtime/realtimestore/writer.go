@@ -38,8 +38,17 @@ func tflDepartureBoardStopKey(stopID string) string {
 	return fmt.Sprintf("realtime-journeys:tfl-stop:%s", stopID)
 }
 
+func tflDepartureBoardIndexedStopsKey(identifier string) string {
+	return fmt.Sprintf("realtime-journey:tfl-indexed-stops/%s", identifier)
+}
+
 func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
-	realtimeJourneyJSON, err := json.Marshal(realtimeJourney)
+	if realtimeJourney == nil {
+		return errors.New("realtime journey is required")
+	}
+
+	storedRealtimeJourney := storedRealtimeJourneyFromCTDF(realtimeJourney)
+	realtimeJourneyJSON, err := json.Marshal(storedRealtimeJourney)
 	if err != nil {
 		return err
 	}
@@ -58,7 +67,9 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 	}
 
 	// Store all the other identifiers in a mapping to the primary identifier for easy lookup
-	redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
+	if realtimeJourney.Journey != nil && realtimeJourney.Journey.PrimaryIdentifier != "" {
+		redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
+	}
 
 	for mappingType, identifier := range realtimeJourney.OtherIdentifiers {
 		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
@@ -76,7 +87,24 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 		return errors.New("realtime journey is required")
 	}
 
+	indexedStopsKey := tflDepartureBoardIndexedStopsKey(realtimeJourney.PrimaryIdentifier)
+	previousStopIDs, err := redis_client.Client.SMembers(ctx, indexedStopsKey).Result()
+	if err != nil {
+		return err
+	}
+	for _, stopID := range previousStopIDs {
+		if err := redis_client.Client.ZRem(ctx, tflDepartureBoardStopKey(stopID), realtimeJourney.PrimaryIdentifier).Err(); err != nil {
+			return err
+		}
+	}
+	if len(previousStopIDs) > 0 {
+		if err := redis_client.Client.Del(ctx, indexedStopsKey).Err(); err != nil {
+			return err
+		}
+	}
+
 	cleanupBefore := strconv.FormatInt(time.Now().Add(-30*time.Second).Unix(), 10)
+	currentStopIDs := make([]interface{}, 0, len(realtimeJourney.Stops))
 
 	for stopID, stop := range realtimeJourney.Stops {
 		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || stop.ArrivalTime.IsZero() {
@@ -95,7 +123,18 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 			return err
 		}
 
-		if err := redis_client.Client.Expire(ctx, key, 12*time.Hour).Err(); err != nil {
+		if err := redis_client.Client.Expire(ctx, key, time.Hour).Err(); err != nil {
+			return err
+		}
+
+		currentStopIDs = append(currentStopIDs, stopID)
+	}
+
+	if len(currentStopIDs) > 0 {
+		if err := redis_client.Client.SAdd(ctx, indexedStopsKey, currentStopIDs...).Err(); err != nil {
+			return err
+		}
+		if err := redis_client.Client.Expire(ctx, indexedStopsKey, time.Hour).Err(); err != nil {
 			return err
 		}
 	}
@@ -104,7 +143,7 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 }
 
 func UpdateLocationDescription(ctx context.Context, identifier string, description string) error {
-	return redis_client.Client.Set(ctx, realtimeJourneyLocationDescriptionKey(identifier), description, 12*time.Hour).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyLocationDescriptionKey(identifier), description, realtimeJourneyTTL(ctx, identifier)).Err()
 }
 
 func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64) error {
@@ -116,6 +155,31 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 		return err
 	}
 
-	err = redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, 12*time.Hour).Err()
+	err = redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
 	return err
+}
+
+func realtimeJourneyTTL(ctx context.Context, identifier string) time.Duration {
+	const defaultTTL = 10 * time.Minute
+
+	result := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
+	if result.Err() != nil {
+		return defaultTTL
+	}
+
+	var stored struct {
+		TimeoutDurationMinutes int `json:"to"`
+	}
+	if err := json.Unmarshal([]byte(result.Val()), &stored); err == nil && stored.TimeoutDurationMinutes > 0 {
+		return time.Duration(stored.TimeoutDurationMinutes) * time.Minute
+	}
+
+	var legacy struct {
+		TimeoutDurationMinutes int
+	}
+	if err := json.Unmarshal([]byte(result.Val()), &legacy); err == nil && legacy.TimeoutDurationMinutes > 0 {
+		return time.Duration(legacy.TimeoutDurationMinutes) * time.Minute
+	}
+
+	return defaultTTL
 }

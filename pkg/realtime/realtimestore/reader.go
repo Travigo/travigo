@@ -204,13 +204,17 @@ func GetRealtimeJourneyMappingFromRedis(ctx context.Context, mappingType string,
 }
 
 func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+	return findByIdentifier(ctx, identifier, false)
+}
+
+func findByIdentifier(ctx context.Context, identifier string, hydrateJourney bool) (*ctdf.RealtimeJourney, error) {
 	realtimeJourneyResult := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if realtimeJourneyResult.Err() != nil {
 		return nil, realtimeJourneyResult.Err()
 	}
 
-	realtimeJourney := &ctdf.RealtimeJourney{}
-	if err := json.Unmarshal([]byte(realtimeJourneyResult.Val()), realtimeJourney); err != nil {
+	realtimeJourney, err := decodeStoredRealtimeJourney(ctx, []byte(realtimeJourneyResult.Val()), hydrateJourney)
+	if err != nil {
 		return nil, err
 	}
 

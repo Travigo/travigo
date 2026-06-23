@@ -42,7 +42,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 	iter := redis_client.Client.Scan(ctx, 0, realtimeJourneyDetailsKey("*"), 0).Iterator()
 
 	for iter.Next(ctx) {
-		realtimeJourney, err := FindByIdentifier(ctx, iter.Val())
+		realtimeJourney, err := findByIdentifier(ctx, realtimeJourneyIdentifierFromDetailsKey(iter.Val()), false)
 
 		if err != nil || realtimeJourney == nil {
 			continue
