@@ -9,24 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	mongooptions "go.mongodb.org/mongo-driver/mongo/options"
 )
-
-func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
-	if realtimeJourney, err := GetRealtimeJourneyFromRedis(ctx, identifier); err == nil {
-		ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-		return realtimeJourney, nil
-	}
-
-	realtimeJourney := &ctdf.RealtimeJourney{}
-	if err := collectionOrDefault(nil).FindOne(ctx, FilterByIdentifier(identifier)).Decode(realtimeJourney); err != nil {
-		return nil, err
-	}
-
-	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-	return realtimeJourney, nil
-}
 
 func FindByMapping(ctx context.Context, mappingType string, identifier string) (*ctdf.RealtimeJourney, error) {
 	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, mappingType, identifier)
@@ -37,34 +20,14 @@ func FindByMapping(ctx context.Context, mappingType string, identifier string) (
 }
 
 func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.RealtimeJourney, error) {
-	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-
 	// Try redis first
 	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, "travigo-journeyid", journeyID)
-	if err == nil && redisJourneyMapping != "" {
-		return FindByIdentifier(ctx, redisJourneyMapping)
-	}
 
-	// Mongo fallback
-	realtimeJourney := &ctdf.RealtimeJourney{}
-	err = collectionOrDefault(nil).FindOne(ctx, bson.M{
-		"journey.primaryidentifier": journeyID,
-		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-	}).Decode(realtimeJourney)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
 
-	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-
-	if !realtimeJourney.IsActive() {
-		return nil, nil
-	}
-
-	return realtimeJourney, nil
+	return FindByIdentifier(ctx, redisJourneyMapping)
 }
 
 func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[string]*ctdf.RealtimeJourney, error) {
@@ -73,110 +36,63 @@ func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[str
 		return realtimeJourneysByJourneyID, nil
 	}
 
-	remainingJourneyIDs := make([]string, 0, len(journeyIDs))
+	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
 	for _, journeyID := range journeyIDs {
-		if realtimeJourney, err := FindCurrentForJourney(ctx, journeyID); err == nil && realtimeJourney != nil {
+		if realtimeJourney, err := FindCurrentForJourney(ctx, journeyID); err == nil && realtimeJourney != nil && realtimeJourney.ModificationDateTime.After(realtimeActiveCutoffDate) {
 			realtimeJourneysByJourneyID[journeyID] = realtimeJourney
 			continue
 		}
-
-		remainingJourneyIDs = append(remainingJourneyIDs, journeyID)
 	}
 
-	if len(remainingJourneyIDs) == 0 {
-		return realtimeJourneysByJourneyID, nil
-	}
-
-	// Mongo fallback
-	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-	realtimeJourneyProjection := bson.D{
-		bson.E{Key: "primaryidentifier", Value: 1},
-		bson.E{Key: "activelytracked", Value: 1},
-		bson.E{Key: "modificationdatetime", Value: 1},
-		bson.E{Key: "timeoutdurationminutes", Value: 1},
-		bson.E{Key: "stops", Value: 1},
-		bson.E{Key: "cancelled", Value: 1},
-		bson.E{Key: "vehiclelocation", Value: 1},
-		bson.E{Key: "journey.primaryidentifier", Value: 1},
-		bson.E{Key: "journey.path.destinationstopref", Value: 1},
-		bson.E{Key: "journey.path.destinationarrivaltime", Value: 1},
-	}
-
-	cursor, err := collectionOrDefault(nil).Find(ctx, bson.M{
-		"journey.primaryidentifier": bson.M{"$in": remainingJourneyIDs},
-		"modificationdatetime":      bson.M{"$gt": realtimeActiveCutoffDate},
-	}, mongooptions.Find().SetProjection(realtimeJourneyProjection))
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	for cursor.Next(ctx) {
-		realtimeJourney := &ctdf.RealtimeJourney{}
-		if err := cursor.Decode(realtimeJourney); err != nil {
-			return nil, err
-		}
-
-		if realtimeJourney.Journey != nil {
-			ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-			realtimeJourneysByJourneyID[realtimeJourney.Journey.PrimaryIdentifier] = realtimeJourney
-		}
-	}
-
-	return realtimeJourneysByJourneyID, cursor.Err()
+	return realtimeJourneysByJourneyID, nil
 }
 
 func FindCurrentByJourneyRefs(ctx context.Context, journeyRefs []string) (*ctdf.RealtimeJourney, error) {
-	if len(journeyRefs) == 0 {
-		return nil, nil
-	}
+	potentials, err := FindCurrentForJourneyIDs(ctx, journeyRefs)
 
-	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
-
-	realtimeJourney := &ctdf.RealtimeJourney{}
-	err := collectionOrDefault(nil).FindOne(ctx, bson.M{
-		"journeyref":           bson.M{"$in": journeyRefs},
-		"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate},
-	}).Decode(realtimeJourney)
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
 
-	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-	return realtimeJourney, nil
+	for _, journeyRef := range journeyRefs {
+		if realtimeJourney := potentials[journeyRef]; realtimeJourney != nil {
+			return realtimeJourney, nil
+		}
+	}
+
+	return nil, nil
 }
 
 func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.RealtimeJourney, error) {
-	realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
+	// realtimeActiveCutoffDate := ctdf.GetShortActiveRealtimeJourneyCutOffDate()
 
-	cursor, err := collectionOrDefault(nil).Find(ctx,
-		bson.M{
-			"$and": bson.A{
-				bson.M{"vehiclelocation.coordinates": boundsQuery},
-				bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
-			},
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
+	// cursor, err := collectionOrDefault(nil).Find(ctx,
+	// 	bson.M{
+	// 		"$and": bson.A{
+	// 			bson.M{"vehiclelocation.coordinates": boundsQuery},
+	// 			bson.M{"modificationdatetime": bson.M{"$gt": realtimeActiveCutoffDate}},
+	// 		},
+	// 	},
+	// )
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer cursor.Close(ctx)
 
-	var realtimeJourneys []*ctdf.RealtimeJourney
-	for cursor.Next(ctx) {
-		realtimeJourney := &ctdf.RealtimeJourney{}
-		if err := cursor.Decode(realtimeJourney); err != nil {
-			return nil, err
-		}
+	// var realtimeJourneys []*ctdf.RealtimeJourney
+	// for cursor.Next(ctx) {
+	// 	realtimeJourney := &ctdf.RealtimeJourney{}
+	// 	if err := cursor.Decode(realtimeJourney); err != nil {
+	// 		return nil, err
+	// 	}
 
-		ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
-		realtimeJourneys = append(realtimeJourneys, realtimeJourney)
-	}
+	// 	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
+	// 	realtimeJourneys = append(realtimeJourneys, realtimeJourney)
+	// }
 
-	return realtimeJourneys, cursor.Err()
+	// return realtimeJourneys, cursor.Err()
+
+	return nil, errors.ErrUnsupported
 }
 
 func ApplyRealtimeJourneyOverlays(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
@@ -239,7 +155,7 @@ func GetRealtimeJourneyMappingFromRedis(ctx context.Context, mappingType string,
 	return mappingResult.Val(), nil
 }
 
-func GetRealtimeJourneyFromRedis(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
 	realtimeJourneyResult := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if realtimeJourneyResult.Err() != nil {
 		return nil, realtimeJourneyResult.Err()
@@ -249,6 +165,8 @@ func GetRealtimeJourneyFromRedis(ctx context.Context, identifier string) (*ctdf.
 	if err := json.Unmarshal([]byte(realtimeJourneyResult.Val()), realtimeJourney); err != nil {
 		return nil, err
 	}
+
+	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
 
 	return realtimeJourney, nil
 }

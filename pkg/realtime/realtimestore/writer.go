@@ -24,10 +24,6 @@ func realtimeJourneyMappingKey(mappingType string, identifier string) string {
 }
 
 func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
-	if realtimeJourney == nil {
-		return ErrEmptyIdentifier
-	}
-
 	realtimeJourneyJSON, err := json.Marshal(realtimeJourney)
 	if err != nil {
 		return err

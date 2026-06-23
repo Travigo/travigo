@@ -4,9 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/util"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -28,14 +26,7 @@ func Connect() error {
 		return err
 	}
 
-	err = ConnectRealtime()
-	if err != nil {
-		return err
-	}
-
 	createIndexes()
-
-	runCommands()
 
 	return nil
 }
@@ -78,53 +69,8 @@ func ConnectStandard() error {
 	return nil
 }
 
-func ConnectRealtime() error {
-	env := util.GetEnvironmentVariables()
-
-	if env["TRAVIGO_REALTIME_MONGODB_CONNECTION"] == "" {
-		return nil
-	}
-	connectionString := env["TRAVIGO_REALTIME_MONGODB_CONNECTION"]
-
-	if env["TRAVIGO_REALTIME_MONGODB_DATABASE"] == "" {
-		return nil
-	}
-	dbName := env["TRAVIGO_REALTIME_MONGODB_DATABASE"]
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(connectionString))
-
-	database := client.Database(dbName)
-
-	if err != nil {
-		return err
-	}
-
-	RealtimeJourneyInstance = &MongoInstance{
-		Client:   client,
-		Database: database,
-	}
-
-	err = client.Ping(context.Background(), nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func GetInstance(collectionName string) *MongoInstance {
-	if collectionName == "realtime_journeys" && RealtimeJourneyInstance != nil {
-		return RealtimeJourneyInstance
-	} else {
-		return Instance
-	}
-}
-
 func GetCollection(collectionName string) *mongo.Collection {
-	return GetInstance(collectionName).Database.Collection(collectionName)
+	return Instance.Database.Collection(collectionName)
 }
 
 // Requires
@@ -133,15 +79,3 @@ func GetCollection(collectionName string) *mongo.Collection {
 //    setClusterParameter:
 //       { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 15 } } }
 // } )
-
-func runCommands() {
-	var result bson.M
-	err := GetInstance("realtime_journeys").Database.RunCommand(context.Background(), bson.D{
-		{Key: "collMod", Value: "realtime_journeys"},
-		{Key: "changeStreamPreAndPostImages", Value: bson.M{"enabled": true}},
-	}).Decode(&result)
-
-	if err != nil {
-		log.Error().Err(err).Msg("Run commands mongodb")
-	}
-}

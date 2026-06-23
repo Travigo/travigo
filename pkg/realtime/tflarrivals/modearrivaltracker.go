@@ -19,10 +19,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type ModeArrivalTracker struct {
@@ -108,9 +105,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	//var realtimeJourneyUpdateOperations []mongo.WriteModel
-	p := pool.NewWithResults[mongo.WriteModel]()
+	p := pool.NewWithResults[struct{}]()
 
 	// Group all the arrivals predictions that are part of the same journey
 	groupedLineArrivals := map[string][]ArrivalPrediction{}
@@ -133,27 +128,20 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 			realtimeJourneyID := realtimeJourneyID
 			predictions := predictions
 
-			p.Go(func() mongo.WriteModel {
-				return l.parseGroupedArrivals(realtimeJourneyID, predictions, datasource)
+			p.Go(func() struct{} {
+				err := l.parseGroupedArrivals(realtimeJourneyID, predictions, datasource)
+				if err != nil {
+					log.Error().Err(err).Msg("Failed to parse grouped arrivals")
+				}
+				return struct{}{}
 			})
 		}
 	}
 
 	realtimeJourneyUpdateOperations := p.Wait()
-	util.InPlaceFilter(&realtimeJourneyUpdateOperations, func(x mongo.WriteModel) bool {
-		return x != nil
-	})
 
 	processingTime := time.Since(startTime)
 	startTime = time.Now()
-
-	if len(realtimeJourneyUpdateOperations) > 0 {
-		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), realtimeJourneyUpdateOperations, &options.BulkWriteOptions{})
-
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
-		}
-	}
 
 	log.Info().
 		Str("id", l.Mode.ModeID).
@@ -164,22 +152,23 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 	// Remove any tfl realtime journey that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
-	deleteQuery := bson.M{
-		"datasource.provider":  datasource.ProviderName,
-		"datasource.datasetid": datasource.DatasetID,
-		"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
-	}
+	// TODO NEED THIS LOGIC BACK IN REDIS
+	// deleteQuery := bson.M{
+	// 	"datasource.provider":  datasource.ProviderName,
+	// 	"datasource.datasetid": datasource.DatasetID,
+	// 	"datasource.timestamp": bson.M{"$ne": datasource.Timestamp},
+	// }
 
-	d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
-	if d.DeletedCount > 0 {
-		log.Info().
-			Str("id", l.Mode.ModeID).
-			Int64("length", d.DeletedCount).
-			Msg("delete expired journeys")
-	}
+	// d, _ := realtimeJourneysCollection.DeleteMany(context.Background(), deleteQuery)
+	// if d.DeletedCount > 0 {
+	// 	log.Info().
+	// 		Str("id", l.Mode.ModeID).
+	// 		Int64("length", d.DeletedCount).
+	// 		Msg("delete expired journeys")
+	// }
 }
 
-func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSourceReference) mongo.WriteModel {
+func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSourceReference) error {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",
@@ -193,19 +182,8 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		return nil
 	}
 
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	searchQuery := bson.M{"primaryidentifier": realtimeJourneyID}
+	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
-	var realtimeJourney *ctdf.RealtimeJourney
-
-	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "stops", Value: 1},
-		{Key: "journey", Value: 1},
-	})
-
-	realtimeJourneysCollection.FindOne(context.Background(), searchQuery, opts).Decode(&realtimeJourney)
-
-	newRealtimeJourney := false
 	if realtimeJourney == nil {
 		journeyDate := time.Now() // TODO may not always be correct?
 
@@ -235,12 +213,6 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
-
-		newRealtimeJourney = true
-	}
-
-	updateMap := bson.M{
-		"modificationdatetime": now,
 	}
 
 	// Add new predictions to the realtime journey
@@ -288,7 +260,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		}
 
 		if key != "" {
-			updateMap[fmt.Sprintf("stops.%s", key)] = stop
+			realtimeJourney.Stops[key] = stop
 		}
 	}
 
@@ -431,48 +403,21 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			if realtimeJourney.DepartedStopRef == "" && realtimeStop.TimeType == ctdf.RealtimeJourneyStopTimeEstimatedFuture {
 				realtimeJourney.DepartedStopRef = referenceItem.OriginStopRef
 				realtimeJourney.DepartedStop = referenceItem.OriginStop
-				updateMap["departedstopref"] = realtimeJourney.DepartedStopRef
-				updateMap["departedstop"] = realtimeJourney.DepartedStop
 
 				realtimeJourney.NextStopRef = referenceItem.DestinationStopRef
 				realtimeJourney.NextStop = referenceItem.DestinationStop
-				updateMap["nextstopref"] = realtimeJourney.NextStopRef
-				updateMap["nextstop"] = realtimeJourney.NextStop
 			}
 		}
 	}
 
 	// Update database
-	if newRealtimeJourney {
-		updateMap["primaryidentifier"] = realtimeJourney.PrimaryIdentifier
-		updateMap["activelytracked"] = realtimeJourney.ActivelyTracked
-		updateMap["timeoutdurationminutes"] = realtimeJourney.TimeoutDurationMinutes
-
-		updateMap["reliability"] = realtimeJourney.Reliability
-
-		updateMap["creationdatetime"] = realtimeJourney.CreationDateTime
-		updateMap["datasource"] = realtimeJourney.DataSource
-
-		updateMap["vehicleref"] = realtimeJourney.VehicleRef
-
-		updateMap["service"] = realtimeJourney.Service
-		updateMap["journeyrundate"] = realtimeJourney.JourneyRunDate
-	} else {
-		updateMap["datasource.timestamp"] = datasource.Timestamp
-	}
-	updateMap["journey"] = realtimeJourney.Journey
+	realtimeJourney.ModificationDateTime = now
+	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 
 	realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription)
 	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
-	// Create update
-	bsonRep, _ := bson.Marshal(bson.M{"$set": updateMap})
-	updateModel := mongo.NewUpdateOneModel()
-	updateModel.SetFilter(searchQuery)
-	updateModel.SetUpdate(bsonRep)
-	updateModel.SetUpsert(true)
-
-	return updateModel
+	return nil
 }
 
 // TODO convert to proper cache
