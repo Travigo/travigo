@@ -3,9 +3,12 @@ package realtimestore
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
@@ -21,6 +24,10 @@ func realtimeJourneyDetailsKey(identifier string) string {
 
 func realtimeJourneyMappingKey(mappingType string, identifier string) string {
 	return fmt.Sprintf("realtime-journey-mapping:%s:%s", mappingType, identifier)
+}
+
+func tflDepartureBoardStopKey(stopID string) string {
+	return fmt.Sprintf("realtime-journeys:tfl-stop:%s", stopID)
 }
 
 func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
@@ -49,6 +56,38 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
 
 		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
+	if realtimeJourney == nil {
+		return errors.New("realtime journey is required")
+	}
+
+	cleanupBefore := strconv.FormatInt(time.Now().Add(-30*time.Second).Unix(), 10)
+
+	for stopID, stop := range realtimeJourney.Stops {
+		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || stop.ArrivalTime.IsZero() {
+			continue
+		}
+
+		key := tflDepartureBoardStopKey(stopID)
+		if err := redis_client.Client.ZRemRangeByScore(ctx, key, "-inf", cleanupBefore).Err(); err != nil {
+			return err
+		}
+
+		if err := redis_client.Client.ZAdd(ctx, key, redis.Z{
+			Score:  float64(stop.ArrivalTime.Unix()),
+			Member: realtimeJourney.PrimaryIdentifier,
+		}).Err(); err != nil {
+			return err
+		}
+
+		if err := redis_client.Client.Expire(ctx, key, 12*time.Hour).Err(); err != nil {
 			return err
 		}
 	}

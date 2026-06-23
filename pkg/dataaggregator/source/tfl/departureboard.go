@@ -2,7 +2,6 @@ package tfl
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -12,9 +11,8 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
-	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 var (
@@ -63,21 +61,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	stopTimezone, _ := time.LoadLocation(q.Stop.Timezone)
 
-	// Query for services from the realtime_journeys table
-	stopQueries := []bson.M{}
 	allStopIDS := append(q.Stop.OtherIdentifiers, q.Stop.PrimaryIdentifier)
-	for _, stopID := range allStopIDS {
-		stopQueries = append(stopQueries, bson.M{fmt.Sprintf("stops.%s.timetype", stopID): ctdf.RealtimeJourneyStopTimeEstimatedFuture})
-	}
-
-	realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-	cursor, _ := realtimeJourneysCollection.Find(context.Background(), bson.M{
-		"$or": stopQueries,
-	})
-
-	var realtimeJourneys []ctdf.RealtimeJourney
-	if err := cursor.All(context.Background(), &realtimeJourneys); err != nil {
-		log.Error().Err(err).Msg("Failed to decode Realtime Journeys")
+	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneys(context.Background(), allStopIDS, now.Add(-30*time.Second))
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
 	}
 
 	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
@@ -88,7 +75,20 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		timedOut := (now.Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
-			scheduledTime := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].ArrivalTime.In(stopTimezone)
+			realtimeJourneyStop := realtimeJourney.Stops[q.Stop.PrimaryIdentifier]
+			if realtimeJourneyStop == nil {
+				for _, stopID := range allStopIDS {
+					if realtimeJourney.Stops[stopID] != nil {
+						realtimeJourneyStop = realtimeJourney.Stops[stopID]
+						break
+					}
+				}
+			}
+			if realtimeJourneyStop == nil || realtimeJourneyStop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+				continue
+			}
+
+			scheduledTime := realtimeJourneyStop.ArrivalTime.In(stopTimezone)
 
 			// Skip over this one if we've already past its arrival time (allow 30 second overlap)
 			if scheduledTime.Before(now.Add(-30 * time.Second)) {
@@ -106,7 +106,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 			departure.Journey.Operator = tflOperator
 			departure.Journey.OperatorRef = tflOperator.PrimaryIdentifier
 
-			platform := realtimeJourney.Stops[q.Stop.PrimaryIdentifier].Platform
+			platform := realtimeJourneyStop.Platform
 
 			if platform != "" {
 				departure.Platform = platform

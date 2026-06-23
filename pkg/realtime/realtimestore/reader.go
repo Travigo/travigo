@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
@@ -61,6 +64,52 @@ func FindCurrentByJourneyRefs(ctx context.Context, journeyRefs []string) (*ctdf.
 	}
 
 	return nil, nil
+}
+
+func FindTFLDepartureBoardJourneys(ctx context.Context, stopIDs []string, from time.Time) ([]ctdf.RealtimeJourney, error) {
+	if len(stopIDs) == 0 {
+		return nil, nil
+	}
+
+	minScore := strconv.FormatInt(from.Unix(), 10)
+	seenRealtimeJourneyIDs := map[string]struct{}{}
+	var realtimeJourneyIDs []string
+
+	for _, stopID := range stopIDs {
+		key := tflDepartureBoardStopKey(stopID)
+		if err := redis_client.Client.ZRemRangeByScore(ctx, key, "-inf", minScore).Err(); err != nil {
+			return nil, err
+		}
+
+		ids, err := redis_client.Client.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+			Min: minScore,
+			Max: "+inf",
+		}).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		for _, id := range ids {
+			if _, seen := seenRealtimeJourneyIDs[id]; seen {
+				continue
+			}
+
+			seenRealtimeJourneyIDs[id] = struct{}{}
+			realtimeJourneyIDs = append(realtimeJourneyIDs, id)
+		}
+	}
+
+	realtimeJourneys := make([]ctdf.RealtimeJourney, 0, len(realtimeJourneyIDs))
+	for _, realtimeJourneyID := range realtimeJourneyIDs {
+		realtimeJourney, err := FindByIdentifier(ctx, realtimeJourneyID)
+		if err != nil {
+			continue
+		}
+
+		realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
+	}
+
+	return realtimeJourneys, nil
 }
 
 func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.RealtimeJourney, error) {

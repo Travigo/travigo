@@ -414,10 +414,14 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	realtimeJourney.ModificationDateTime = now
 	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 
-	realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription)
-	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	if err := realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription); err != nil {
+		return err
+	}
+	if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+		return err
+	}
 
-	return nil
+	return realtimestore.IndexTFLDepartureBoardJourney(context.Background(), realtimeJourney)
 }
 
 // TODO convert to proper cache
