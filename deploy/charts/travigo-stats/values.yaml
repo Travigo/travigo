@@ -13,6 +13,10 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "travigo-elasticsearch-user"
 
+redis:
+  address: "redis-headless.redis:6379"
+  passwordSecret: redis-password
+
 web_api:
   args: ["stats", "run", "--listen", ":8081"]
 
