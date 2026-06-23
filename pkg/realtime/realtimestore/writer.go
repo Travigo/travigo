@@ -37,7 +37,7 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		ctx,
 		realtimeJourneyDetailsKey(realtimeJourney.PrimaryIdentifier),
 		realtimeJourneyJSON,
-		12*time.Hour,
+		time.Duration(realtimeJourney.TimeoutDurationMinutes)*time.Minute,
 	).Err()
 
 	if err != nil {
