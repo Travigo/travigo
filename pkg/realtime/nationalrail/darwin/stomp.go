@@ -3,12 +3,10 @@ package darwin
 import (
 	"bytes"
 	"compress/gzip"
-	"time"
 
 	"github.com/go-stomp/stomp/v3"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type StompClient struct {
@@ -26,14 +24,7 @@ func (s *StompClient) Run() {
 	stopCache = railutils.StopCache{}
 	stopCache.Setup()
 
-	// Setup batch queue processor first
-	queue := &railutils.BatchProcessingQueue{
-		Timeout: time.Second * 5,
-		Items:   make(chan mongo.WriteModel, 500),
-	}
-	queue.Process()
-
-	go RetryRecords(queue)
+	go RetryRecords()
 
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
@@ -74,7 +65,7 @@ func (s *StompClient) Run() {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
 
-			go pushPortData.UpdateRealtimeJourneys(queue)
+			go pushPortData.UpdateRealtimeJourneys()
 		}
 	}
 }

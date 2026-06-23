@@ -25,7 +25,7 @@ type PushPortData struct {
 	ScheduleFormations []ScheduleFormations
 }
 
-func (p *PushPortData) UpdateRealtimeJourneys(queue *railutils.BatchProcessingQueue) {
+func (p *PushPortData) UpdateRealtimeJourneys() {
 	now := time.Now()
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "DarwinPushPort",

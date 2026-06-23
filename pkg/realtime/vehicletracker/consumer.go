@@ -93,7 +93,6 @@ func NewBatchConsumer(id int) *BatchConsumer {
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
-	realtimeJourneyOperations := make([]mongo.WriteModel, 0, len(payloads))
 	serviceAlertOperations := make([]mongo.WriteModel, 0, len(payloads))
 
 	for _, payload := range payloads {
@@ -111,8 +110,6 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
 
 			if identifiedJourneyID != "" {
-				var writeModel mongo.WriteModel
-
 				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
 					err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
 					if err != nil {
@@ -123,10 +120,6 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 					if err != nil {
 						log.Error().Err(err).Msg("Failed to update realtime journey location only")
 					}
-				}
-
-				if writeModel != nil {
-					realtimeJourneyOperations = append(realtimeJourneyOperations, writeModel)
 				}
 			} else {
 				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
@@ -153,18 +146,6 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			if writeModel != nil {
 				serviceAlertOperations = append(serviceAlertOperations, writeModel)
 			}
-		}
-	}
-
-	if len(realtimeJourneyOperations) > 0 {
-		realtimeJourneysCollection := database.GetCollection("realtime_journeys")
-
-		startTime := time.Now()
-		_, err := realtimeJourneysCollection.BulkWrite(context.Background(), realtimeJourneyOperations, &options.BulkWriteOptions{})
-		log.Info().Int("Length", len(realtimeJourneyOperations)).Str("Time", time.Now().Sub(startTime).String()).Msg("Bulk write realtime_journeys")
-
-		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write Realtime Journeys")
 		}
 	}
 

@@ -6,12 +6,11 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func RetryRecords(queue *railutils.BatchProcessingQueue) {
+func RetryRecords() {
 	retryRecordsCollection := database.GetCollection("retry_records")
 
 	for true {
@@ -43,7 +42,7 @@ func RetryRecords(queue *railutils.BatchProcessingQueue) {
 		pushPort := PushPortData{
 			ScheduleFormations: matchingFormations,
 		}
-		pushPort.UpdateRealtimeJourneys(queue)
+		pushPort.UpdateRealtimeJourneys()
 
 		// Run this loop every 90 seconds
 		time.Sleep(90 * time.Second)
