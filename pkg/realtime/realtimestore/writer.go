@@ -19,11 +19,19 @@ type storedVehicleLocation struct {
 }
 
 func realtimeJourneyDetailsKey(identifier string) string {
-	return fmt.Sprintf("realtime-journey:%s/details", identifier)
+	return fmt.Sprintf("realtime-journey:details/%s", identifier)
+}
+
+func realtimeJourneyLocationKey(identifier string) string {
+	return fmt.Sprintf("realtime-journey:location/%s", identifier)
+}
+
+func realtimeJourneyLocationDescriptionKey(identifier string) string {
+	return fmt.Sprintf("realtime-journey:locationdescription/%s", identifier)
 }
 
 func realtimeJourneyMappingKey(mappingType string, identifier string) string {
-	return fmt.Sprintf("realtime-journey-mapping:%s:%s", mappingType, identifier)
+	return fmt.Sprintf("realtime-journey:mapping:%s:%s", mappingType, identifier)
 }
 
 func tflDepartureBoardStopKey(stopID string) string {
@@ -96,7 +104,7 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 }
 
 func UpdateLocationDescription(ctx context.Context, identifier string, description string) error {
-	return redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier), description, 12*time.Hour).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyLocationDescriptionKey(identifier), description, 12*time.Hour).Err()
 }
 
 func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64) error {
@@ -108,6 +116,6 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 		return err
 	}
 
-	err = redis_client.Client.Set(ctx, fmt.Sprintf("realtime-journey:%s/location", identifier), locationJSON, 12*time.Hour).Err()
+	err = redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, 12*time.Hour).Err()
 	return err
 }

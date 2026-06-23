@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -173,7 +172,7 @@ func ApplyLocationDescription(ctx context.Context, realtimeJourney *ctdf.Realtim
 }
 
 func GetLocationDescription(ctx context.Context, identifier string) (string, error) {
-	description := redis_client.Client.Get(ctx, fmt.Sprintf("realtime-journey:%s/locationdescription", identifier))
+	description := redis_client.Client.Get(ctx, realtimeJourneyLocationDescriptionKey(identifier))
 	if description.Err() != nil {
 		return "", description.Err()
 	}
@@ -181,7 +180,7 @@ func GetLocationDescription(ctx context.Context, identifier string) (string, err
 }
 
 func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64, error) {
-	locationResult := redis_client.Client.Get(ctx, fmt.Sprintf("realtime-journey:%s/location", identifier))
+	locationResult := redis_client.Client.Get(ctx, realtimeJourneyLocationKey(identifier))
 	if locationResult.Err() != nil {
 		return ctdf.Location{}, 0, locationResult.Err()
 	}

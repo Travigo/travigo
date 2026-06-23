@@ -1,29 +1,33 @@
 # Realtime Journeys Mongo Read Migration
 
-This tracks the current read-side state for realtime journeys as reads move behind `pkg/realtime/realtimestore` and Redis.
+This tracks the current read-side state for realtime journeys now that normal realtime journey reads have moved behind `pkg/realtime/realtimestore` and Redis.
 
-Already centralised in `realtimestore`:
-
-- `GET /realtime_journeys`
-  - Uses `realtimestore.FindActiveWithinBounds`.
-  - Still depends on Mongo `vehiclelocation.coordinates` for discovery, then overlays Redis location fields.
+## Redis-backed Reads
 
 - `GET /realtime_journeys/:identifier`
   - Uses `realtimestore.FindByIdentifier`.
-  - Reads full realtime journeys from Redis first, then falls back to Mongo by `primaryidentifier`.
+  - Reads the full realtime journey document from Redis.
 
 - `GET /journeys/:identifier` current realtime journey lookup
   - Uses `realtimestore.FindCurrentForJourney`.
-  - Reads the Redis `travigo-journeyid` mapping first, then falls back to Mongo by `journey.primaryidentifier`.
+  - Reads the Redis `travigo-journeyid` mapping, then loads the mapped realtime journey from Redis.
 
 - Local departure board realtime journey lookup
   - Uses `realtimestore.FindCurrentForJourneyIDs`.
-  - Reads Redis mappings per journey first, then falls back to a Mongo batch lookup for misses.
-  - Block-offset estimation still uses `realtimestore.FindCurrentByJourneyRefs`, which is Mongo-only.
+  - Reads Redis mappings per static journey ID.
+  - Block-offset estimation uses `realtimestore.FindCurrentByJourneyRefs`, which now also resolves through the static journey ID mappings.
+
+- TfL departure board realtime lookup
+  - `pkg/dataaggregator/source/tfl/departureboard.go` uses `realtimestore.FindTFLDepartureBoardJourneys`.
+  - Redis sorted sets keyed by `realtime-journeys:tfl-stop:<stopID>` replace the old Mongo `stops.<stopID>.timetype` query.
+  - The reader loads full realtime journeys from Redis after finding matching journey IDs in the stop index.
+
+- TfL realtime journey lookup
+  - `pkg/dataaggregator/source/tfl/journey.go` uses `realtimestore.FindByIdentifier`.
+  - `pkg/realtime/tflarrivals/modearrivaltracker.go` uses `realtimestore.FindByIdentifier` before updating a TfL realtime journey.
 
 - Vehicle tracker previous-state lookup
-  - `pkg/realtime/vehicletracker/realtimejourney.go` now uses `realtimestore.FindByIdentifier`.
-  - It no longer reads `realtime_journeys` directly.
+  - `pkg/realtime/vehicletracker/realtimejourney.go` uses `realtimestore.FindByIdentifier`.
 
 - National Rail realtime journey lookups
   - NROD activation uses `realtimestore.FindByIdentifier`.
@@ -31,56 +35,45 @@ Already centralised in `realtimestore`:
   - Darwin status/schedule updates use `realtimestore.FindByIdentifier`.
   - Darwin formation/loading/retry paths use `realtimestore.FindByMapping("nationalrailrid", ...)`.
 
-- Realtime journey stats aggregation
-  - `pkg/stats/calculator/realtimejourneys.go` delegates to `realtimestore.GetRealtimeJourneys`.
-
 - Redis overlays
   - `vehiclelocation`, `vehiclebearing`, and `vehiclelocationdescription` are applied in `realtimestore`.
 
 ## Remaining Direct Mongo Reads
 
-- `pkg/dataaggregator/source/tfl/departureboard.go`
-  - Direct `Find` by `stops.<stopID>.timetype` for TfL departure board generation.
+No normal request, dataaggregator, or realtime producer path currently performs an active Mongo `Find`, `FindOne`, or `Aggregate` against `realtime_journeys`.
 
-- `pkg/dataaggregator/source/tfl/journey.go`
-  - Direct `FindOne` by `primaryidentifier`, returning the static journey attached to a TfL realtime journey.
+## Not Yet Rebuilt In Redis
 
-- `pkg/realtime/tflarrivals/modearrivaltracker.go`
-  - Direct `FindOne` by realtime journey `primaryidentifier` before updating TfL arrivals.
-  - The updated realtime journey is also saved to Redis, but this previous-state read still comes from Mongo.
+- `GET /realtime_journeys`
+  - Still calls `realtimestore.FindActiveWithinBounds`.
+  - `FindActiveWithinBounds` currently returns `errors.ErrUnsupported`; the old Mongo bounds query is commented out.
+  - The map/live-location list still needs a Redis geospatial or location-index reader.
 
-## Central Mongo Fallbacks In `realtimestore`
-
-These are no longer scattered read paths, but they still read Mongo:
-
-- `FindByIdentifier`
-  - Fallback `FindOne` by `primaryidentifier`.
-
-- `FindCurrentForJourney`
-  - Fallback `FindOne` by `journey.primaryidentifier` and active `modificationdatetime`.
-
-- `FindCurrentForJourneyIDs`
-  - Redis-first loop per journey ID, then fallback batch `Find` by `journey.primaryidentifier`.
-
-- `FindCurrentByJourneyRefs`
-  - Mongo-only `FindOne` by `journeyref`.
-
-- `FindActiveWithinBounds`
-  - Mongo-only geospatial `Find` by `vehiclelocation.coordinates`.
-  - Redis-only realtime journeys are not discoverable by this map/bounds query unless a Mongo document still exists with a matching `vehiclelocation`.
-
-- `GetRealtimeJourneys`
-  - Mongo aggregation used by stats.
+- Realtime journey stats
+  - `pkg/stats/calculator/realtimejourneys.go` delegates to `realtimestore.GetRealtimeJourneys`.
+  - `realtimestore.GetRealtimeJourneys` currently returns empty counters; the old Mongo aggregation is commented out with `TODO MOVE TO REDIS`.
 
 ## Watchers
 
 - `pkg/dbwatch/realtimejourneys.go`
-  - Watches `realtime_journeys` with a Mongo change stream.
+  - Still watches `realtime_journeys` with a Mongo change stream.
   - Redis-only realtime journey producers will not trigger these events unless equivalent event publishing is added elsewhere.
+
+## Redis Indexes And Keys
+
+- Full realtime journey document:
+  - `realtime-journey:<primaryIdentifier>/details`
+
+- Identifier mappings:
+  - `realtime-journey-mapping:travigo-journeyid:<journeyID>`
+  - `realtime-journey-mapping:<otherIdentifierName>:<otherIdentifierValue>`
+
+- TfL departure board stop index:
+  - `realtime-journeys:tfl-stop:<stopID>`
+  - Sorted-set score is the stop arrival Unix timestamp.
 
 ## Notes
 
-- `pkg/realtime/realtimestore/writer.go` stores full realtime journeys in Redis and writes lookup mappings for `travigo-journeyid` plus `RealtimeJourney.OtherIdentifiers`.
-- `FindByMapping` currently depends on the Redis mapping existing; it does not fall back to Mongo by arbitrary identifier fields.
-- `pkg/realtime/vehicletracker/consumer.go` still contains a legacy realtime journey `BulkWrite` block, but the current vehicle tracker trip/location-only paths no longer append realtime journey write models.
-- `pkg/realtime/nationalrail/railutils/queue.go` still contains a legacy Mongo bulk writer, but there are currently no `BatchProcessingQueue.Add` callers for realtime journey updates.
+- `FindByIdentifier` no longer has a Mongo fallback.
+- `FindByMapping` depends on the Redis mapping existing; it does not fall back to Mongo by arbitrary identifier fields.
+- `pkg/realtime/realtimestore/filters.go` still contains Mongo-style filter helpers, but current `realtimestore` readers do not use them for active `realtime_journeys` reads.
