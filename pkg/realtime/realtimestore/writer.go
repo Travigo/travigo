@@ -26,6 +26,10 @@ func realtimeJourneyLocationKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:location/%s", identifier)
 }
 
+func realtimeJourneyLocationGeoIndexKey() string {
+	return "realtime-journey:location:index"
+}
+
 func realtimeJourneyLocationDescriptionKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:locationdescription/%s", identifier)
 }
@@ -155,8 +159,19 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 		return err
 	}
 
-	err = redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
-	return err
+	if err := redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, realtimeJourneyTTL(ctx, identifier)).Err(); err != nil {
+		return err
+	}
+
+	if location.Type != "Point" || len(location.Coordinates) < 2 {
+		return redis_client.Client.ZRem(ctx, realtimeJourneyLocationGeoIndexKey(), identifier).Err()
+	}
+
+	return redis_client.Client.GeoAdd(ctx, realtimeJourneyLocationGeoIndexKey(), &redis.GeoLocation{
+		Name:      identifier,
+		Longitude: location.Coordinates[0],
+		Latitude:  location.Coordinates[1],
+	}).Err()
 }
 
 func realtimeJourneyTTL(ctx context.Context, identifier string) time.Duration {
