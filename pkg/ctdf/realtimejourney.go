@@ -79,7 +79,7 @@ const (
 func (r *RealtimeJourney) IsActive() bool {
 	timedOut := (time.Since(r.ModificationDateTime)).Minutes() > float64(r.TimeoutDurationMinutes)
 
-	if timedOut {
+	if timedOut && r.TimeoutDurationMinutes > 0 {
 		return false
 	}
 

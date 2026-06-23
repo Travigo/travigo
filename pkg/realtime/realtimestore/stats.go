@@ -23,10 +23,7 @@ type RealtimeJourneyStats struct {
 	Countries      map[string]int
 }
 
-// TODO MOVE TO REDIS
 func GetRealtimeJourneys() RealtimeJourneyStats {
-	// realtimeJourneysCollection := collectionOrDefault(nil)
-
 	var numberActiveRealtimeJourneys int64
 	var numberActiveRealtimeJourneysWithTrack int64
 	var numberActiveRealtimeJourneysWithoutTrack int64
