@@ -29,6 +29,7 @@ func StopsRouter(router fiber.Router) {
 
 	router.Get("/search", searchStops)
 
+	router.Get("/:identifier/osm", getStopOSM)
 	router.Get("/:identifier", getStop)
 	router.Get("/:identifier/departures", getStopDepartures)
 }
@@ -135,6 +136,57 @@ func getStop(c *fiber.Ctx) error {
 
 		return c.JSON(reducedStop)
 	}
+}
+
+func getStopOSM(c *fiber.Ctx) error {
+	identifier := c.Params("identifier")
+	forceRefresh := strings.ToLower(c.Query("force_refresh")) == "true"
+	radiusMetres := 0
+
+	if radiusMetresQuery := c.Query("radius_metres"); radiusMetresQuery != "" {
+		var err error
+		radiusMetres, err = strconv.Atoi(radiusMetresQuery)
+		if err != nil {
+			c.SendStatus(fiber.StatusBadRequest)
+			return c.JSON(fiber.Map{
+				"error": "Parameter radius_metres should be an integer",
+			})
+		}
+	}
+
+	stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+		Identifier: identifier,
+	})
+	if err != nil {
+		c.SendStatus(fiber.StatusNotFound)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	osmStop, err := dataaggregator.Lookup[*ctdf.OSMStop](query.OSMStop{
+		Stop:         stop,
+		ForceRefresh: forceRefresh,
+		RadiusMetres: radiusMetres,
+	})
+	if err != nil {
+		c.SendStatus(fiber.StatusBadGateway)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	reducedOSMStop, err := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"basic", "detailed", "internal"},
+	}, osmStop)
+	if err != nil {
+		c.SendStatus(fiber.StatusInternalServerError)
+		return c.JSON(fiber.Map{
+			"error": "Sherrif could not reduce OSMStop",
+		})
+	}
+
+	return c.JSON(reducedOSMStop)
 }
 
 func getStopDepartures(c *fiber.Ctx) error {

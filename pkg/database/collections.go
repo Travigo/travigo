@@ -11,8 +11,36 @@ import (
 
 func createIndexes() {
 	createStopsIndexes()
+	createOSMStopIndexes()
 	createOperatorsIndexes()
 	createJourneysIndexes()
+}
+
+func createOSMStopIndexes() {
+	osmStopCollection := GetCollection("osm_stops")
+	osmStopIndex := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "stopref", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "stopgroupref", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "stoparea.id", Value: 1}},
+		},
+	}
+
+	opts := options.CreateIndexes()
+	_, err := osmStopCollection.Indexes().CreateMany(context.Background(), osmStopIndex, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Index")
+	}
 }
 
 func createStopsIndexes() {

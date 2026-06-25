@@ -30,6 +30,7 @@ func (s Source) Supports() []reflect.Type {
 		reflect.TypeOf(ctdf.Operator{}),
 		reflect.TypeOf(ctdf.OperatorGroup{}),
 		reflect.TypeOf(ctdf.Service{}),
+		reflect.TypeOf(ctdf.OSMStop{}),
 		reflect.TypeOf([]*ctdf.Service{}),
 		reflect.TypeOf([]*ctdf.ServiceAlert{}),
 	}
@@ -49,6 +50,8 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.OperatorGroupQuery(q.(query.OperatorGroup))
 	case query.Service:
 		return s.ServiceQuery(q.(query.Service))
+	case query.OSMStop:
+		return s.OSMStopQuery(q.(query.OSMStop))
 	case query.ServicesByStop:
 		return s.ServicesByStopQuery(q.(query.ServicesByStop))
 	case query.ServiceAlertsForMatchingIdentifiers:
