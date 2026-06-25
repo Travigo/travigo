@@ -231,9 +231,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	//// Shapes ////
 	////// TODO RE-ADD SHAPES
 	shapsMapping := map[string][]*Shape{}
-	// for _, shape := range g.Shapes {
-	// 	shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
-	// }
+	for _, shape := range g.Shapes {
+		shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
+	}
 
 	//// Routes / Services ////
 	g.ctdfServices = map[string]*ctdf.Service{}
@@ -281,7 +281,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	//// Journeys / Trips ////
 	gtfsTrips := map[string]Trip{}
-	// fullJourneyTracks := map[string][]ctdf.Location{}
+	fullJourneyTracks := map[string][]ctdf.Location{}
 
 	// PERF(medium-risk): cache the parsed+formatted calendar date-range condition
 	// value keyed by calendar ServiceID. Many trips share the same calendar, and the
@@ -379,7 +379,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				})
 			}
 
-			// fullJourneyTracks[trip.ID] = journeyTrack
+			fullJourneyTracks[t.ID] = journeyTrack
 			journey.Track = journeyTrack
 		}
 
