@@ -30,6 +30,7 @@ func StopsRouter(router fiber.Router) {
 	router.Get("/search", searchStops)
 
 	router.Get("/:identifier/osm", getStopOSM)
+	router.Get("/:identifier/detailed", getStopDetailed)
 	router.Get("/:identifier", getStop)
 	router.Get("/:identifier/departures", getStopDepartures)
 }
@@ -187,6 +188,28 @@ func getStopOSM(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(reducedOSMStop)
+}
+
+func getStopDetailed(c *fiber.Ctx) error {
+	identifier := c.Params("identifier")
+
+	var stop *ctdf.StopDetailed
+	stop, err := dataaggregator.Lookup[*ctdf.StopDetailed](query.StopDetailed{
+		PrimaryIdentifier: identifier,
+	})
+
+	if err != nil {
+		c.SendStatus(fiber.StatusNotFound)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	reducedStop, _ := sheriff.Marshal(&sheriff.Options{
+		Groups: []string{"basic", "detailed"},
+	}, stop)
+
+	return c.JSON(reducedStop)
 }
 
 func getStopDepartures(c *fiber.Ctx) error {

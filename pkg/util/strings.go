@@ -1,5 +1,7 @@
 package util
 
+import "strings"
+
 func RemoveDuplicateStrings(strings []string, ignoreList []string) []string {
 	presentStrings := make(map[string]bool)
 	var list []string
@@ -33,4 +35,15 @@ func TrimString(s string, length int) string {
 	}
 
 	return s[:length]
+}
+
+func SplitAndTrim(s string, sep string) []string {
+	split := make([]string, 0)
+	for _, part := range strings.Split(s, sep) {
+		trimSpace := strings.TrimSpace(part)
+		if trimSpace != "" {
+			split = append(split, trimSpace)
+		}
+	}
+	return split
 }
