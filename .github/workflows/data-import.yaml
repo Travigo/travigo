@@ -126,7 +126,7 @@ jobs:
 
   postprocess:
     needs: import-dataset
-    runs-on: ubuntu-latest
+    runs-on: arc
     timeout-minutes: 180
     steps:
       - name: Checkout repository
