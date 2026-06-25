@@ -22,6 +22,11 @@ type StopToilets struct {
 	Cost         bool `groups:"basic" bson:",omitempty"`
 	Accessible   bool `groups:"basic" bson:",omitempty"`
 
+	Male   bool `groups:"basic" bson:",omitempty"`
+	Female bool `groups:"basic" bson:",omitempty"`
+
+	OpenHoursDescription string `groups:"basic" bson:",omitempty"`
+
 	LocationDescription string    `groups:"basic" bson:",omitempty"`
 	Location            *Location `groups:"detailed" bson:",omitempty"`
 }

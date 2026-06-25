@@ -70,11 +70,14 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 				}
 			} else if isToiletsFeatureType(feature.Type) {
 				stopToilets := ctdf.StopToilets{
-					CustomerOnly:        feature.Tags["access"] == "customers",
-					Cost:                feature.Tags["fee"] == "yes",
-					Accessible:          feature.Tags["wheelchair"] == "yes",
-					Location:            feature.Location,
-					LocationDescription: feature.Tags["note"],
+					CustomerOnly:         feature.Tags["access"] == "customers",
+					Cost:                 feature.Tags["fee"] == "yes",
+					Accessible:           feature.Tags["wheelchair"] == "yes",
+					Male:                 feature.Tags["male"] == "yes",
+					Female:               feature.Tags["female"] == "yes",
+					OpenHoursDescription: feature.Tags["opening_hours"],
+					Location:             feature.Location,
+					LocationDescription:  feature.Tags["note"],
 				}
 				stopDetailed.Toilets = append(stopDetailed.Toilets, stopToilets)
 			}
