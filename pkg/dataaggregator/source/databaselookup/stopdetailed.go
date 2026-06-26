@@ -2,6 +2,7 @@ package databaselookup
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -22,12 +23,16 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 
 	// Build detailed stop information from OSM features
 	stopDetailed := &ctdf.StopDetailed{
-		FoodDrink: []ctdf.StopShop{},
-		Shops:     []ctdf.StopShop{},
+		FoodDrink:   []ctdf.StopShop{},
+		Shops:       []ctdf.StopShop{},
+		CarPark:     []ctdf.StopParking{},
+		BicyclePark: []ctdf.StopParking{},
 	}
 
 	for _, feature := range osmStop.(*ctdf.OSMStop).Features {
 		if isRelevantFeatureType(feature.Type) {
+
+			// Shop & Food/Drink
 			if isShopFeatureType(feature.Type) || isFoodDrinkFeatureType(feature.Type) {
 				wikiDataID := feature.Tags["wikidata"]
 				if wikiDataID == "" {
@@ -57,6 +62,8 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 					Website:             feature.Tags["website"],
 					WikiDataID:          wikiDataID,
 					LocationDescription: feature.Tags["location"],
+					Association:         string(feature.Association),
+					DistanceMetres:      feature.DistanceMetres,
 					Location:            feature.Location,
 				}
 				if isFoodDrinkFeatureType(feature.Type) {
@@ -74,12 +81,88 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 					OpenHoursDescription: feature.Tags["opening_hours"],
 					Location:             feature.Location,
 					LocationDescription:  feature.Tags["note"],
+					Association:          string(feature.Association),
+					DistanceMetres:       feature.DistanceMetres,
 				}
 				stopDetailed.Toilets = append(stopDetailed.Toilets, stopToilets)
+			} else if isParkingFeatureType(feature.Type) {
+				capacity, _ := strconv.Atoi(feature.Tags["capacity"])
+
+				parkingType := feature.Tags["parking"]
+				if feature.Tags["bicycle_parking"] != "" {
+					parkingType = feature.Tags["bicycle_parking"]
+				}
+
+				stopParking := ctdf.StopParking{
+					PrimaryName:        feature.Tags["name"],
+					Type:               parkingType,
+					Cost:               feature.Tags["fee"] == "yes",
+					Accessible:         feature.Tags["wheelchair"] == "yes",
+					OperatorName:       feature.Tags["operator"],
+					OperatorWikiDataID: feature.Tags["operator:wikidata"],
+					Association:        string(feature.Association),
+					DistanceMetres:     feature.DistanceMetres,
+					Capacity:           capacity,
+					Covered:            feature.Tags["covered"] == "yes",
+				}
+
+				if feature.Type == ctdf.OSMStopFeatureTypeCarPark && feature.ParkingAssociation == ctdf.OSMStopParkingOfficial {
+					stopDetailed.CarPark = append(stopDetailed.CarPark, stopParking)
+				} else if feature.Type == ctdf.OSMStopFeatureTypeBicyclePark {
+					stopDetailed.BicyclePark = append(stopDetailed.BicyclePark, stopParking)
+				}
 			}
 		}
 	}
+	stopDetailed.BicyclePark = mergeStopBicycleParking(stopDetailed.BicyclePark)
 	return stopDetailed, nil
+}
+
+type stopBicycleParkingMergeKey struct {
+	cost        bool
+	covered     bool
+	parkingType string
+	accessible  bool
+	primaryName string
+}
+
+func mergeStopBicycleParking(parking []ctdf.StopParking) []ctdf.StopParking {
+	merged := []ctdf.StopParking{}
+	mergedIndexByKey := map[stopBicycleParkingMergeKey]int{}
+
+	for _, item := range parking {
+		key := stopBicycleParkingMergeKey{
+			cost:        item.Cost,
+			covered:     item.Covered,
+			parkingType: item.Type,
+			accessible:  item.Accessible,
+			primaryName: item.PrimaryName,
+		}
+
+		index, exists := mergedIndexByKey[key]
+		if !exists {
+			mergedIndexByKey[key] = len(merged)
+			merged = append(merged, item)
+			continue
+		}
+
+		merged[index].Capacity += item.Capacity
+		if merged[index].DistanceMetres == 0 ||
+			(item.DistanceMetres > 0 && item.DistanceMetres < merged[index].DistanceMetres) {
+			merged[index].DistanceMetres = item.DistanceMetres
+		}
+		if merged[index].Association == "" {
+			merged[index].Association = item.Association
+		}
+		if merged[index].OperatorName == "" {
+			merged[index].OperatorName = item.OperatorName
+		}
+		if merged[index].OperatorWikiDataID == "" {
+			merged[index].OperatorWikiDataID = item.OperatorWikiDataID
+		}
+	}
+
+	return merged
 }
 
 func isFoodDrinkFeatureType(featureType ctdf.OSMStopFeatureType) bool {
@@ -103,6 +186,10 @@ func isToiletsFeatureType(featureType ctdf.OSMStopFeatureType) bool {
 	return featureType == ctdf.OSMStopFeatureTypeToilets
 }
 
+func isParkingFeatureType(featureType ctdf.OSMStopFeatureType) bool {
+	return featureType == ctdf.OSMStopFeatureTypeCarPark || featureType == ctdf.OSMStopFeatureTypeBicyclePark
+}
+
 func isRelevantFeatureType(featureType ctdf.OSMStopFeatureType) bool {
 	if isFoodDrinkFeatureType(featureType) {
 		return true
@@ -111,6 +198,9 @@ func isRelevantFeatureType(featureType ctdf.OSMStopFeatureType) bool {
 		return true
 	}
 	if isToiletsFeatureType(featureType) {
+		return true
+	}
+	if isParkingFeatureType(featureType) {
 		return true
 	}
 

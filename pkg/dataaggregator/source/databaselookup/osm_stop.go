@@ -77,6 +77,12 @@ type osmStopQueryPlan struct {
 	location      *ctdf.Location
 }
 
+type stopFeatureAssociationContext struct {
+	roleByKey            map[string]string
+	stationPolygons      [][]overpassPoint
+	stationRetailAnchors []overpassPoint
+}
+
 func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 	if q.Stop == nil {
 		return nil, errors.New("OSMStop query requires a Stop")
@@ -145,9 +151,6 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 	if station != nil {
 		ref := osmElementRef(*station)
 		osmStop.Station = &ref
-	}
-	if stopGroupRef := firstStopGroupRef(q.Stop); stopGroupRef != "" {
-		osmStop.StopGroupRef = stopGroupRef
 	}
 
 	opts := options.Update().SetUpsert(true)
@@ -268,31 +271,60 @@ way(bn.platform_nodes)
 ->.platform_edges_from_platforms;
 
 (
-  node(around.member_nodes:80)["shop"];
-  way(around.member_nodes:80)["shop"];
-  relation(around.member_nodes:80)["shop"];
-  node(around.member_way_nodes:80)["shop"];
-  way(around.member_way_nodes:80)["shop"];
-  relation(around.member_way_nodes:80)["shop"];
-  node(around.nested_nodes:80)["shop"];
-  way(around.nested_nodes:80)["shop"];
-  relation(around.nested_nodes:80)["shop"];
-  node(around.nested_way_nodes:80)["shop"];
-  way(around.nested_way_nodes:80)["shop"];
-  relation(around.nested_way_nodes:80)["shop"];
-  node(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  .station;
+  .stop_area;
+  .member_ways;
+  .nested_ways;
+)->.station_area_sources;
+.station_area_sources map_to_area -> .station_areas;
+
+(
+  node(area.station_areas)["shop"];
+  way(area.station_areas)["shop"];
+  relation(area.station_areas)["shop"];
+  node(around.member_nodes:25)["shop"];
+  way(around.member_nodes:25)["shop"];
+  relation(around.member_nodes:25)["shop"];
+  node(around.member_way_nodes:25)["shop"];
+  way(around.member_way_nodes:25)["shop"];
+  relation(around.member_way_nodes:25)["shop"];
+  node(around.nested_nodes:25)["shop"];
+  way(around.nested_nodes:25)["shop"];
+  relation(around.nested_nodes:25)["shop"];
+  node(around.nested_way_nodes:25)["shop"];
+  way(around.nested_way_nodes:25)["shop"];
+  relation(around.nested_way_nodes:25)["shop"];
+  node(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
 )->.candidate_pois;
+
+(
+  node(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+)->.candidate_parking;
 
 (
   .station;
@@ -307,6 +339,7 @@ way(bn.platform_nodes)
   .roads_at_stops;
   .platform_edges_from_platforms;
   .candidate_pois;
+  .candidate_parking;
 );
 out body geom;`, stationLookup)
 }
@@ -349,31 +382,59 @@ way(bn.platform_nodes)
 ->.platform_edges_from_platforms;
 
 (
-  node(around.member_nodes:80)["shop"];
-  way(around.member_nodes:80)["shop"];
-  relation(around.member_nodes:80)["shop"];
-  node(around.member_way_nodes:80)["shop"];
-  way(around.member_way_nodes:80)["shop"];
-  relation(around.member_way_nodes:80)["shop"];
-  node(around.nested_nodes:80)["shop"];
-  way(around.nested_nodes:80)["shop"];
-  relation(around.nested_nodes:80)["shop"];
-  node(around.nested_way_nodes:80)["shop"];
-  way(around.nested_way_nodes:80)["shop"];
-  relation(around.nested_way_nodes:80)["shop"];
-  node(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.member_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.member_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.nested_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  node(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  way(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
-  relation(around.nested_way_nodes:80)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  .stop_area;
+  .member_ways;
+  .nested_ways;
+)->.station_area_sources;
+.station_area_sources map_to_area -> .station_areas;
+
+(
+  node(area.station_areas)["shop"];
+  way(area.station_areas)["shop"];
+  relation(area.station_areas)["shop"];
+  node(around.member_nodes:25)["shop"];
+  way(around.member_nodes:25)["shop"];
+  relation(around.member_nodes:25)["shop"];
+  node(around.member_way_nodes:25)["shop"];
+  way(around.member_way_nodes:25)["shop"];
+  relation(around.member_way_nodes:25)["shop"];
+  node(around.nested_nodes:25)["shop"];
+  way(around.nested_nodes:25)["shop"];
+  relation(around.nested_nodes:25)["shop"];
+  node(around.nested_way_nodes:25)["shop"];
+  way(around.nested_way_nodes:25)["shop"];
+  relation(around.nested_way_nodes:25)["shop"];
+  node(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(area.station_areas)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.member_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.member_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.nested_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  node(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  way(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
+  relation(around.nested_way_nodes:20)["amenity"~"^(cafe|restaurant|fast_food|food_court|pub|bar|toilets|atm|bank|pharmacy)$"];
 )->.candidate_pois;
+
+(
+  node(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.member_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.member_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.nested_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  node(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  way(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+  relation(around.nested_way_nodes:300)["amenity"~"^(parking|bicycle_parking|motorcycle_parking)$"];
+)->.candidate_parking;
 
 (
   relation.stop_area;
@@ -387,6 +448,7 @@ way(bn.platform_nodes)
   .roads_at_stops;
   .platform_edges_from_platforms;
   .candidate_pois;
+  .candidate_parking;
 );
 out body geom;`, radiusMetres, lat, lon)
 }
@@ -460,11 +522,14 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 
 	stopPositionNodeIDs := map[int64]bool{}
 	platformNodeIDs := map[int64]bool{}
+	stationPolygons := [][]overpassPoint{}
+	stationRetailAnchors := []overpassPoint{}
 
 	byKey := mapOverpassElementsByKey(elements)
 	for _, member := range stopArea.Members {
 		key := overpassElementRefKey(member.Type, member.Ref)
 		included[key] = true
+		stationPolygons = append(stationPolygons, stationContainmentMemberPolygons(member)...)
 
 		memberElement, exists := byKey[key]
 		if !exists {
@@ -479,10 +544,21 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 				platformNodeIDs[nodeID] = true
 			}
 		}
+		if isStationRetailAnchor(memberElement) {
+			stationRetailAnchors = append(stationRetailAnchors, anchorPoints(memberElement)...)
+		}
+		stationPolygons = append(stationPolygons, stationContainmentPolygons(memberElement, member.Role)...)
 
 		for _, nestedMember := range memberElement.Members {
 			nestedKey := overpassElementRefKey(nestedMember.Type, nestedMember.Ref)
 			included[nestedKey] = true
+			stationPolygons = append(stationPolygons, stationContainmentMemberPolygons(nestedMember)...)
+			if nestedElement, exists := byKey[nestedKey]; exists {
+				stationPolygons = append(stationPolygons, stationContainmentPolygons(nestedElement, nestedMember.Role)...)
+			}
+			if nestedElement, exists := byKey[nestedKey]; exists && isStationRetailAnchor(nestedElement) {
+				stationRetailAnchors = append(stationRetailAnchors, anchorPoints(nestedElement)...)
+			}
 		}
 	}
 
@@ -509,7 +585,11 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 			}
 		}
 
-		if isStationPOI(element) {
+		if isStationParking(element) ||
+			(isStationRetailPOI(element) &&
+				(elementInsideAnyPolygon(element, stationPolygons) ||
+					hasStationContext(element) ||
+					elementNearAnyPoint(element, stationRetailAnchors, 60))) {
 			included[overpassElementKey(element)] = true
 		}
 	}
@@ -611,12 +691,7 @@ func elementMatchesTransportType(element overpassElement, transportType ctdf.Tra
 }
 
 func buildOSMStopFeatures(elements []overpassElement, stopArea *overpassElement) []ctdf.OSMStopFeature {
-	roleByKey := map[string]string{}
-	if stopArea != nil {
-		for _, member := range stopArea.Members {
-			roleByKey[overpassElementRefKey(member.Type, member.Ref)] = member.Role
-		}
-	}
+	associationContext := buildStopFeatureAssociationContext(elements, stopArea)
 
 	features := make([]ctdf.OSMStopFeature, 0, len(elements))
 	for _, element := range elements {
@@ -625,15 +700,26 @@ func buildOSMStopFeatures(elements []overpassElement, stopArea *overpassElement)
 			continue
 		}
 
+		role := associationContext.roleByKey[overpassElementKey(element)]
+		parkingAssociation, parkingConfidence := classifyParkingAssociation(element, role)
+		if isStationParking(element) && parkingAssociation == ctdf.OSMStopParkingUnrelated {
+			continue
+		}
+
+		association, distanceMetres := classifyStopFeatureAssociation(element, role, parkingAssociation, associationContext)
 		feature := ctdf.OSMStopFeature{
-			Type:        featureType,
-			Element:     osmElementRef(element),
-			Role:        roleByKey[overpassElementKey(element)],
-			PrimaryName: element.Tags["name"],
-			Ref:         element.Tags["ref"],
-			LocalRef:    element.Tags["local_ref"],
-			Tags:        element.Tags,
-			Geometry:    overpassGeometryToLocations(element.Geometry),
+			Type:               featureType,
+			Element:            osmElementRef(element),
+			Role:               role,
+			PrimaryName:        element.Tags["name"],
+			Ref:                element.Tags["ref"],
+			LocalRef:           element.Tags["local_ref"],
+			Tags:               element.Tags,
+			ParkingAssociation: parkingAssociation,
+			ParkingConfidence:  parkingConfidence,
+			Association:        association,
+			DistanceMetres:     distanceMetres,
+			Geometry:           overpassGeometryToLocations(element.Geometry),
 		}
 
 		if point, ok := representativePoint(element); ok {
@@ -644,6 +730,82 @@ func buildOSMStopFeatures(elements []overpassElement, stopArea *overpassElement)
 	}
 
 	return features
+}
+
+func buildStopFeatureAssociationContext(elements []overpassElement, stopArea *overpassElement) stopFeatureAssociationContext {
+	context := stopFeatureAssociationContext{
+		roleByKey: map[string]string{},
+	}
+	if stopArea == nil {
+		return context
+	}
+
+	byKey := mapOverpassElementsByKey(elements)
+	for _, member := range stopArea.Members {
+		key := overpassElementRefKey(member.Type, member.Ref)
+		context.roleByKey[key] = member.Role
+		context.stationPolygons = append(context.stationPolygons, stationContainmentMemberPolygons(member)...)
+
+		memberElement, exists := byKey[key]
+		if !exists {
+			continue
+		}
+
+		if isStationRetailAnchor(memberElement) {
+			context.stationRetailAnchors = append(context.stationRetailAnchors, anchorPoints(memberElement)...)
+		}
+		context.stationPolygons = append(context.stationPolygons, stationContainmentPolygons(memberElement, member.Role)...)
+
+		for _, nestedMember := range memberElement.Members {
+			nestedKey := overpassElementRefKey(nestedMember.Type, nestedMember.Ref)
+			context.roleByKey[nestedKey] = nestedMember.Role
+			context.stationPolygons = append(context.stationPolygons, stationContainmentMemberPolygons(nestedMember)...)
+
+			nestedElement, exists := byKey[nestedKey]
+			if !exists {
+				continue
+			}
+			if isStationRetailAnchor(nestedElement) {
+				context.stationRetailAnchors = append(context.stationRetailAnchors, anchorPoints(nestedElement)...)
+			}
+			context.stationPolygons = append(context.stationPolygons, stationContainmentPolygons(nestedElement, nestedMember.Role)...)
+		}
+	}
+
+	return context
+}
+
+func classifyStopFeatureAssociation(
+	element overpassElement,
+	role string,
+	parkingAssociation ctdf.OSMStopParkingAssociation,
+	context stopFeatureAssociationContext,
+) (ctdf.OSMStopFeatureAssociation, float64) {
+	if isStopArea(element) ||
+		isStation(element) ||
+		isStopPosition(element) ||
+		isPlatform(element) ||
+		isPlatformEdge(element) ||
+		isEntrance(element) ||
+		isTrack(element) ||
+		isRoad(element) ||
+		isAccess(element) ||
+		role != "" ||
+		elementInsideAnyPolygon(element, context.stationPolygons) ||
+		hasStationContext(element) {
+		return ctdf.OSMStopFeatureAssociationInside, 0
+	}
+
+	if elementNearAnyPoint(element, context.stationRetailAnchors, 60) ||
+		isStationRetailPOI(element) ||
+		parkingAssociation == ctdf.OSMStopParkingNearby ||
+		parkingAssociation == ctdf.OSMStopParkingOfficial ||
+		parkingAssociation == ctdf.OSMStopParkingLikely {
+		distanceMetres, _ := nearestElementDistanceToPoints(element, context.stationRetailAnchors)
+		return ctdf.OSMStopFeatureAssociationNearby, distanceMetres
+	}
+
+	return "", 0
 }
 
 func buildOSMElements(elements []overpassElement) []ctdf.OSMElement {
@@ -703,6 +865,118 @@ func buildOSMStopOtherIdentifiers(stopArea *overpassElement, station *overpassEl
 	return ids
 }
 
+func classifyParkingAssociation(element overpassElement, role string) (ctdf.OSMStopParkingAssociation, float64) {
+	if !isStationParking(element) {
+		return "", 0
+	}
+
+	score := 0
+
+	if role != "" {
+		score += 4
+	}
+	if parkingHasStationContext(element) {
+		score += 4
+	}
+	if parkingHasRailOperatorContext(element) {
+		score += 3
+	}
+	if parkingHasNearbyContext(element) {
+		score += 1
+	}
+	if parkingHasUnrelatedContext(element) {
+		score -= 4
+	}
+	if parkingHasRestrictedAccess(element) {
+		score -= 2
+	}
+
+	switch {
+	case score >= 7:
+		return ctdf.OSMStopParkingOfficial, 0.95
+	case score >= 4:
+		return ctdf.OSMStopParkingLikely, 0.8
+	case score >= 0:
+		return ctdf.OSMStopParkingNearby, 0.55
+	default:
+		return ctdf.OSMStopParkingUnrelated, 0.2
+	}
+}
+
+func parkingHasStationContext(element overpassElement) bool {
+	for _, value := range parkingContextValues(element) {
+		if strings.Contains(value, "station") ||
+			strings.Contains(value, "rail") ||
+			strings.Contains(value, "train") ||
+			strings.Contains(value, "cyclepoint") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parkingHasRailOperatorContext(element overpassElement) bool {
+	for _, value := range parkingContextValues(element) {
+		if strings.Contains(value, "network rail") ||
+			strings.Contains(value, "national rail") ||
+			strings.Contains(value, "greater anglia") ||
+			strings.Contains(value, "gtr") ||
+			strings.Contains(value, "govia thameslink") ||
+			strings.Contains(value, "national car parks") ||
+			strings.Contains(value, " ncp") ||
+			strings.Contains(value, "apcoa") ||
+			strings.Contains(value, "saba") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parkingHasNearbyContext(element overpassElement) bool {
+	access := strings.ToLower(element.Tags["access"])
+	return access == "" || access == "yes" || access == "destination" || access == "customers"
+}
+
+func parkingHasUnrelatedContext(element overpassElement) bool {
+	for _, value := range parkingContextValues(element) {
+		if strings.Contains(value, "travelodge") ||
+			strings.Contains(value, "leisure park") ||
+			strings.Contains(value, "cambridge city council") ||
+			strings.Contains(value, "gwydir street") ||
+			strings.Contains(value, "residential") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func parkingHasRestrictedAccess(element overpassElement) bool {
+	access := strings.ToLower(element.Tags["access"])
+	return access == "private" || access == "no" || access == "permit"
+}
+
+func parkingContextValues(element overpassElement) []string {
+	values := []string{
+		element.Tags["name"],
+		element.Tags["operator"],
+		element.Tags["description"],
+		element.Tags["note"],
+		element.Tags["location"],
+		element.Tags["website"],
+		element.Tags["url"],
+		element.Tags["access"],
+	}
+
+	for i, value := range values {
+		values[i] = strings.ToLower(value)
+	}
+
+	return values
+}
+
 func classifyOSMStopFeature(element overpassElement) ctdf.OSMStopFeatureType {
 	switch {
 	case isStopArea(element):
@@ -731,6 +1005,12 @@ func classifyOSMStopFeature(element overpassElement) ctdf.OSMStopFeatureType {
 		return ctdf.OSMStopFeatureTypeToilets
 	case isATM(element):
 		return ctdf.OSMStopFeatureTypeATM
+	case isCarPark(element):
+		return ctdf.OSMStopFeatureTypeCarPark
+	case isBicyclePark(element):
+		return ctdf.OSMStopFeatureTypeBicyclePark
+	case isMotorcyclePark(element):
+		return ctdf.OSMStopFeatureTypeMotorcyclePark
 	case isShop(element):
 		return ctdf.OSMStopFeatureTypeShop
 	case isStationAmenity(element):
@@ -778,7 +1058,15 @@ func isEntrance(element overpassElement) bool {
 		element.Tags["entrance"] != ""
 }
 
+func isStationRetailAnchor(element overpassElement) bool {
+	return isStation(element) || isStopPosition(element) || isPlatform(element) || isEntrance(element)
+}
+
 func isStationPOI(element overpassElement) bool {
+	return isShop(element) || isStationAmenity(element) || isStationParking(element)
+}
+
+func isStationRetailPOI(element overpassElement) bool {
 	return isShop(element) || isStationAmenity(element)
 }
 
@@ -813,8 +1101,37 @@ func isStationAmenity(element overpassElement) bool {
 	}
 }
 
+func isStationParking(element overpassElement) bool {
+	return isCarPark(element) || isBicyclePark(element) || isMotorcyclePark(element)
+}
+
+func isCarPark(element overpassElement) bool {
+	return element.Tags["amenity"] == "parking"
+}
+
+func isBicyclePark(element overpassElement) bool {
+	return element.Tags["amenity"] == "bicycle_parking"
+}
+
+func isMotorcyclePark(element overpassElement) bool {
+	return element.Tags["amenity"] == "motorcycle_parking"
+}
+
 func isShop(element overpassElement) bool {
-	return element.Tags["shop"] != ""
+	shop := strings.ToLower(element.Tags["shop"])
+	if shop == "" {
+		return false
+	}
+
+	switch shop {
+	case "vacant", "closed", "disused", "abandoned", "no":
+		return false
+	}
+
+	return element.Tags["vacant"] != "yes" &&
+		element.Tags["disused:shop"] == "" &&
+		element.Tags["abandoned:shop"] == "" &&
+		element.Tags["was:shop"] == ""
 }
 
 func isCafe(element overpassElement) bool {
@@ -879,6 +1196,43 @@ func isStationContainmentPolygon(element overpassElement) bool {
 		element.Tags["public_transport"] == "station"
 }
 
+func stationContainmentPolygons(element overpassElement, role string) [][]overpassPoint {
+	polygons := [][]overpassPoint{}
+
+	if isStationContainmentPolygon(element) || (isStationContainmentRole(role) && isClosedPolygon(element.Geometry)) {
+		polygons = append(polygons, element.Geometry)
+	}
+
+	if element.Type == string(ctdf.OSMElementTypeRelation) &&
+		(isStopArea(element) || isStation(element) || isStationContainmentRole(role)) {
+		for _, member := range element.Members {
+			if isClosedPolygon(member.Geometry) &&
+				(member.Role == "outer" || isStationContainmentRole(member.Role)) {
+				polygons = append(polygons, member.Geometry)
+			}
+		}
+	}
+
+	return polygons
+}
+
+func stationContainmentMemberPolygons(member overpassMember) [][]overpassPoint {
+	if !isStationContainmentRole(member.Role) || !isClosedPolygon(member.Geometry) {
+		return nil
+	}
+
+	return [][]overpassPoint{member.Geometry}
+}
+
+func isStationContainmentRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "station", "platform", "entrance", "building", "outline":
+		return true
+	default:
+		return false
+	}
+}
+
 func elementInsideAnyPolygon(element overpassElement, polygons [][]overpassPoint) bool {
 	if len(polygons) == 0 {
 		return false
@@ -896,6 +1250,56 @@ func elementInsideAnyPolygon(element overpassElement, polygons [][]overpassPoint
 	}
 
 	return false
+}
+
+func elementNearAnyPoint(element overpassElement, points []overpassPoint, maxDistanceMetres float64) bool {
+	distanceMetres, ok := nearestElementDistanceToPoints(element, points)
+	if !ok {
+		return false
+	}
+
+	return distanceMetres <= maxDistanceMetres
+}
+
+func nearestElementDistanceToPoints(element overpassElement, points []overpassPoint) (float64, bool) {
+	if len(points) == 0 {
+		return 0, false
+	}
+
+	point, ok := representativePoint(element)
+	if !ok {
+		return 0, false
+	}
+
+	nearestDistanceMetres := math.MaxFloat64
+	for _, candidate := range points {
+		distanceMetres := haversineMetres(point.Lat, point.Lon, candidate.Lat, candidate.Lon)
+		if distanceMetres < nearestDistanceMetres {
+			nearestDistanceMetres = distanceMetres
+		}
+	}
+
+	return nearestDistanceMetres, true
+}
+
+func anchorPoints(element overpassElement) []overpassPoint {
+	points := make([]overpassPoint, 0, len(element.Geometry)+2)
+
+	if element.Type == string(ctdf.OSMElementTypeNode) {
+		points = append(points, overpassPoint{Lat: element.Lat, Lon: element.Lon})
+	}
+	if element.Center != nil {
+		points = append(points, *element.Center)
+	}
+	points = append(points, element.Geometry...)
+
+	if len(points) == 0 {
+		if point, ok := representativePoint(element); ok {
+			points = append(points, point)
+		}
+	}
+
+	return points
 }
 
 func isClosedPolygon(points []overpassPoint) bool {
@@ -1030,16 +1434,6 @@ func defaultRadius(stop *ctdf.Stop) int {
 	}
 
 	return defaultOtherSearchRadius
-}
-
-func firstStopGroupRef(stop *ctdf.Stop) string {
-	for _, association := range stop.Associations {
-		if association != nil && association.Type == "stop_group" {
-			return association.AssociatedIdentifier
-		}
-	}
-
-	return ""
 }
 
 func osmStopMatchConfidence(method ctdf.OSMStopMatchMethod, stopArea *overpassElement) float64 {

@@ -19,25 +19,44 @@ const (
 type OSMStopFeatureType string
 
 const (
-	OSMStopFeatureTypeStation      OSMStopFeatureType = "Station"
-	OSMStopFeatureTypeStopArea     OSMStopFeatureType = "StopArea"
-	OSMStopFeatureTypeStopPosition OSMStopFeatureType = "StopPosition"
-	OSMStopFeatureTypePlatform     OSMStopFeatureType = "Platform"
-	OSMStopFeatureTypePlatformEdge OSMStopFeatureType = "PlatformEdge"
-	OSMStopFeatureTypeEntrance     OSMStopFeatureType = "Entrance"
-	OSMStopFeatureTypeTrack        OSMStopFeatureType = "Track"
-	OSMStopFeatureTypeRoad         OSMStopFeatureType = "Road"
-	OSMStopFeatureTypeAccess       OSMStopFeatureType = "Access"
-	OSMStopFeatureTypeShop         OSMStopFeatureType = "Shop"
-	OSMStopFeatureTypeCafe         OSMStopFeatureType = "Cafe"
-	OSMStopFeatureTypeRestaurant   OSMStopFeatureType = "Restaurant"
-	OSMStopFeatureTypeFastFood     OSMStopFeatureType = "FastFood"
-	OSMStopFeatureTypePub          OSMStopFeatureType = "Pub"
-	OSMStopFeatureTypeBar          OSMStopFeatureType = "Bar"
-	OSMStopFeatureTypeToilets      OSMStopFeatureType = "Toilets"
-	OSMStopFeatureTypeATM          OSMStopFeatureType = "ATM"
-	OSMStopFeatureTypeAmenity      OSMStopFeatureType = "Amenity"
-	OSMStopFeatureTypeOther        OSMStopFeatureType = "Other"
+	OSMStopFeatureTypeStation        OSMStopFeatureType = "Station"
+	OSMStopFeatureTypeStopArea       OSMStopFeatureType = "StopArea"
+	OSMStopFeatureTypeStopPosition   OSMStopFeatureType = "StopPosition"
+	OSMStopFeatureTypePlatform       OSMStopFeatureType = "Platform"
+	OSMStopFeatureTypePlatformEdge   OSMStopFeatureType = "PlatformEdge"
+	OSMStopFeatureTypeEntrance       OSMStopFeatureType = "Entrance"
+	OSMStopFeatureTypeTrack          OSMStopFeatureType = "Track"
+	OSMStopFeatureTypeRoad           OSMStopFeatureType = "Road"
+	OSMStopFeatureTypeAccess         OSMStopFeatureType = "Access"
+	OSMStopFeatureTypeShop           OSMStopFeatureType = "Shop"
+	OSMStopFeatureTypeCafe           OSMStopFeatureType = "Cafe"
+	OSMStopFeatureTypeRestaurant     OSMStopFeatureType = "Restaurant"
+	OSMStopFeatureTypeFastFood       OSMStopFeatureType = "FastFood"
+	OSMStopFeatureTypePub            OSMStopFeatureType = "Pub"
+	OSMStopFeatureTypeBar            OSMStopFeatureType = "Bar"
+	OSMStopFeatureTypeToilets        OSMStopFeatureType = "Toilets"
+	OSMStopFeatureTypeATM            OSMStopFeatureType = "ATM"
+	OSMStopFeatureTypeCarPark        OSMStopFeatureType = "CarPark"
+	OSMStopFeatureTypeBicyclePark    OSMStopFeatureType = "BicyclePark"
+	OSMStopFeatureTypeMotorcyclePark OSMStopFeatureType = "MotorcyclePark"
+	OSMStopFeatureTypeAmenity        OSMStopFeatureType = "Amenity"
+	OSMStopFeatureTypeOther          OSMStopFeatureType = "Other"
+)
+
+type OSMStopParkingAssociation string
+
+const (
+	OSMStopParkingOfficial  OSMStopParkingAssociation = "OfficialStationParking"
+	OSMStopParkingLikely    OSMStopParkingAssociation = "LikelyStationParking"
+	OSMStopParkingNearby    OSMStopParkingAssociation = "NearbyParking"
+	OSMStopParkingUnrelated OSMStopParkingAssociation = "UnrelatedParking"
+)
+
+type OSMStopFeatureAssociation string
+
+const (
+	OSMStopFeatureAssociationInside OSMStopFeatureAssociation = "Inside"
+	OSMStopFeatureAssociationNearby OSMStopFeatureAssociation = "Nearby"
 )
 
 type OSMStopMatchMethod string
@@ -63,8 +82,7 @@ type OSMStop struct {
 
 	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
-	StopRef      string `groups:"basic,search" bson:",omitempty"`
-	StopGroupRef string `groups:"basic,search" bson:",omitempty"`
+	StopRef string `groups:"basic,search" bson:",omitempty"`
 
 	TransportTypes []TransportType `groups:"basic,search" bson:",omitempty"`
 
@@ -102,6 +120,11 @@ type OSMStopFeature struct {
 	Ref         string            `groups:"detailed" bson:",omitempty"`
 	LocalRef    string            `groups:"detailed" bson:",omitempty"`
 	Tags        map[string]string `groups:"internal" bson:",omitempty"`
+
+	ParkingAssociation OSMStopParkingAssociation `groups:"detailed" bson:",omitempty"`
+	ParkingConfidence  float64                   `groups:"detailed" bson:",omitempty"`
+	Association        OSMStopFeatureAssociation `groups:"detailed" bson:",omitempty"`
+	DistanceMetres     float64                   `groups:"detailed" bson:",omitempty"`
 
 	Location *Location  `groups:"detailed" bson:",omitempty"`
 	Geometry []Location `groups:"internal" bson:",omitempty"`
@@ -157,7 +180,6 @@ func (osmStop *OSMStop) SetOtherIdentifiers(ids []string) {
 
 func (osmStop *OSMStop) GenerateDeterministicID(writer io.Writer) {
 	writer.Write([]byte(osmStop.StopRef))
-	writer.Write([]byte(osmStop.StopGroupRef))
 
 	if osmStop.StopArea != nil {
 		writer.Write([]byte(osmStop.StopArea.Type))
