@@ -295,6 +295,10 @@ func getStopDepartures(c *fiber.Ctx) error {
 	}
 	afterTruncateCount := len(departureBoard)
 
+	destinationDisplayStart := time.Now()
+	journeyDestinationDisplayUsed, destinationFallbacks := resolveDepartureBoardDestinationDisplays(departureBoard)
+	destinationDisplayDuration := time.Since(destinationDisplayStart)
+
 	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
@@ -348,17 +352,58 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Int("departures_before_sort", beforeSortCount).
 		Int("departures_after_truncate", afterTruncateCount).
 		Int("nil_departure_items", nilDepartureItems).
+		Int("journey_destination_display_used", journeyDestinationDisplayUsed).
+		Int("destination_fallbacks", destinationFallbacks).
 		Int("transformed_operators", transformedOperators).
 		Int("transformed_services", transformedServices).
 		Dur("stop_lookup_duration", stopLookupDuration).
 		Dur("departure_lookup_duration", departureLookupDuration).
 		Dur("sort_duration", sortDuration).
+		Dur("destination_display_duration", destinationDisplayDuration).
 		Dur("transform_duration", transformDuration).
 		Dur("marshal_duration", marshalDuration).
 		Dur("total_duration", time.Since(requestStart)).
 		Msg("Stop departures response stats")
 
 	return c.JSON(departureBoardReduced)
+}
+
+func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
+	journeyDestinationDisplayUsed := 0
+	destinationFallbacks := 0
+
+	for _, item := range departureBoard {
+		if item == nil || item.DestinationDisplay != "" || item.Journey == nil {
+			continue
+		}
+
+		if item.Journey.DestinationDisplay != "" {
+			item.DestinationDisplay = item.Journey.DestinationDisplay
+			journeyDestinationDisplayUsed++
+			continue
+		}
+
+		if len(item.Journey.Path) == 0 {
+			item.DestinationDisplay = "See Vehicle"
+			destinationFallbacks++
+			continue
+		}
+
+		destinationFallbacks++
+		lastPathItem := item.Journey.Path[len(item.Journey.Path)-1]
+		lastPathItem.GetDestinationStop()
+
+		if lastPathItem.DestinationStop == nil {
+			item.DestinationDisplay = "See Vehicle"
+			continue
+		}
+
+		item.Journey.GetService()
+		lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(item.Journey.Service)
+		item.DestinationDisplay = lastPathItem.DestinationStop.PrimaryName
+	}
+
+	return journeyDestinationDisplayUsed, destinationFallbacks
 }
 
 func searchStops(c *fiber.Ctx) error {

@@ -64,7 +64,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	var estimateBlockJourneyCount atomic.Int64
 	var estimateRealtimeMatchedCount atomic.Int64
 	var estimatedCount atomic.Int64
-	var destinationFallbackCount atomic.Int64
 
 	stopRefsSet := make(map[string]struct{}, len(stopRefs))
 	for _, stopRef := range stopRefs {
@@ -247,30 +246,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					}
 				}
 
-				// TODO(high-risk): GetDestinationStop() and GetService() each issue a
-				// per-journey FindOne. A batch plan would pre-fetch, for every journey's last path
-				// item, the destination stop and the service via two Find($in) calls before the
-				// pool, keyed into maps. This is not cleanly replicable here because both lookups
-				// match on either primaryidentifier OR otheridentifiers (otheridentifiers is an
-				// array, so a simple key->doc map can miss matches), GetService() mutates
-				// journey.Service which is consumed downstream, and UpdateNameFromServiceOverrides
-				// mutates the stop name. Deferred to preserve exact behaviour and output.
-				if destinationDisplay == "" {
-					destinationFallbackCount.Add(1)
-					lastPathItem := journey.Path[len(journey.Path)-1]
-					lastPathItem.GetDestinationStop()
-
-					if lastPathItem.DestinationStop == nil {
-						destinationDisplay = "See Vehicle"
-					} else {
-						journey.GetService()
-						lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
-
-						destinationDisplay = lastPathItem.DestinationStop.PrimaryName
-					}
-
-				}
-
 				return &DepartureBoard{
 					Journey:            journey,
 					Time:               stopDepartureTime,
@@ -314,7 +289,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		Int64("estimate_block_journeys", estimateBlockJourneyCount.Load()).
 		Int64("estimate_realtime_matched", estimateRealtimeMatchedCount.Load()).
 		Int64("estimated_records", estimatedCount.Load()).
-		Int64("destination_fallbacks", destinationFallbackCount.Load()).
 		Int("nil_results", len(departureBoardWithNil)-len(departureBoard)).
 		Int("generated_departures", len(departureBoard)).
 		Dur("duration", time.Since(generationStart)).

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
@@ -41,20 +42,146 @@ func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.Realtim
 }
 
 func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[string]*ctdf.RealtimeJourney, error) {
+	start := time.Now()
 	realtimeJourneysByJourneyID := map[string]*ctdf.RealtimeJourney{}
 	if len(journeyIDs) == 0 {
 		return realtimeJourneysByJourneyID, nil
 	}
 
-	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
+	uniqueJourneyIDs := make([]string, 0, len(journeyIDs))
+	seenJourneyIDs := make(map[string]struct{}, len(journeyIDs))
 	for _, journeyID := range journeyIDs {
-		if realtimeJourney, err := FindCurrentForJourney(ctx, journeyID); err == nil && realtimeJourney != nil && realtimeJourney.ModificationDateTime.After(realtimeActiveCutoffDate) {
-			realtimeJourneysByJourneyID[journeyID] = realtimeJourney
+		if journeyID == "" {
 			continue
 		}
+		if _, seen := seenJourneyIDs[journeyID]; seen {
+			continue
+		}
+
+		seenJourneyIDs[journeyID] = struct{}{}
+		uniqueJourneyIDs = append(uniqueJourneyIDs, journeyID)
+	}
+	if len(uniqueJourneyIDs) == 0 {
+		return realtimeJourneysByJourneyID, nil
 	}
 
+	mappingKeys := make([]string, 0, len(uniqueJourneyIDs))
+	for _, journeyID := range uniqueJourneyIDs {
+		mappingKeys = append(mappingKeys, realtimeJourneyMappingKey("travigo-journeyid", journeyID))
+	}
+
+	mappingStart := time.Now()
+	mappingValues, err := redis_client.Client.MGet(ctx, mappingKeys...).Result()
+	mappingDuration := time.Since(mappingStart)
+	if err != nil {
+		return realtimeJourneysByJourneyID, err
+	}
+
+	journeyIDsByRealtimeJourneyID := map[string][]string{}
+	realtimeJourneyIDs := make([]string, 0, len(mappingValues))
+	seenRealtimeJourneyIDs := map[string]struct{}{}
+	mappingHits := 0
+	mappingMisses := 0
+	for i, mappingValue := range mappingValues {
+		realtimeJourneyID, ok := redisString(mappingValue)
+		if !ok || realtimeJourneyID == "" {
+			mappingMisses++
+			continue
+		}
+
+		mappingHits++
+		journeyIDsByRealtimeJourneyID[realtimeJourneyID] = append(journeyIDsByRealtimeJourneyID[realtimeJourneyID], uniqueJourneyIDs[i])
+		if _, seen := seenRealtimeJourneyIDs[realtimeJourneyID]; seen {
+			continue
+		}
+
+		seenRealtimeJourneyIDs[realtimeJourneyID] = struct{}{}
+		realtimeJourneyIDs = append(realtimeJourneyIDs, realtimeJourneyID)
+	}
+	if len(realtimeJourneyIDs) == 0 {
+		log.Debug().
+			Int("journey_ids", len(journeyIDs)).
+			Int("unique_journey_ids", len(uniqueJourneyIDs)).
+			Int("mapping_hits", mappingHits).
+			Int("mapping_misses", mappingMisses).
+			Dur("mapping_duration", mappingDuration).
+			Dur("total_duration", time.Since(start)).
+			Msg("Realtime journey batch lookup complete")
+		return realtimeJourneysByJourneyID, nil
+	}
+
+	detailKeys := make([]string, 0, len(realtimeJourneyIDs))
+	for _, realtimeJourneyID := range realtimeJourneyIDs {
+		detailKeys = append(detailKeys, realtimeJourneyDetailsKey(realtimeJourneyID))
+	}
+
+	detailsStart := time.Now()
+	detailValues, err := redis_client.Client.MGet(ctx, detailKeys...).Result()
+	detailsDuration := time.Since(detailsStart)
+	if err != nil {
+		return realtimeJourneysByJourneyID, err
+	}
+
+	realtimeActiveCutoffDate := ctdf.GetActiveRealtimeJourneyCutOffDate()
+	decodeStart := time.Now()
+	detailHits := 0
+	detailMisses := 0
+	decodeErrors := 0
+	inactiveRealtimeJourneys := 0
+	for i, detailValue := range detailValues {
+		realtimeJourneyJSON, ok := redisString(detailValue)
+		if !ok || realtimeJourneyJSON == "" {
+			detailMisses++
+			continue
+		}
+
+		detailHits++
+		realtimeJourney, err := decodeStoredRealtimeJourney(ctx, []byte(realtimeJourneyJSON), false)
+		if err != nil || realtimeJourney == nil {
+			decodeErrors++
+			continue
+		}
+
+		if !realtimeJourney.ModificationDateTime.After(realtimeActiveCutoffDate) {
+			inactiveRealtimeJourneys++
+			continue
+		}
+
+		for _, journeyID := range journeyIDsByRealtimeJourneyID[realtimeJourneyIDs[i]] {
+			realtimeJourneysByJourneyID[journeyID] = realtimeJourney
+		}
+	}
+	decodeDuration := time.Since(decodeStart)
+
+	log.Debug().
+		Int("journey_ids", len(journeyIDs)).
+		Int("unique_journey_ids", len(uniqueJourneyIDs)).
+		Int("mapping_hits", mappingHits).
+		Int("mapping_misses", mappingMisses).
+		Int("unique_realtime_journey_ids", len(realtimeJourneyIDs)).
+		Int("detail_hits", detailHits).
+		Int("detail_misses", detailMisses).
+		Int("decode_errors", decodeErrors).
+		Int("inactive_realtime_journeys", inactiveRealtimeJourneys).
+		Int("active_realtime_journeys", len(realtimeJourneysByJourneyID)).
+		Dur("mapping_duration", mappingDuration).
+		Dur("details_duration", detailsDuration).
+		Dur("decode_duration", decodeDuration).
+		Dur("total_duration", time.Since(start)).
+		Msg("Realtime journey batch lookup complete")
+
 	return realtimeJourneysByJourneyID, nil
+}
+
+func redisString(value interface{}) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		return v, true
+	case []byte:
+		return string(v), true
+	default:
+		return "", false
+	}
 }
 
 func FindCurrentByJourneyRefs(ctx context.Context, journeyRefs []string) (*ctdf.RealtimeJourney, error) {
