@@ -150,7 +150,9 @@ jobs:
           add_mask "$ES_PASSWORD"
 
           echo "TRAVIGO_MONGODB_CONNECTION=$MONGO_CONN" >> $GITHUB_ENV
+          echo "TRAVIGO_REDIS_ADDRESS=redis-headless.redis:6379" >> $GITHUB_ENV
           echo "TRAVIGO_REDIS_PASSWORD=$REDIS_PASSWORD" >> $GITHUB_ENV
+          echo "TRAVIGO_ELASTICSEARCH_ADDRESS=http://primary-es-http.elastic:9200" >> $GITHUB_ENV
           echo "TRAVIGO_ELASTICSEARCH_USERNAME=$ES_USERNAME" >> $GITHUB_ENV
           echo "TRAVIGO_ELASTICSEARCH_PASSWORD=$ES_PASSWORD" >> $GITHUB_ENV
 
