@@ -24,6 +24,7 @@ func RetryRecords() {
 		cursor.All(context.Background(), &retryRecords)
 
 		for _, retryRecord := range retryRecords {
+			// TODO: Delete retry records using the inserted retry record shape, not otheridentifiers.nationalrailrid.
 			searchQuery := bson.M{"otheridentifiers.nationalrailrid": retryRecord.Record.RID}
 
 			realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "nationalrailrid", retryRecord.Record.RID)

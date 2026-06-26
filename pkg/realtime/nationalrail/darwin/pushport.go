@@ -3,11 +3,9 @@ package darwin
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -96,19 +94,25 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		realtimeJourney.OtherIdentifiers["nationalrailrid"] = trainStatus.RID
 
 		// Update database
+		if realtimeJourney.DataSource == nil {
+			realtimeJourney.DataSource = datasource
+		}
 		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 		realtimeJourney.ActivelyTracked = true
+
+		if realtimeJourney.Stops == nil {
+			realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
+		}
+		if realtimeJourney.Journey == nil {
+			log.Error().Str("realtimejourney", realtimeJourney.PrimaryIdentifier).Msg("Realtime Journey missing Journey")
+			continue
+		}
 
 		for _, location := range trainStatus.Locations {
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", location.TPL))
 
 			if stop == nil {
 				log.Debug().Str("tiploc", location.TPL).Msg("Failed to find stop")
-				continue
-			}
-
-			if realtimeJourney.Journey == nil {
-				log.Error().Str("realtimejourney", realtimeJourney.PrimaryIdentifier).Msg("Realtime Journey missing Journey")
 				continue
 			}
 
@@ -121,6 +125,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 					TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 				}
 			}
+			journeyStop.StopRef = stop.PrimaryIdentifier
 
 			if location.Arrival != nil {
 				arrivalTime, err := location.Arrival.GetTiming()
@@ -142,6 +147,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 
 			if location.Platform != nil && location.Platform.CISPLATSUP != "true" && location.Platform.PLATSUP != "true" {
 				journeyStop.Platform = location.Platform.Name
+				journeyStopUpdated = true
 			}
 
 			if journeyStopUpdated {
@@ -175,6 +181,9 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 	for _, schedule := range p.Schedules {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
 		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+		if realtimeJourney == nil && schedule.RID != "" {
+			realtimeJourney, _ = realtimestore.FindByMapping(context.Background(), "nationalrailrid", schedule.RID)
+		}
 
 		if realtimeJourney == nil {
 			// Find the journey for this train
@@ -226,6 +235,12 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		}
 
 		realtimeJourney.ModificationDateTime = now
+		if realtimeJourney.OtherIdentifiers == nil {
+			realtimeJourney.OtherIdentifiers = map[string]string{}
+		}
+		if schedule.RID != "" {
+			realtimeJourney.OtherIdentifiers["nationalrailrid"] = schedule.RID
+		}
 
 		// Calculate the new stops
 		scheduleStops := []ScheduleStop{
@@ -235,8 +250,10 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		scheduleStops = append(scheduleStops, schedule.Destination)
 
 		cancelCount := 0
+		resolvedScheduleStopCount := 0
+		scheduleCancellations := map[string]bool{}
 
-		for _, scheduleStop := range scheduleStops {
+		for scheduleStopIndex, scheduleStop := range scheduleStops {
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", scheduleStop.Tiploc))
 
 			if stop == nil {
@@ -244,23 +261,43 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				continue
 			}
 
-			if scheduleStop.Cancelled == "true" {
-				if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
-					realtimeJourney.Stops[stop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
-				}
-				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = true
-				pretty.Println(realtimeJourneyID, stop.PrimaryIdentifier)
+			log.Info().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+				Str("rid", schedule.RID).
+				Str("uid", schedule.UID).
+				Str("ssd", schedule.SSD).
+				Int("schedule_stop_index", scheduleStopIndex).
+				Str("tiploc", scheduleStop.Tiploc).
+				Str("stop_ref", stop.PrimaryIdentifier).
+				Str("stop_name", stop.PrimaryName).
+				Str("pta", scheduleStop.PublicArrival).
+				Str("ptd", scheduleStop.PublicDeparture).
+				Str("wta", scheduleStop.WorkingArrival).
+				Str("wtd", scheduleStop.WorkingDeparture).
+				Str("cancelled", scheduleStop.Cancelled).
+				Bool("existing_cancelled", realtimeJourney.Stops[stop.PrimaryIdentifier] != nil && realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled).
+				Msg("Darwin schedule stop cancellation state")
 
+			resolvedScheduleStopCount += 1
+			scheduleCancellations[stop.PrimaryIdentifier] = scheduleStop.Cancelled == "true"
+			if scheduleStop.Cancelled == "true" {
 				cancelCount += 1
-			} else {
-				if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
-					realtimeJourney.Stops[stop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
-				}
-				realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled = false
 			}
 		}
 
-		if cancelCount > 0 && cancelCount == len(scheduleStops) {
+		if resolvedScheduleStopCount == 0 {
+			log.Error().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+				Str("rid", schedule.RID).
+				Msg("Skipping Darwin schedule update because no schedule stops resolved")
+			continue
+		}
+
+		applyDarwinScheduleCancellationState(realtimeJourney, scheduleCancellations)
+
+		if cancelCount > 0 && cancelCount == resolvedScheduleStopCount {
 			railutils.CreateServiceAlert(ctdf.ServiceAlert{
 				PrimaryIdentifier:    fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
 				CreationDateTime:     now,
@@ -304,6 +341,8 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			})
 
 			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+
+			realtimeJourney.Cancelled = false
 		} else {
 			realtimeJourney.Cancelled = false
 
@@ -312,6 +351,9 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		}
 
 		// Update database
+		if realtimeJourney.DataSource == nil {
+			realtimeJourney.DataSource = datasource
+		}
 		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
@@ -413,26 +455,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
 				Msg("Updated formation")
 
-			var realtimeCarriages []ctdf.RailCarriage
-
-			// TODO: only handing the 1 formation here :(
-			for _, carriage := range scheduleFormation.Formations[0].Coaches {
-				var toilets []ctdf.RailCarriageToilet
-
-				for _, toilet := range carriage.Toilets {
-					toilets = append(toilets, ctdf.RailCarriageToilet{
-						Type:   toilet.Type,
-						Status: toilet.Status,
-					})
-				}
-				realtimeCarriages = append(realtimeCarriages, ctdf.RailCarriage{
-					ID:        carriage.Number,
-					Class:     carriage.Class,
-					Toilets:   toilets,
-					Occupancy: -1,
-				})
-			}
-			realtimeJourney.DetailedRailInformation.Carriages = realtimeCarriages
+			realtimeJourney.DetailedRailInformation.Carriages = buildDarwinRailCarriages(scheduleFormation)
 
 			realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 		}
@@ -453,25 +476,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
 				Msg("Updated occupancy")
 
-			for _, loading := range formationLoading.Loading {
-				occupancy, _ := strconv.Atoi(loading.LoadingPercentage)
-				carriageFound := false
-
-				for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
-					if carriage.ID == loading.CoachNumber {
-						carriage.Occupancy = occupancy
-						carriageFound = true
-						break
-					}
-				}
-
-				if !carriageFound {
-					realtimeJourney.DetailedRailInformation.Carriages = append(realtimeJourney.DetailedRailInformation.Carriages, ctdf.RailCarriage{
-						ID:        loading.CoachNumber,
-						Occupancy: occupancy,
-					})
-				}
-			}
+			applyDarwinFormationLoading(realtimeJourney, formationLoading)
 
 			// Calculate the total train occupancy based on percentage of all carriages
 			totalOccupancy := 0

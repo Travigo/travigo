@@ -29,6 +29,7 @@ type TrainStatusLocation struct {
 type TrainStatusTiming struct {
 	AT    string `xml:"at,attr"`
 	ATMIN string `xml:"atmin,attr"`
+	// TODO: Handle Darwin atRemoved so erroneous actual times can clear previously stored values.
 
 	ET    string `xml:"et,attr"`
 	ETMIN string `xml:"etmin,attr"`
@@ -65,6 +66,7 @@ func (t *TrainStatusTiming) GetTiming() (time.Time, error) {
 }
 
 type TrainStatusPlatform struct {
+	// TODO: Decode Darwin platform suppression attributes correctly and honour Location>suppr.
 	PLATSRC    string `xml:"platsrc"`
 	PLATSUP    string `xml:"platsup"`
 	CISPLATSUP string `xml:"cisPlatsup"`

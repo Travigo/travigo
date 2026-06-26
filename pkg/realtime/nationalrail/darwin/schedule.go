@@ -8,6 +8,7 @@ type Schedule struct {
 
 	CancelReason string `xml:"cancelReason"`
 
+	// TODO: Model all Darwin schedule location types (PP, OPOR, OPIP, OPDT) and rdelay.
 	Origin       ScheduleStop   `xml:"OR"`
 	Intermediate []ScheduleStop `xml:"IP"`
 	Destination  ScheduleStop   `xml:"DT"`
