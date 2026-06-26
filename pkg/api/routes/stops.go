@@ -296,34 +296,13 @@ func getStopDepartures(c *fiber.Ctx) error {
 	afterTruncateCount := len(departureBoard)
 
 	destinationDisplayStart := time.Now()
-	journeyDestinationDisplayUsed, destinationFallbacks := resolveDepartureBoardDestinationDisplays(departureBoard)
+	destinationFallbacks, destinationServiceOverridesApplied := resolveDepartureBoardDestinationDisplays(departureBoard)
 	destinationDisplayDuration := time.Since(destinationDisplayStart)
 
 	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
-	nilDepartureItems := 0
-	transformedOperators := 0
-	transformedServices := 0
-	for _, item := range departureBoard {
-		if item == nil || item.Journey == nil {
-			nilDepartureItems++
-			continue
-		}
-
-		item.Journey.GetOperator()
-		item.Journey.GetService()
-
-		if item.Journey.Operator != nil {
-			transforms.Transform(item.Journey.Operator, 1)
-			transformedOperators++
-		}
-
-		if item.Journey.Service != nil {
-			transforms.Transform(item.Journey.Service, 1)
-			transformedServices++
-		}
-	}
+	nilDepartureItems, transformedOperators, transformedServices, reusedOperators, reusedServices := transformDepartureBoardReferences(departureBoard)
 	transformDuration := time.Since(currentTime)
 
 	reduceGroupsName := []string{"basic"}
@@ -352,10 +331,12 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Int("departures_before_sort", beforeSortCount).
 		Int("departures_after_truncate", afterTruncateCount).
 		Int("nil_departure_items", nilDepartureItems).
-		Int("journey_destination_display_used", journeyDestinationDisplayUsed).
 		Int("destination_fallbacks", destinationFallbacks).
+		Int("destination_service_overrides_applied", destinationServiceOverridesApplied).
 		Int("transformed_operators", transformedOperators).
 		Int("transformed_services", transformedServices).
+		Int("reused_operators", reusedOperators).
+		Int("reused_services", reusedServices).
 		Dur("stop_lookup_duration", stopLookupDuration).
 		Dur("departure_lookup_duration", departureLookupDuration).
 		Dur("sort_duration", sortDuration).
@@ -369,17 +350,11 @@ func getStopDepartures(c *fiber.Ctx) error {
 }
 
 func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
-	journeyDestinationDisplayUsed := 0
 	destinationFallbacks := 0
+	destinationServiceOverridesApplied := 0
 
 	for _, item := range departureBoard {
 		if item == nil || item.DestinationDisplay != "" || item.Journey == nil {
-			continue
-		}
-
-		if item.Journey.DestinationDisplay != "" {
-			item.DestinationDisplay = item.Journey.DestinationDisplay
-			journeyDestinationDisplayUsed++
 			continue
 		}
 
@@ -399,11 +374,84 @@ func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBo
 		}
 
 		item.Journey.GetService()
+		primaryNameBeforeOverride := lastPathItem.DestinationStop.PrimaryName
 		lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(item.Journey.Service)
+		if lastPathItem.DestinationStop.PrimaryName != primaryNameBeforeOverride {
+			destinationServiceOverridesApplied++
+		}
 		item.DestinationDisplay = lastPathItem.DestinationStop.PrimaryName
 	}
 
-	return journeyDestinationDisplayUsed, destinationFallbacks
+	return destinationFallbacks, destinationServiceOverridesApplied
+}
+
+func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (int, int, int, int, int) {
+	nilDepartureItems := 0
+	transformedOperators := 0
+	transformedServices := 0
+	reusedOperators := 0
+	reusedServices := 0
+	operatorsByID := map[string]*ctdf.Operator{}
+	servicesByID := map[string]*ctdf.Service{}
+
+	for _, item := range departureBoard {
+		if item == nil || item.Journey == nil {
+			nilDepartureItems++
+			continue
+		}
+
+		operatorKey := item.Journey.OperatorRef
+		if operatorKey == "" && item.Journey.Operator != nil {
+			operatorKey = item.Journey.Operator.PrimaryIdentifier
+		}
+		if operatorKey != "" {
+			if operator := operatorsByID[operatorKey]; operator != nil {
+				item.Journey.Operator = operator
+				reusedOperators++
+			} else {
+				item.Journey.GetOperator()
+				if item.Journey.Operator != nil {
+					transforms.Transform(item.Journey.Operator, 1)
+					transformedOperators++
+					operatorsByID[operatorKey] = item.Journey.Operator
+					operatorsByID[item.Journey.Operator.PrimaryIdentifier] = item.Journey.Operator
+				}
+			}
+		} else {
+			item.Journey.GetOperator()
+			if item.Journey.Operator != nil {
+				transforms.Transform(item.Journey.Operator, 1)
+				transformedOperators++
+			}
+		}
+
+		serviceKey := item.Journey.ServiceRef
+		if serviceKey == "" && item.Journey.Service != nil {
+			serviceKey = item.Journey.Service.PrimaryIdentifier
+		}
+		if serviceKey != "" {
+			if service := servicesByID[serviceKey]; service != nil {
+				item.Journey.Service = service
+				reusedServices++
+			} else {
+				item.Journey.GetService()
+				if item.Journey.Service != nil {
+					transforms.Transform(item.Journey.Service, 1)
+					transformedServices++
+					servicesByID[serviceKey] = item.Journey.Service
+					servicesByID[item.Journey.Service.PrimaryIdentifier] = item.Journey.Service
+				}
+			}
+		} else {
+			item.Journey.GetService()
+			if item.Journey.Service != nil {
+				transforms.Transform(item.Journey.Service, 1)
+				transformedServices++
+			}
+		}
+	}
+
+	return nilDepartureItems, transformedOperators, transformedServices, reusedOperators, reusedServices
 }
 
 func searchStops(c *fiber.Ctx) error {
