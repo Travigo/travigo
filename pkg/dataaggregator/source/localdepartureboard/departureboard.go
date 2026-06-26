@@ -22,6 +22,7 @@ import (
 )
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+	queryStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
 
 	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
@@ -59,11 +60,29 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	}
 	journeysToday := s.getDateJourneys(baseCacheItemPath, journeyQuery, q.StartDateTime)
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - today")
+	log.Debug().
+		Str("stop", q.Stop.PrimaryIdentifier).
+		Int("requested_count", q.Count).
+		Int("stop_ids", len(allStopIDs)).
+		Int("journeys", len(journeysToday)).
+		Time("date", q.StartDateTime).
+		Dur("duration", time.Since(currentTime)).
+		Msg("Departure board journeys loaded - today")
 
 	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, s.realtimeLookup(journeysToday))
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation today")
+	realtimeLookupToday := s.realtimeLookup(journeysToday)
+	realtimeLookupTodayDuration := time.Since(currentTime)
+
+	currentTime = time.Now()
+	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday)
+	log.Debug().
+		Str("stop", q.Stop.PrimaryIdentifier).
+		Int("journeys", len(journeysToday)).
+		Int("departures", len(departureBoardToday)).
+		Int("prefetched_realtime_journeys", len(realtimeLookupToday.ByJourneyID)).
+		Dur("realtime_lookup_duration", realtimeLookupTodayDuration).
+		Dur("generation_duration", time.Since(currentTime)).
+		Msg("Departure board generation complete - today")
 
 	// If not enough journeys in todays departure board then look into tomorrows
 	if len(departureBoardToday) < q.Count {
@@ -71,23 +90,52 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 		journeysTomorrow := s.getDateJourneys(baseCacheItemPath, journeyQuery, dayAfterDateTime)
 
-		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Int("num", len(journeysToday)).Msg("Get cached journeys - tomorrow")
-		currentTime = time.Now()
+		log.Debug().
+			Str("stop", q.Stop.PrimaryIdentifier).
+			Int("requested_count", q.Count).
+			Int("today_departures", len(departureBoardToday)).
+			Int("journeys", len(journeysTomorrow)).
+			Time("date", dayAfterDateTime).
+			Dur("duration", time.Since(currentTime)).
+			Msg("Departure board journeys loaded - tomorrow")
 
-		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, s.realtimeLookup(journeysTomorrow))
-		log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Departure Board generation tomorrow")
+		currentTime = time.Now()
+		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow)
+		realtimeLookupTomorrowDuration := time.Since(currentTime)
+
+		currentTime = time.Now()
+		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow)
+		log.Debug().
+			Str("stop", q.Stop.PrimaryIdentifier).
+			Int("journeys", len(journeysTomorrow)).
+			Int("departures", len(departureBoardTomorrow)).
+			Int("prefetched_realtime_journeys", len(realtimeLookupTomorrow.ByJourneyID)).
+			Dur("realtime_lookup_duration", realtimeLookupTomorrowDuration).
+			Dur("generation_duration", time.Since(currentTime)).
+			Msg("Departure board generation complete - tomorrow")
 
 		departureBoard = append(departureBoardToday, departureBoardTomorrow...)
 	} else {
 		departureBoard = departureBoardToday
 	}
 
+	log.Debug().
+		Str("stop", q.Stop.PrimaryIdentifier).
+		Int("requested_count", q.Count).
+		Int("departures", len(departureBoard)).
+		Dur("total_duration", time.Since(queryStart)).
+		Msg("Departure board source query complete")
+
 	return departureBoard, nil
 }
 
 func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRealtimeLookup {
+	lookupStart := time.Now()
 	journeyIDs := make([]string, 0, len(journeys))
 	for _, journey := range journeys {
+		if journey == nil {
+			continue
+		}
 		journeyIDs = append(journeyIDs, journey.PrimaryIdentifier)
 	}
 
@@ -96,13 +144,27 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRea
 		log.Error().Err(err).Msg("Failed to query realtime journeys")
 	}
 
+	log.Debug().
+		Int("journeys", len(journeys)).
+		Int("journey_ids", len(journeyIDs)).
+		Int("realtime_journeys", len(realtimeJourneysByJourneyID)).
+		Dur("duration", time.Since(lookupStart)).
+		Msg("Prefetched realtime journeys for departure board")
+
 	return &ctdf.DepartureBoardRealtimeLookup{
 		ByJourneyID: realtimeJourneysByJourneyID,
 		FindByJourneyRefs: func(journeyRefs []string) *ctdf.RealtimeJourney {
+			blockLookupStart := time.Now()
 			realtimeJourney, err := realtimestore.FindCurrentByJourneyRefs(context.Background(), journeyRefs)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to query realtime journey by journey refs")
 			}
+
+			log.Debug().
+				Int("journey_refs", len(journeyRefs)).
+				Bool("found", realtimeJourney != nil).
+				Dur("duration", time.Since(blockLookupStart)).
+				Msg("Lookup realtime journey by block journey refs")
 
 			return realtimeJourney
 		},
@@ -110,6 +172,7 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRea
 }
 
 func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
+	loadStart := time.Now()
 	journeys := make([]*ctdf.Journey, 0, 50)
 
 	cacheItemPath := fmt.Sprintf("%s/%s", baseCacheItemPath, dateTime.Format("2006-01-02"))
@@ -117,6 +180,12 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
 
 	if err == nil {
+		log.Debug().
+			Str("cache_item", cacheItemPath).
+			Time("date", dateTime).
+			Int("journeys", len(journeys)).
+			Dur("duration", time.Since(loadStart)).
+			Msg("Departure board journey cache hit")
 		return journeys
 	}
 
@@ -146,22 +215,36 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		log.Error().Err(err).Msg("Failed to query Journeys")
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup")
+	log.Debug().
+		Str("cache_item", cacheItemPath).
+		Time("date", dateTime).
+		Dur("duration", time.Since(currentTime)).
+		Msg("Departure board journey database query complete")
 	currentTime = time.Now()
 
+	decodedJourneys := 0
+	dateMatchedJourneys := 0
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to decode journey")
 		}
+		decodedJourneys++
 
 		if journey.Availability.MatchDate(dateTime) {
 			journeys = append(journeys, &journey)
+			dateMatchedJourneys++
 		}
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Database lookup decode 2")
+	log.Debug().
+		Str("cache_item", cacheItemPath).
+		Time("date", dateTime).
+		Int("decoded_journeys", decodedJourneys).
+		Int("date_matched_journeys", dateMatchedJourneys).
+		Dur("duration", time.Since(currentTime)).
+		Msg("Departure board journey database decode complete")
 
 	writeCacheTime := time.Now()
 	reducedJourneys, _ := sheriff.Marshal(&sheriff.Options{
@@ -169,7 +252,12 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	}, journeys)
 
 	cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 18*time.Hour)
-	log.Debug().Str("Length", time.Now().Sub(writeCacheTime).String()).Msg("Write cache")
+	log.Debug().
+		Str("cache_item", cacheItemPath).
+		Int("cached_journeys", len(journeys)).
+		Dur("marshal_and_write_duration", time.Since(writeCacheTime)).
+		Dur("total_duration", time.Since(loadStart)).
+		Msg("Departure board journey cache write complete")
 
 	return journeys
 }

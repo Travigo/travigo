@@ -228,6 +228,7 @@ func getStopDetailed(c *fiber.Ctx) error {
 }
 
 func getStopDepartures(c *fiber.Ctx) error {
+	requestStart := time.Now()
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
 	startDateTimeString := c.Query("datetime")
@@ -240,10 +241,12 @@ func getStopDepartures(c *fiber.Ctx) error {
 		})
 	}
 
+	stopLookupStart := time.Now()
 	var stop *ctdf.Stop
 	stop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
 		Identifier: stopIdentifier,
 	})
+	stopLookupDuration := time.Since(stopLookupStart)
 
 	if err != nil {
 		c.SendStatus(fiber.StatusNotFound)
@@ -269,29 +272,38 @@ func getStopDepartures(c *fiber.Ctx) error {
 		}
 	}
 
+	departureLookupStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
-
 	departureBoard, err = dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
 		Stop:          stop,
 		Count:         count,
 		StartDateTime: startDateTime,
 	})
+	departureLookupDuration := time.Since(departureLookupStart)
+	beforeSortCount := len(departureBoard)
 
 	// Sort departures by DepartureBoard time
+	sortStart := time.Now()
 	sort.Slice(departureBoard, func(i, j int) bool {
 		return departureBoard[i].Time.Before(departureBoard[j].Time)
 	})
+	sortDuration := time.Since(sortStart)
 
 	// Once sorted cut off any records higher than our max count
 	if len(departureBoard) > count {
 		departureBoard = departureBoard[:count]
 	}
+	afterTruncateCount := len(departureBoard)
 
 	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
+	nilDepartureItems := 0
+	transformedOperators := 0
+	transformedServices := 0
 	for _, item := range departureBoard {
 		if item == nil || item.Journey == nil {
+			nilDepartureItems++
 			continue
 		}
 
@@ -300,21 +312,26 @@ func getStopDepartures(c *fiber.Ctx) error {
 
 		if item.Journey.Operator != nil {
 			transforms.Transform(item.Journey.Operator, 1)
+			transformedOperators++
 		}
 
 		if item.Journey.Service != nil {
 			transforms.Transform(item.Journey.Service, 1)
+			transformedServices++
 		}
 	}
+	transformDuration := time.Since(currentTime)
 
 	reduceGroupsName := []string{"basic"}
 	if isLLM == "true" {
 		reduceGroupsName = []string{"departures-llm"}
 	}
 
+	marshalStart := time.Now()
 	departureBoardReduced, err := sheriff.Marshal(&sheriff.Options{
 		Groups: reduceGroupsName,
 	}, departureBoard)
+	marshalDuration := time.Since(marshalStart)
 
 	if err != nil {
 		c.SendStatus(fiber.StatusInternalServerError)
@@ -323,7 +340,23 @@ func getStopDepartures(c *fiber.Ctx) error {
 		})
 	}
 
-	log.Debug().Str("Length", time.Now().Sub(currentTime).String()).Msg("Prepare departures response")
+	log.Debug().
+		Str("stop", stopIdentifier).
+		Int("requested_count", count).
+		Time("start_datetime", startDateTime).
+		Bool("llm", isLLM == "true").
+		Int("departures_before_sort", beforeSortCount).
+		Int("departures_after_truncate", afterTruncateCount).
+		Int("nil_departure_items", nilDepartureItems).
+		Int("transformed_operators", transformedOperators).
+		Int("transformed_services", transformedServices).
+		Dur("stop_lookup_duration", stopLookupDuration).
+		Dur("departure_lookup_duration", departureLookupDuration).
+		Dur("sort_duration", sortDuration).
+		Dur("transform_duration", transformDuration).
+		Dur("marshal_duration", marshalDuration).
+		Dur("total_duration", time.Since(requestStart)).
+		Msg("Stop departures response stats")
 
 	return c.JSON(departureBoardReduced)
 }
