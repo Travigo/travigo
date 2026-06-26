@@ -4,6 +4,9 @@ type StopDetailed struct {
 	FoodDrink []StopShop    `groups:"detailed" bson:",omitempty"`
 	Shops     []StopShop    `groups:"detailed" bson:",omitempty"`
 	Toilets   []StopToilets `groups:"detailed" bson:",omitempty"`
+
+	// ATM
+	// TICKETS
 }
 
 type StopShop struct {

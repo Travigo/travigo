@@ -46,7 +46,7 @@ func newRealtimeJourneyMinimised(realtimeJourney *ctdf.RealtimeJourney) realtime
 }
 
 func listRealtimeJourney(c *fiber.Ctx) error {
-	boundsQuery, err := getBoundsQuery(c)
+	boundsQuery, err := getLocationQuery(c)
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{

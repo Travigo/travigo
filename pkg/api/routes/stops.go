@@ -36,7 +36,10 @@ func StopsRouter(router fiber.Router) {
 }
 
 func listStops(c *fiber.Ctx) error {
-	boundsQuery, err := getBoundsQuery(c)
+	boundsQuery, err := getLocationQuery(c)
+
+	point := c.Query("point")
+
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -44,11 +47,17 @@ func listStops(c *fiber.Ctx) error {
 		})
 	}
 
+	// TODO get these all working with the 1 field/index
+	locationField := "location.coordinates"
+	if point != "" {
+		locationField = "location"
+	}
+
 	var stops []*ctdf.Stop
 
 	stopsCollection := database.GetCollection("stops")
 
-	bsonQuery := bson.M{"location.coordinates": boundsQuery}
+	bsonQuery := bson.M{locationField: boundsQuery}
 
 	transportTypeFilter := c.Query("transport_type")
 	if transportTypeFilter != "" {
@@ -57,7 +66,7 @@ func listStops(c *fiber.Ctx) error {
 		bsonQuery = bson.M{
 			"$and": bson.A{
 				bson.M{"transporttypes": bson.M{"$in": transportType}},
-				bson.M{"location.coordinates": boundsQuery},
+				bson.M{locationField: boundsQuery},
 			},
 		}
 	}
@@ -71,7 +80,13 @@ func listStops(c *fiber.Ctx) error {
 		bson.E{Key: "associations", Value: 0},
 	})
 
-	cursor, _ := stopsCollection.Find(context.Background(), bsonQuery, opts)
+	cursor, err := stopsCollection.Find(context.Background(), bsonQuery, opts)
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
 	for cursor.Next(context.Background()) {
 		var stop *ctdf.Stop
