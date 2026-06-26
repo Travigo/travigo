@@ -290,29 +290,20 @@ func getStopDepartures(c *fiber.Ctx) error {
 	currentTime := time.Now()
 	// Transforming the whole document is incredibly ineffecient
 	// Instead just transform the Operator & Service as those are the key values
-	//
-	// TODO(high-risk): the board above is generated in full, sorted, then
-	// truncated to [:count]. Capping the amount of work should happen inside the board
-	// source BEFORE realtime enrichment, not in this handler. It cannot be safely moved
-	// here because realtime offsets reorder departures, so truncation must stay AFTER the
-	// sort. Leaving the sort/truncate logic unchanged.
-	transformedOperators := make(map[string]struct{}, len(departureBoard))
-	transformedServices := make(map[string]struct{}, len(departureBoard))
 	for _, item := range departureBoard {
-		item.Journey.GetOperator()
-
-		if operator := item.Journey.Operator; operator != nil {
-			if _, done := transformedOperators[operator.PrimaryIdentifier]; !done {
-				transforms.Transform(operator, 1)
-				transformedOperators[operator.PrimaryIdentifier] = struct{}{}
-			}
+		if item == nil || item.Journey == nil {
+			continue
 		}
 
-		if service := item.Journey.Service; service != nil {
-			if _, done := transformedServices[service.PrimaryIdentifier]; !done {
-				transforms.Transform(service, 1)
-				transformedServices[service.PrimaryIdentifier] = struct{}{}
-			}
+		item.Journey.GetOperator()
+		item.Journey.GetService()
+
+		if item.Journey.Operator != nil {
+			transforms.Transform(item.Journey.Operator, 1)
+		}
+
+		if item.Journey.Service != nil {
+			transforms.Transform(item.Journey.Service, 1)
 		}
 	}
 
