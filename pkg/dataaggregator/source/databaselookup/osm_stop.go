@@ -460,7 +460,6 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 
 	stopPositionNodeIDs := map[int64]bool{}
 	platformNodeIDs := map[int64]bool{}
-	stationPolygons := [][]overpassPoint{}
 
 	byKey := mapOverpassElementsByKey(elements)
 	for _, member := range stopArea.Members {
@@ -480,16 +479,10 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 				platformNodeIDs[nodeID] = true
 			}
 		}
-		if isStationContainmentPolygon(memberElement) {
-			stationPolygons = append(stationPolygons, memberElement.Geometry)
-		}
 
 		for _, nestedMember := range memberElement.Members {
 			nestedKey := overpassElementRefKey(nestedMember.Type, nestedMember.Ref)
 			included[nestedKey] = true
-			if nestedElement, exists := byKey[nestedKey]; exists && isStationContainmentPolygon(nestedElement) {
-				stationPolygons = append(stationPolygons, nestedElement.Geometry)
-			}
 		}
 	}
 
@@ -516,7 +509,7 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 			}
 		}
 
-		if isStationPOI(element) && (elementInsideAnyPolygon(element, stationPolygons) || hasStationContext(element)) {
+		if isStationPOI(element) {
 			included[overpassElementKey(element)] = true
 		}
 	}

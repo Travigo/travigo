@@ -46,10 +46,6 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 						return cuisine == "" || cuisine == shopType
 					})
 
-					for i, cuisine := range cuisineSplit {
-						cuisineSplit[i] = strings.ReplaceAll(cuisine, "_", " ")
-					}
-
 					if len(cuisineSplit) > 1 {
 						shopType = shopType + " - " + strings.Join(cuisineSplit, ", ")
 					}
@@ -57,7 +53,7 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 
 				stopShop := ctdf.StopShop{
 					PrimaryName:         feature.PrimaryName,
-					Type:                strings.Title(shopType),
+					Type:                strings.Title(strings.ReplaceAll(shopType, "_", " ")),
 					Website:             feature.Tags["website"],
 					WikiDataID:          wikiDataID,
 					LocationDescription: feature.Tags["location"],
