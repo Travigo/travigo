@@ -14,6 +14,25 @@ func createIndexes() {
 	createOSMStopIndexes()
 	createOperatorsIndexes()
 	createJourneysIndexes()
+	createSavedObjectsIndexes()
+}
+
+func createSavedObjectsIndexes() {
+	collection := GetCollection("saved_objects")
+	index := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "userid", Value: 1}},
+		},
+	}
+
+	opts := options.CreateIndexes()
+	_, err := collection.Indexes().CreateMany(context.Background(), index, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Saved Object Index")
+	}
 }
 
 func createOSMStopIndexes() {

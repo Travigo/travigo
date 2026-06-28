@@ -10,6 +10,8 @@ import (
 	"github.com/auth0/go-jwt-middleware/v2/jwks"
 	"github.com/auth0/go-jwt-middleware/v2/validator"
 	"github.com/gofiber/fiber/v2"
+	"github.com/kr/pretty"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 // CustomClaims contains custom data we want from the token.
@@ -61,16 +63,27 @@ func EnsureValidToken() fiber.Handler {
 		jwtToken := authHeader[7:]
 		claimsI, jwtErr := jwtValidator.ValidateToken(context.Background(), jwtToken)
 
-		if jwtErr == nil {
-			claims := claimsI.(*validator.ValidatedClaims)
+		env := util.GetEnvironmentVariables()
 
-			c.Locals("account_userid", claims.RegisteredClaims.Subject)
+		if jwtErr == nil || env["TRAVIGO_SINGLE_USER_MODE"] != "" {
+			var userID string
+
+			if env["TRAVIGO_SINGLE_USER_MODE"] != "" {
+				userID = env["TRAVIGO_SINGLE_USER_MODE"]
+			} else {
+				claims := claimsI.(*validator.ValidatedClaims)
+				userID = claims.RegisteredClaims.Subject
+			}
+
+			c.Locals("account_userid", userID)
 
 			return c.Next()
 		} else {
 			c.SendStatus(fiber.StatusUnauthorized)
+			pretty.Println(jwtErr)
 			return c.JSON(fiber.Map{
-				"error": "Invalid auth token",
+				"error":    "Invalid auth token",
+				"detailed": jwtErr,
 			})
 		}
 	}
