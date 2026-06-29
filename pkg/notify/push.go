@@ -43,13 +43,30 @@ func (m *PushManager) Setup() error {
 
 func (m *PushManager) SendPush(notification ctdf.Notification) error {
 	userPushNotificationTargetCollection := database.GetCollection("user_push_notification_target")
-	var userPushNotificationTarget *ctdf.UserPushNotificationTarget
 
-	userPushNotificationTargetCollection.FindOne(context.Background(), bson.M{
+	cursor, err := userPushNotificationTargetCollection.Find(context.Background(), bson.M{
 		"userid": notification.TargetUser,
-	}).Decode(&userPushNotificationTarget)
+	})
+	if err != nil {
+		return err
+	}
 
-	if userPushNotificationTarget == nil {
+	var userPushNotificationTargets []*ctdf.UserPushNotificationTarget
+	for cursor.Next(context.Background()) {
+		var userPushNotificationTarget *ctdf.UserPushNotificationTarget
+		err := cursor.Decode(&userPushNotificationTarget)
+		if err != nil {
+			log.Error().Err(err).Str("target", notification.TargetUser).Msg("Failed to decode push notification target")
+			continue
+		}
+
+		userPushNotificationTargets = append(userPushNotificationTargets, userPushNotificationTarget)
+	}
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+
+	if len(userPushNotificationTargets) == 0 {
 		return errors.New("failed to find user token")
 	}
 
@@ -59,19 +76,31 @@ func (m *PushManager) SendPush(notification ctdf.Notification) error {
 		return err
 	}
 
-	_, err = fcmClient.Send(context.Background(), &messaging.Message{
-		Notification: &messaging.Notification{
-			Title: notification.Title,
-			Body:  notification.Message,
-		},
-		Token: userPushNotificationTarget.PushNotificationToken,
-	})
+	sentCount := 0
+	var lastErr error
+	for _, userPushNotificationTarget := range userPushNotificationTargets {
+		_, err = fcmClient.Send(context.Background(), &messaging.Message{
+			Notification: &messaging.Notification{
+				Title: notification.Title,
+				Body:  notification.Message,
+			},
+			Token: userPushNotificationTarget.PushNotificationToken,
+		})
 
-	if err != nil {
-		return err
+		if err != nil {
+			lastErr = err
+			log.Error().Err(err).Str("target", notification.TargetUser).Msg("Failed to send push notification")
+			continue
+		}
+
+		sentCount++
 	}
 
-	log.Info().Str("target", notification.TargetUser).Msg("Sent Push Notification")
+	if sentCount == 0 {
+		return lastErr
+	}
+
+	log.Info().Str("target", notification.TargetUser).Int("tokens", sentCount).Msg("Sent Push Notification")
 
 	return nil
 }
