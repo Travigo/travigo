@@ -21,7 +21,7 @@ Match:
   OperatorRef: "gb-toc-TL"
   TransportType: "Rail"
 Data:
-  BrandColour: "#444e55"
+  BrandColour: "#ced0d2"
   SecondaryBrandColour: "#ea3b8b"
 # Grand Central
 ---
