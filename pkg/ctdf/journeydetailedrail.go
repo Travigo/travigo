@@ -46,6 +46,25 @@ type RailCarriage struct {
 	Class   string               `groups:"basic"`
 	Toilets []RailCarriageToilet `groups:"basic"`
 
+	VehicleID              string `groups:"detailed"`
+	ResourceGroupID        string `groups:"detailed"`
+	ResourceGroupType      string `groups:"detailed"`
+	ResourceGroupStatus    string `groups:"detailed"`
+	ResourceGroupPosition  int    `groups:"detailed"`
+	VehiclePosition        int    `groups:"detailed"`
+	PlannedResourceGroup   string `groups:"detailed"`
+	FleetID                string `groups:"detailed"`
+	SpecificType           string `groups:"detailed"`
+	Livery                 string `groups:"detailed"`
+	Decor                  string `groups:"detailed"`
+	SpecialCharacteristics string `groups:"detailed"`
+	VehicleStatus          string `groups:"detailed"`
+	RegisteredStatus       string `groups:"detailed"`
+	LengthMM               int    `groups:"detailed"`
+	WeightKG               int    `groups:"detailed"`
+	SeatCount              int    `groups:"detailed"`
+	MaximumSpeedMPH        int    `groups:"detailed"`
+
 	Occupancy int `groups:"basic"`
 }
 

@@ -1,13 +1,16 @@
 package nationalrail
 
 import (
+	"context"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/darwin"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/linxconsist"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/nrod"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
@@ -50,6 +53,54 @@ func RegisterCLI() *cli.Command {
 					stompClient.Run()
 
 					return nil
+				},
+			},
+			{
+				Name:  "linx-consist",
+				Usage: "run an instance of the LINX passenger train allocation and consist tracker",
+				Action: func(c *cli.Context) error {
+					env := util.GetEnvironmentVariables()
+					if env["TRAVIGO_LINX_CONSIST_KAFKA_TOPIC"] == "" {
+						log.Fatal().Msg("TRAVIGO_LINX_CONSIST_KAFKA_TOPIC must be set")
+					}
+					if env["TRAVIGO_LINX_CONSIST_KAFKA_USERNAME"] == "" {
+						log.Fatal().Msg("TRAVIGO_LINX_CONSIST_KAFKA_USERNAME must be set")
+					}
+					if env["TRAVIGO_LINX_CONSIST_KAFKA_PASSWORD"] == "" {
+						log.Fatal().Msg("TRAVIGO_LINX_CONSIST_KAFKA_PASSWORD must be set")
+					}
+
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					if err := redis_client.Connect(); err != nil {
+						return err
+					}
+
+					brokers := env["TRAVIGO_LINX_CONSIST_KAFKA_BROKERS"]
+					if brokers == "" {
+						brokers = linxconsist.DefaultBootstrapServer
+					}
+
+					groupID := env["TRAVIGO_LINX_CONSIST_KAFKA_GROUP_ID"]
+					if groupID == "" {
+						groupID = "travigo-linx-consist"
+					}
+
+					log.Info().Msg("Starting LINX passenger train allocation and consist tracker")
+
+					ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+					defer cancel()
+
+					kafkaClient := linxconsist.KafkaClient{
+						Brokers:  strings.Split(brokers, ","),
+						Topic:    env["TRAVIGO_LINX_CONSIST_KAFKA_TOPIC"],
+						GroupID:  groupID,
+						Username: env["TRAVIGO_LINX_CONSIST_KAFKA_USERNAME"],
+						Password: env["TRAVIGO_LINX_CONSIST_KAFKA_PASSWORD"],
+					}
+
+					return kafkaClient.Run(ctx)
 				},
 			},
 			{

@@ -25,6 +25,11 @@ tfl:
 nationalRail:
   darwinCredentialsSecret: travigo-nationalrail-darwin-stomp-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials
+  linxConsistCredentialsSecret: travigo-linx-consist-kafka-credentials
+  linxConsistKafka:
+    brokers: pkc-z3p1v0.europe-west2.gcp.confluent.cloud:9092
+    topic: "prod-1033-Passenger-Train-Allocation-and-Consist-1_0"
+    groupId: "SC-a7a28bed-0eec-4989-bd37-5a7149c61dd0"
 
 runner:
   resources:

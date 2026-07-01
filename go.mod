@@ -24,6 +24,7 @@ require (
 	github.com/redis/go-redis/v9 v9.20.1
 	github.com/rs/zerolog v1.35.1
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
+	github.com/segmentio/kafka-go v0.4.51
 	github.com/sourcegraph/conc v0.3.0
 	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/exp v0.0.0-20260611194520-c48552f49976
@@ -84,6 +85,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/common v0.68.1 // indirect
