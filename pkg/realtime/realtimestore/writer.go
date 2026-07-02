@@ -112,7 +112,7 @@ func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detail
 		return err
 	}
 
-	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("allocation", identifier), detailedRailInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("allocation", identifier), detailedRailInformationJSON, 24*time.Hour).Err()
 }
 
 func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
@@ -137,7 +137,7 @@ func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedR
 		return err
 	}
 
-	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("loading", identifier), loadingInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("loading", identifier), loadingInformationJSON, 24*time.Hour).Err()
 }
 
 func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
