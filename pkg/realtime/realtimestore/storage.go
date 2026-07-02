@@ -33,7 +33,7 @@ type storedRealtimeJourney struct {
 	VehicleRef             string                              `json:"veh,omitempty"`
 	Cancelled              bool                                `json:"can,omitempty"`
 	Occupancy              *ctdf.RealtimeJourneyOccupancy      `json:"occ,omitempty"`
-	DetailedRail           *ctdf.RealtimeJourneyDetailedRail   `json:"rail,omitempty"`
+	DetailedRail           *ctdf.JourneyDetailedRail           `json:"rail,omitempty"`
 }
 
 type storedJourney struct {
@@ -107,11 +107,6 @@ func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *store
 		occupancy := realtimeJourney.Occupancy
 		stored.Occupancy = &occupancy
 	}
-	if len(realtimeJourney.DetailedRailInformation.Carriages) > 0 {
-		detailedRail := realtimeJourney.DetailedRailInformation
-		stored.DetailedRail = &detailedRail
-	}
-
 	return stored
 }
 

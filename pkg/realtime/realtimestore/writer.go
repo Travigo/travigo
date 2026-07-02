@@ -22,6 +22,10 @@ func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:details/%s", identifier)
 }
 
+func realtimeJourneyRailDetailedKey(identifier string) string {
+	return fmt.Sprintf("realtime-journey:raildetailed/%s", identifier)
+}
+
 func realtimeJourneyLocationKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:location/%s", identifier)
 }
@@ -70,20 +74,41 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	// Store all the other identifiers in a mapping to the primary identifier for easy lookup
+	return SaveRealtimeJourneyMappings(ctx, realtimeJourney)
+}
+
+func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
+	if realtimeJourney == nil {
+		return errors.New("realtime journey is required")
+	}
+
+	timeoutDuration := realtimeJourneyTTL(ctx, realtimeJourney.PrimaryIdentifier)
 	if realtimeJourney.Journey != nil && realtimeJourney.Journey.PrimaryIdentifier != "" {
-		redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
+		if err := redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err(); err != nil {
+			return err
+		}
 	}
 
 	for mappingType, identifier := range realtimeJourney.OtherIdentifiers {
-		err = redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err()
-
-		if err != nil {
+		if err := redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err(); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func UpdateRailDetailed(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
+	if len(detailedRailInformation.Carriages) == 0 {
+		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey(identifier)).Err()
+	}
+
+	detailedRailInformationJSON, err := json.Marshal(detailedRailInformation)
+	if err != nil {
+		return err
+	}
+
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey(identifier), detailedRailInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
 }
 
 func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {

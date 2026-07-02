@@ -287,6 +287,7 @@ func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.Re
 func ApplyRealtimeJourneyOverlays(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
 	ApplyLocation(ctx, realtimeJourney)
 	ApplyLocationDescription(ctx, realtimeJourney)
+	ApplyRailDetailed(ctx, realtimeJourney)
 }
 
 func ApplyLocation(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
@@ -332,6 +333,31 @@ func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64
 	}
 
 	return vehicleLocation.Location, vehicleLocation.Bearing, nil
+}
+
+func ApplyRailDetailed(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
+	if realtimeJourney == nil {
+		return
+	}
+
+	detailedRailInformation, err := GetRailDetailed(ctx, realtimeJourney.PrimaryIdentifier)
+	if err == nil {
+		realtimeJourney.DetailedRailInformation = detailedRailInformation
+	}
+}
+
+func GetRailDetailed(ctx context.Context, identifier string) (ctdf.JourneyDetailedRail, error) {
+	detailedRailResult := redis_client.Client.Get(ctx, realtimeJourneyRailDetailedKey(identifier))
+	if detailedRailResult.Err() != nil {
+		return ctdf.JourneyDetailedRail{}, detailedRailResult.Err()
+	}
+
+	var detailedRailInformation ctdf.JourneyDetailedRail
+	if err := json.Unmarshal([]byte(detailedRailResult.Val()), &detailedRailInformation); err != nil {
+		return ctdf.JourneyDetailedRail{}, err
+	}
+
+	return detailedRailInformation, nil
 }
 
 // Temporary name it FromRedis to avoid confusion with the mongo version of this function

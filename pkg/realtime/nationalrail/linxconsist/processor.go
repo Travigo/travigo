@@ -42,6 +42,7 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 
 	realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", identifier.StartDate, identifier.TrainUID)
 	realtimeJourney, _ := realtimestore.FindByIdentifier(ctx, realtimeJourneyID)
+	realtimeJourneyCreated := false
 
 	if realtimeJourney == nil {
 		var err error
@@ -49,6 +50,7 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 		if err != nil {
 			return err
 		}
+		realtimeJourneyCreated = true
 	}
 
 	if realtimeJourney.OtherIdentifiers == nil {
@@ -65,14 +67,24 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 		realtimeJourney.OtherIdentifiers["OperationalTrainNumber"] = identifier.OperationalTrainNumber
 	}
 
-	realtimeJourney.ModificationDateTime = now
-	if realtimeJourney.DataSource == nil {
-		realtimeJourney.DataSource = datasource
+	if realtimeJourneyCreated {
+		realtimeJourney.ModificationDateTime = now
+		if realtimeJourney.DataSource == nil {
+			realtimeJourney.DataSource = datasource
+		}
+		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
+		if err := realtimestore.SaveRealtimeJourney(ctx, realtimeJourney); err != nil {
+			return err
+		}
+	} else if err := realtimestore.SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
+		return err
 	}
-	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 	realtimeJourney.DetailedRailInformation.Carriages = BuildRailCarriages(message)
+	realtimeJourney.DetailedRailInformation.TrainLength = len(realtimeJourney.DetailedRailInformation.Carriages)
 
-	realtimestore.SaveRealtimeJourney(ctx, realtimeJourney)
+	if err := realtimestore.UpdateRailDetailed(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation); err != nil {
+		return err
+	}
 
 	log.Info().
 		Str("realtimejourney", realtimeJourney.PrimaryIdentifier).

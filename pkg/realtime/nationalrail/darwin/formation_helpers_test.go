@@ -34,7 +34,7 @@ func TestBuildDarwinRailCarriagesIncludesAllFormations(t *testing.T) {
 
 func TestApplyDarwinFormationLoadingUpdatesExistingCarriage(t *testing.T) {
 	realtimeJourney := &ctdf.RealtimeJourney{
-		DetailedRailInformation: ctdf.RealtimeJourneyDetailedRail{
+		DetailedRailInformation: ctdf.JourneyDetailedRail{
 			Carriages: []ctdf.RailCarriage{
 				{ID: "front:A", Occupancy: -1},
 			},

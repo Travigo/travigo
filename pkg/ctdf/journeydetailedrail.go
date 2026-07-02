@@ -5,7 +5,8 @@ type JourneyDetailedRail struct {
 	VehicleTypeName string `groups:"detailed"`
 	PowerType       string `groups:"detailed"`
 
-	Carriages []RailCarriage `groups:"detailed"`
+	TrainLength int            `groups:"detailed"`
+	Carriages   []RailCarriage `groups:"detailed"`
 
 	Seating []JourneyDetailedRailSeating `groups:"detailed"`
 
