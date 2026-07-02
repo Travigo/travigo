@@ -82,7 +82,7 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 	realtimeJourney.DetailedRailInformation.Carriages = BuildRailCarriages(message)
 	realtimeJourney.DetailedRailInformation.TrainLength = len(realtimeJourney.DetailedRailInformation.Carriages)
 
-	if err := realtimestore.UpdateRailDetailed(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation); err != nil {
+	if err := realtimestore.UpdateRailDetailedAllocation(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation); err != nil {
 		return err
 	}
 

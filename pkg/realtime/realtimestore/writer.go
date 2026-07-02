@@ -22,8 +22,8 @@ func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:details/%s", identifier)
 }
 
-func realtimeJourneyRailDetailedKey(identifier string) string {
-	return fmt.Sprintf("realtime-journey:raildetailed/%s", identifier)
+func realtimeJourneyRailDetailedKey(detailType string, identifier string) string {
+	return fmt.Sprintf("realtime-journey:raildetailed:%s/%s", detailType, identifier)
 }
 
 func realtimeJourneyLocationKey(identifier string) string {
@@ -98,9 +98,13 @@ func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.Real
 	return nil
 }
 
-func UpdateRailDetailed(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
+func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
 	if len(detailedRailInformation.Carriages) == 0 {
-		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey(identifier)).Err()
+		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey("allocation", identifier)).Err()
+	}
+
+	for carriageIndex := range detailedRailInformation.Carriages {
+		detailedRailInformation.Carriages[carriageIndex].Occupancy = -1
 	}
 
 	detailedRailInformationJSON, err := json.Marshal(detailedRailInformation)
@@ -108,7 +112,32 @@ func UpdateRailDetailed(ctx context.Context, identifier string, detailedRailInfo
 		return err
 	}
 
-	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey(identifier), detailedRailInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("allocation", identifier), detailedRailInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
+}
+
+func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
+	loadingInformation := ctdf.JourneyDetailedRail{}
+	for _, carriage := range detailedRailInformation.Carriages {
+		if carriage.Occupancy < 0 {
+			continue
+		}
+
+		loadingInformation.Carriages = append(loadingInformation.Carriages, ctdf.RailCarriage{
+			ID:        carriage.ID,
+			Occupancy: carriage.Occupancy,
+		})
+	}
+
+	if len(loadingInformation.Carriages) == 0 {
+		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey("loading", identifier)).Err()
+	}
+
+	loadingInformationJSON, err := json.Marshal(loadingInformation)
+	if err != nil {
+		return err
+	}
+
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("loading", identifier), loadingInformationJSON, realtimeJourneyTTL(ctx, identifier)).Err()
 }
 
 func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {

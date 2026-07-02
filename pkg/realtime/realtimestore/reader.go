@@ -347,7 +347,24 @@ func ApplyRailDetailed(ctx context.Context, realtimeJourney *ctdf.RealtimeJourne
 }
 
 func GetRailDetailed(ctx context.Context, identifier string) (ctdf.JourneyDetailedRail, error) {
-	detailedRailResult := redis_client.Client.Get(ctx, realtimeJourneyRailDetailedKey(identifier))
+	allocation, allocationErr := getRailDetailedPart(ctx, "allocation", identifier)
+	loading, loadingErr := getRailDetailedPart(ctx, "loading", identifier)
+
+	if allocationErr != nil && loadingErr != nil {
+		return ctdf.JourneyDetailedRail{}, allocationErr
+	}
+	if allocationErr != nil {
+		return loading, nil
+	}
+	if loadingErr != nil {
+		return allocation, nil
+	}
+
+	return mergeRailDetailed(allocation, loading), nil
+}
+
+func getRailDetailedPart(ctx context.Context, detailType string, identifier string) (ctdf.JourneyDetailedRail, error) {
+	detailedRailResult := redis_client.Client.Get(ctx, realtimeJourneyRailDetailedKey(detailType, identifier))
 	if detailedRailResult.Err() != nil {
 		return ctdf.JourneyDetailedRail{}, detailedRailResult.Err()
 	}
@@ -358,6 +375,26 @@ func GetRailDetailed(ctx context.Context, identifier string) (ctdf.JourneyDetail
 	}
 
 	return detailedRailInformation, nil
+}
+
+func mergeRailDetailed(allocation ctdf.JourneyDetailedRail, loading ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
+	merged := allocation
+
+	carriageIndexes := map[string]int{}
+	for carriageIndex, carriage := range merged.Carriages {
+		carriageIndexes[carriage.ID] = carriageIndex
+	}
+
+	for _, loadingCarriage := range loading.Carriages {
+		if carriageIndex, ok := carriageIndexes[loadingCarriage.ID]; ok {
+			merged.Carriages[carriageIndex].Occupancy = loadingCarriage.Occupancy
+			continue
+		}
+
+		merged.Carriages = append(merged.Carriages, loadingCarriage)
+	}
+
+	return merged
 }
 
 // Temporary name it FromRedis to avoid confusion with the mongo version of this function

@@ -457,7 +457,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 
 			realtimeJourney.DetailedRailInformation.Carriages = buildDarwinRailCarriages(scheduleFormation)
 
-			realtimestore.UpdateRailDetailed(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation)
+			realtimestore.UpdateRailDetailedAllocation(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation)
 		}
 	}
 
@@ -477,7 +477,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Msg("Updated occupancy")
 
 			applyDarwinFormationLoading(realtimeJourney, formationLoading)
-			realtimestore.UpdateRailDetailed(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation)
+			realtimestore.UpdateRailDetailedLoading(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation)
 
 			// Calculate the total train occupancy based on percentage of all carriages
 			totalOccupancy := 0
