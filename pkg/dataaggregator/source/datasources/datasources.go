@@ -19,6 +19,7 @@ func (s Source) Supports() []reflect.Type {
 	return []reflect.Type{
 		reflect.TypeOf(datasets.DataSet{}),
 		reflect.TypeOf(datasets.DataSource{}),
+		reflect.TypeOf([]datasets.DataSource{}),
 	}
 }
 
@@ -28,6 +29,8 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.DataSetQuery(q.(query.DataSet))
 	case query.DataSource:
 		return s.DataSourceQuery(q.(query.DataSource))
+	case query.DataSources:
+		return s.DataSourcesQuery(q.(query.DataSources))
 	default:
 		return nil, source.UnsupportedSourceError
 	}

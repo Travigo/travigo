@@ -7,3 +7,5 @@ type DataSet struct {
 type DataSource struct {
 	Identifier string
 }
+
+type DataSources struct{}
