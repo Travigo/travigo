@@ -169,6 +169,10 @@ jobs:
         continue-on-error: true
         run: ./travigo data-linker run --type stops
 
+      - name: Run data-linker stop transfers
+        continue-on-error: true
+        run: ./travigo data-linker run --type stop-transfers
+
       - name: Run data-linker services
         continue-on-error: true
         run: ./travigo data-linker run --type services

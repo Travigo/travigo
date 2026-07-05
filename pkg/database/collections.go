@@ -11,10 +11,41 @@ import (
 
 func createIndexes() {
 	createStopsIndexes()
+	createStopTransferIndexes()
 	createOSMStopIndexes()
 	createOperatorsIndexes()
 	createJourneysIndexes()
 	createSavedObjectsIndexes()
+}
+
+func createStopTransferIndexes() {
+	collection := GetCollection("stop_transfers")
+	index := []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "fromstopref", Value: 1}},
+		},
+		{
+			Keys: bson.D{{Key: "tostopref", Value: 1}},
+		},
+		{
+			Keys: bson.D{
+				{Key: "fromstopref", Value: 1},
+				{Key: "tostopref", Value: 1},
+			},
+		},
+		{
+			Keys: bson.D{{Key: "type", Value: 1}},
+		},
+	}
+
+	opts := options.CreateIndexes()
+	_, err := collection.Indexes().CreateMany(context.Background(), index, opts)
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Stop Transfer Index")
+	}
 }
 
 func createSavedObjectsIndexes() {

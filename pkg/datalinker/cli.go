@@ -31,6 +31,26 @@ func RegisterCLI() *cli.Command {
 						Usage:    "Type of the dataset",
 						Required: true,
 					},
+					&cli.IntFlag{
+						Name:  "max-transfer-distance-metres",
+						Usage: "Maximum distance in metres for generated nearby walking transfers",
+						Value: defaultStopTransferMaxDistanceMetres,
+					},
+					&cli.IntFlag{
+						Name:  "min-change-seconds",
+						Usage: "Additional change buffer applied to generated stop transfers",
+						Value: defaultStopTransferMinChangeSeconds,
+					},
+					&cli.Float64Flag{
+						Name:  "walk-speed-metres-per-second",
+						Usage: "Walking speed used to calculate transfer durations",
+						Value: defaultStopTransferWalkSpeedMetresPerSecond,
+					},
+					&cli.IntFlag{
+						Name:  "batch-size",
+						Usage: "Mongo bulk write batch size",
+						Value: defaultStopTransferBatchSize,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -76,6 +96,13 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
 						linker.Run()
+					case "stop-transfers", "transfers":
+						return BuildStopTransfers(StopTransferBuildConfig{
+							MaxDistanceMetres:     c.Int("max-transfer-distance-metres"),
+							MinChangeSeconds:      c.Int("min-change-seconds"),
+							WalkSpeedMetresPerSec: c.Float64("walk-speed-metres-per-second"),
+							BatchSize:             c.Int("batch-size"),
+						})
 					case "services":
 						linker := NewLinker[*ctdf.Service]("service", mongo.Pipeline{
 							bson.D{

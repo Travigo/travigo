@@ -136,6 +136,7 @@ with DAG(
     end = EmptyOperator(task_id="end")
 
     stop_linker = generate_job("stop-linker", [ "data-linker", "run", "--type", "stops" ])
+    stop_transfers_linker = generate_job("stop-transfers-linker", [ "data-linker", "run", "--type", "stop-transfers" ])
     services_linker = generate_job("service-linker", [ "data-linker", "run", "--type", "services" ])
     stop_indexer = generate_job("stop-indexer", [ "indexer", "stops" ], instance_size="index_small")
 
@@ -170,6 +171,6 @@ with DAG(
             except yaml.YAMLError as exc:
                 print(exc)
 
-    start >> taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> services_linker >> stop_indexer >> end
+    start >> taskgroups["small"] >> taskgroups["medium"] >> taskgroups["large"] >> stop_linker >> stop_transfers_linker >> services_linker >> stop_indexer >> end
     taskgroups["medium"] >>stop_linker
     taskgroups["small"] >> stop_linker

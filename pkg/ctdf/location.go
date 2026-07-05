@@ -51,7 +51,7 @@ func (l1 *Location) Distance(l2 *Location) float64 {
 	var la1, lo1, la2, lo2, r float64
 	la1 = l1.Coordinates[1] * math.Pi / 180
 	lo1 = l1.Coordinates[0] * math.Pi / 180
-	la2 = l1.Coordinates[1] * math.Pi / 180
+	la2 = l2.Coordinates[1] * math.Pi / 180
 	lo2 = l2.Coordinates[0] * math.Pi / 180
 
 	r = 6378100 // Earth radius in METERS
