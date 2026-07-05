@@ -1,0 +1,112 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-373"
+Data:
+  VehicleTypeName: Class 373
+  PowerType: "Electric"
+  SpeedKMH: 300
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-373"
+  TrainLength: 18
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "7"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "8"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "9"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "10"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "11"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "12"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "13"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "14"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "15"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "16"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "17"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "18"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"

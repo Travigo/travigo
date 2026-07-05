@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -81,6 +82,20 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 	}
 	realtimeJourney.DetailedRailInformation.Carriages = BuildRailCarriages(message)
 	realtimeJourney.DetailedRailInformation.TrainLength = len(realtimeJourney.DetailedRailInformation.Carriages)
+
+	// Extract Vehicle IDs from the carriages and store them in the DetailedRailInformation
+	mappedVehicleIDs := make(map[string]struct{})
+	for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
+		mappedVehicleIDs[carriage.VehicleID] = struct{}{}
+	}
+
+	vehicleIDs := make([]string, 0, len(mappedVehicleIDs))
+	for vehicleID := range mappedVehicleIDs {
+		vehicleIDs = append(vehicleIDs, vehicleID)
+	}
+
+	realtimeJourney.DetailedRailInformation.VehicleIDs = vehicleIDs
+	pretty.Println(vehicleIDs)
 
 	if err := realtimestore.UpdateRailDetailedAllocation(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation); err != nil {
 		return err

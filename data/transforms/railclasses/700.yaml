@@ -1,25 +1,64 @@
-
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
   VehicleType: "gb-railclass-700"
 Data:
   VehicleTypeName: Class 700
-  # WiFi: true                # not sure this is actually always true
+  PowerType: "Electric"
+  SpeedKMH: 160
   AirConditioning: true
+  Toilets: true
+  PowerPlugs: false
+  USBPlugs: false
   DisabledAccess: true
   BicycleSpaces: true
-  Toilets: true
+  WiFi: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-700"
+  TrainLength: 8
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "8"
+    Class: "First"
+    Occupancy: -1
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
   VehicleType: "gb-railclass-700"
   TrainLength: 12
 Data:
-  # TODO NOT TRUE
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    Class: "First"
     Occupancy: -1
   - ID: "2"
     Class: "Standard"
@@ -29,24 +68,34 @@ Data:
   - ID: "3"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
   - ID: "4"
     Class: "Standard"
     Occupancy: -1
-  - ID: "1"
+  - ID: "5"
     Class: "Standard"
     Occupancy: -1
-  - ID: "2"
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "8"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "9"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "10"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "11"
     Class: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
-  - ID: "3"
-    Class: "Standard"
-    Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
-  - ID: "4"
-    Class: "Standard"
+  - ID: "12"
+    Class: "First"
     Occupancy: -1

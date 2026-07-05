@@ -4,13 +4,19 @@ Match:
   VehicleType: "gb-railclass-357"
 Data:
   VehicleTypeName: Class 357
-  WiFi: true
+  PowerType: "Electric"
+  SpeedKMH: 160
   AirConditioning: true
+  WiFi: true
+  Toilets: true
   DisabledAccess: true
   BicycleSpaces: true
-  Toilets: true
-  # PowerPlugs: false
-  # USBPlugs: false
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-357"
+  TrainLength: 4
+Data:
   Carriages:
   - ID: "1"
     Class: "Standard"

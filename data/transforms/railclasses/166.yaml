@@ -1,0 +1,32 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-166"
+Data:
+  VehicleTypeName: Class 166
+  PowerType: "Diesel"
+  SpeedKMH: 144
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-166"
+  TrainLength: 3
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"

@@ -1,0 +1,11 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-158_168_170_175"
+Data:
+  VehicleTypeName: Class 158/168/170/175
+  PowerType: "Diesel"
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true

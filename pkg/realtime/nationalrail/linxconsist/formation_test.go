@@ -74,14 +74,11 @@ func TestBuildRailCarriagesPreservesFormationDetails(t *testing.T) {
 	if carriages[0].ID != "156406:52406" {
 		t.Fatalf("expected reversed leading carriage 156406:52406, got %s", carriages[0].ID)
 	}
-	if carriages[0].VehicleID != "52406" || carriages[0].ResourceGroupID != "156406" {
+	if carriages[0].CarriageID != "52406" || carriages[0].VehicleID != "156406" {
 		t.Fatalf("expected vehicle and resource group ids to be preserved, got %+v", carriages[0])
 	}
-	if carriages[0].FleetID != "156" || carriages[0].SpecificType != "DMSL" || carriages[0].Livery != "AT" || carriages[0].Decor != "ZZ" {
+	if carriages[0].FleetID != "156" || carriages[0].SpecificType != "DMSL" || carriages[0].Livery != "AT" {
 		t.Fatalf("expected vehicle presentation fields to be preserved, got %+v", carriages[0])
-	}
-	if carriages[0].ResourceGroupType != "U" || carriages[0].ResourceGroupStatus != "N" || carriages[0].VehicleStatus != "N" || carriages[0].RegisteredStatus != "C" {
-		t.Fatalf("expected resource and vehicle status fields to be preserved, got %+v", carriages[0])
 	}
 	if carriages[0].Occupancy != -1 {
 		t.Fatalf("expected occupancy to be unknown, got %d", carriages[0].Occupancy)

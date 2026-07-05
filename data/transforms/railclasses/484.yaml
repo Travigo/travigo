@@ -1,0 +1,25 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-484"
+Data:
+  VehicleTypeName: Class 484
+  PowerType: "Electric"
+  SpeedKMH: 72
+  AirConditioning: false
+  Toilets: false
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-484"
+  TrainLength: 2
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1

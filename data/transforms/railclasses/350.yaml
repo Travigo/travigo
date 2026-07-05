@@ -1,0 +1,66 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-350"
+Data:
+  VehicleTypeName: Class 350
+  PowerType: "Electric"
+  SpeedKMH: 177
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-350/1"
+Data:
+  VehicleTypeName: Class 350
+  PowerType: "Electric"
+  SpeedKMH: 177
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-350"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-350/1"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1

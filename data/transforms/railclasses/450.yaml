@@ -1,0 +1,34 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-450"
+Data:
+  VehicleTypeName: Class 450
+  PowerType: "Electric"
+  SpeedKMH: 160
+  AirConditioning: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-450"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "First"
+    Occupancy: -1

@@ -1,0 +1,53 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-375"
+Data:
+  VehicleTypeName: Class 375
+  PowerType: "Electric"
+  SpeedKMH: 160
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-375"
+  TrainLength: 3
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-375"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1

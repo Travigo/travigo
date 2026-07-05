@@ -4,10 +4,65 @@ Match:
   VehicleType: "gb-railclass-745"
 Data:
   VehicleTypeName: Class 745
-  WiFi: true
+  PowerType: "Electric"
+  SpeedKMH: 160
   AirConditioning: true
-  DisabledAccess: true
-  BicycleSpaces: true
+  WiFi: true
   Toilets: true
   PowerPlugs: true
   USBPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-745"
+  TrainLength: 12
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+  - ID: "2"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "8"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "9"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "10"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "11"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "12"
+    Class: "Standard"
+    Occupancy: -1

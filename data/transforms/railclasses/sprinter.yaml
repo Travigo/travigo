@@ -1,15 +1,57 @@
-
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
   VehicleType: "gb-railclass-150_153_155_156"
 Data:
-  VehicleTypeName: Sprinter
-  # Such a wide range of vehicle classes & operators we cant say any for certain
-  WiFi: false
+  VehicleTypeName: Class 150/153/155/156
+  PowerType: "Diesel"
+  SpeedKMH: 120
   AirConditioning: false
-  DisabledAccess: false
-  BicycleSpaces: false
-  Toilets: false
-  PowerPlugs: false
-  USBPlugs: false
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-150_153_155_156"
+  TrainLength: 1
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-150_153_155_156"
+  TrainLength: 2
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-150_153_155_156"
+  TrainLength: 3
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1

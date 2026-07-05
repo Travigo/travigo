@@ -1,0 +1,8 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-91"
+Data:
+  VehicleTypeName: Class 91
+  PowerType: "Electric"
+  SpeedKMH: 225

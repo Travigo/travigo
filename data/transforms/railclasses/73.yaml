@@ -1,0 +1,8 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-73"
+Data:
+  VehicleTypeName: Class 73
+  PowerType: Electro-diesel
+  SpeedKMH: 144

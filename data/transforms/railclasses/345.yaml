@@ -1,17 +1,20 @@
-
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
   VehicleType: "gb-railclass-345"
 Data:
   VehicleTypeName: Class 345
-  WiFi: true
+  PowerType: "Electric"
+  SpeedKMH: 144
   AirConditioning: true
+  Toilets: false
   DisabledAccess: true
-  BicycleSpaces: true
-  # Toilets: false
-  # PowerPlugs: false
-  USBPlugs: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-345"
+  TrainLength: 9
+Data:
   Carriages:
   - ID: "1"
     Class: "Standard"

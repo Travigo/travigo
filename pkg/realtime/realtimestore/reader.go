@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -356,6 +357,9 @@ func GetRailDetailed(ctx context.Context, identifier string) (ctdf.JourneyDetail
 	if allocationErr != nil {
 		return loading, nil
 	}
+
+	allocation = enrichRailDetailedAllocation(allocation)
+
 	if loadingErr != nil {
 		return allocation, nil
 	}
@@ -375,6 +379,90 @@ func getRailDetailedPart(ctx context.Context, detailType string, identifier stri
 	}
 
 	return detailedRailInformation, nil
+}
+
+func enrichRailDetailedAllocation(allocation ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
+	allocation = inferRailDetailedAllocationFields(allocation)
+	originalCarriages := append([]ctdf.RailCarriage(nil), allocation.Carriages...)
+	enriched := allocation
+	transforms.Transform(&enriched, 1)
+
+	if len(originalCarriages) == 0 || len(enriched.Carriages) == 0 {
+		return enriched
+	}
+
+	transformCarriages := enriched.Carriages
+	if len(transformCarriages) > len(originalCarriages) {
+		transformCarriages = transformCarriages[len(originalCarriages):]
+	}
+
+	enriched.Carriages = originalCarriages
+	for carriageIndex := range enriched.Carriages {
+		if carriageIndex >= len(transformCarriages) {
+			continue
+		}
+
+		applyRailCarriageEnrichment(&enriched.Carriages[carriageIndex], transformCarriages[carriageIndex])
+	}
+
+	return enriched
+}
+
+func inferRailDetailedAllocationFields(allocation ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
+	if allocation.TrainLength == 0 {
+		allocation.TrainLength = len(allocation.Carriages)
+	}
+	if allocation.VehicleType != "" {
+		return allocation
+	}
+
+	for _, carriage := range allocation.Carriages {
+		vehicleType := railClassVehicleType(carriage.FleetID)
+		if vehicleType == "" {
+			vehicleType = railClassVehicleType(carriage.CarriageType)
+		}
+		if vehicleType == "" {
+			vehicleType = railClassVehicleType(carriage.SpecificType)
+		}
+		if vehicleType != "" {
+			allocation.VehicleType = vehicleType
+			return allocation
+		}
+	}
+
+	return allocation
+}
+
+func railClassVehicleType(value string) string {
+	if value == "" {
+		return ""
+	}
+
+	class := ""
+	for _, char := range value {
+		if char >= '0' && char <= '9' {
+			class += string(char)
+			continue
+		}
+		if class != "" {
+			break
+		}
+	}
+
+	if class == "" {
+		return ""
+	}
+
+	return "gb-railclass-" + class
+}
+
+func applyRailCarriageEnrichment(carriage *ctdf.RailCarriage, enrichment ctdf.RailCarriage) {
+	if carriage.Class == "" {
+		carriage.Class = enrichment.Class
+	}
+	if len(carriage.Toilets) == 0 {
+		carriage.Toilets = enrichment.Toilets
+	}
 }
 
 func mergeRailDetailed(allocation ctdf.JourneyDetailedRail, loading ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {

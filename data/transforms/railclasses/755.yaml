@@ -1,0 +1,54 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-755"
+Data:
+  VehicleTypeName: Class 755
+  PowerType: Bi-mode
+  SpeedKMH: 160
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  USBPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-755"
+  TrainLength: 3
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-755"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1

@@ -1,0 +1,69 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-221"
+Data:
+  VehicleTypeName: Class 221
+  PowerType: Diesel-electric
+  SpeedKMH: 201
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-221"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-221"
+  TrainLength: 5
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"

@@ -1,0 +1,79 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-701"
+Data:
+  VehicleTypeName: Class 701
+  PowerType: "Electric"
+  SpeedKMH: 160
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  USBPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-701"
+  TrainLength: 5
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-701"
+  TrainLength: 10
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "8"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "9"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "10"
+    Class: "Standard"
+    Occupancy: -1

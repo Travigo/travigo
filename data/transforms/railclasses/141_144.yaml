@@ -1,0 +1,48 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-141_144"
+Data:
+  VehicleTypeName: Class 141/144
+  PowerType: "Diesel"
+  SpeedKMH: 120
+  AirConditioning: false
+  WiFi: false
+  Toilets: true
+  PowerPlugs: false
+  USBPlugs: false
+  DisabledAccess: false
+  BicycleSpaces: false
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-141_144"
+  TrainLength: 2
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-141_144"
+  TrainLength: 3
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"

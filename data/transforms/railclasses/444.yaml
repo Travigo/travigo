@@ -1,0 +1,37 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-444"
+Data:
+  VehicleTypeName: Class 444
+  PowerType: "Electric"
+  SpeedKMH: 160
+  AirConditioning: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-444"
+  TrainLength: 5
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1

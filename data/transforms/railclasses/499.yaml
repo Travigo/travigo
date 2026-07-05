@@ -1,0 +1,8 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-499"
+Data:
+  VehicleTypeName: Class 499
+  PowerType: "Electric"
+  Toilets: false

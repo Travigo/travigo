@@ -1,0 +1,41 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-395"
+Data:
+  VehicleTypeName: Class 395
+  PowerType: "Electric"
+  SpeedKMH: 225
+  AirConditioning: true
+  Toilets: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-395"
+  TrainLength: 6
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"

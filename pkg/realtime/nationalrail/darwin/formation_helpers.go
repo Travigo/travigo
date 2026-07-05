@@ -29,10 +29,10 @@ func buildDarwinRailCarriages(scheduleFormation ScheduleFormations) []ctdf.RailC
 				})
 			}
 			realtimeCarriages = append(realtimeCarriages, ctdf.RailCarriage{
-				ID:        darwinRailCarriageID(formation.FID, carriage.Number, multipleFormations),
-				Class:     carriage.Class,
-				Toilets:   toilets,
-				Occupancy: -1,
+				ID:           darwinRailCarriageID(formation.FID, carriage.Number, multipleFormations),
+				CarriageType: carriage.Class,
+				Toilets:      toilets,
+				Occupancy:    -1,
 			})
 		}
 	}

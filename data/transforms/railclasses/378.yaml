@@ -1,17 +1,20 @@
-
 ---
 Type: ctdf.JourneyDetailedRail
 Match:
   VehicleType: "gb-railclass-378"
 Data:
   VehicleTypeName: Class 378
-  # WiFi: false
+  PowerType: "Electric"
+  SpeedKMH: 120
   AirConditioning: true
+  Toilets: false
   DisabledAccess: true
-  BicycleSpaces: true
-  # Toilets: false
-  # PowerPlugs: false
-  # USBPlugs: false
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-378"
+  TrainLength: 5
+Data:
   Carriages:
   - ID: "1"
     Class: "Standard"

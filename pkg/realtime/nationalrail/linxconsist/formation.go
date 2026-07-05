@@ -62,27 +62,27 @@ func BuildRailCarriages(message PassengerTrainConsistMessage) []ctdf.RailCarriag
 
 		for position, vehicle := range vehicles {
 			carriages = append(carriages, ctdf.RailCarriage{
-				ID:                     fmt.Sprintf("%s:%s", allocation.ResourceGroup.ResourceGroupID, vehicle.VehicleID),
-				Class:                  carriageClass(allocation.ResourceGroup, vehicle),
-				VehicleID:              vehicle.VehicleID,
-				ResourceGroupID:        allocation.ResourceGroup.ResourceGroupID,
-				ResourceGroupType:      allocation.ResourceGroup.TypeOfResource,
-				ResourceGroupStatus:    allocation.ResourceGroup.ResourceGroupStatus,
-				ResourceGroupPosition:  allocation.ResourceGroupPosition,
-				VehiclePosition:        position + 1,
-				PlannedResourceGroup:   vehicle.PlannedResourceGroup,
-				FleetID:                allocation.ResourceGroup.FleetID,
-				SpecificType:           vehicle.SpecificType,
-				Livery:                 vehicle.Livery,
-				Decor:                  vehicle.Decor,
+				ID:           fmt.Sprintf("%s:%s", allocation.ResourceGroup.ResourceGroupID, vehicle.VehicleID),
+				CarriageType: carriageType(allocation.ResourceGroup, vehicle),
+				CarriageID:   vehicle.VehicleID,
+				VehicleID:    allocation.ResourceGroup.ResourceGroupID,
+				// ResourceGroupType:      allocation.ResourceGroup.TypeOfResource,
+				// ResourceGroupStatus:    allocation.ResourceGroup.ResourceGroupStatus,
+				// ResourceGroupPosition:  allocation.ResourceGroupPosition,
+				VehiclePosition: position + 1,
+				// PlannedResourceGroup:   vehicle.PlannedResourceGroup,
+				FleetID:      allocation.ResourceGroup.FleetID,
+				SpecificType: vehicle.SpecificType,
+				Livery:       vehicle.Livery,
+				// Decor:                  vehicle.Decor,
 				SpecialCharacteristics: vehicle.SpecialCharacteristics,
 				VehicleStatus:          vehicle.VehicleStatus,
 				RegisteredStatus:       vehicle.RegisteredStatus,
 				LengthMM:               lengthInMM(vehicle.Length),
 				WeightKG:               vehicle.Weight,
 				SeatCount:              vehicle.NumberOfSeats,
-				MaximumSpeedMPH:        vehicle.MaximumSpeed,
-				Occupancy:              -1,
+				// MaximumSpeedMPH:        vehicle.MaximumSpeed,
+				Occupancy: -1,
 			})
 		}
 	}
@@ -90,7 +90,7 @@ func BuildRailCarriages(message PassengerTrainConsistMessage) []ctdf.RailCarriag
 	return carriages
 }
 
-func carriageClass(resourceGroup ResourceGroup, vehicle Vehicle) string {
+func carriageType(resourceGroup ResourceGroup, vehicle Vehicle) string {
 	if resourceGroup.FleetID != "" {
 		return resourceGroup.FleetID
 	}

@@ -1,0 +1,93 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-801"
+Data:
+  VehicleTypeName: Class 801
+  PowerType: "Electric"
+  SpeedKMH: 201
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  USBPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-801"
+  TrainLength: 5
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "5"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-801"
+  TrainLength: 9
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "8"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "9"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"

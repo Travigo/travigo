@@ -1,0 +1,8 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-67"
+Data:
+  VehicleTypeName: Class 67
+  PowerType: "Diesel"
+  SpeedKMH: 201

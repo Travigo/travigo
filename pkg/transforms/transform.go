@@ -1,6 +1,7 @@
 package transforms
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -30,7 +31,7 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		for key, value := range t.Match {
 			field := inputValue.FieldByName(key)
 			if field.IsValid() {
-				if value != field.String() {
+				if value != fmt.Sprint(field.Interface()) {
 					isMatch = false
 				}
 			} else {
@@ -69,42 +70,85 @@ func handleSubDocument(inputValue reflect.Value, data map[string]interface{}) {
 	for key, value := range data {
 		field := inputValue.FieldByName(key)
 		if field.IsValid() {
-			valueOf := reflect.ValueOf(value)
-			if valueOf.Kind() == reflect.Slice {
-				handleSubDocument2(field, valueOf, data)
-			} else if valueOf.Kind() == reflect.Map {
-				handleMap(field, value.(map[string]interface{}))
-			} else {
-				field.Set(reflect.ValueOf(value))
-			}
+			setTransformField(field, value)
 		}
 	}
 }
 
-func handleMap(field reflect.Value, data map[string]interface{}) {
-	for key, value := range data {
-		field.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(value))
+func setTransformField(field reflect.Value, value interface{}) {
+	if !field.CanSet() {
+		return
+	}
+
+	switch field.Kind() {
+	case reflect.Slice:
+		setTransformSlice(field, value)
+	case reflect.Map:
+		setTransformMap(field, value)
+	case reflect.Struct:
+		if data, ok := value.(map[string]interface{}); ok {
+			handleSubDocument(field, data)
+		}
+	default:
+		valueOf := reflect.ValueOf(value)
+		if valueOf.IsValid() && valueOf.Type().AssignableTo(field.Type()) {
+			field.Set(valueOf)
+		} else if valueOf.IsValid() && valueOf.Type().ConvertibleTo(field.Type()) {
+			field.Set(valueOf.Convert(field.Type()))
+		}
 	}
 }
 
-func handleSubDocument2(field reflect.Value, valueOf reflect.Value, data map[string]interface{}) {
+func setTransformMap(field reflect.Value, value interface{}) {
+	data, ok := value.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	if field.IsNil() {
+		field.Set(reflect.MakeMap(field.Type()))
+	}
+
+	for key, itemValue := range data {
+		keyValue := reflect.ValueOf(key)
+		valueValue := reflect.ValueOf(itemValue)
+		if keyValue.Type().ConvertibleTo(field.Type().Key()) {
+			keyValue = keyValue.Convert(field.Type().Key())
+		}
+		if valueValue.IsValid() && valueValue.Type().ConvertibleTo(field.Type().Elem()) {
+			valueValue = valueValue.Convert(field.Type().Elem())
+		}
+		if keyValue.Type().AssignableTo(field.Type().Key()) && valueValue.IsValid() && valueValue.Type().AssignableTo(field.Type().Elem()) {
+			field.SetMapIndex(keyValue, valueValue)
+		}
+	}
+}
+
+func setTransformSlice(field reflect.Value, value interface{}) {
+	valueOf := reflect.ValueOf(value)
+	if !valueOf.IsValid() || valueOf.Kind() != reflect.Slice {
+		return
+	}
+
 	for i := 0; i < valueOf.Len(); i++ {
-		item := valueOf.Index(i)
+		item := valueOf.Index(i).Interface()
 		newSliceValue := reflect.New(field.Type().Elem()).Elem()
 
-		for itemKey, itemValue := range item.Interface().(map[string]interface{}) {
-			itemField := newSliceValue.FieldByName(itemKey)
-			itemValueOf := reflect.ValueOf(itemValue)
-
-			if itemValueOf.Kind() == reflect.Slice {
-				for i2 := 0; i2 < itemValueOf.Len(); i2++ {
-					// itemStuckInALoopOfDoom := itemValueOf.Index(i2)
-					// pretty.Println(i, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-					// pretty.Println(itemField.String(), newSliceValue.String(), itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
-					// handleSubDocument2(newSliceValue, itemField, itemStuckInALoopOfDoom.Interface().(map[string]interface{}))
+		if itemMap, ok := item.(map[string]interface{}); ok && newSliceValue.Kind() == reflect.Struct {
+			for itemKey, itemValue := range itemMap {
+				itemField := newSliceValue.FieldByName(itemKey)
+				if itemField.IsValid() {
+					setTransformField(itemField, itemValue)
 				}
+			}
+		} else {
+			itemValue := reflect.ValueOf(item)
+			if itemValue.IsValid() && itemValue.Type().AssignableTo(field.Type().Elem()) {
+				newSliceValue.Set(itemValue)
+			} else if itemValue.IsValid() && itemValue.Type().ConvertibleTo(field.Type().Elem()) {
+				newSliceValue.Set(itemValue.Convert(field.Type().Elem()))
 			} else {
-				itemField.Set(itemValueOf)
+				continue
 			}
 		}
 

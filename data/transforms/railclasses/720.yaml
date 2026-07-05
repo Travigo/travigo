@@ -4,30 +4,37 @@ Match:
   VehicleType: "gb-railclass-720"
 Data:
   VehicleTypeName: Class 720
-  WiFi: true
+  PowerType: "Electric"
+  SpeedKMH: 160
   AirConditioning: true
-  DisabledAccess: true
-  # BicycleSpaces: false
+  WiFi: true
   Toilets: true
   PowerPlugs: true
-  USBPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-720"
+  TrainLength: 5
+Data:
   Carriages:
   - ID: "1"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Accessible"
   - ID: "2"
     Class: "Standard"
     Occupancy: -1
+    Toilets:
+    - Type: "Standard"
   - ID: "3"
     Class: "Standard"
     Occupancy: -1
   - ID: "4"
     Class: "Standard"
     Occupancy: -1
-    Toilets:
-    - Type: "Standard"
   - ID: "5"
     Class: "Standard"
     Occupancy: -1
+    Toilets:
+    - Type: "Accessible"

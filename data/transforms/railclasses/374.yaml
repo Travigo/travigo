@@ -1,0 +1,107 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-374"
+Data:
+  VehicleTypeName: Class 374
+  PowerType: "Electric"
+  SpeedKMH: 320
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-374"
+  TrainLength: 16
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "First"
+    Occupancy: -1
+  - ID: "2"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "3"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "5"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "6"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "7"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "8"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "9"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "10"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "11"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "12"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "13"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "14"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "15"
+    Class: "First"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+    - Type: "Standard"
+  - ID: "16"
+    Class: "First"
+    Occupancy: -1

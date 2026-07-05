@@ -1,0 +1,37 @@
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-379"
+Data:
+  VehicleTypeName: Class 379
+  PowerType: "Electric"
+  SpeedKMH: 160
+  AirConditioning: true
+  WiFi: true
+  Toilets: true
+  PowerPlugs: true
+  DisabledAccess: true
+  BicycleSpaces: true
+---
+Type: ctdf.JourneyDetailedRail
+Match:
+  VehicleType: "gb-railclass-379"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    Class: "Standard"
+    Occupancy: -1
+  - ID: "2"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Standard"
+  - ID: "3"
+    Class: "Standard"
+    Occupancy: -1
+    Toilets:
+    - Type: "Accessible"
+  - ID: "4"
+    Class: "Standard"
+    Occupancy: -1
