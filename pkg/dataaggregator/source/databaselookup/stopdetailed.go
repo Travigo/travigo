@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -23,6 +24,13 @@ func (s Source) StopDetailedQuery(stopQuery query.StopDetailed) (*ctdf.StopDetai
 
 	// Build detailed stop information from OSM features
 	stopDetailed := &ctdf.StopDetailed{
+		DataSource: &ctdf.DataSourceReference{
+			OriginalFormat: "OSMStopFeatures",
+			ProviderName:   "OpenStreetMap",
+			ProviderID:     "global-openstreetmap",
+			DatasetID:      "OSMStopFeatures",
+			Timestamp:      osmStop.(*ctdf.OSMStop).ModificationDateTime.Format(time.RFC3339),
+		},
 		FoodDrink:   []ctdf.StopShop{},
 		Shops:       []ctdf.StopShop{},
 		CarPark:     []ctdf.StopParking{},

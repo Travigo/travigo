@@ -1,6 +1,8 @@
 package ctdf
 
 type StopDetailed struct {
+	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
+
 	FoodDrink []StopShop    `groups:"detailed" bson:",omitempty"`
 	Shops     []StopShop    `groups:"detailed" bson:",omitempty"`
 	Toilets   []StopToilets `groups:"detailed" bson:",omitempty"`

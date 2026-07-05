@@ -1,0 +1,6 @@
+identifier: global-openstreetmap
+region: global
+provider:
+  name: OpenStreetMap
+  website: "http://openstreetmap.org/"
+datasets: []
