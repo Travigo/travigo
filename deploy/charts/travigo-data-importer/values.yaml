@@ -103,6 +103,52 @@ podAnnotations: {}
 nameOverride: ""
 fullnameOverride: ""
 
+batchRunner:
+  enabled: true
+  replicaCount: 1
+  storagePath: /batch-runs
+  maxActiveTasks: 1
+  continueOnFailure: true
+  forceImport: false
+  allowConcurrentRuns: false
+  job:
+    backoffLimit: 0
+    ttlSecondsAfterFinished: 3600
+    activeDeadlineSeconds: 0
+  persistence:
+    enabled: true
+    existingClaim: ""
+    size: 10Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ""
+  service:
+    type: ClusterIP
+    port: 8080
+  ingress:
+    enabled: true
+    className: ""
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+    hosts:
+      - host: api.travigo.app
+        paths:
+          - path: /data-importer(/|$)(.*)
+            pathType: ImplementationSpecific
+    tls: []
+  schedule:
+    enabled: true
+    cron: "0 5 * * *"
+    timeZone: Europe/London
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    skipLinkStops: false
+    skipLinkTransfers: false
+    skipLinkServices: false
+    skipIndexStops: false
+
 serviceAccount:
   # Specifies whether a service account should be created
   create: true

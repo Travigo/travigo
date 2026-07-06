@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/api"
+	"github.com/travigo/travigo/pkg/batchrunner"
 	"github.com/travigo/travigo/pkg/dataimporter"
 	"github.com/travigo/travigo/pkg/datalinker"
 	"github.com/travigo/travigo/pkg/dbwatch"
@@ -57,6 +58,7 @@ func main() {
 			dbwatch.RegisterCLI(),
 			indexer.RegisterCLI(),
 			datalinker.RegisterCLI(),
+			batchrunner.RegisterCLI(),
 		},
 	}
 

@@ -1,0 +1,54 @@
+{{- if and .Values.batchRunner.enabled .Values.batchRunner.schedule.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner-trigger
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner-trigger
+spec:
+  schedule: {{ .Values.batchRunner.schedule.cron | quote }}
+  {{- with .Values.batchRunner.schedule.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.batchRunner.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.batchRunner.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+      template:
+        spec:
+          serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" . }}
+          restartPolicy: OnFailure
+          containers:
+            - name: trigger
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - batch-runner
+                - trigger
+                - --server
+                - http://{{ include "travigo-data-importer.fullname" . }}-batch-runner:{{ .Values.batchRunner.service.port }}
+                - --max-active-tasks
+                - {{ .Values.batchRunner.maxActiveTasks | quote }}
+                - --continue-on-failure={{ .Values.batchRunner.continueOnFailure }}
+                {{- if .Values.batchRunner.forceImport }}
+                - --force
+                {{- end }}
+                {{- if .Values.batchRunner.schedule.skipLinkStops }}
+                - --skip-link-stops
+                {{- end }}
+                {{- if .Values.batchRunner.schedule.skipLinkTransfers }}
+                - --skip-link-transfers
+                {{- end }}
+                {{- if .Values.batchRunner.schedule.skipLinkServices }}
+                - --skip-link-services
+                {{- end }}
+                {{- if .Values.batchRunner.schedule.skipIndexStops }}
+                - --skip-index-stops
+                {{- end }}
+              env:
+                - name: TRAVIGO_LOG_FORMAT
+                  value: JSON
+{{- end }}

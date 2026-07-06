@@ -1,0 +1,35 @@
+{{- if .Values.batchRunner.enabled -}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "travigo-data-importer.serviceAccountName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+{{- end }}

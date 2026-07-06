@@ -1,0 +1,92 @@
+{{- if .Values.batchRunner.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner
+spec:
+  replicas: {{ .Values.batchRunner.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  template:
+    metadata:
+      labels:
+        app: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+        app.kubernetes.io/component: batch-runner
+    spec:
+      serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" . }}
+      containers:
+        - name: batch-runner
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["batch-runner", "server"]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: TRAVIGO_LOG_FORMAT
+              value: JSON
+            - name: TRAVIGO_BATCH_ADDRESS
+              value: ":8080"
+            - name: TRAVIGO_BATCH_STORAGE_PATH
+              value: {{ .Values.batchRunner.storagePath | quote }}
+            - name: TRAVIGO_BATCH_JOB_IMAGE
+              value: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: TRAVIGO_BATCH_JOB_IMAGE_PULL_POLICY
+              value: {{ .Values.image.pullPolicy | quote }}
+            - name: TRAVIGO_BATCH_JOB_SERVICE_ACCOUNT
+              value: {{ include "travigo-data-importer.serviceAccountName" . | quote }}
+            - name: TRAVIGO_BATCH_JOB_BACKOFF_LIMIT
+              value: {{ .Values.batchRunner.job.backoffLimit | quote }}
+            - name: TRAVIGO_BATCH_JOB_TTL_SECONDS
+              value: {{ .Values.batchRunner.job.ttlSecondsAfterFinished | quote }}
+            - name: TRAVIGO_BATCH_JOB_ACTIVE_DEADLINE_SECONDS
+              value: {{ .Values.batchRunner.job.activeDeadlineSeconds | quote }}
+            - name: TRAVIGO_BATCH_ALLOW_CONCURRENT_RUNS
+              value: {{ .Values.batchRunner.allowConcurrentRuns | quote }}
+            - name: TRAVIGO_BATCH_BODS_API_KEY_SECRET
+              value: {{ .Values.bods.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_IE_NATIONALTRANSPORT_API_KEY_SECRET
+              value: {{ .Values.ie_nationaltransport.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_NATIONALRAIL_CREDENTIALS_SECRET
+              value: {{ .Values.nationalRail.credentialsSecret | quote }}
+            - name: TRAVIGO_BATCH_NETWORKRAIL_CREDENTIALS_SECRET
+              value: {{ .Values.nationalRail.networkRailCredentialsSecret | quote }}
+            - name: TRAVIGO_BATCH_TRAFIKLAB_STATIC_SECRET
+              value: {{ .Values.se_trafiklab.staticSecret | quote }}
+            - name: TRAVIGO_BATCH_TRAFIKLAB_REALTIME_SECRET
+              value: {{ .Values.se_trafiklab.realtimeSecret | quote }}
+            - name: TRAVIGO_BATCH_ODPT_API_KEY_SECRET
+              value: {{ .Values.jp_odpt.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_MONGODB_CONNECTION_SECRET
+              value: {{ .Values.database.connectionStringSecret | quote }}
+            - name: TRAVIGO_BATCH_MONGODB_DATABASE
+              value: {{ .Values.database.database | quote }}
+            - name: TRAVIGO_BATCH_ELASTICSEARCH_ADDRESS
+              value: {{ .Values.elasticsearch.address | quote }}
+            - name: TRAVIGO_BATCH_ELASTICSEARCH_USER_SECRET
+              value: {{ .Values.elasticsearch.accountSecret | quote }}
+            - name: TRAVIGO_BATCH_REDIS_ADDRESS
+              value: {{ .Values.redis.address | quote }}
+            - name: TRAVIGO_BATCH_REDIS_PASSWORD_SECRET
+              value: {{ .Values.redis.passwordSecret | quote }}
+          {{- if .Values.batchRunner.persistence.enabled }}
+          volumeMounts:
+            - name: batch-runner-storage
+              mountPath: {{ .Values.batchRunner.storagePath }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.batchRunner.persistence.enabled }}
+      volumes:
+        - name: batch-runner-storage
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-batch-runner" (include "travigo-data-importer.fullname" .)) .Values.batchRunner.persistence.existingClaim }}
+      {{- end }}
+{{- end }}

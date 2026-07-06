@@ -1,0 +1,18 @@
+{{- if and .Values.batchRunner.enabled .Values.batchRunner.persistence.enabled (not .Values.batchRunner.persistence.existingClaim) -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner
+spec:
+  accessModes:
+    {{- toYaml .Values.batchRunner.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.batchRunner.persistence.size }}
+  {{- with .Values.batchRunner.persistence.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
