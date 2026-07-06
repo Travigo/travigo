@@ -36,18 +36,6 @@ spec:
                 {{- if .Values.batchRunner.forceImport }}
                 - --force
                 {{- end }}
-                {{- if .Values.batchRunner.schedule.skipLinkStops }}
-                - --skip-link-stops
-                {{- end }}
-                {{- if .Values.batchRunner.schedule.skipLinkTransfers }}
-                - --skip-link-transfers
-                {{- end }}
-                {{- if .Values.batchRunner.schedule.skipLinkServices }}
-                - --skip-link-services
-                {{- end }}
-                {{- if .Values.batchRunner.schedule.skipIndexStops }}
-                - --skip-index-stops
-                {{- end }}
               env:
                 - name: TRAVIGO_LOG_FORMAT
                   value: JSON

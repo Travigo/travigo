@@ -33,27 +33,25 @@ const (
 	RunStatusCancelled RunStatus = "cancelled"
 )
 
-type DatasetPlan struct {
-	Identifier string `json:"identifier"`
-	Size       string `json:"size"`
-	Format     string `json:"format"`
-	Provider   string `json:"provider"`
+type PlanTask struct {
+	Identifier string   `json:"identifier"`
+	Name       string   `json:"name,omitempty"`
+	Kind       TaskKind `json:"kind"`
+	Size       string   `json:"size,omitempty"`
+	Format     string   `json:"format,omitempty"`
+	Provider   string   `json:"provider,omitempty"`
 }
 
 type Plan struct {
-	Groups map[string][]DatasetPlan `json:"groups"`
+	Groups map[string][]PlanTask `json:"groups"`
 }
 
 type RunOptions struct {
-	DatasetIDs          []string `json:"datasetIds"`
-	IncludeAllDatasets  bool     `json:"includeAllDatasets"`
-	IncludeLinkStops    bool     `json:"includeLinkStops"`
-	IncludeTransfers    bool     `json:"includeTransfers"`
-	IncludeLinkServices bool     `json:"includeLinkServices"`
-	IncludeIndexStops   bool     `json:"includeIndexStops"`
-	ForceImport         bool     `json:"forceImport"`
-	MaxActiveTasks      int      `json:"maxActiveTasks"`
-	ContinueOnFailure   bool     `json:"continueOnFailure"`
+	TaskIDs           []string `json:"taskIds"`
+	IncludeAllTasks   bool     `json:"includeAllTasks"`
+	ForceImport       bool     `json:"forceImport"`
+	MaxActiveTasks    int      `json:"maxActiveTasks"`
+	ContinueOnFailure bool     `json:"continueOnFailure"`
 }
 
 type Run struct {

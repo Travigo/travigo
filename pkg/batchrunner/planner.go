@@ -8,15 +8,31 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 )
 
+const postProcessingGroup = "post-processing"
+
 var datasetSizes = []string{"small", "medium", "large"}
+var planGroupOrder = []string{"small", "medium", "large", postProcessingGroup}
+
+type fixedTaskDefinition struct {
+	id   string
+	name string
+	kind TaskKind
+	args []string
+}
+
+var postProcessingTaskDefinitions = []fixedTaskDefinition{
+	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}},
+	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}},
+	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}},
+	{id: "index-stops", name: "Index stops", kind: TaskKindIndexStops, args: []string{"indexer", "stops"}},
+}
 
 func BuildPlan() Plan {
 	plan := Plan{
-		Groups: map[string][]DatasetPlan{
-			"small":  {},
-			"medium": {},
-			"large":  {},
-		},
+		Groups: map[string][]PlanTask{},
+	}
+	for _, group := range planGroupOrder {
+		plan.Groups[group] = []PlanTask{}
 	}
 
 	for _, dataset := range manager.GetRegisteredDataSets() {
@@ -32,68 +48,97 @@ func BuildPlan() Plan {
 			size = "small"
 		}
 
-		plan.Groups[size] = append(plan.Groups[size], DatasetPlan{
+		plan.Groups[size] = append(plan.Groups[size], PlanTask{
 			Identifier: dataset.Identifier,
+			Name:       dataset.Identifier,
+			Kind:       TaskKindDataset,
 			Size:       size,
 			Format:     string(dataset.Format),
 			Provider:   dataset.Provider.Name,
 		})
 	}
 
-	for size := range plan.Groups {
+	for _, size := range datasetSizes {
 		sort.Slice(plan.Groups[size], func(i, j int) bool {
 			return plan.Groups[size][i].Identifier < plan.Groups[size][j].Identifier
 		})
 	}
+	plan.Groups[postProcessingGroup] = buildPostProcessingPlanTasks()
 
 	return plan
 }
 
 func BuildRunTasks(plan Plan, options RunOptions) []Task {
-	selected := map[string]bool{}
-	for _, id := range options.DatasetIDs {
-		selected[id] = true
-	}
-	includeAllDatasets := options.IncludeAllDatasets
-
+	selected := selectedTaskIDs(options)
 	tasks := []Task{}
-	for _, size := range datasetSizes {
-		for _, dataset := range plan.Groups[size] {
-			if !includeAllDatasets && !selected[dataset.Identifier] {
+
+	for _, group := range planGroupOrder {
+		for _, item := range plan.Groups[group] {
+			if !includePlanTask(item, selected, options) {
 				continue
 			}
 
-			args := []string{"data-importer", "dataset", "--id", dataset.Identifier}
-			if options.ForceImport {
-				args = append(args, "--force")
+			task, ok := taskFromPlanTask(item, options)
+			if ok {
+				tasks = append(tasks, task)
 			}
-
-			tasks = append(tasks, Task{
-				ID:        dataset.Identifier,
-				Name:      dataset.Identifier,
-				Kind:      TaskKindDataset,
-				Size:      size,
-				DatasetID: dataset.Identifier,
-				Args:      args,
-				Status:    TaskStatusPending,
-			})
 		}
 	}
 
-	if options.IncludeLinkStops {
-		tasks = append(tasks, fixedTask("link-stops", "Link stops", TaskKindLinkStops, []string{"data-linker", "run", "--type", "stops"}))
+	return tasks
+}
+
+func buildPostProcessingPlanTasks() []PlanTask {
+	tasks := make([]PlanTask, 0, len(postProcessingTaskDefinitions))
+	for _, definition := range postProcessingTaskDefinitions {
+		tasks = append(tasks, PlanTask{
+			Identifier: definition.id,
+			Name:       definition.name,
+			Kind:       definition.kind,
+		})
 	}
-	if options.IncludeTransfers {
-		tasks = append(tasks, fixedTask("link-stop-transfers", "Build stop transfers", TaskKindLinkTransfers, []string{"data-linker", "run", "--type", "stop-transfers"}))
+	return tasks
+}
+
+func selectedTaskIDs(options RunOptions) map[string]bool {
+	selected := map[string]bool{}
+	for _, id := range options.TaskIDs {
+		selected[id] = true
 	}
-	if options.IncludeLinkServices {
-		tasks = append(tasks, fixedTask("link-services", "Link services", TaskKindLinkServices, []string{"data-linker", "run", "--type", "services"}))
-	}
-	if options.IncludeIndexStops {
-		tasks = append(tasks, fixedTask("index-stops", "Index stops", TaskKindIndexStops, []string{"indexer", "stops"}))
+	return selected
+}
+
+func includePlanTask(item PlanTask, selected map[string]bool, options RunOptions) bool {
+	return options.IncludeAllTasks || selected[item.Identifier]
+}
+
+func taskFromPlanTask(item PlanTask, options RunOptions) (Task, bool) {
+	if item.Kind == TaskKindDataset {
+		args := []string{"data-importer", "dataset", "--id", item.Identifier}
+		if options.ForceImport {
+			args = append(args, "--force")
+		}
+
+		return Task{
+			ID:        item.Identifier,
+			Name:      item.Identifier,
+			Kind:      TaskKindDataset,
+			Size:      item.Size,
+			DatasetID: item.Identifier,
+			Args:      args,
+			Status:    TaskStatusPending,
+		}, true
 	}
 
-	return tasks
+	for _, definition := range postProcessingTaskDefinitions {
+		if definition.id == item.Identifier {
+			task := fixedTask(definition.id, definition.name, definition.kind, definition.args)
+			task.Size = postProcessingGroup
+			return task, true
+		}
+	}
+
+	return Task{}, false
 }
 
 func fixedTask(id string, name string, kind TaskKind, args []string) Task {

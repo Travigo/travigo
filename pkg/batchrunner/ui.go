@@ -257,12 +257,6 @@ const indexHTML = `<!doctype html>
           <label><input id="continueOnFailure" type="checkbox" checked> Continue after failures</label>
           <label>Max active tasks <input id="maxActiveTasks" type="number" min="1" max="64" value="1"></label>
         </div>
-        <div class="fieldset">
-          <label><input id="linkStops" type="checkbox" checked> Link stops</label>
-          <label><input id="linkTransfers" type="checkbox" checked> Build stop transfers</label>
-          <label><input id="linkServices" type="checkbox" checked> Link services</label>
-          <label><input id="indexStops" type="checkbox" checked> Index stops</label>
-        </div>
         <div class="toolbar">
           <button id="selectAll">Select all</button>
           <button id="selectNone">Select none</button>
@@ -287,11 +281,12 @@ const indexHTML = `<!doctype html>
       runs: [],
       selectedRunId: null,
       selectedTaskId: null,
-      selectedDatasets: new Set(),
-      datasetSelectionInitialized: false
+      selectedPlanTasks: new Set(),
+      planTaskSelectionInitialized: false
     };
 
     const $ = (id) => document.getElementById(id);
+    const PLAN_GROUPS = ['small', 'medium', 'large', 'post-processing'];
     const API_BASE = (() => {
       const path = window.location.pathname;
       if (path === '/' || path === '') return '';
@@ -317,38 +312,38 @@ const indexHTML = `<!doctype html>
       state.plan = plan;
       state.runs = runs;
       if (!state.selectedRunId && runs.length) state.selectedRunId = runs[0].id;
-      if (!state.datasetSelectionInitialized) {
-        for (const size of ['small', 'medium', 'large']) {
-          for (const dataset of plan.groups[size] || []) state.selectedDatasets.add(dataset.identifier);
+      if (!state.planTaskSelectionInitialized) {
+        for (const group of PLAN_GROUPS) {
+          for (const item of plan.groups[group] || []) state.selectedPlanTasks.add(item.identifier);
         }
-        state.datasetSelectionInitialized = true;
+        state.planTaskSelectionInitialized = true;
       }
-      renderDatasets();
+      renderPlanTasks();
       renderRuns();
       await renderSelectedRun();
     }
 
-    function renderDatasets() {
+    function renderPlanTasks() {
       const root = $('datasets');
       root.innerHTML = '';
-      for (const size of ['small', 'medium', 'large']) {
-        const items = state.plan.groups[size] || [];
+      for (const group of PLAN_GROUPS) {
+        const items = state.plan.groups[group] || [];
         const title = document.createElement('h3');
-        title.textContent = size + ' (' + items.length + ')';
+        title.textContent = group + ' (' + items.length + ')';
         root.appendChild(title);
         const list = document.createElement('div');
         list.className = 'dataset-list';
-        for (const dataset of items) {
+        for (const item of items) {
           const label = document.createElement('label');
           const checkbox = document.createElement('input');
           checkbox.type = 'checkbox';
-          checkbox.checked = state.selectedDatasets.has(dataset.identifier);
+          checkbox.checked = state.selectedPlanTasks.has(item.identifier);
           checkbox.addEventListener('change', () => {
-            if (checkbox.checked) state.selectedDatasets.add(dataset.identifier);
-            else state.selectedDatasets.delete(dataset.identifier);
+            if (checkbox.checked) state.selectedPlanTasks.add(item.identifier);
+            else state.selectedPlanTasks.delete(item.identifier);
           });
           const text = document.createElement('span');
-          text.innerHTML = escapeHtml(dataset.identifier) + '<span class="dataset-meta">' + escapeHtml(dataset.format + ' / ' + dataset.provider) + '</span>';
+          text.innerHTML = escapeHtml(item.name || item.identifier) + '<span class="dataset-meta">' + escapeHtml(planItemMeta(item)) + '</span>';
           label.appendChild(checkbox);
           label.appendChild(text);
           list.appendChild(label);
@@ -424,12 +419,8 @@ const indexHTML = `<!doctype html>
 
     async function startRun() {
       const options = {
-        datasetIds: Array.from(state.selectedDatasets),
-        includeAllDatasets: false,
-        includeLinkStops: $('linkStops').checked,
-        includeTransfers: $('linkTransfers').checked,
-        includeLinkServices: $('linkServices').checked,
-        includeIndexStops: $('indexStops').checked,
+        taskIds: Array.from(state.selectedPlanTasks),
+        includeAllTasks: false,
         forceImport: $('forceImport').checked,
         maxActiveTasks: Number($('maxActiveTasks').value || 1),
         continueOnFailure: $('continueOnFailure').checked
@@ -449,6 +440,11 @@ const indexHTML = `<!doctype html>
       return new Date(value).toLocaleString();
     }
 
+    function planItemMeta(item) {
+      if (item.kind === 'dataset') return [item.format, item.provider].filter(Boolean).join(' / ');
+      return item.kind || item.identifier;
+    }
+
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     }
@@ -460,14 +456,14 @@ const indexHTML = `<!doctype html>
     $('refresh').addEventListener('click', load);
     $('runSelected').addEventListener('click', () => startRun().catch((err) => alert(err.message)));
     $('selectAll').addEventListener('click', () => {
-      for (const size of ['small', 'medium', 'large']) {
-        for (const dataset of state.plan.groups[size] || []) state.selectedDatasets.add(dataset.identifier);
+      for (const group of PLAN_GROUPS) {
+        for (const item of state.plan.groups[group] || []) state.selectedPlanTasks.add(item.identifier);
       }
-      renderDatasets();
+      renderPlanTasks();
     });
     $('selectNone').addEventListener('click', () => {
-      state.selectedDatasets.clear();
-      renderDatasets();
+      state.selectedPlanTasks.clear();
+      renderPlanTasks();
     });
     $('cancelRun').addEventListener('click', async () => {
       if (!state.selectedRunId) return;

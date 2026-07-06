@@ -63,26 +63,19 @@ func RegisterCLI() *cli.Command {
 				Usage: "Start a run through a batch runner API",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "server", Value: "http://travigo-data-importer-batch-runner:8080", Usage: "Batch runner API base URL"},
-					&cli.StringSliceFlag{Name: "dataset", Usage: "Dataset ID to run; repeat for multiple datasets"},
+					&cli.StringSliceFlag{Name: "task", Usage: "Plan task ID to run; repeat for multiple tasks. Defaults to all tasks."},
 					&cli.BoolFlag{Name: "force", Usage: "Force dataset imports"},
 					&cli.IntFlag{Name: "max-active-tasks", Value: 1, Usage: "Maximum child jobs to run concurrently"},
 					&cli.BoolFlag{Name: "continue-on-failure", Value: true, Usage: "Continue later stages after failures"},
-					&cli.BoolFlag{Name: "skip-link-stops", Usage: "Skip stop linking"},
-					&cli.BoolFlag{Name: "skip-link-transfers", Usage: "Skip stop transfer building"},
-					&cli.BoolFlag{Name: "skip-link-services", Usage: "Skip service linking"},
-					&cli.BoolFlag{Name: "skip-index-stops", Usage: "Skip stop indexing"},
 				},
 				Action: func(c *cli.Context) error {
+					taskIDs := c.StringSlice("task")
 					options := RunOptions{
-						DatasetIDs:          c.StringSlice("dataset"),
-						IncludeAllDatasets:  len(c.StringSlice("dataset")) == 0,
-						IncludeLinkStops:    !c.Bool("skip-link-stops"),
-						IncludeTransfers:    !c.Bool("skip-link-transfers"),
-						IncludeLinkServices: !c.Bool("skip-link-services"),
-						IncludeIndexStops:   !c.Bool("skip-index-stops"),
-						ForceImport:         c.Bool("force"),
-						MaxActiveTasks:      c.Int("max-active-tasks"),
-						ContinueOnFailure:   c.Bool("continue-on-failure"),
+						TaskIDs:           taskIDs,
+						IncludeAllTasks:   len(taskIDs) == 0,
+						ForceImport:       c.Bool("force"),
+						MaxActiveTasks:    c.Int("max-active-tasks"),
+						ContinueOnFailure: c.Bool("continue-on-failure"),
 					}
 					return triggerRun(c.String("server"), options)
 				},

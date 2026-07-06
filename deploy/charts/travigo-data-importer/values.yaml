@@ -144,10 +144,6 @@ batchRunner:
     timeZone: Europe/London
     successfulJobsHistoryLimit: 3
     failedJobsHistoryLimit: 3
-    skipLinkStops: false
-    skipLinkTransfers: false
-    skipLinkServices: false
-    skipIndexStops: false
 
 serviceAccount:
   # Specifies whether a service account should be created

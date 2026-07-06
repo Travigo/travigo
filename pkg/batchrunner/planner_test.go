@@ -4,36 +4,37 @@ import "testing"
 
 func TestBuildRunTasksDatasetSelection(t *testing.T) {
 	plan := Plan{
-		Groups: map[string][]DatasetPlan{
+		Groups: map[string][]PlanTask{
 			"small": {
-				{Identifier: "small-a", Size: "small"},
+				{Identifier: "small-a", Kind: TaskKindDataset, Size: "small"},
 			},
 			"medium": {
-				{Identifier: "medium-a", Size: "medium"},
+				{Identifier: "medium-a", Kind: TaskKindDataset, Size: "medium"},
 			},
-			"large": {},
+			"large":             {},
+			postProcessingGroup: buildPostProcessingPlanTasks(),
 		},
 	}
 
-	allTasks := BuildRunTasks(plan, RunOptions{IncludeAllDatasets: true})
-	if len(allTasks) != 2 {
-		t.Fatalf("expected all datasets to produce 2 tasks, got %d", len(allTasks))
+	noTasks := BuildRunTasks(plan, RunOptions{})
+	if len(noTasks) != 0 {
+		t.Fatalf("expected no tasks without selected ids, got %d", len(noTasks))
 	}
 
-	noDatasetTasks := BuildRunTasks(plan, RunOptions{IncludeLinkStops: true})
-	if len(noDatasetTasks) != 1 {
-		t.Fatalf("expected only fixed task, got %d tasks", len(noDatasetTasks))
-	}
-	if noDatasetTasks[0].Kind != TaskKindLinkStops {
-		t.Fatalf("expected link stops task, got %s", noDatasetTasks[0].Kind)
+	allTasks := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
+	if len(allTasks) != 6 {
+		t.Fatalf("expected all plan tasks to produce 6 tasks, got %d", len(allTasks))
 	}
 
-	selectedTasks := BuildRunTasks(plan, RunOptions{DatasetIDs: []string{"medium-a"}})
-	if len(selectedTasks) != 1 {
-		t.Fatalf("expected one selected dataset task, got %d", len(selectedTasks))
+	selectedTasks := BuildRunTasks(plan, RunOptions{TaskIDs: []string{"medium-a", "link-stops"}})
+	if len(selectedTasks) != 2 {
+		t.Fatalf("expected two selected tasks, got %d", len(selectedTasks))
 	}
 	if selectedTasks[0].DatasetID != "medium-a" {
 		t.Fatalf("expected medium-a, got %s", selectedTasks[0].DatasetID)
+	}
+	if selectedTasks[1].Kind != TaskKindLinkStops {
+		t.Fatalf("expected link stops after dataset task, got %s", selectedTasks[1].Kind)
 	}
 }
 
