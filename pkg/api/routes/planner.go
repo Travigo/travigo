@@ -20,15 +20,47 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	originIdentifier := c.Params("origin")
 	destinationIdentifier := c.Params("destination")
 
-	count, err := strconv.Atoi(c.Query("count", "25"))
-	startDateTimeString := c.Query("datetime")
-
+	count, err := parsePlannerIntQuery(c, "count", "25")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"error": "Parameter count should be an integer",
 		})
 	}
+
+	maxChanges, err := parsePlannerIntQuery(c, "max_changes", "3")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter max_changes should be an integer",
+		})
+	}
+
+	maxTransferDistanceMetres, err := parsePlannerIntQuery(c, "max_transfer_distance_metres", "1000")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter max_transfer_distance_metres should be an integer",
+		})
+	}
+
+	maxJourneyDurationMinutes, err := parsePlannerIntQuery(c, "max_journey_duration_minutes", "360")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter max_journey_duration_minutes should be an integer",
+		})
+	}
+
+	departureBoardCountPerStop, err := parsePlannerIntQuery(c, "departure_board_count_per_stop", "40")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter departure_board_count_per_stop should be an integer",
+		})
+	}
+
+	startDateTimeString := c.Query("datetime")
 
 	// Get stops
 	var originStop *ctdf.Stop
@@ -74,11 +106,21 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	var journeyPlans *ctdf.JourneyPlanResults
 
 	journeyPlans, err = dataaggregator.Lookup[*ctdf.JourneyPlanResults](query.JourneyPlan{
-		OriginStop:      originStop,
-		DestinationStop: destinationStop,
-		Count:           count,
-		StartDateTime:   startDateTime,
+		OriginStop:                 originStop,
+		DestinationStop:            destinationStop,
+		Count:                      count,
+		StartDateTime:              startDateTime,
+		MaxChanges:                 maxChanges,
+		MaxTransferDistanceMetres:  maxTransferDistanceMetres,
+		MaxJourneyDuration:         time.Duration(maxJourneyDurationMinutes) * time.Minute,
+		DepartureBoardCountPerStop: departureBoardCountPerStop,
 	})
+	if err != nil {
+		c.SendStatus(fiber.StatusInternalServerError)
+		return c.JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
 
 	// Sort departures by DepartureBoard time
 	sort.Slice(journeyPlans.JourneyPlans, func(i, j int) bool {
@@ -95,4 +137,8 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	}, journeyPlans)
 
 	return c.JSON(reducedJourneyPlans)
+}
+
+func parsePlannerIntQuery(c *fiber.Ctx, key string, defaultValue string) (int, error) {
+	return strconv.Atoi(c.Query(key, defaultValue))
 }

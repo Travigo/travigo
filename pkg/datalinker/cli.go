@@ -51,6 +51,11 @@ func RegisterCLI() *cli.Command {
 						Usage: "Mongo bulk write batch size",
 						Value: defaultStopTransferBatchSize,
 					},
+					&cli.IntFlag{
+						Name:  "max-nearby-transfers-per-stop",
+						Usage: "Maximum number of generated nearby walking transfers retained per stop",
+						Value: defaultStopTransferMaxNearbyTransfers,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -98,10 +103,11 @@ func RegisterCLI() *cli.Command {
 						linker.Run()
 					case "stop-transfers", "transfers":
 						return BuildStopTransfers(StopTransferBuildConfig{
-							MaxDistanceMetres:     c.Int("max-transfer-distance-metres"),
-							MinChangeSeconds:      c.Int("min-change-seconds"),
-							WalkSpeedMetresPerSec: c.Float64("walk-speed-metres-per-second"),
-							BatchSize:             c.Int("batch-size"),
+							MaxDistanceMetres:         c.Int("max-transfer-distance-metres"),
+							MinChangeSeconds:          c.Int("min-change-seconds"),
+							WalkSpeedMetresPerSec:     c.Float64("walk-speed-metres-per-second"),
+							BatchSize:                 c.Int("batch-size"),
+							MaxNearbyTransfersPerStop: c.Int("max-nearby-transfers-per-stop"),
 						})
 					case "services":
 						linker := NewLinker[*ctdf.Service]("service", mongo.Pipeline{

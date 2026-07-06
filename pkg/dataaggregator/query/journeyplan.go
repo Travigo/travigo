@@ -10,4 +10,9 @@ type JourneyPlan struct {
 	DestinationStop *ctdf.Stop
 	Count           int
 	StartDateTime   time.Time
+
+	MaxChanges                 int
+	MaxJourneyDuration         time.Duration
+	MaxTransferDistanceMetres  int
+	DepartureBoardCountPerStop int
 }

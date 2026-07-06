@@ -20,21 +20,26 @@ const (
 	defaultStopTransferMinChangeSeconds         = 60
 	defaultStopTransferWalkSpeedMetresPerSecond = 1.3
 	defaultStopTransferBatchSize                = 5000
+	defaultStopTransferMaxNearbyTransfers       = 24
 	metresPerDegree                             = 111320.0
-	earthRadiusMetres                           = 6378100.0
 )
 
 type StopTransferBuildConfig struct {
-	MaxDistanceMetres       int
-	MinChangeSeconds        int
-	WalkSpeedMetresPerSec   float64
-	BatchSize               int
-	SameStopGroupMultiplier int
+	MaxDistanceMetres         int
+	MinChangeSeconds          int
+	WalkSpeedMetresPerSec     float64
+	BatchSize                 int
+	MaxNearbyTransfersPerStop int
+	SameStopGroupMultiplier   int
 }
 
 type transferStop struct {
 	PrimaryIdentifier string
+	Index             int
 	Location          *ctdf.Location
+	Latitude          float64
+	Longitude         float64
+	CosLatitude       float64
 	Associations      []*ctdf.Association
 	Platforms         []*ctdf.StopPlatform
 }
@@ -60,6 +65,11 @@ type gridKey struct {
 	lon int
 }
 
+type nearbyTransferCandidate struct {
+	toStopIndex    int
+	distanceMetres int
+}
+
 func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 	if config.MaxDistanceMetres <= 0 {
 		config.MaxDistanceMetres = defaultStopTransferMaxDistanceMetres
@@ -72,6 +82,9 @@ func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 	}
 	if config.BatchSize <= 0 {
 		config.BatchSize = defaultStopTransferBatchSize
+	}
+	if config.MaxNearbyTransfersPerStop <= 0 {
+		config.MaxNearbyTransfersPerStop = defaultStopTransferMaxNearbyTransfers
 	}
 	if config.SameStopGroupMultiplier <= 0 {
 		config.SameStopGroupMultiplier = 2
@@ -105,6 +118,7 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 		Int("transfers", len(transfers)).
 		Int("max_distance_metres", config.MaxDistanceMetres).
 		Int("min_change_seconds", config.MinChangeSeconds).
+		Int("max_nearby_transfers_per_stop", config.MaxNearbyTransfersPerStop).
 		Float64("walk_speed_metres_per_second", config.WalkSpeedMetresPerSec).
 		Dur("duration", time.Since(start)).
 		Msg("Built Stop Transfers")
@@ -150,9 +164,15 @@ func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
 			continue
 		}
 
+		latitude := stop.Location.Coordinates[1]
+		longitude := stop.Location.Coordinates[0]
 		stops = append(stops, &transferStop{
 			PrimaryIdentifier: stop.PrimaryIdentifier,
+			Index:             len(stops),
 			Location:          stop.Location,
+			Latitude:          latitude,
+			Longitude:         longitude,
+			CosLatitude:       math.Cos(latitude * math.Pi / 180),
 			Associations:      stop.Associations,
 			Platforms:         stop.Platforms,
 		})
@@ -188,18 +208,18 @@ func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKe
 	}
 
 	for _, groupStops := range stopGroups {
-		for i, fromStop := range groupStops {
-			for j, toStop := range groupStops {
-				if i == j {
-					continue
-				}
+		for i := 0; i < len(groupStops); i++ {
+			for j := i + 1; j < len(groupStops); j++ {
+				fromStop := groupStops[i]
+				toStop := groupStops[j]
 
-				distance := roundedDistanceMetres(fromStop.Location, toStop.Location)
+				distance := roundedStopDistanceMetres(fromStop, toStop)
 				if distance > maxDistanceMetres {
 					continue
 				}
 
 				addTransfer(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
+				addTransfer(transfers, toStop.PrimaryIdentifier, fromStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
 			}
 		}
 	}
@@ -227,7 +247,7 @@ func buildPlatformAliasTransfers(stops []*transferStop, transfers map[transferKe
 				continue
 			}
 
-			distance := roundedDistanceMetres(parentStop.Location, platformStop.Location)
+			distance := roundedStopDistanceMetres(parentStop, platformStop)
 			addTransfer(transfers, parentStop.PrimaryIdentifier, platformStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
 			addTransfer(transfers, platformStop.PrimaryIdentifier, parentStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
 		}
@@ -252,15 +272,19 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 		grid[key] = append(grid[key], stop)
 	}
 
+	nearbyCandidatesByStop := make([][]nearbyTransferCandidate, len(stops))
+	maxDistance := float64(config.MaxDistanceMetres)
+	maxDistanceSquared := maxDistance * maxDistance
+	nearbyPairCandidates := 0
+
 	for _, fromStop := range stops {
-		fromLat := fromStop.Location.Coordinates[1]
 		fromKey := stopGridKey(fromStop, cellDegrees)
 		latRange := int(math.Ceil((float64(config.MaxDistanceMetres) / metresPerDegree) / cellDegrees))
 		if latRange < 1 {
 			latRange = 1
 		}
 
-		cosLat := math.Cos(fromLat * math.Pi / 180)
+		cosLat := fromStop.CosLatitude
 		if math.Abs(cosLat) < 0.01 {
 			cosLat = 0.01
 		}
@@ -277,22 +301,94 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 				}]
 
 				for _, toStop := range candidates {
+					if fromStop.Index >= toStop.Index {
+						continue
+					}
 					if fromStop.PrimaryIdentifier == toStop.PrimaryIdentifier {
 						continue
 					}
-
-					distance := roundedDistanceMetres(fromStop.Location, toStop.Location)
-					if distance > config.MaxDistanceMetres {
+					if transferExists(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier) {
 						continue
 					}
 
-					addTransfer(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier, ctdf.StopTransferTypeNearbyWalk, distance, config.MaxDistanceMetres, config)
+					distanceSquared := squaredStopDistanceMetres(fromStop, toStop)
+					if distanceSquared > maxDistanceSquared {
+						continue
+					}
+
+					distance := int(math.Round(math.Sqrt(distanceSquared)))
+					addNearbyCandidate(nearbyCandidatesByStop, fromStop.Index, toStop.Index, stops, distance, config.MaxNearbyTransfersPerStop)
+					addNearbyCandidate(nearbyCandidatesByStop, toStop.Index, fromStop.Index, stops, distance, config.MaxNearbyTransfersPerStop)
+					nearbyPairCandidates++
 				}
 			}
 		}
 	}
 
-	log.Info().Int("transfers", len(transfers)).Msg("Built nearby walk transfer candidates")
+	addedNearbyTransfers := 0
+	for _, fromStop := range stops {
+		candidates := nearbyCandidatesByStop[fromStop.Index]
+		sort.Slice(candidates, func(i, j int) bool {
+			return nearbyCandidateLess(candidates[i], candidates[j], stops)
+		})
+
+		if len(candidates) > config.MaxNearbyTransfersPerStop {
+			candidates = candidates[:config.MaxNearbyTransfersPerStop]
+		}
+
+		for _, candidate := range candidates {
+			addTransfer(transfers, fromStop.PrimaryIdentifier, stops[candidate.toStopIndex].PrimaryIdentifier, ctdf.StopTransferTypeNearbyWalk, candidate.distanceMetres, config.MaxDistanceMetres, config)
+			addedNearbyTransfers++
+		}
+	}
+
+	log.Info().
+		Int("nearby_pair_candidates", nearbyPairCandidates).
+		Int("nearby_transfers_added", addedNearbyTransfers).
+		Int("transfers", len(transfers)).
+		Msg("Built nearby walk transfer candidates")
+}
+
+func addNearbyCandidate(
+	candidatesByStop [][]nearbyTransferCandidate,
+	fromStopIndex int,
+	toStopIndex int,
+	stops []*transferStop,
+	distanceMetres int,
+	maxCandidates int,
+) {
+	if maxCandidates <= 0 || fromStopIndex < 0 || fromStopIndex >= len(candidatesByStop) || toStopIndex < 0 || toStopIndex >= len(stops) {
+		return
+	}
+
+	candidate := nearbyTransferCandidate{
+		toStopIndex:    toStopIndex,
+		distanceMetres: distanceMetres,
+	}
+	candidates := candidatesByStop[fromStopIndex]
+	if len(candidates) < maxCandidates {
+		candidatesByStop[fromStopIndex] = append(candidates, candidate)
+		return
+	}
+
+	worstIndex := 0
+	for i := 1; i < len(candidates); i++ {
+		if nearbyCandidateLess(candidates[worstIndex], candidates[i], stops) {
+			worstIndex = i
+		}
+	}
+
+	if nearbyCandidateLess(candidate, candidates[worstIndex], stops) {
+		candidates[worstIndex] = candidate
+		candidatesByStop[fromStopIndex] = candidates
+	}
+}
+
+func nearbyCandidateLess(a nearbyTransferCandidate, b nearbyTransferCandidate, stops []*transferStop) bool {
+	if a.distanceMetres == b.distanceMetres {
+		return stops[a.toStopIndex].PrimaryIdentifier < stops[b.toStopIndex].PrimaryIdentifier
+	}
+	return a.distanceMetres < b.distanceMetres
 }
 
 func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) error {
@@ -431,9 +527,14 @@ func transferTypePriority(transferType ctdf.StopTransferType) int {
 
 func stopGridKey(stop *transferStop, cellDegrees float64) gridKey {
 	return gridKey{
-		lat: int(math.Floor(stop.Location.Coordinates[1] / cellDegrees)),
-		lon: int(math.Floor(stop.Location.Coordinates[0] / cellDegrees)),
+		lat: int(math.Floor(stop.Latitude / cellDegrees)),
+		lon: int(math.Floor(stop.Longitude / cellDegrees)),
 	}
+}
+
+func transferExists(transfers map[transferKey]transferCandidate, fromStopRef string, toStopRef string) bool {
+	_, exists := transfers[transferKey{from: fromStopRef, to: toStopRef}]
+	return exists
 }
 
 func validTransferLocation(location *ctdf.Location) bool {
@@ -453,21 +554,13 @@ func validTransferLocation(location *ctdf.Location) bool {
 	return lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90
 }
 
-func roundedDistanceMetres(from *ctdf.Location, to *ctdf.Location) int {
-	return int(math.Round(distanceMetres(from, to)))
+func roundedStopDistanceMetres(from *transferStop, to *transferStop) int {
+	return int(math.Round(math.Sqrt(squaredStopDistanceMetres(from, to))))
 }
 
-func distanceMetres(from *ctdf.Location, to *ctdf.Location) float64 {
-	fromLat := from.Coordinates[1] * math.Pi / 180
-	fromLon := from.Coordinates[0] * math.Pi / 180
-	toLat := to.Coordinates[1] * math.Pi / 180
-	toLon := to.Coordinates[0] * math.Pi / 180
+func squaredStopDistanceMetres(from *transferStop, to *transferStop) float64 {
+	latMetres := (to.Latitude - from.Latitude) * metresPerDegree
+	lonMetres := (to.Longitude - from.Longitude) * metresPerDegree * from.CosLatitude
 
-	dLat := toLat - fromLat
-	dLon := toLon - fromLon
-
-	a := math.Pow(math.Sin(dLat/2), 2) +
-		math.Cos(fromLat)*math.Cos(toLat)*math.Pow(math.Sin(dLon/2), 2)
-
-	return 2 * earthRadiusMetres * math.Asin(math.Sqrt(a))
+	return (latMetres * latMetres) + (lonMetres * lonMetres)
 }
