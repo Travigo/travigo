@@ -18,28 +18,30 @@ import (
 )
 
 const (
-	defaultJourneyPlanCount                   = 5
-	defaultJourneyPlanMaxChanges              = 3
-	defaultJourneyPlanMaxJourneyDuration      = 6 * time.Hour
-	defaultJourneyPlanMaxTransferDistance     = 1000
-	defaultJourneyPlanDepartureBoardCount     = 12
-	defaultJourneyPlanMaxExpandedLabels       = 150
-	defaultJourneyPlanMaxRouteItems           = 10
-	defaultJourneyPlanMaxConsecutiveTransfers = 1
-	defaultJourneyPlanMaxSearchDuration       = 8 * time.Second
+	defaultJourneyPlanCount                     = 5
+	defaultJourneyPlanMaxChanges                = 3
+	defaultJourneyPlanMaxJourneyDuration        = 6 * time.Hour
+	defaultJourneyPlanMaxTransferDistance       = 1000
+	defaultJourneyPlanDepartureBoardCount       = 12
+	defaultJourneyPlanOriginDepartureBoardCount = 96
+	defaultJourneyPlanMaxExpandedLabels         = 150
+	defaultJourneyPlanMaxRouteItems             = 10
+	defaultJourneyPlanMaxConsecutiveTransfers   = 1
+	defaultJourneyPlanMaxSearchDuration         = 8 * time.Second
 )
 
 type plannerConfig struct {
-	count                   int
-	maxVehicleLegs          int
-	maxJourneyDuration      time.Duration
-	maxTransferDistance     int
-	departureBoardCount     int
-	maxExpandedLabels       int
-	maxRouteItems           int
-	maxConsecutiveTransfers int
-	maxLabelsPerState       int
-	maxSearchDuration       time.Duration
+	count                     int
+	maxVehicleLegs            int
+	maxJourneyDuration        time.Duration
+	maxTransferDistance       int
+	departureBoardCount       int
+	originDepartureBoardCount int
+	maxExpandedLabels         int
+	maxRouteItems             int
+	maxConsecutiveTransfers   int
+	maxLabelsPerState         int
+	maxSearchDuration         time.Duration
 }
 
 type plannerStateKey struct {
@@ -103,6 +105,7 @@ func (pq *plannerPriorityQueue) Pop() any {
 
 type cachedDepartureBoard struct {
 	fetchTime time.Time
+	count     int
 	board     []*ctdf.DepartureBoard
 }
 
@@ -241,6 +244,14 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 		departureBoardCount = defaultJourneyPlanDepartureBoardCount
 	}
 
+	originDepartureBoardCount := q.OriginDepartureBoardCount
+	if originDepartureBoardCount <= 0 {
+		originDepartureBoardCount = defaultJourneyPlanOriginDepartureBoardCount
+	}
+	if originDepartureBoardCount < departureBoardCount {
+		originDepartureBoardCount = departureBoardCount
+	}
+
 	maxExpandedLabels := q.MaxExpandedLabels
 	if maxExpandedLabels <= 0 {
 		maxExpandedLabels = defaultJourneyPlanMaxExpandedLabels
@@ -252,16 +263,17 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 	}
 
 	return plannerConfig{
-		count:                   count,
-		maxVehicleLegs:          maxChanges + 1,
-		maxJourneyDuration:      maxJourneyDuration,
-		maxTransferDistance:     maxTransferDistance,
-		departureBoardCount:     departureBoardCount,
-		maxExpandedLabels:       maxExpandedLabels,
-		maxRouteItems:           defaultJourneyPlanMaxRouteItems,
-		maxConsecutiveTransfers: defaultJourneyPlanMaxConsecutiveTransfers,
-		maxLabelsPerState:       count,
-		maxSearchDuration:       maxSearchDuration,
+		count:                     count,
+		maxVehicleLegs:            maxChanges + 1,
+		maxJourneyDuration:        maxJourneyDuration,
+		maxTransferDistance:       maxTransferDistance,
+		departureBoardCount:       departureBoardCount,
+		originDepartureBoardCount: originDepartureBoardCount,
+		maxExpandedLabels:         maxExpandedLabels,
+		maxRouteItems:             defaultJourneyPlanMaxRouteItems,
+		maxConsecutiveTransfers:   defaultJourneyPlanMaxConsecutiveTransfers,
+		maxLabelsPerState:         count,
+		maxSearchDuration:         maxSearchDuration,
 	}
 }
 
@@ -334,7 +346,12 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		return nil
 	}
 
-	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime)
+	departureBoardCount := runtime.config.departureBoardCount
+	if current.routeItems == nil {
+		departureBoardCount = runtime.config.originDepartureBoardCount
+	}
+
+	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime, departureBoardCount)
 	if err != nil {
 		return err
 	}
@@ -413,14 +430,15 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 // first N departures from each stop as its expansion frontier; later visits to
 // the same stop filter that cached frontier forward rather than issuing another
 // expensive departure-board generation.
-func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime time.Time) ([]*ctdf.DepartureBoard, error) {
+func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime time.Time, departureBoardCount int) ([]*ctdf.DepartureBoard, error) {
 	if stop == nil {
 		return nil, nil
 	}
 
 	if cached, exists := runtime.departureBoardCache[stop.PrimaryIdentifier]; exists {
 		if !startDateTime.Before(cached.fetchTime) &&
-			sameCalendarDay(cached.fetchTime, startDateTime) {
+			sameCalendarDay(cached.fetchTime, startDateTime) &&
+			cached.count >= departureBoardCount {
 			filtered := make([]*ctdf.DepartureBoard, 0, len(cached.board))
 			for _, departure := range cached.board {
 				if departure == nil || departure.Time.Before(startDateTime) {
@@ -434,15 +452,17 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 
 	board, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
 		Stop:          stop,
-		Count:         runtime.config.departureBoardCount,
+		Count:         departureBoardCount,
 		StartDateTime: startDateTime,
 	})
 	if err != nil {
 		return nil, err
 	}
+	board = limitDepartureBoard(board, departureBoardCount)
 
 	runtime.departureBoardCache[stop.PrimaryIdentifier] = cachedDepartureBoard{
 		fetchTime: startDateTime,
+		count:     departureBoardCount,
 		board:     board,
 	}
 
@@ -459,6 +479,29 @@ func (runtime *plannerRuntime) searchExpired() bool {
 
 	runtime.timedOut = true
 	return true
+}
+
+func limitDepartureBoard(board []*ctdf.DepartureBoard, count int) []*ctdf.DepartureBoard {
+	if len(board) == 0 {
+		return board
+	}
+
+	limited := make([]*ctdf.DepartureBoard, 0, len(board))
+	for _, departure := range board {
+		if departure != nil {
+			limited = append(limited, departure)
+		}
+	}
+
+	sort.Slice(limited, func(i, j int) bool {
+		return limited[i].Time.Before(limited[j].Time)
+	})
+
+	if count > 0 && len(limited) > count {
+		limited = limited[:count]
+	}
+
+	return limited
 }
 
 func sameCalendarDay(a time.Time, b time.Time) bool {
