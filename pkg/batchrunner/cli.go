@@ -19,7 +19,7 @@ func RegisterCLI() *cli.Command {
 		Subcommands: []*cli.Command{
 			{
 				Name:  "server",
-				Usage: "Start the batch runner UI and API",
+				Usage: "Start the batch runner API",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "address", Value: ConfigFromEnv().Address, Usage: "HTTP listen address"},
 					&cli.StringFlag{Name: "storage-path", Value: ConfigFromEnv().StoragePath, Usage: "Directory used for run metadata and logs"},
@@ -94,7 +94,7 @@ func triggerRun(baseURL string, options RunOptions) error {
 		return err
 	}
 
-	resp, err := http.Post(strings.TrimRight(baseURL, "/")+"/api/runs", "application/json", bytes.NewReader(data))
+	resp, err := http.Post(strings.TrimRight(baseURL, "/")+"/runs", "application/json", bytes.NewReader(data))
 	if err != nil {
 		return err
 	}

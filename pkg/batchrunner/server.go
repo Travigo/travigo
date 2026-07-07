@@ -23,21 +23,10 @@ func NewServer(store *Store, runner *Runner) *Server {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.handleIndex)
-	mux.HandleFunc("/api/plan", s.handlePlan)
-	mux.HandleFunc("/api/runs", s.handleRuns)
-	mux.HandleFunc("/api/runs/", s.handleRunPath)
+	mux.HandleFunc("/plan", s.handlePlan)
+	mux.HandleFunc("/runs", s.handleRuns)
+	mux.HandleFunc("/runs/", s.handleRunPath)
 	return mux
-}
-
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = w.Write([]byte(indexHTML))
 }
 
 func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +66,7 @@ func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRunPath(w http.ResponseWriter, r *http.Request) {
-	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/")
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/runs/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		writeError(w, http.StatusNotFound, "run not found")
 		return
