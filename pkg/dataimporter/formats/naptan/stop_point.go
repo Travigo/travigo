@@ -104,7 +104,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			ctdf.TransportTypeBus,
 			ctdf.TransportTypeCoach,
 		}
-	case "RPLY": // railPlatform
+	case "RPL", "RPLY": // railPlatform
 		TransportTypes = []ctdf.TransportType{
 			ctdf.TransportTypeRail,
 		}
@@ -189,7 +189,7 @@ func (orig *StopPoint) ToCTDF() *ctdf.Stop {
 			Coordinates: []float64{orig.Location.Longitude, orig.Location.Latitude},
 		},
 
-		Active:   orig.Status == "active",
+		Active:   strings.EqualFold(orig.Status, "active"),
 		Timezone: "Europe/London",
 	}
 

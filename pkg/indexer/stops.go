@@ -135,13 +135,33 @@ func indexStopsFromMongo(indexName string) {
 	now := time.Now()
 	stopsCollection := database.GetCollection("stops")
 
-	cursor, _ := stopsCollection.Find(context.Background(), bson.M{})
+	cursor, err := stopsCollection.Find(context.Background(), bson.M{})
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to fetch stops for indexing")
+		return
+	}
+
+	totalStops := 0
+	inactiveSkipped := 0
+	railInactiveSkipped := 0
+	indexedStops := 0
+	railIndexedStops := 0
 
 	for cursor.Next(context.Background()) {
 		var stop *ctdf.Stop
-		cursor.Decode(&stop)
+		err := cursor.Decode(&stop)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to decode stop for indexing")
+			continue
+		}
+
+		totalStops++
 
 		if !stop.Active {
+			inactiveSkipped++
+			if stopHasTransportType(stop, ctdf.TransportTypeRail) {
+				railInactiveSkipped++
+			}
 			continue
 		}
 
@@ -185,7 +205,34 @@ func indexStopsFromMongo(indexName string) {
 		})
 
 		elastic_client.IndexRequest(indexName, bytes.NewReader(jsonStop))
+		indexedStops++
+		if stopHasTransportType(stop, ctdf.TransportTypeRail) {
+			railIndexedStops++
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Msg("Failed while iterating stops for indexing")
 	}
 
-	log.Info().Msg("Sent all index requests to queue")
+	log.Info().
+		Int("total_stops", totalStops).
+		Int("indexed_stops", indexedStops).
+		Int("rail_indexed_stops", railIndexedStops).
+		Int("inactive_skipped", inactiveSkipped).
+		Int("rail_inactive_skipped", railInactiveSkipped).
+		Msg("Sent stop index requests to queue")
+}
+
+func stopHasTransportType(stop *ctdf.Stop, transportType ctdf.TransportType) bool {
+	if stop == nil {
+		return false
+	}
+
+	for _, stopTransportType := range stop.TransportTypes {
+		if stopTransportType == transportType {
+			return true
+		}
+	}
+
+	return false
 }
