@@ -64,6 +64,7 @@ type plannerLabel struct {
 	arrivalTime          time.Time
 	vehicleLegs          int
 	consecutiveTransfers int
+	transfersExpanded    bool
 	routeItems           *routeItemNode
 	index                int
 }
@@ -170,8 +171,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if current.consecutiveTransfers < config.maxConsecutiveTransfers {
-			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
+		if current.vehicleLegs < config.maxVehicleLegs {
+			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -179,8 +180,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if current.vehicleLegs < config.maxVehicleLegs {
-			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
+		if !current.transfersExpanded && current.consecutiveTransfers < config.maxConsecutiveTransfers {
+			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -342,6 +343,15 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			continue
 		}
 
+		if nextLabel.vehicleLegs < runtime.config.maxVehicleLegs && shouldScanTransferDepartures(nextLabel.stop) {
+			if err := runtime.recordDirectDeparturesToDestination(nextLabel, destinationStop, results); err != nil {
+				return err
+			}
+			if len(results.JourneyPlans) >= runtime.config.count {
+				return nil
+			}
+		}
+
 		runtime.pushLabel(pq, nextLabel)
 	}
 
@@ -386,7 +396,38 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 			continue
 		}
 
+		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) && len(results.JourneyPlans) >= runtime.config.count {
+			return nil
+		}
+	}
+
+	for _, departure := range departureBoard {
+		if runtime.searchExpired() {
+			return nil
+		}
+		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
+			continue
+		}
+		if departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
+			continue
+		}
+		if departure.Time.Before(current.arrivalTime) || departure.Time.After(runtime.searchEndTime) {
+			continue
+		}
+
+		boardingIndex := boardingPathIndex(departure.Journey, current.stop)
+		if boardingIndex < 0 {
+			continue
+		}
+
 		boardingStopRef := departure.Journey.Path[boardingIndex].OriginStopRef
+		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) {
+			if len(results.JourneyPlans) >= runtime.config.count {
+				return nil
+			}
+			continue
+		}
+
 		lastTime := departure.Time
 		for pathIndex := boardingIndex; pathIndex < len(departure.Journey.Path); pathIndex++ {
 			if runtime.searchExpired() {
@@ -434,11 +475,109 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				continue
 			}
 
+			if nextLabel.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
+				if err := runtime.expandTransfers(pq, nextLabel, destinationStop, results); err != nil {
+					return err
+				}
+				nextLabel.transfersExpanded = true
+				if len(results.JourneyPlans) >= runtime.config.count {
+					return nil
+				}
+			}
+
 			runtime.pushLabel(pq, nextLabel)
 		}
 	}
 
 	return nil
+}
+
+func (runtime *plannerRuntime) recordDirectDeparturesToDestination(current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
+	if runtime.searchExpired() || current == nil || current.stop == nil || destinationStop == nil {
+		return nil
+	}
+
+	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime, runtime.config.departureBoardCount)
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(departureBoard, func(i, j int) bool {
+		return departureBoard[i].Time.Before(departureBoard[j].Time)
+	})
+
+	for _, departure := range departureBoard {
+		if runtime.searchExpired() {
+			return nil
+		}
+		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
+			continue
+		}
+		if departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
+			continue
+		}
+		if departure.Time.Before(current.arrivalTime) || departure.Time.After(runtime.searchEndTime) {
+			continue
+		}
+
+		boardingIndex := boardingPathIndex(departure.Journey, current.stop)
+		if boardingIndex < 0 {
+			continue
+		}
+
+		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) && len(results.JourneyPlans) >= runtime.config.count {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func (runtime *plannerRuntime) recordDirectDestinationFromDeparture(current *plannerLabel, departure *ctdf.DepartureBoard, boardingIndex int, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) bool {
+	if current == nil || departure == nil || departure.Journey == nil || destinationStop == nil {
+		return false
+	}
+	if boardingIndex < 0 || boardingIndex >= len(departure.Journey.Path) {
+		return false
+	}
+
+	boardingStopRef := departure.Journey.Path[boardingIndex].OriginStopRef
+	lastTime := departure.Time
+	recorded := false
+	for pathIndex := boardingIndex; pathIndex < len(departure.Journey.Path); pathIndex++ {
+		pathItem := departure.Journey.Path[pathIndex]
+		if pathItem == nil || pathItem.DestinationStopRef == "" {
+			continue
+		}
+
+		arrivalTime := pathTimeOnOrAfter(lastTime, pathItem.DestinationArrivalTime)
+		lastTime = arrivalTime
+		if arrivalTime.After(runtime.searchEndTime) {
+			break
+		}
+		if !stopMatchesRef(destinationStop, pathItem.DestinationStopRef) {
+			continue
+		}
+
+		routeItem := ctdf.JourneyPlanRouteItem{
+			Type:               ctdf.JourneyPlanRouteItemTypeJourney,
+			Journey:            departure.Journey,
+			JourneyType:        departure.Type,
+			OriginStopRef:      boardingStopRef,
+			DestinationStopRef: pathItem.DestinationStopRef,
+			StartTime:          departure.Time,
+			ArrivalTime:        arrivalTime,
+		}
+		runtime.recordResult(results, &plannerLabel{
+			stop:        destinationStop,
+			arrivalTime: arrivalTime,
+			vehicleLegs: current.vehicleLegs + 1,
+			routeItems:  appendRouteItem(current.routeItems, routeItem),
+		})
+		recorded = true
+	}
+
+	return recorded
 }
 
 // loadDepartureBoard returns a bounded departure board for a stop, memoising the
@@ -769,6 +908,21 @@ func stopMatchesRef(stop *ctdf.Stop, stopRef string) bool {
 
 	for _, stopID := range stop.GetAllStopIDs() {
 		if stopID == stopRef {
+			return true
+		}
+	}
+
+	return false
+}
+
+func shouldScanTransferDepartures(stop *ctdf.Stop) bool {
+	if stop == nil {
+		return false
+	}
+
+	for _, transportType := range stop.TransportTypes {
+		switch transportType {
+		case ctdf.TransportTypeRail, ctdf.TransportTypeMetro, ctdf.TransportTypeTram:
 			return true
 		}
 	}

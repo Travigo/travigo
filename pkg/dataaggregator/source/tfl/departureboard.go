@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -59,7 +60,10 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	now = time.Now()
 	latestDepartureTime := now
 
-	stopTimezone, _ := time.LoadLocation(q.Stop.Timezone)
+	stopTimezone, err := time.LoadLocation(q.Stop.Timezone)
+	if err != nil || stopTimezone == nil {
+		stopTimezone = time.UTC
+	}
 
 	allStopIDS := append(q.Stop.OtherIdentifiers, q.Stop.PrimaryIdentifier)
 	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneys(context.Background(), allStopIDS, now.Add(-30*time.Second))

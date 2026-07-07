@@ -113,3 +113,72 @@ func TestRecordResultBuildsAndDeduplicatesPlan(t *testing.T) {
 		t.Fatalf("expected one route item, got %d", len(plan.RouteItems))
 	}
 }
+
+func TestRecordDirectDestinationFromDeparture(t *testing.T) {
+	start := time.Date(2026, 7, 7, 20, 25, 0, 0, time.UTC)
+	arrival := start.Add(87 * time.Minute)
+	runtime := &plannerRuntime{
+		resultKeys:    map[string]bool{},
+		searchEndTime: start.Add(6 * time.Hour),
+	}
+	results := &ctdf.JourneyPlanResults{}
+	current := &plannerLabel{
+		stop:        &ctdf.Stop{PrimaryIdentifier: "origin"},
+		arrivalTime: start.Add(-10 * time.Minute),
+	}
+	departure := &ctdf.DepartureBoard{
+		Time: start,
+		Journey: &ctdf.Journey{
+			PrimaryIdentifier: "journey-1",
+			Path: []*ctdf.JourneyPathItem{
+				{
+					OriginStopRef:          "origin",
+					DestinationStopRef:     "middle",
+					DestinationArrivalTime: start.Add(20 * time.Minute),
+					OriginDepartureTime:    start,
+					DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
+					OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
+				},
+				{
+					OriginStopRef:          "middle",
+					DestinationStopRef:     "destination",
+					DestinationArrivalTime: arrival,
+					OriginDepartureTime:    start.Add(25 * time.Minute),
+					DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
+					OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
+				},
+			},
+		},
+	}
+
+	recorded := runtime.recordDirectDestinationFromDeparture(current, departure, 0, &ctdf.Stop{PrimaryIdentifier: "destination"}, results)
+
+	if !recorded {
+		t.Fatal("expected direct destination to be recorded")
+	}
+	if len(results.JourneyPlans) != 1 {
+		t.Fatalf("expected one journey plan, got %d", len(results.JourneyPlans))
+	}
+	routeItems := results.JourneyPlans[0].RouteItems
+	if len(routeItems) != 1 {
+		t.Fatalf("expected one route item, got %d", len(routeItems))
+	}
+	if routeItems[0].OriginStopRef != "origin" || routeItems[0].DestinationStopRef != "destination" {
+		t.Fatalf("unexpected route item %s -> %s", routeItems[0].OriginStopRef, routeItems[0].DestinationStopRef)
+	}
+	if !routeItems[0].ArrivalTime.Equal(arrival) {
+		t.Fatalf("expected arrival %s, got %s", arrival, routeItems[0].ArrivalTime)
+	}
+}
+
+func TestShouldScanTransferDeparturesOnlyForRailLikeStops(t *testing.T) {
+	if !shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}) {
+		t.Fatal("expected rail stop to be scanned")
+	}
+	if !shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeMetro}}) {
+		t.Fatal("expected metro stop to be scanned")
+	}
+	if shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}) {
+		t.Fatal("did not expect bus stop to be scanned")
+	}
+}
