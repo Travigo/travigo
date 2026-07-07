@@ -20,7 +20,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	originIdentifier := c.Params("origin")
 	destinationIdentifier := c.Params("destination")
 
-	count, err := parsePlannerIntQuery(c, "count", "25")
+	count, err := parsePlannerIntQuery(c, "count", "5")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -52,11 +52,27 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	departureBoardCountPerStop, err := parsePlannerIntQuery(c, "departure_board_count_per_stop", "40")
+	departureBoardCountPerStop, err := parsePlannerIntQuery(c, "departure_board_count_per_stop", "12")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"error": "Parameter departure_board_count_per_stop should be an integer",
+		})
+	}
+
+	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "150")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter max_expanded_labels should be an integer",
+		})
+	}
+
+	maxSearchSeconds, err := parsePlannerIntQuery(c, "max_search_seconds", "8")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter max_search_seconds should be an integer",
 		})
 	}
 
@@ -114,6 +130,8 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		MaxTransferDistanceMetres:  maxTransferDistanceMetres,
 		MaxJourneyDuration:         time.Duration(maxJourneyDurationMinutes) * time.Minute,
 		DepartureBoardCountPerStop: departureBoardCountPerStop,
+		MaxExpandedLabels:          maxExpandedLabels,
+		MaxSearchDuration:          time.Duration(maxSearchSeconds) * time.Second,
 	})
 	if err != nil {
 		c.SendStatus(fiber.StatusInternalServerError)

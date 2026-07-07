@@ -15,4 +15,6 @@ type JourneyPlan struct {
 	MaxJourneyDuration         time.Duration
 	MaxTransferDistanceMetres  int
 	DepartureBoardCountPerStop int
+	MaxExpandedLabels          int
+	MaxSearchDuration          time.Duration
 }

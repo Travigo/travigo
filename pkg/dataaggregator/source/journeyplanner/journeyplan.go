@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -17,14 +18,15 @@ import (
 )
 
 const (
-	defaultJourneyPlanCount                   = 25
+	defaultJourneyPlanCount                   = 5
 	defaultJourneyPlanMaxChanges              = 3
 	defaultJourneyPlanMaxJourneyDuration      = 6 * time.Hour
 	defaultJourneyPlanMaxTransferDistance     = 1000
-	defaultJourneyPlanDepartureBoardCount     = 40
-	defaultJourneyPlanMaxExpandedLabels       = 500
+	defaultJourneyPlanDepartureBoardCount     = 12
+	defaultJourneyPlanMaxExpandedLabels       = 150
 	defaultJourneyPlanMaxRouteItems           = 10
 	defaultJourneyPlanMaxConsecutiveTransfers = 1
+	defaultJourneyPlanMaxSearchDuration       = 8 * time.Second
 )
 
 type plannerConfig struct {
@@ -37,6 +39,7 @@ type plannerConfig struct {
 	maxRouteItems           int
 	maxConsecutiveTransfers int
 	maxLabelsPerState       int
+	maxSearchDuration       time.Duration
 }
 
 type plannerStateKey struct {
@@ -99,9 +102,8 @@ func (pq *plannerPriorityQueue) Pop() any {
 }
 
 type cachedDepartureBoard struct {
-	fetchTime     time.Time
-	coversNextDay bool
-	board         []*ctdf.DepartureBoard
+	fetchTime time.Time
+	board     []*ctdf.DepartureBoard
 }
 
 type plannerRuntime struct {
@@ -112,6 +114,8 @@ type plannerRuntime struct {
 	resultKeys          map[string]bool
 	config              plannerConfig
 	searchEndTime       time.Time
+	searchDeadline      time.Time
+	timedOut            bool
 }
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
@@ -128,6 +132,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		resultKeys:          map[string]bool{},
 		config:              config,
 		searchEndTime:       q.StartDateTime.Add(config.maxJourneyDuration),
+		searchDeadline:      time.Now().Add(config.maxSearchDuration),
 	}
 	runtime.cacheStop(q.OriginStop)
 	runtime.cacheStop(q.DestinationStop)
@@ -148,7 +153,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	runtime.pushLabel(pq, initialLabel)
 
 	expandedLabels := 0
-	for pq.Len() > 0 && len(results.JourneyPlans) < config.count && expandedLabels < config.maxExpandedLabels {
+	searchStart := time.Now()
+	for pq.Len() > 0 && len(results.JourneyPlans) < config.count && expandedLabels < config.maxExpandedLabels && !runtime.searchExpired() {
 		current := heap.Pop(pq).(*plannerLabel)
 		expandedLabels++
 
@@ -190,6 +196,22 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		results.JourneyPlans = results.JourneyPlans[:config.count]
 	}
 
+	if runtime.timedOut {
+		log.Warn().
+			Int("results", len(results.JourneyPlans)).
+			Int("expanded_labels", expandedLabels).
+			Dur("duration", time.Since(searchStart)).
+			Dur("max_search_duration", config.maxSearchDuration).
+			Msg("Journey planner search stopped by time budget")
+	} else if expandedLabels >= config.maxExpandedLabels {
+		log.Warn().
+			Int("results", len(results.JourneyPlans)).
+			Int("expanded_labels", expandedLabels).
+			Int("max_expanded_labels", config.maxExpandedLabels).
+			Dur("duration", time.Since(searchStart)).
+			Msg("Journey planner search stopped by expanded label budget")
+	}
+
 	return results, nil
 }
 
@@ -219,26 +241,44 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 		departureBoardCount = defaultJourneyPlanDepartureBoardCount
 	}
 
+	maxExpandedLabels := q.MaxExpandedLabels
+	if maxExpandedLabels <= 0 {
+		maxExpandedLabels = defaultJourneyPlanMaxExpandedLabels
+	}
+
+	maxSearchDuration := q.MaxSearchDuration
+	if maxSearchDuration <= 0 {
+		maxSearchDuration = defaultJourneyPlanMaxSearchDuration
+	}
+
 	return plannerConfig{
 		count:                   count,
 		maxVehicleLegs:          maxChanges + 1,
 		maxJourneyDuration:      maxJourneyDuration,
 		maxTransferDistance:     maxTransferDistance,
 		departureBoardCount:     departureBoardCount,
-		maxExpandedLabels:       defaultJourneyPlanMaxExpandedLabels,
+		maxExpandedLabels:       maxExpandedLabels,
 		maxRouteItems:           defaultJourneyPlanMaxRouteItems,
 		maxConsecutiveTransfers: defaultJourneyPlanMaxConsecutiveTransfers,
 		maxLabelsPerState:       count,
+		maxSearchDuration:       maxSearchDuration,
 	}
 }
 
 func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current *plannerLabel) error {
+	if runtime.searchExpired() {
+		return nil
+	}
+
 	transfers, err := runtime.loadTransfers(current.stop)
 	if err != nil {
 		return err
 	}
 
 	for _, transfer := range transfers {
+		if runtime.searchExpired() {
+			return nil
+		}
 		if transfer == nil || transfer.ToStopRef == "" {
 			continue
 		}
@@ -290,6 +330,10 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 }
 
 func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, current *plannerLabel) error {
+	if runtime.searchExpired() {
+		return nil
+	}
+
 	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime)
 	if err != nil {
 		return err
@@ -300,6 +344,9 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	})
 
 	for _, departure := range departureBoard {
+		if runtime.searchExpired() {
+			return nil
+		}
 		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
 			continue
 		}
@@ -318,6 +365,10 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		boardingStopRef := departure.Journey.Path[boardingIndex].OriginStopRef
 		lastTime := departure.Time
 		for pathIndex := boardingIndex; pathIndex < len(departure.Journey.Path); pathIndex++ {
+			if runtime.searchExpired() {
+				return nil
+			}
+
 			pathItem := departure.Journey.Path[pathIndex]
 			if pathItem == nil || pathItem.DestinationStopRef == "" {
 				continue
@@ -357,17 +408,11 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	return nil
 }
 
-// loadDepartureBoard returns the departure board for a stop at a given time,
-// memoising results per stop for the duration of a single search.
-//
-// Departure boards are forward-in-time: a board fetched at an earlier time on a
-// given day is a superset of one fetched later the same day. Because the search
-// pops labels in non-decreasing arrival-time order, a stop is always first seen
-// at its earliest arrival time, so later visits can be served by filtering the
-// cached board forward. We only reuse the cache when the requested time falls on
-// the same calendar day as the cached fetch and either matches it exactly or the
-// cached board already covers the following day (so no later departures are
-// missed). Otherwise we fetch fresh and replace the entry.
+// loadDepartureBoard returns a bounded departure board for a stop, memoising the
+// first board fetched for that stop on a calendar day. Journey planning uses the
+// first N departures from each stop as its expansion frontier; later visits to
+// the same stop filter that cached frontier forward rather than issuing another
+// expensive departure-board generation.
 func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime time.Time) ([]*ctdf.DepartureBoard, error) {
 	if stop == nil {
 		return nil, nil
@@ -375,8 +420,7 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 
 	if cached, exists := runtime.departureBoardCache[stop.PrimaryIdentifier]; exists {
 		if !startDateTime.Before(cached.fetchTime) &&
-			sameCalendarDay(cached.fetchTime, startDateTime) &&
-			(startDateTime.Equal(cached.fetchTime) || cached.coversNextDay) {
+			sameCalendarDay(cached.fetchTime, startDateTime) {
 			filtered := make([]*ctdf.DepartureBoard, 0, len(cached.board))
 			for _, departure := range cached.board {
 				if departure == nil || departure.Time.Before(startDateTime) {
@@ -398,30 +442,29 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 	}
 
 	runtime.departureBoardCache[stop.PrimaryIdentifier] = cachedDepartureBoard{
-		fetchTime:     startDateTime,
-		coversNextDay: departureBoardCoversNextDay(startDateTime, board),
-		board:         board,
+		fetchTime: startDateTime,
+		board:     board,
 	}
 
 	return board, nil
+}
+
+func (runtime *plannerRuntime) searchExpired() bool {
+	if runtime.timedOut {
+		return true
+	}
+	if runtime.searchDeadline.IsZero() || time.Now().Before(runtime.searchDeadline) {
+		return false
+	}
+
+	runtime.timedOut = true
+	return true
 }
 
 func sameCalendarDay(a time.Time, b time.Time) bool {
 	yearA, monthA, dayA := a.Date()
 	yearB, monthB, dayB := b.Date()
 	return yearA == yearB && monthA == monthB && dayA == dayB
-}
-
-func departureBoardCoversNextDay(fetchTime time.Time, board []*ctdf.DepartureBoard) bool {
-	for _, departure := range board {
-		if departure == nil {
-			continue
-		}
-		if !sameCalendarDay(fetchTime, departure.Time) && departure.Time.After(fetchTime) {
-			return true
-		}
-	}
-	return false
 }
 
 func (runtime *plannerRuntime) loadTransfers(stop *ctdf.Stop) ([]*ctdf.StopTransfer, error) {
