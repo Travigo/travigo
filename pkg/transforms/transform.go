@@ -24,13 +24,24 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		return
 	}
 
-	// Only check values and try and replace them if the types match the transform def
+	if inputValue.Kind() == reflect.Pointer {
+		if inputValue.IsNil() {
+			return
+		}
+		inputValue = inputValue.Elem()
+	}
+
+	if inputValue.Kind() != reflect.Struct {
+		return
+	}
+
+	// Only check values and try and replace them if the types match the transform def.
 	inputTypeName := strings.Replace(inputTypeOf.String(), "*", "", 1)
 
 	if inputTypeName == t.Type {
 		for key, value := range t.Match {
 			field := inputValue.FieldByName(key)
-			if field.IsValid() {
+			if field.IsValid() && field.CanInterface() {
 				if value != fmt.Sprint(field.Interface()) {
 					isMatch = false
 				}
@@ -43,25 +54,6 @@ func (t *TransformDefinition) Transform(inputTypeOf reflect.Type, inputValue ref
 		if isMatch {
 			// pretty.Println(inputValue, t.Data)
 			handleSubDocument(inputValue, t.Data)
-		}
-	}
-
-	// Go through all the fields and try and run transform against anymore structs/slices
-	for i := 0; i < inputValue.NumField(); i++ {
-		valueField := inputValue.Field(i)
-		typeField := inputValue.Type().Field(i)
-
-		valueTypeKind := typeField.Type.Kind()
-		if valueTypeKind == reflect.Pointer {
-			valueType := reflect.Indirect(valueField)
-			if !valueType.IsValid() {
-				continue
-			}
-			valueTypeKind = valueType.Type().Kind()
-		}
-
-		if valueTypeKind == reflect.Slice || valueTypeKind == reflect.Struct {
-			Transform(valueField.Interface(), depth-1)
 		}
 	}
 }
@@ -166,25 +158,64 @@ func Transform(input interface{}, depth int, groups ...string) {
 		group = groups[0]
 	}
 
-	if inputTypeOf.Kind() == reflect.Slice {
-		for i := 0; i < inputValueOf.Len(); i++ {
-			indexInput := inputValueOf.Index(i).Interface()
-			transformValue(reflect.TypeOf(indexInput), reflect.ValueOf(indexInput), depth, group)
-		}
-	} else {
-		transformValue(inputTypeOf, inputValueOf, depth, group)
-	}
+	transformValue(inputTypeOf, inputValueOf, depth, group)
 }
 
 func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value, depth int, group string) {
-	var inputValue reflect.Value
+	if inputTypeOf == nil || !inputValueOf.IsValid() || depth < 0 {
+		return
+	}
+
+	if inputTypeOf.Kind() == reflect.Interface {
+		if inputValueOf.IsNil() {
+			return
+		}
+		transformValue(inputValueOf.Elem().Type(), inputValueOf.Elem(), depth, group)
+		return
+	}
+
 	if inputTypeOf.Kind() == reflect.Pointer {
-		inputValue = inputValueOf.Elem()
+		if inputValueOf.IsNil() {
+			return
+		}
+		inputValueOf = inputValueOf.Elem()
+		inputTypeOf = inputValueOf.Type()
+	}
+
+	if inputTypeOf.Kind() == reflect.Slice {
+		for i := 0; i < inputValueOf.Len(); i++ {
+			indexInput := inputValueOf.Index(i)
+			transformValue(indexInput.Type(), indexInput, depth, group)
+		}
+		return
+	}
+
+	if inputTypeOf.Kind() != reflect.Struct {
+		return
 	}
 
 	for _, transformDef := range transforms {
 		if transformDef.Group == group {
-			transformDef.Transform(inputTypeOf, inputValue, depth)
+			transformDef.Transform(inputTypeOf, inputValueOf, depth)
+		}
+	}
+
+	for i := 0; i < inputValueOf.NumField(); i++ {
+		valueField := inputValueOf.Field(i)
+		if !valueField.IsValid() || !valueField.CanInterface() {
+			continue
+		}
+
+		valueTypeKind := valueField.Kind()
+		if valueTypeKind == reflect.Pointer {
+			if valueField.IsNil() {
+				continue
+			}
+			valueTypeKind = valueField.Elem().Kind()
+		}
+
+		if valueTypeKind == reflect.Slice || valueTypeKind == reflect.Struct {
+			transformValue(valueField.Type(), valueField, depth-1, group)
 		}
 	}
 }
