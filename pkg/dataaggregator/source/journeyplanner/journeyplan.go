@@ -45,12 +45,21 @@ type plannerStateKey struct {
 	consecutiveTransfers int
 }
 
+// routeItemNode is an immutable node in a persistent singly-linked list of
+// route items. Sharing the tail between labels means expanding a label is O(1)
+// instead of copying the whole route on every push.
+type routeItemNode struct {
+	item   ctdf.JourneyPlanRouteItem
+	parent *routeItemNode
+	depth  int
+}
+
 type plannerLabel struct {
 	stop                 *ctdf.Stop
 	arrivalTime          time.Time
 	vehicleLegs          int
 	consecutiveTransfers int
-	routeItems           []ctdf.JourneyPlanRouteItem
+	routeItems           *routeItemNode
 	index                int
 }
 
@@ -89,13 +98,20 @@ func (pq *plannerPriorityQueue) Pop() any {
 	return item
 }
 
+type cachedDepartureBoard struct {
+	fetchTime     time.Time
+	coversNextDay bool
+	board         []*ctdf.DepartureBoard
+}
+
 type plannerRuntime struct {
-	stopCache     map[string]*ctdf.Stop
-	transferCache map[string][]*ctdf.StopTransfer
-	bestArrivals  map[plannerStateKey][]time.Time
-	resultKeys    map[string]bool
-	config        plannerConfig
-	searchEndTime time.Time
+	stopCache           map[string]*ctdf.Stop
+	transferCache       map[string][]*ctdf.StopTransfer
+	departureBoardCache map[string]cachedDepartureBoard
+	bestArrivals        map[plannerStateKey][]time.Time
+	resultKeys          map[string]bool
+	config              plannerConfig
+	searchEndTime       time.Time
 }
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
@@ -105,12 +121,13 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 
 	config := journeyPlanConfig(q)
 	runtime := &plannerRuntime{
-		stopCache:     map[string]*ctdf.Stop{},
-		transferCache: map[string][]*ctdf.StopTransfer{},
-		bestArrivals:  map[plannerStateKey][]time.Time{},
-		resultKeys:    map[string]bool{},
-		config:        config,
-		searchEndTime: q.StartDateTime.Add(config.maxJourneyDuration),
+		stopCache:           map[string]*ctdf.Stop{},
+		transferCache:       map[string][]*ctdf.StopTransfer{},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		bestArrivals:        map[plannerStateKey][]time.Time{},
+		resultKeys:          map[string]bool{},
+		config:              config,
+		searchEndTime:       q.StartDateTime.Add(config.maxJourneyDuration),
 	}
 	runtime.cacheStop(q.OriginStop)
 	runtime.cacheStop(q.DestinationStop)
@@ -124,7 +141,6 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	initialLabel := &plannerLabel{
 		stop:        q.OriginStop,
 		arrivalTime: q.StartDateTime,
-		routeItems:  []ctdf.JourneyPlanRouteItem{},
 	}
 
 	pq := &plannerPriorityQueue{}
@@ -136,7 +152,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		current := heap.Pop(pq).(*plannerLabel)
 		expandedLabels++
 
-		if stopMatchesStop(current.stop, q.DestinationStop) && len(current.routeItems) > 0 {
+		if stopMatchesStop(current.stop, q.DestinationStop) && current.routeItems != nil {
 			plan := buildJourneyPlan(current)
 			key := journeyPlanKey(plan)
 			if !runtime.resultKeys[key] {
@@ -146,7 +162,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if len(current.routeItems) >= config.maxRouteItems || current.arrivalTime.After(runtime.searchEndTime) {
+		if routeItemDepth(current.routeItems) >= config.maxRouteItems || current.arrivalTime.After(runtime.searchEndTime) {
 			continue
 		}
 
@@ -274,11 +290,7 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 }
 
 func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, current *plannerLabel) error {
-	departureBoard, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
-		Stop:          current.stop,
-		Count:         runtime.config.departureBoardCount,
-		StartDateTime: current.arrivalTime,
-	})
+	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime)
 	if err != nil {
 		return err
 	}
@@ -343,6 +355,73 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	}
 
 	return nil
+}
+
+// loadDepartureBoard returns the departure board for a stop at a given time,
+// memoising results per stop for the duration of a single search.
+//
+// Departure boards are forward-in-time: a board fetched at an earlier time on a
+// given day is a superset of one fetched later the same day. Because the search
+// pops labels in non-decreasing arrival-time order, a stop is always first seen
+// at its earliest arrival time, so later visits can be served by filtering the
+// cached board forward. We only reuse the cache when the requested time falls on
+// the same calendar day as the cached fetch and either matches it exactly or the
+// cached board already covers the following day (so no later departures are
+// missed). Otherwise we fetch fresh and replace the entry.
+func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime time.Time) ([]*ctdf.DepartureBoard, error) {
+	if stop == nil {
+		return nil, nil
+	}
+
+	if cached, exists := runtime.departureBoardCache[stop.PrimaryIdentifier]; exists {
+		if !startDateTime.Before(cached.fetchTime) &&
+			sameCalendarDay(cached.fetchTime, startDateTime) &&
+			(startDateTime.Equal(cached.fetchTime) || cached.coversNextDay) {
+			filtered := make([]*ctdf.DepartureBoard, 0, len(cached.board))
+			for _, departure := range cached.board {
+				if departure == nil || departure.Time.Before(startDateTime) {
+					continue
+				}
+				filtered = append(filtered, departure)
+			}
+			return filtered, nil
+		}
+	}
+
+	board, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
+		Stop:          stop,
+		Count:         runtime.config.departureBoardCount,
+		StartDateTime: startDateTime,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	runtime.departureBoardCache[stop.PrimaryIdentifier] = cachedDepartureBoard{
+		fetchTime:     startDateTime,
+		coversNextDay: departureBoardCoversNextDay(startDateTime, board),
+		board:         board,
+	}
+
+	return board, nil
+}
+
+func sameCalendarDay(a time.Time, b time.Time) bool {
+	yearA, monthA, dayA := a.Date()
+	yearB, monthB, dayB := b.Date()
+	return yearA == yearB && monthA == monthB && dayA == dayB
+}
+
+func departureBoardCoversNextDay(fetchTime time.Time, board []*ctdf.DepartureBoard) bool {
+	for _, departure := range board {
+		if departure == nil {
+			continue
+		}
+		if !sameCalendarDay(fetchTime, departure.Time) && departure.Time.After(fetchTime) {
+			return true
+		}
+	}
+	return false
 }
 
 func (runtime *plannerRuntime) loadTransfers(stop *ctdf.Stop) ([]*ctdf.StopTransfer, error) {
@@ -430,11 +509,9 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 		}
 	}
 
+	// arrivals is kept sorted ascending as an invariant (we always re-sort
+	// before storing below), so the worst kept arrival is the last element.
 	if len(arrivals) >= runtime.config.maxLabelsPerState {
-		sort.Slice(arrivals, func(i, j int) bool {
-			return arrivals[i].Before(arrivals[j])
-		})
-
 		lastIndex := len(arrivals) - 1
 		if !label.arrivalTime.Before(arrivals[lastIndex]) {
 			return
@@ -454,13 +531,15 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 }
 
 func buildJourneyPlan(label *plannerLabel) ctdf.JourneyPlan {
+	routeItems := routeItemsSlice(label.routeItems)
+
 	startTime := label.arrivalTime
-	if len(label.routeItems) > 0 {
-		startTime = label.routeItems[0].StartTime
+	if len(routeItems) > 0 {
+		startTime = routeItems[0].StartTime
 	}
 
 	return ctdf.JourneyPlan{
-		RouteItems:  label.routeItems,
+		RouteItems:  routeItems,
 		StartTime:   startTime,
 		ArrivalTime: label.arrivalTime,
 		Duration:    label.arrivalTime.Sub(startTime),
@@ -489,11 +568,35 @@ func journeyPlanKey(plan ctdf.JourneyPlan) string {
 	return strings.Join(parts, "|")
 }
 
-func appendRouteItem(routeItems []ctdf.JourneyPlanRouteItem, routeItem ctdf.JourneyPlanRouteItem) []ctdf.JourneyPlanRouteItem {
-	nextRouteItems := make([]ctdf.JourneyPlanRouteItem, 0, len(routeItems)+1)
-	nextRouteItems = append(nextRouteItems, routeItems...)
-	nextRouteItems = append(nextRouteItems, routeItem)
-	return nextRouteItems
+func appendRouteItem(parent *routeItemNode, routeItem ctdf.JourneyPlanRouteItem) *routeItemNode {
+	depth := 1
+	if parent != nil {
+		depth = parent.depth + 1
+	}
+
+	return &routeItemNode{
+		item:   routeItem,
+		parent: parent,
+		depth:  depth,
+	}
+}
+
+func routeItemDepth(node *routeItemNode) int {
+	if node == nil {
+		return 0
+	}
+
+	return node.depth
+}
+
+func routeItemsSlice(node *routeItemNode) []ctdf.JourneyPlanRouteItem {
+	routeItems := make([]ctdf.JourneyPlanRouteItem, routeItemDepth(node))
+	for node != nil {
+		routeItems[node.depth-1] = node.item
+		node = node.parent
+	}
+
+	return routeItems
 }
 
 func boardingPathIndex(journey *ctdf.Journey, stop *ctdf.Stop) int {

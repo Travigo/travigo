@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/sourcegraph/conc/pool"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -68,6 +70,12 @@ type gridKey struct {
 type nearbyTransferCandidate struct {
 	toStopIndex    int
 	distanceMetres int
+}
+
+type nearbyPair struct {
+	fromIndex int
+	toIndex   int
+	distance  int
 }
 
 func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
@@ -272,56 +280,97 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 		grid[key] = append(grid[key], stop)
 	}
 
-	nearbyCandidatesByStop := make([][]nearbyTransferCandidate, len(stops))
 	maxDistance := float64(config.MaxDistanceMetres)
 	maxDistanceSquared := maxDistance * maxDistance
-	nearbyPairCandidates := 0
 
-	for _, fromStop := range stops {
-		fromKey := stopGridKey(fromStop, cellDegrees)
-		latRange := int(math.Ceil((float64(config.MaxDistanceMetres) / metresPerDegree) / cellDegrees))
-		if latRange < 1 {
-			latRange = 1
+	// Discover candidate pairs in parallel. Each worker owns a contiguous chunk
+	// of stops (by index) and only emits pairs where fromStop.Index < toStop.Index,
+	// so no pair is discovered twice. transfers is read-only during discovery
+	// (only written in buildSameStopGroup/buildPlatformAlias beforehand and in the
+	// emit phase afterwards), so concurrent transferExists reads are safe. Results
+	// are returned in chunk order, so the subsequent merge is identical to a
+	// single-threaded scan.
+	workerCount := runtime.NumCPU()
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	chunkSize := (len(stops) + workerCount - 1) / workerCount
+
+	discoveryPool := pool.NewWithResults[[]nearbyPair]().WithMaxGoroutines(workerCount)
+
+	for start := 0; start < len(stops); start += chunkSize {
+		end := start + chunkSize
+		if end > len(stops) {
+			end = len(stops)
 		}
+		chunk := stops[start:end]
 
-		cosLat := fromStop.CosLatitude
-		if math.Abs(cosLat) < 0.01 {
-			cosLat = 0.01
-		}
-		lonRange := int(math.Ceil((float64(config.MaxDistanceMetres) / (metresPerDegree * math.Abs(cosLat))) / cellDegrees))
-		if lonRange < 1 {
-			lonRange = 1
-		}
+		discoveryPool.Go(func() []nearbyPair {
+			pairs := make([]nearbyPair, 0, len(chunk)*config.MaxNearbyTransfersPerStop)
 
-		for latOffset := -latRange; latOffset <= latRange; latOffset++ {
-			for lonOffset := -lonRange; lonOffset <= lonRange; lonOffset++ {
-				candidates := grid[gridKey{
-					lat: fromKey.lat + latOffset,
-					lon: fromKey.lon + lonOffset,
-				}]
+			for _, fromStop := range chunk {
+				fromKey := stopGridKey(fromStop, cellDegrees)
+				latRange := int(math.Ceil((float64(config.MaxDistanceMetres) / metresPerDegree) / cellDegrees))
+				if latRange < 1 {
+					latRange = 1
+				}
 
-				for _, toStop := range candidates {
-					if fromStop.Index >= toStop.Index {
-						continue
+				cosLat := fromStop.CosLatitude
+				if math.Abs(cosLat) < 0.01 {
+					cosLat = 0.01
+				}
+				lonRange := int(math.Ceil((float64(config.MaxDistanceMetres) / (metresPerDegree * math.Abs(cosLat))) / cellDegrees))
+				if lonRange < 1 {
+					lonRange = 1
+				}
+
+				for latOffset := -latRange; latOffset <= latRange; latOffset++ {
+					for lonOffset := -lonRange; lonOffset <= lonRange; lonOffset++ {
+						candidates := grid[gridKey{
+							lat: fromKey.lat + latOffset,
+							lon: fromKey.lon + lonOffset,
+						}]
+
+						for _, toStop := range candidates {
+							if fromStop.Index >= toStop.Index {
+								continue
+							}
+							if fromStop.PrimaryIdentifier == toStop.PrimaryIdentifier {
+								continue
+							}
+							if transferExists(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier) {
+								continue
+							}
+
+							distanceSquared := squaredStopDistanceMetres(fromStop, toStop)
+							if distanceSquared > maxDistanceSquared {
+								continue
+							}
+
+							distance := int(math.Round(math.Sqrt(distanceSquared)))
+							pairs = append(pairs, nearbyPair{
+								fromIndex: fromStop.Index,
+								toIndex:   toStop.Index,
+								distance:  distance,
+							})
+						}
 					}
-					if fromStop.PrimaryIdentifier == toStop.PrimaryIdentifier {
-						continue
-					}
-					if transferExists(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier) {
-						continue
-					}
-
-					distanceSquared := squaredStopDistanceMetres(fromStop, toStop)
-					if distanceSquared > maxDistanceSquared {
-						continue
-					}
-
-					distance := int(math.Round(math.Sqrt(distanceSquared)))
-					addNearbyCandidate(nearbyCandidatesByStop, fromStop.Index, toStop.Index, stops, distance, config.MaxNearbyTransfersPerStop)
-					addNearbyCandidate(nearbyCandidatesByStop, toStop.Index, fromStop.Index, stops, distance, config.MaxNearbyTransfersPerStop)
-					nearbyPairCandidates++
 				}
 			}
+
+			return pairs
+		})
+	}
+
+	discoveredPairs := discoveryPool.Wait()
+
+	nearbyCandidatesByStop := make([][]nearbyTransferCandidate, len(stops))
+	nearbyPairCandidates := 0
+	for _, pairs := range discoveredPairs {
+		for _, pair := range pairs {
+			addNearbyCandidate(nearbyCandidatesByStop, pair.fromIndex, pair.toIndex, stops, pair.distance, config.MaxNearbyTransfersPerStop)
+			addNearbyCandidate(nearbyCandidatesByStop, pair.toIndex, pair.fromIndex, stops, pair.distance, config.MaxNearbyTransfersPerStop)
+			nearbyPairCandidates++
 		}
 	}
 
@@ -394,12 +443,6 @@ func nearbyCandidateLess(a nearbyTransferCandidate, b nearbyTransferCandidate, s
 func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) error {
 	stopTransfersCollection := database.GetCollection("stop_transfers")
 
-	deleted, err := stopTransfersCollection.DeleteMany(ctx, bson.M{})
-	if err != nil {
-		return err
-	}
-	log.Info().Int64("deleted", deleted.DeletedCount).Msg("Deleted existing Stop Transfers")
-
 	keys := make([]transferKey, 0, len(transfers))
 	for key := range transfers {
 		keys = append(keys, key)
@@ -412,7 +455,10 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	})
 
 	operations := make([]mongo.WriteModel, 0, config.BatchSize)
-	now := time.Now()
+	// Truncated to the millisecond so it round-trips through BSON exactly: the
+	// stale-delete below relies on this run's documents comparing not-less-than
+	// `now`, which only holds if the stored value has no sub-millisecond part.
+	now := time.Now().Truncate(time.Millisecond)
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "travigo-stop-transfer-generator",
 		ProviderName:   "Travigo",
@@ -459,6 +505,18 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 			return err
 		}
 	}
+
+	// Remove transfers from previous runs that were not re-written this run.
+	// Upserting first and deleting stale afterwards keeps the collection fully
+	// populated throughout the rebuild, so concurrent readers (the journey
+	// planner) never see an empty transfers set.
+	deleted, err := stopTransfersCollection.DeleteMany(ctx, bson.M{
+		"modificationdatetime": bson.M{"$lt": now},
+	})
+	if err != nil {
+		return err
+	}
+	log.Info().Int64("deleted", deleted.DeletedCount).Msg("Deleted stale Stop Transfers")
 
 	return nil
 }

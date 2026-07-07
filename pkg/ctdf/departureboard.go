@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -69,6 +70,15 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	for _, stopRef := range stopRefs {
 		stopRefsSet[stopRef] = struct{}{}
 	}
+
+	// Journeys within the same vehicle block share the same block-journey list
+	// and the same block realtime journey. Memoise both per (serviceRef,
+	// blockNumber) so that qualifying journeys sharing a block don't each issue
+	// duplicate Mongo/realtime lookups during this generation.
+	var (
+		blockJourneysCache sync.Map // blockKey -> []string
+		blockRealtimeCache sync.Map // blockKey -> *RealtimeJourney (may be nil)
+	)
 
 	p := pool.NewWithResults[*DepartureBoard]()
 	maxGoroutines := 200
@@ -195,15 +205,16 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					replacementBusCount.Add(1)
 				}
 
-				// TODO(high-risk): This block does a Find (block journeys by
-				// serviceref + BlockNumber) plus a realtime lookup by journeyref $in per
-				// qualifying journey. It cannot be cleanly pre-batched because qualification
+				// This block does a Find (block journeys by serviceref + BlockNumber)
+				// plus a realtime lookup per qualifying journey. Qualification
 				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
 				// stopDepartureTime and departureBoardRecordType which are only known after the
-				// path loop above. A batch approach would be: after a first pass computes which
-				// journeys qualify, group by (serviceRef, BlockNumber) to issue one journeys Find
-				// with $in, then one realtime lookup with $in over all collected journeyrefs,
-				// mapping offsets back per block. Deferred to preserve exact behaviour.
+				// path loop above, so it can't be fully hoisted into a pre-pass. As a cheaper
+				// mitigation, both lookups are memoised per (serviceRef, BlockNumber) via
+				// blockJourneysCache/blockRealtimeCache so journeys sharing a block reuse the
+				// result instead of each issuing duplicate Mongo/realtime round trips.
+				// A fuller batch (first pass to collect qualifiers, then one Find with $in over
+				// all blocks and one realtime lookup over all refs) remains possible.
 				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
 				// We estimate the current vehicle realtime journey based on the Block Number
 				stopDepartureTimeFromNow := stopDepartureTime.Sub(dateTime).Minutes()
@@ -213,26 +224,40 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 					journey.OtherIdentifiers["BlockNumber"] != "" {
 					estimateCandidateCount.Add(1)
 
-					var blockJourneys []string
-					opts := options.Find().SetProjection(bson.D{
-						bson.E{Key: "primaryidentifier", Value: 1},
-					})
-					cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"]}, opts)
+					blockNumber := journey.OtherIdentifiers["BlockNumber"]
+					blockKey := journey.ServiceRef + "\x00" + blockNumber
 
-					for cursor.Next(context.Background()) {
-						var blockJourney Journey
-						err := cursor.Decode(&blockJourney)
-						if err != nil {
-							log.Error().Err(err).Msg("Failed to decode Journey")
+					var blockJourneys []string
+					if cached, ok := blockJourneysCache.Load(blockKey); ok {
+						blockJourneys = cached.([]string)
+					} else {
+						opts := options.Find().SetProjection(bson.D{
+							bson.E{Key: "primaryidentifier", Value: 1},
+						})
+						cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": blockNumber}, opts)
+
+						for cursor.Next(context.Background()) {
+							var blockJourney Journey
+							err := cursor.Decode(&blockJourney)
+							if err != nil {
+								log.Error().Err(err).Msg("Failed to decode Journey")
+							}
+
+							blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
 						}
 
-						blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
+						blockJourneysCache.Store(blockKey, blockJourneys)
 					}
 					estimateBlockJourneyCount.Add(int64(len(blockJourneys)))
 
 					var blockRealtimeJourney *RealtimeJourney
 					if realtimeLookup.FindByJourneyRefs != nil && len(blockJourneys) > 0 {
-						blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(blockJourneys)
+						if cached, ok := blockRealtimeCache.Load(blockKey); ok {
+							blockRealtimeJourney = cached.(*RealtimeJourney)
+						} else {
+							blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(blockJourneys)
+							blockRealtimeCache.Store(blockKey, blockRealtimeJourney)
+						}
 					}
 
 					if blockRealtimeJourney != nil {

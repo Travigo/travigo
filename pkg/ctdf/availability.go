@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -72,6 +73,22 @@ const YearMonthDayFormat = "2006-01-02"
 
 var daysOfWeek = []string{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
 
+// parsedDateCache memoises YearMonthDayFormat parses. checkRule is called once
+// per rule per journey during departure board generation (hundreds of thousands
+// of times, concurrently), and rule values repeat heavily, so caching the parse
+// avoids re-parsing the same date strings over and over.
+var parsedDateCache sync.Map // string -> time.Time
+
+func parseYearMonthDay(value string) time.Time {
+	if cached, ok := parsedDateCache.Load(value); ok {
+		return cached.(time.Time)
+	}
+
+	parsed, _ := time.Parse(YearMonthDayFormat, value)
+	parsedDateCache.Store(value, parsed)
+	return parsed
+}
+
 func datesMatch(a time.Time, b time.Time) bool {
 	return a.Year() == b.Year() && a.Month() == b.Month() && a.Day() == b.Day()
 }
@@ -83,23 +100,23 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 	case AvailabilityDayOfWeek:
 		return rule.Value == dayOfWeek
 	case AvailabilityDate:
-		ruleDateTime, _ := time.Parse(YearMonthDayFormat, rule.Value)
+		ruleDateTime := parseYearMonthDay(rule.Value)
 		return datesMatch(ruleDateTime, dateTime)
 	case AvailabilityDateRange:
 		splitDateRange := strings.Split(rule.Value, ":")
 
 		var startDate time.Time
 		if splitDateRange[0] == "" {
-			startDate, _ = time.Parse(YearMonthDayFormat, "0-0-0")
+			startDate = parseYearMonthDay("0-0-0")
 		} else {
-			startDate, _ = time.Parse(YearMonthDayFormat, splitDateRange[0])
+			startDate = parseYearMonthDay(splitDateRange[0])
 		}
 
 		var endDate time.Time
 		if splitDateRange[1] == "" {
-			endDate, _ = time.Parse(YearMonthDayFormat, "3022-12-24")
+			endDate = parseYearMonthDay("3022-12-24")
 		} else {
-			endDate, _ = time.Parse(YearMonthDayFormat, splitDateRange[1])
+			endDate = parseYearMonthDay(splitDateRange[1])
 		}
 
 		return (dateTime.After(startDate) && dateTime.Before(endDate)) || datesMatch(startDate, dateTime) || datesMatch(endDate, dateTime)
