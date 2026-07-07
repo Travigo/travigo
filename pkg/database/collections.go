@@ -39,6 +39,9 @@ func createStopTransferIndexes() {
 		{
 			Keys: bson.D{{Key: "type", Value: 1}},
 		},
+		{
+			Keys: bson.D{{Key: "modificationdatetime", Value: 1}},
+		},
 	}
 
 	opts := options.CreateIndexes()

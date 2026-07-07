@@ -49,6 +49,24 @@ func TestBuildNearbyWalkTransfersPreservesExistingTransferType(t *testing.T) {
 	assertTransferType(t, transfers, "B", "A", ctdf.StopTransferTypeSameStopGroup)
 }
 
+func TestStopTransferWorkerCountUsesAtMostHalfCPUs(t *testing.T) {
+	tests := map[int]int{
+		0:  1,
+		1:  1,
+		2:  1,
+		3:  1,
+		4:  2,
+		8:  4,
+		16: 8,
+	}
+
+	for cpuCount, expectedWorkers := range tests {
+		if workers := stopTransferWorkerCount(cpuCount); workers != expectedWorkers {
+			t.Fatalf("expected %d workers for %d CPUs, got %d", expectedWorkers, cpuCount, workers)
+		}
+	}
+}
+
 func testTransferStop(index int, ref string, latitude float64, longitude float64) *transferStop {
 	return &transferStop{
 		PrimaryIdentifier: ref,

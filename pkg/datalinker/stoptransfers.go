@@ -32,6 +32,7 @@ type StopTransferBuildConfig struct {
 	WalkSpeedMetresPerSec     float64
 	BatchSize                 int
 	MaxNearbyTransfersPerStop int
+	WorkerCount               int
 	SameStopGroupMultiplier   int
 }
 
@@ -72,10 +73,14 @@ type nearbyTransferCandidate struct {
 	distanceMetres int
 }
 
-type nearbyPair struct {
-	fromIndex int
-	toIndex   int
-	distance  int
+type nearbyStopCandidates struct {
+	stopIndex  int
+	candidates []nearbyTransferCandidate
+}
+
+type nearbyDiscoveryResult struct {
+	stopCandidates []nearbyStopCandidates
+	candidateEdges int
 }
 
 func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
@@ -94,6 +99,9 @@ func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 	if config.MaxNearbyTransfersPerStop <= 0 {
 		config.MaxNearbyTransfersPerStop = defaultStopTransferMaxNearbyTransfers
 	}
+	if config.WorkerCount <= 0 {
+		config.WorkerCount = defaultStopTransferWorkerCount()
+	}
 	if config.SameStopGroupMultiplier <= 0 {
 		config.SameStopGroupMultiplier = 2
 	}
@@ -106,20 +114,32 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 	ctx := context.Background()
 	start := time.Now()
 
+	phaseStart := time.Now()
 	stops, err := loadTransferStops(ctx)
 	if err != nil {
 		return err
 	}
+	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: load stops")
 
 	transfers := make(map[transferKey]transferCandidate)
 
+	phaseStart = time.Now()
 	buildSameStopGroupTransfers(stops, transfers, config)
-	buildPlatformAliasTransfers(stops, transfers, config)
-	buildNearbyWalkTransfers(stops, transfers, config)
+	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: same stop groups")
 
+	phaseStart = time.Now()
+	buildPlatformAliasTransfers(stops, transfers, config)
+	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: platform aliases")
+
+	phaseStart = time.Now()
+	buildNearbyWalkTransfers(stops, transfers, config)
+	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: nearby walk scan")
+
+	phaseStart = time.Now()
 	if err := writeStopTransfers(ctx, transfers, config); err != nil {
 		return err
 	}
+	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: write transfers")
 
 	log.Info().
 		Int("stops", len(stops)).
@@ -127,6 +147,7 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 		Int("max_distance_metres", config.MaxDistanceMetres).
 		Int("min_change_seconds", config.MinChangeSeconds).
 		Int("max_nearby_transfers_per_stop", config.MaxNearbyTransfersPerStop).
+		Int("worker_count", config.WorkerCount).
 		Float64("walk_speed_metres_per_second", config.WalkSpeedMetresPerSec).
 		Dur("duration", time.Since(start)).
 		Msg("Built Stop Transfers")
@@ -283,20 +304,22 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 	maxDistance := float64(config.MaxDistanceMetres)
 	maxDistanceSquared := maxDistance * maxDistance
 
-	// Discover candidate pairs in parallel. Each worker owns a contiguous chunk
-	// of stops (by index) and only emits pairs where fromStop.Index < toStop.Index,
-	// so no pair is discovered twice. transfers is read-only during discovery
+	// Discover candidate transfers in parallel. Each worker owns a contiguous
+	// chunk of origin stops and keeps only the nearest candidates for those stops
+	// while scanning, so dense areas do not accumulate all possible nearby pairs
+	// before applying MaxNearbyTransfersPerStop. transfers is read-only during discovery
 	// (only written in buildSameStopGroup/buildPlatformAlias beforehand and in the
-	// emit phase afterwards), so concurrent transferExists reads are safe. Results
-	// are returned in chunk order, so the subsequent merge is identical to a
-	// single-threaded scan.
-	workerCount := runtime.NumCPU()
+	// emit phase afterwards), so concurrent transferExists reads are safe.
+	workerCount := config.WorkerCount
 	if workerCount < 1 {
 		workerCount = 1
 	}
+	if workerCount > len(stops) {
+		workerCount = len(stops)
+	}
 	chunkSize := (len(stops) + workerCount - 1) / workerCount
 
-	discoveryPool := pool.NewWithResults[[]nearbyPair]().WithMaxGoroutines(workerCount)
+	discoveryPool := pool.NewWithResults[nearbyDiscoveryResult]().WithMaxGoroutines(workerCount)
 
 	for start := 0; start < len(stops); start += chunkSize {
 		end := start + chunkSize
@@ -305,10 +328,13 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 		}
 		chunk := stops[start:end]
 
-		discoveryPool.Go(func() []nearbyPair {
-			pairs := make([]nearbyPair, 0, len(chunk)*config.MaxNearbyTransfersPerStop)
+		discoveryPool.Go(func() nearbyDiscoveryResult {
+			result := nearbyDiscoveryResult{
+				stopCandidates: make([]nearbyStopCandidates, 0, len(chunk)),
+			}
 
 			for _, fromStop := range chunk {
+				stopCandidates := make([]nearbyTransferCandidate, 0, minInt(config.MaxNearbyTransfersPerStop, 8))
 				fromKey := stopGridKey(fromStop, cellDegrees)
 				latRange := int(math.Ceil((float64(config.MaxDistanceMetres) / metresPerDegree) / cellDegrees))
 				if latRange < 1 {
@@ -332,9 +358,6 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 						}]
 
 						for _, toStop := range candidates {
-							if fromStop.Index >= toStop.Index {
-								continue
-							}
 							if fromStop.PrimaryIdentifier == toStop.PrimaryIdentifier {
 								continue
 							}
@@ -348,29 +371,30 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 							}
 
 							distance := int(math.Round(math.Sqrt(distanceSquared)))
-							pairs = append(pairs, nearbyPair{
-								fromIndex: fromStop.Index,
-								toIndex:   toStop.Index,
-								distance:  distance,
-							})
+							addNearbyCandidate(&stopCandidates, toStop.Index, stops, distance, config.MaxNearbyTransfersPerStop)
+							result.candidateEdges++
 						}
 					}
 				}
+
+				result.stopCandidates = append(result.stopCandidates, nearbyStopCandidates{
+					stopIndex:  fromStop.Index,
+					candidates: stopCandidates,
+				})
 			}
 
-			return pairs
+			return result
 		})
 	}
 
-	discoveredPairs := discoveryPool.Wait()
+	discoveredResults := discoveryPool.Wait()
 
 	nearbyCandidatesByStop := make([][]nearbyTransferCandidate, len(stops))
-	nearbyPairCandidates := 0
-	for _, pairs := range discoveredPairs {
-		for _, pair := range pairs {
-			addNearbyCandidate(nearbyCandidatesByStop, pair.fromIndex, pair.toIndex, stops, pair.distance, config.MaxNearbyTransfersPerStop)
-			addNearbyCandidate(nearbyCandidatesByStop, pair.toIndex, pair.fromIndex, stops, pair.distance, config.MaxNearbyTransfersPerStop)
-			nearbyPairCandidates++
+	nearbyCandidateEdges := 0
+	for _, result := range discoveredResults {
+		nearbyCandidateEdges += result.candidateEdges
+		for _, stopCandidates := range result.stopCandidates {
+			nearbyCandidatesByStop[stopCandidates.stopIndex] = stopCandidates.candidates
 		}
 	}
 
@@ -392,21 +416,20 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 	}
 
 	log.Info().
-		Int("nearby_pair_candidates", nearbyPairCandidates).
+		Int("nearby_candidate_edges", nearbyCandidateEdges).
 		Int("nearby_transfers_added", addedNearbyTransfers).
 		Int("transfers", len(transfers)).
 		Msg("Built nearby walk transfer candidates")
 }
 
 func addNearbyCandidate(
-	candidatesByStop [][]nearbyTransferCandidate,
-	fromStopIndex int,
+	candidates *[]nearbyTransferCandidate,
 	toStopIndex int,
 	stops []*transferStop,
 	distanceMetres int,
 	maxCandidates int,
 ) {
-	if maxCandidates <= 0 || fromStopIndex < 0 || fromStopIndex >= len(candidatesByStop) || toStopIndex < 0 || toStopIndex >= len(stops) {
+	if maxCandidates <= 0 || candidates == nil || toStopIndex < 0 || toStopIndex >= len(stops) {
 		return
 	}
 
@@ -414,22 +437,20 @@ func addNearbyCandidate(
 		toStopIndex:    toStopIndex,
 		distanceMetres: distanceMetres,
 	}
-	candidates := candidatesByStop[fromStopIndex]
-	if len(candidates) < maxCandidates {
-		candidatesByStop[fromStopIndex] = append(candidates, candidate)
+	if len(*candidates) < maxCandidates {
+		*candidates = append(*candidates, candidate)
 		return
 	}
 
 	worstIndex := 0
-	for i := 1; i < len(candidates); i++ {
-		if nearbyCandidateLess(candidates[worstIndex], candidates[i], stops) {
+	for i := 1; i < len(*candidates); i++ {
+		if nearbyCandidateLess((*candidates)[worstIndex], (*candidates)[i], stops) {
 			worstIndex = i
 		}
 	}
 
-	if nearbyCandidateLess(candidate, candidates[worstIndex], stops) {
-		candidates[worstIndex] = candidate
-		candidatesByStop[fromStopIndex] = candidates
+	if nearbyCandidateLess(candidate, (*candidates)[worstIndex], stops) {
+		(*candidates)[worstIndex] = candidate
 	}
 }
 
@@ -593,6 +614,26 @@ func stopGridKey(stop *transferStop, cellDegrees float64) gridKey {
 func transferExists(transfers map[transferKey]transferCandidate, fromStopRef string, toStopRef string) bool {
 	_, exists := transfers[transferKey{from: fromStopRef, to: toStopRef}]
 	return exists
+}
+
+func defaultStopTransferWorkerCount() int {
+	return stopTransferWorkerCount(runtime.NumCPU())
+}
+
+func stopTransferWorkerCount(cpuCount int) int {
+	if cpuCount <= 1 {
+		return 1
+	}
+
+	return cpuCount / 2
+}
+
+func minInt(a int, b int) int {
+	if a < b {
+		return a
+	}
+
+	return b
 }
 
 func validTransferLocation(location *ctdf.Location) bool {

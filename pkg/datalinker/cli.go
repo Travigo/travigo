@@ -56,6 +56,11 @@ func RegisterCLI() *cli.Command {
 						Usage: "Maximum number of generated nearby walking transfers retained per stop",
 						Value: defaultStopTransferMaxNearbyTransfers,
 					},
+					&cli.IntFlag{
+						Name:  "stop-transfer-workers",
+						Usage: "Number of workers used while discovering nearby stop transfers",
+						Value: defaultStopTransferWorkerCount(),
+					},
 					&cli.BoolFlag{
 						Name:  "skip-stop-linker-oplog-maintenance",
 						Usage: "Skip post-run oplog cleanup for the stops linker",
@@ -122,6 +127,7 @@ func RegisterCLI() *cli.Command {
 							WalkSpeedMetresPerSec:     c.Float64("walk-speed-metres-per-second"),
 							BatchSize:                 c.Int("batch-size"),
 							MaxNearbyTransfersPerStop: c.Int("max-nearby-transfers-per-stop"),
+							WorkerCount:               c.Int("stop-transfer-workers"),
 						})
 					case "services":
 						linker := NewLinker[*ctdf.Service]("service", mongo.Pipeline{
