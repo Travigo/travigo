@@ -352,6 +352,8 @@ func getStopDepartures(c *fiber.Ctx) error {
 func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
 	destinationFallbacks := 0
 	destinationServiceOverridesApplied := 0
+	destinationStopsByRef := map[string]*ctdf.Stop{}
+	serviceStopNameOverridesByRef := map[string]map[string]string{}
 
 	for _, item := range departureBoard {
 		if item == nil || item.DestinationDisplay != "" || item.Journey == nil {
@@ -366,23 +368,108 @@ func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBo
 
 		destinationFallbacks++
 		lastPathItem := item.Journey.Path[len(item.Journey.Path)-1]
-		lastPathItem.GetDestinationStop()
 
-		if lastPathItem.DestinationStop == nil {
+		destinationStop := lastPathItem.DestinationStop
+		if destinationStop == nil {
+			destinationStop = destinationStopsByRef[lastPathItem.DestinationStopRef]
+		}
+		if destinationStop == nil {
+			destinationStop = findDepartureDestinationStop(lastPathItem.DestinationStopRef)
+			if destinationStop != nil {
+				destinationStopsByRef[lastPathItem.DestinationStopRef] = destinationStop
+				destinationStopsByRef[destinationStop.PrimaryIdentifier] = destinationStop
+				for _, otherIdentifier := range destinationStop.OtherIdentifiers {
+					destinationStopsByRef[otherIdentifier] = destinationStop
+				}
+			}
+		}
+
+		if destinationStop == nil {
 			item.DestinationDisplay = "See Vehicle"
 			continue
 		}
 
-		item.Journey.GetService()
-		primaryNameBeforeOverride := lastPathItem.DestinationStop.PrimaryName
-		lastPathItem.DestinationStop.UpdateNameFromServiceOverrides(item.Journey.Service)
-		if lastPathItem.DestinationStop.PrimaryName != primaryNameBeforeOverride {
+		serviceStopNameOverrides := map[string]string(nil)
+		if item.Journey.Service != nil {
+			serviceStopNameOverrides = item.Journey.Service.StopNameOverrides
+		} else if item.Journey.ServiceRef != "" {
+			serviceStopNameOverrides = serviceStopNameOverridesByRef[item.Journey.ServiceRef]
+			if serviceStopNameOverrides == nil {
+				serviceStopNameOverrides = findDepartureServiceStopNameOverrides(item.Journey.ServiceRef)
+				serviceStopNameOverridesByRef[item.Journey.ServiceRef] = serviceStopNameOverrides
+			}
+		}
+
+		destinationDisplay, overrideApplied := resolveStopDisplayName(destinationStop, serviceStopNameOverrides)
+		if overrideApplied {
 			destinationServiceOverridesApplied++
 		}
-		item.DestinationDisplay = lastPathItem.DestinationStop.PrimaryName
+		item.DestinationDisplay = destinationDisplay
 	}
 
 	return destinationFallbacks, destinationServiceOverridesApplied
+}
+
+func findDepartureDestinationStop(stopRef string) *ctdf.Stop {
+	if stopRef == "" {
+		return nil
+	}
+
+	stopsCollection := database.GetCollection("stops")
+	var stop *ctdf.Stop
+	opts := options.FindOne().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "primaryidentifier", Value: 1},
+		bson.E{Key: "otheridentifiers", Value: 1},
+		bson.E{Key: "primaryname", Value: 1},
+	})
+	stopsCollection.FindOne(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": stopRef},
+			bson.M{"otheridentifiers": stopRef},
+		},
+	}, opts).Decode(&stop)
+
+	return stop
+}
+
+func findDepartureServiceStopNameOverrides(serviceRef string) map[string]string {
+	if serviceRef == "" {
+		return nil
+	}
+
+	servicesCollection := database.GetCollection("services")
+	var service *ctdf.Service
+	opts := options.FindOne().SetProjection(bson.D{
+		bson.E{Key: "_id", Value: 0},
+		bson.E{Key: "stopnameoverrides", Value: 1},
+	})
+	servicesCollection.FindOne(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": serviceRef},
+			bson.M{"otheridentifiers": serviceRef},
+		},
+	}, opts).Decode(&service)
+
+	if service == nil {
+		return nil
+	}
+
+	return service.StopNameOverrides
+}
+
+func resolveStopDisplayName(stop *ctdf.Stop, stopNameOverrides map[string]string) (string, bool) {
+	if stop == nil {
+		return "See Vehicle", false
+	}
+
+	for _, stopID := range stop.GetAllStopIDs() {
+		if stopNameOverrides[stopID] != "" {
+			return stopNameOverrides[stopID], stopNameOverrides[stopID] != stop.PrimaryName
+		}
+	}
+
+	return stop.PrimaryName, false
 }
 
 func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (int, int, int, int, int) {
