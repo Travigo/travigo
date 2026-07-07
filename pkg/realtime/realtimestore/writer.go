@@ -55,6 +55,8 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return errors.New("realtime journey is required")
 	}
 
+	previousRealtimeJourney, previousRealtimeJourneyKnown := previousRealtimeJourneyForEvents(ctx, realtimeJourney.PrimaryIdentifier)
+
 	storedRealtimeJourney := storedRealtimeJourneyFromCTDF(realtimeJourney)
 	realtimeJourneyJSON, err := json.Marshal(storedRealtimeJourney)
 	if err != nil {
@@ -74,7 +76,13 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	return SaveRealtimeJourneyMappings(ctx, realtimeJourney)
+	if err := SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
+		return err
+	}
+
+	publishRealtimeJourneyEvents(previousRealtimeJourney, realtimeJourney, previousRealtimeJourneyKnown)
+
+	return nil
 }
 
 func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {

@@ -53,11 +53,12 @@ No normal request, dataaggregator, or realtime producer path currently performs 
   - `pkg/stats/calculator/realtimejourneys.go` delegates to `realtimestore.GetRealtimeJourneys`.
   - `realtimestore.GetRealtimeJourneys` currently returns empty counters; the old Mongo aggregation is commented out with `TODO MOVE TO REDIS`.
 
-## Watchers
+## Watchers And Events
 
-- `pkg/dbwatch/realtimejourneys.go`
-  - Still watches `realtime_journeys` with a Mongo change stream.
-  - Redis-only realtime journey producers will not trigger these events unless equivalent event publishing is added elsewhere.
+- `pkg/realtime/realtimestore.SaveRealtimeJourney`
+  - Compares the previous Redis realtime journey document with the new one.
+  - Publishes created, cancellation, platform set, and platform changed events to `events-queue` after a successful save.
+- The old realtime journey Mongo change-stream watcher has been removed from `pkg/dbwatch`; dbwatch still handles service alert Mongo events.
 
 ## Redis Indexes And Keys
 

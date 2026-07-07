@@ -7,6 +7,7 @@ This tracks the current write-side state for `realtime_journeys` now that realti
 - `pkg/realtime/realtimestore/writer.go`
   - `SaveRealtimeJourney` writes the full realtime journey JSON to Redis.
   - `SaveRealtimeJourney` writes lookup mappings for `travigo-journeyid` and every entry in `RealtimeJourney.OtherIdentifiers`.
+  - `SaveRealtimeJourney` compares the previous Redis document with the new one and publishes created, cancellation, platform set, and platform changed events to `events-queue`.
   - Mapping/detail TTL is based on `RealtimeJourney.TimeoutDurationMinutes`.
   - `IndexTFLDepartureBoardJourney` writes TfL departure board stop indexes to Redis sorted sets.
   - `UpdateLocationDescription` writes vehicle location descriptions to Redis.
@@ -61,11 +62,10 @@ No active code path currently writes to the `realtime_journeys` Mongo collection
 - Realtime journey stats
   - Stats are not currently rebuilt from Redis; `realtimestore.GetRealtimeJourneys` returns empty counters.
 
-## Watcher Impact
+## Event Publishing
 
-- `pkg/dbwatch/realtimejourneys.go`
-  - Depends on Mongo change streams from `realtime_journeys`.
-  - Redis-only realtime journey producers will not trigger these Mongo change-stream events.
+- Realtime journey events publish from `realtimestore.SaveRealtimeJourney`.
+- The old `pkg/dbwatch/realtimejourneys.go` Mongo change-stream watcher has been removed.
 
 ## Notes
 

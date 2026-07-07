@@ -8,15 +8,14 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"go.mongodb.org/mongo-driver/bson"
 
 	"github.com/adjust/rmq/v5"
 )
 
 type EventsBatchConsumer struct {
-	NotifyQueue rmq.Queue
+	NotifyQueue   rmq.Queue
+	Subscriptions *eventSubscriptionCache
 }
 
 func NewEventsBatchConsumer() *EventsBatchConsumer {
@@ -25,8 +24,15 @@ func NewEventsBatchConsumer() *EventsBatchConsumer {
 		log.Fatal().Err(err).Msg("Failed to start notify queue")
 	}
 
+	subscriptions := newEventSubscriptionCache()
+	if err := subscriptions.Reload(context.Background()); err != nil {
+		log.Error().Err(err).Msg("Failed to load event subscriptions")
+	}
+	subscriptions.StartBackgroundReload(eventSubscriptionRefreshInterval)
+
 	return &EventsBatchConsumer{
-		NotifyQueue: notifyQueue,
+		NotifyQueue:   notifyQueue,
+		Subscriptions: subscriptions,
 	}
 }
 
@@ -43,25 +49,13 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 
 		log.Info().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
 
-		userEventSubscriptionCollection := database.GetCollection("user_event_subscription")
-		cursor, _ := userEventSubscriptionCollection.Find(context.Background(), bson.M{
-			"eventtype": event.Type,
-		})
+		var subscriptions []compiledEventSubscription
+		if c.Subscriptions != nil {
+			subscriptions = c.Subscriptions.ForEventType(event.Type)
+		}
 
-		for cursor.Next(context.Background()) {
-			var userEventSubscription ctdf.UserEventSubscription
-			err := cursor.Decode(&userEventSubscription)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to decode UserEventSubscription")
-				continue
-			}
-
-			program, err := expr.Compile(userEventSubscription.Expression, expr.AsBool(), expr.AllowUndefinedVariables())
-			if err != nil {
-				continue
-			}
-
-			output, err := expr.Run(program, event)
+		for _, userEventSubscription := range subscriptions {
+			output, err := expr.Run(userEventSubscription.Program, event)
 			if err != nil {
 				continue
 			}
