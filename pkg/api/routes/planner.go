@@ -1,8 +1,10 @@
 package routes
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -68,6 +70,14 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
+	originLocationStopCount, err := parsePlannerIntQuery(c, "origin_location_stop_count", "12")
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{
+			"error": "Parameter origin_location_stop_count should be an integer",
+		})
+	}
+
 	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "150")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -88,15 +98,26 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 
 	// Get stops
 	var originStop *ctdf.Stop
-	originStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		Identifier: originIdentifier,
-	})
+	var originLocation *ctdf.Location
+	originLocation, originIsCoordinate, err := parsePlannerCoordinate(originIdentifier)
 	if err != nil {
-		c.SendStatus(fiber.StatusNotFound)
+		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"field": "origin",
 			"error": err.Error(),
 		})
+	}
+	if !originIsCoordinate {
+		originStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+			Identifier: originIdentifier,
+		})
+		if err != nil {
+			c.SendStatus(fiber.StatusNotFound)
+			return c.JSON(fiber.Map{
+				"field": "origin",
+				"error": err.Error(),
+			})
+		}
 	}
 	var destinationStop *ctdf.Stop
 	destinationStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
@@ -131,6 +152,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 
 	journeyPlans, err = dataaggregator.Lookup[*ctdf.JourneyPlanResults](query.JourneyPlan{
 		OriginStop:                 originStop,
+		OriginLocation:             originLocation,
 		DestinationStop:            destinationStop,
 		Count:                      count,
 		StartDateTime:              startDateTime,
@@ -139,6 +161,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		MaxJourneyDuration:         time.Duration(maxJourneyDurationMinutes) * time.Minute,
 		DepartureBoardCountPerStop: departureBoardCountPerStop,
 		OriginDepartureBoardCount:  originDepartureBoardCount,
+		OriginLocationStopCount:    originLocationStopCount,
 		MaxExpandedLabels:          maxExpandedLabels,
 		MaxSearchDuration:          time.Duration(maxSearchSeconds) * time.Second,
 	})
@@ -168,4 +191,36 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 
 func parsePlannerIntQuery(c *fiber.Ctx, key string, defaultValue string) (int, error) {
 	return strconv.Atoi(c.Query(key, defaultValue))
+}
+
+func parsePlannerCoordinate(value string) (*ctdf.Location, bool, error) {
+	value = strings.TrimSpace(value)
+	if !strings.Contains(value, ",") {
+		return nil, false, nil
+	}
+
+	parts := strings.Split(value, ",")
+	if len(parts) != 2 {
+		return nil, true, fmt.Errorf("origin coordinates must be formatted as lon,lat")
+	}
+
+	lon, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	if err != nil {
+		return nil, true, fmt.Errorf("origin longitude must be a number")
+	}
+	lat, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	if err != nil {
+		return nil, true, fmt.Errorf("origin latitude must be a number")
+	}
+	if lon < -180 || lon > 180 {
+		return nil, true, fmt.Errorf("origin longitude must be between -180 and 180")
+	}
+	if lat < -90 || lat > 90 {
+		return nil, true, fmt.Errorf("origin latitude must be between -90 and 90")
+	}
+
+	return &ctdf.Location{
+		Type:        "Point",
+		Coordinates: []float64{lon, lat},
+	}, true, nil
 }

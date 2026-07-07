@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -24,10 +25,12 @@ const (
 	defaultJourneyPlanMaxTransferDistance       = 1000
 	defaultJourneyPlanDepartureBoardCount       = 12
 	defaultJourneyPlanOriginDepartureBoardCount = 96
+	defaultJourneyPlanOriginLocationStopCount   = 12
 	defaultJourneyPlanMaxExpandedLabels         = 150
 	defaultJourneyPlanMaxRouteItems             = 10
 	defaultJourneyPlanMaxConsecutiveTransfers   = 1
 	defaultJourneyPlanMaxSearchDuration         = 8 * time.Second
+	defaultJourneyPlanWalkSpeedMetresPerSecond  = 1.3
 )
 
 type plannerConfig struct {
@@ -37,6 +40,7 @@ type plannerConfig struct {
 	maxTransferDistance       int
 	departureBoardCount       int
 	originDepartureBoardCount int
+	originLocationStopCount   int
 	maxExpandedLabels         int
 	maxRouteItems             int
 	maxConsecutiveTransfers   int
@@ -123,11 +127,19 @@ type plannerRuntime struct {
 }
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
-	if q.OriginStop == nil || q.DestinationStop == nil {
-		return nil, fmt.Errorf("journey plan requires origin and destination stops")
+	if q.DestinationStop == nil {
+		return nil, fmt.Errorf("journey plan requires a destination stop")
+	}
+	if q.OriginStop == nil && q.OriginLocation == nil {
+		return nil, fmt.Errorf("journey plan requires an origin stop or origin location")
 	}
 
 	config := journeyPlanConfig(q)
+	originStop := q.OriginStop
+	if originStop == nil {
+		originStop = coordinateOriginStop(q.OriginLocation)
+	}
+
 	runtime := &plannerRuntime{
 		stopCache:           map[string]*ctdf.Stop{},
 		transferCache:       map[string][]*ctdf.StopTransfer{},
@@ -138,23 +150,26 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		searchEndTime:       q.StartDateTime.Add(config.maxJourneyDuration),
 		searchDeadline:      time.Now().Add(config.maxSearchDuration),
 	}
-	runtime.cacheStop(q.OriginStop)
+	runtime.cacheStop(originStop)
 	runtime.cacheStop(q.DestinationStop)
 
 	results := &ctdf.JourneyPlanResults{
 		JourneyPlans:    []ctdf.JourneyPlan{},
-		OriginStop:      *q.OriginStop,
+		OriginStop:      *originStop,
 		DestinationStop: *q.DestinationStop,
-	}
-
-	initialLabel := &plannerLabel{
-		stop:        q.OriginStop,
-		arrivalTime: q.StartDateTime,
 	}
 
 	pq := &plannerPriorityQueue{}
 	heap.Init(pq)
-	runtime.pushLabel(pq, initialLabel)
+
+	if q.OriginStop != nil {
+		runtime.pushLabel(pq, &plannerLabel{
+			stop:        q.OriginStop,
+			arrivalTime: q.StartDateTime,
+		})
+	} else if err := runtime.pushOriginLocationLabels(pq, originStop, q.OriginLocation, q.StartDateTime); err != nil {
+		return nil, err
+	}
 
 	expandedLabels := 0
 	searchStart := time.Now()
@@ -251,6 +266,11 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 		originDepartureBoardCount = departureBoardCount
 	}
 
+	originLocationStopCount := q.OriginLocationStopCount
+	if originLocationStopCount <= 0 {
+		originLocationStopCount = defaultJourneyPlanOriginLocationStopCount
+	}
+
 	maxExpandedLabels := q.MaxExpandedLabels
 	if maxExpandedLabels <= 0 {
 		maxExpandedLabels = defaultJourneyPlanMaxExpandedLabels
@@ -268,11 +288,78 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 		maxTransferDistance:       maxTransferDistance,
 		departureBoardCount:       departureBoardCount,
 		originDepartureBoardCount: originDepartureBoardCount,
+		originLocationStopCount:   originLocationStopCount,
 		maxExpandedLabels:         maxExpandedLabels,
 		maxRouteItems:             defaultJourneyPlanMaxRouteItems,
 		maxConsecutiveTransfers:   defaultJourneyPlanMaxConsecutiveTransfers,
 		maxLabelsPerState:         count,
 		maxSearchDuration:         maxSearchDuration,
+	}
+}
+
+func coordinateOriginStop(location *ctdf.Location) *ctdf.Stop {
+	if location == nil || len(location.Coordinates) != 2 {
+		return &ctdf.Stop{
+			PrimaryIdentifier: "coordinate-origin",
+			PrimaryName:       "Selected location",
+			Active:            true,
+		}
+	}
+
+	coordinates := []float64{location.Coordinates[0], location.Coordinates[1]}
+	return &ctdf.Stop{
+		PrimaryIdentifier: fmt.Sprintf("coordinate-origin:%.6f,%.6f", coordinates[0], coordinates[1]),
+		PrimaryName:       "Selected location",
+		Location: &ctdf.Location{
+			Type:        "Point",
+			Coordinates: coordinates,
+		},
+		Active: true,
+	}
+}
+
+func (runtime *plannerRuntime) pushOriginLocationLabels(pq *plannerPriorityQueue, originStop *ctdf.Stop, originLocation *ctdf.Location, startDateTime time.Time) error {
+	nearbyStops, err := runtime.loadOriginLocationStops(originLocation)
+	if err != nil {
+		return err
+	}
+
+	for _, stop := range nearbyStops {
+		label := originLocationLabel(originStop, originLocation, stop, startDateTime)
+		runtime.pushLabel(pq, label)
+	}
+
+	return nil
+}
+
+func originLocationLabel(originStop *ctdf.Stop, originLocation *ctdf.Location, stop *ctdf.Stop, startDateTime time.Time) *plannerLabel {
+	if originStop == nil || originLocation == nil || stop == nil || stop.Location == nil {
+		return nil
+	}
+
+	distanceMetres := int(math.Ceil(originLocation.Distance(stop.Location)))
+	if distanceMetres < 0 {
+		distanceMetres = 0
+	}
+
+	walkDurationSeconds := int(math.Ceil(float64(distanceMetres) / defaultJourneyPlanWalkSpeedMetresPerSecond))
+	arrivalTime := startDateTime.Add(time.Duration(walkDurationSeconds) * time.Second)
+	routeItem := ctdf.JourneyPlanRouteItem{
+		Type:                 ctdf.JourneyPlanRouteItemTypeTransfer,
+		TransferType:         ctdf.StopTransferTypeNearbyWalk,
+		OriginStopRef:        originStop.PrimaryIdentifier,
+		DestinationStopRef:   stop.PrimaryIdentifier,
+		StartTime:            startDateTime,
+		ArrivalTime:          arrivalTime,
+		DistanceMetres:       distanceMetres,
+		WalkDurationSeconds:  walkDurationSeconds,
+		TotalDurationSeconds: walkDurationSeconds,
+	}
+
+	return &plannerLabel{
+		stop:        stop,
+		arrivalTime: arrivalTime,
+		routeItems:  appendRouteItem(nil, routeItem),
 	}
 }
 
@@ -364,7 +451,7 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	}
 
 	departureBoardCount := runtime.config.departureBoardCount
-	if current.routeItems == nil {
+	if current.vehicleLegs == 0 {
 		departureBoardCount = runtime.config.originDepartureBoardCount
 	}
 
@@ -663,6 +750,50 @@ func sameCalendarDay(a time.Time, b time.Time) bool {
 	yearA, monthA, dayA := a.Date()
 	yearB, monthB, dayB := b.Date()
 	return yearA == yearB && monthA == monthB && dayA == dayB
+}
+
+func (runtime *plannerRuntime) loadOriginLocationStops(location *ctdf.Location) ([]*ctdf.Stop, error) {
+	if location == nil || len(location.Coordinates) != 2 {
+		return nil, nil
+	}
+
+	stopsCollection := database.GetCollection("stops")
+	opts := options.Find().
+		SetProjection(bson.D{
+			bson.E{Key: "_id", Value: 0},
+		}).
+		SetLimit(int64(runtime.config.originLocationStopCount))
+
+	cursor, err := stopsCollection.Find(context.Background(), bson.M{
+		"location": bson.M{
+			"$near": bson.M{
+				"$geometry": bson.M{
+					"type":        "Point",
+					"coordinates": bson.A{location.Coordinates[0], location.Coordinates[1]},
+				},
+				"$maxDistance": runtime.config.maxTransferDistance,
+			},
+		},
+	}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	stops := make([]*ctdf.Stop, 0, runtime.config.originLocationStopCount)
+	for cursor.Next(context.Background()) {
+		var stop ctdf.Stop
+		if err := cursor.Decode(&stop); err != nil {
+			return nil, err
+		}
+		runtime.cacheStop(&stop)
+		stops = append(stops, &stop)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return stops, nil
 }
 
 func (runtime *plannerRuntime) loadTransfers(stop *ctdf.Stop) ([]*ctdf.StopTransfer, error) {

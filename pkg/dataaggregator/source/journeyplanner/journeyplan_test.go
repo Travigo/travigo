@@ -20,6 +20,9 @@ func TestJourneyPlanConfigDefaultsBoundSearchFanout(t *testing.T) {
 	if config.originDepartureBoardCount != defaultJourneyPlanOriginDepartureBoardCount {
 		t.Fatalf("expected default origin departure board count %d, got %d", defaultJourneyPlanOriginDepartureBoardCount, config.originDepartureBoardCount)
 	}
+	if config.originLocationStopCount != defaultJourneyPlanOriginLocationStopCount {
+		t.Fatalf("expected default origin location stop count %d, got %d", defaultJourneyPlanOriginLocationStopCount, config.originLocationStopCount)
+	}
 	if config.maxExpandedLabels != defaultJourneyPlanMaxExpandedLabels {
 		t.Fatalf("expected default max expanded labels %d, got %d", defaultJourneyPlanMaxExpandedLabels, config.maxExpandedLabels)
 	}
@@ -33,6 +36,7 @@ func TestJourneyPlanConfigAllowsSearchBudgetOverrides(t *testing.T) {
 		Count:                      7,
 		DepartureBoardCountPerStop: 20,
 		OriginDepartureBoardCount:  50,
+		OriginLocationStopCount:    9,
 		MaxExpandedLabels:          80,
 		MaxSearchDuration:          3 * time.Second,
 	})
@@ -45,6 +49,9 @@ func TestJourneyPlanConfigAllowsSearchBudgetOverrides(t *testing.T) {
 	}
 	if config.originDepartureBoardCount != 50 {
 		t.Fatalf("expected origin departure board count override 50, got %d", config.originDepartureBoardCount)
+	}
+	if config.originLocationStopCount != 9 {
+		t.Fatalf("expected origin location stop count override 9, got %d", config.originLocationStopCount)
 	}
 	if config.maxExpandedLabels != 80 {
 		t.Fatalf("expected max expanded labels override 80, got %d", config.maxExpandedLabels)
@@ -180,5 +187,72 @@ func TestShouldScanTransferDeparturesOnlyForRailLikeStops(t *testing.T) {
 	}
 	if shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}) {
 		t.Fatal("did not expect bus stop to be scanned")
+	}
+}
+
+func TestCoordinateOriginStop(t *testing.T) {
+	location := &ctdf.Location{
+		Type:        "Point",
+		Coordinates: []float64{-0.1234567, 52.1234567},
+	}
+
+	stop := coordinateOriginStop(location)
+
+	if stop.PrimaryIdentifier != "coordinate-origin:-0.123457,52.123457" {
+		t.Fatalf("unexpected coordinate origin identifier %q", stop.PrimaryIdentifier)
+	}
+	if stop.PrimaryName != "Selected location" {
+		t.Fatalf("unexpected coordinate origin name %q", stop.PrimaryName)
+	}
+	if stop.Location == nil || len(stop.Location.Coordinates) != 2 {
+		t.Fatal("expected coordinate origin location to be set")
+	}
+	if stop.Location.Coordinates[0] != location.Coordinates[0] || stop.Location.Coordinates[1] != location.Coordinates[1] {
+		t.Fatalf("unexpected coordinate origin location %+v", stop.Location.Coordinates)
+	}
+}
+
+func TestOriginLocationLabelBuildsInitialWalkTransfer(t *testing.T) {
+	start := time.Date(2026, 7, 7, 8, 0, 0, 0, time.UTC)
+	originStop := &ctdf.Stop{PrimaryIdentifier: "coordinate-origin:-0.100000,52.000000"}
+	originLocation := &ctdf.Location{
+		Type:        "Point",
+		Coordinates: []float64{-0.100000, 52.000000},
+	}
+	stop := &ctdf.Stop{
+		PrimaryIdentifier: "nearby-stop",
+		Location: &ctdf.Location{
+			Type:        "Point",
+			Coordinates: []float64{-0.100000, 52.001000},
+		},
+	}
+
+	label := originLocationLabel(originStop, originLocation, stop, start)
+
+	if label == nil {
+		t.Fatal("expected origin location label")
+	}
+	if label.stop != stop {
+		t.Fatal("expected label to arrive at nearby stop")
+	}
+	routeItems := routeItemsSlice(label.routeItems)
+	if len(routeItems) != 1 {
+		t.Fatalf("expected one initial route item, got %d", len(routeItems))
+	}
+	routeItem := routeItems[0]
+	if routeItem.Type != ctdf.JourneyPlanRouteItemTypeTransfer {
+		t.Fatalf("expected transfer route item, got %s", routeItem.Type)
+	}
+	if routeItem.TransferType != ctdf.StopTransferTypeNearbyWalk {
+		t.Fatalf("expected nearby walk transfer, got %s", routeItem.TransferType)
+	}
+	if routeItem.OriginStopRef != originStop.PrimaryIdentifier || routeItem.DestinationStopRef != stop.PrimaryIdentifier {
+		t.Fatalf("unexpected transfer refs %s -> %s", routeItem.OriginStopRef, routeItem.DestinationStopRef)
+	}
+	if routeItem.DistanceMetres <= 0 || routeItem.WalkDurationSeconds <= 0 {
+		t.Fatalf("expected positive walk distance and duration, got %dm/%ds", routeItem.DistanceMetres, routeItem.WalkDurationSeconds)
+	}
+	if !routeItem.ArrivalTime.Equal(label.arrivalTime) {
+		t.Fatalf("expected route item arrival %s to match label arrival %s", routeItem.ArrivalTime, label.arrivalTime)
 	}
 }

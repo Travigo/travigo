@@ -7,6 +7,7 @@ import (
 
 type JourneyPlan struct {
 	OriginStop      *ctdf.Stop
+	OriginLocation  *ctdf.Location
 	DestinationStop *ctdf.Stop
 	Count           int
 	StartDateTime   time.Time
@@ -16,6 +17,7 @@ type JourneyPlan struct {
 	MaxTransferDistanceMetres  int
 	DepartureBoardCountPerStop int
 	OriginDepartureBoardCount  int
+	OriginLocationStopCount    int
 	MaxExpandedLabels          int
 	MaxSearchDuration          time.Duration
 }
