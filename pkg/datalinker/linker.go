@@ -46,6 +46,9 @@ func (l Linker[T]) Run() {
 	rawCollection := database.GetCollection(rawCollectionName)
 	stagingCollection := database.GetCollection(stagingCollectionName)
 
+	dropCollection(stagingCollectionName)
+	defer dropCollection(stagingCollectionName)
+
 	copyCollection(rawCollectionName, stagingCollectionName)
 
 	log.Info().Msg("Fetching aggregate records started")
@@ -183,6 +186,6 @@ func (l Linker[T]) Run() {
 
 	// Copy staging to live
 	copyCollection(stagingCollectionName, liveCollectionName)
-	// Delete staging as it's not needed now
-	emptyCollection(stagingCollectionName)
+
+	compactLinkedCollections(context.Background(), rawCollectionName, liveCollectionName)
 }

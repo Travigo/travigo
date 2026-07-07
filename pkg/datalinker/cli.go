@@ -56,6 +56,15 @@ func RegisterCLI() *cli.Command {
 						Usage: "Maximum number of generated nearby walking transfers retained per stop",
 						Value: defaultStopTransferMaxNearbyTransfers,
 					},
+					&cli.BoolFlag{
+						Name:  "skip-stop-linker-oplog-maintenance",
+						Usage: "Skip post-run oplog cleanup for the stops linker",
+					},
+					&cli.IntFlag{
+						Name:  "oplog-clear-size-mb",
+						Usage: "Temporary oplog size in MB used while clearing the oplog after the stops linker",
+						Value: defaultOplogClearSizeMB,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -101,6 +110,11 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
 						linker.Run()
+						if !c.Bool("skip-stop-linker-oplog-maintenance") {
+							runStopLinkerOplogMaintenance(StopLinkerMongoMaintenanceConfig{
+								OplogClearSizeMB: c.Int("oplog-clear-size-mb"),
+							})
+						}
 					case "stop-transfers", "transfers":
 						return BuildStopTransfers(StopTransferBuildConfig{
 							MaxDistanceMetres:         c.Int("max-transfer-distance-metres"),

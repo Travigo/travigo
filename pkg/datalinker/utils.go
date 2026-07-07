@@ -21,9 +21,11 @@ func copyCollection(source string, destination string) {
 	sourceCollection.Aggregate(context.Background(), aggregation)
 }
 
-func emptyCollection(collectionName string) {
-	log.Info().Str("collection", collectionName).Msg("Emptying collection")
+func dropCollection(collectionName string) {
+	log.Info().Str("collection", collectionName).Msg("Dropping collection")
 	collection := database.GetCollection(collectionName)
 
-	collection.DeleteMany(context.Background(), bson.M{})
+	if err := collection.Drop(context.Background()); err != nil {
+		log.Error().Err(err).Str("collection", collectionName).Msg("Failed to drop collection")
+	}
 }
