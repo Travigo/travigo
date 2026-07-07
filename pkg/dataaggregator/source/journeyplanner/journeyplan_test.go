@@ -75,3 +75,41 @@ func TestLimitDepartureBoardSortsAndLimits(t *testing.T) {
 		t.Fatalf("expected second departure at +10m, got %s", limited[1].Time)
 	}
 }
+
+func TestRecordResultBuildsAndDeduplicatesPlan(t *testing.T) {
+	start := time.Date(2026, 7, 7, 19, 39, 0, 0, time.UTC)
+	arrival := start.Add(65 * time.Minute)
+	runtime := &plannerRuntime{
+		resultKeys: map[string]bool{},
+	}
+	results := &ctdf.JourneyPlanResults{}
+	label := &plannerLabel{
+		stop:        &ctdf.Stop{PrimaryIdentifier: "destination"},
+		arrivalTime: arrival,
+		routeItems: appendRouteItem(nil, ctdf.JourneyPlanRouteItem{
+			Type:               ctdf.JourneyPlanRouteItemTypeJourney,
+			OriginStopRef:      "origin",
+			DestinationStopRef: "destination",
+			StartTime:          start,
+			ArrivalTime:        arrival,
+			Journey:            &ctdf.Journey{PrimaryIdentifier: "journey-1"},
+		}),
+	}
+
+	runtime.recordResult(results, label)
+	runtime.recordResult(results, label)
+
+	if len(results.JourneyPlans) != 1 {
+		t.Fatalf("expected one deduplicated journey plan, got %d", len(results.JourneyPlans))
+	}
+	plan := results.JourneyPlans[0]
+	if !plan.StartTime.Equal(start) {
+		t.Fatalf("expected plan start %s, got %s", start, plan.StartTime)
+	}
+	if !plan.ArrivalTime.Equal(arrival) {
+		t.Fatalf("expected plan arrival %s, got %s", arrival, plan.ArrivalTime)
+	}
+	if len(plan.RouteItems) != 1 {
+		t.Fatalf("expected one route item, got %d", len(plan.RouteItems))
+	}
+}

@@ -162,12 +162,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		expandedLabels++
 
 		if stopMatchesStop(current.stop, q.DestinationStop) && current.routeItems != nil {
-			plan := buildJourneyPlan(current)
-			key := journeyPlanKey(plan)
-			if !runtime.resultKeys[key] {
-				results.JourneyPlans = append(results.JourneyPlans, plan)
-				runtime.resultKeys[key] = true
-			}
+			runtime.recordResult(results, current)
 			continue
 		}
 
@@ -176,13 +171,16 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		}
 
 		if current.consecutiveTransfers < config.maxConsecutiveTransfers {
-			if err := runtime.expandTransfers(pq, current); err != nil {
+			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
+		if len(results.JourneyPlans) >= config.count {
+			continue
+		}
 
 		if current.vehicleLegs < config.maxVehicleLegs {
-			if err := runtime.expandDepartures(pq, current); err != nil {
+			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -277,7 +275,7 @@ func journeyPlanConfig(q query.JourneyPlan) plannerConfig {
 	}
 }
 
-func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current *plannerLabel) error {
+func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
 	if runtime.searchExpired() {
 		return nil
 	}
@@ -329,19 +327,28 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			TotalDurationSeconds:     totalDurationSeconds,
 		}
 
-		runtime.pushLabel(pq, &plannerLabel{
+		nextLabel := &plannerLabel{
 			stop:                 toStop,
 			arrivalTime:          arrivalTime,
 			vehicleLegs:          current.vehicleLegs,
 			consecutiveTransfers: current.consecutiveTransfers + 1,
 			routeItems:           appendRouteItem(current.routeItems, routeItem),
-		})
+		}
+		if stopMatchesStop(toStop, destinationStop) {
+			runtime.recordResult(results, nextLabel)
+			if len(results.JourneyPlans) >= runtime.config.count {
+				return nil
+			}
+			continue
+		}
+
+		runtime.pushLabel(pq, nextLabel)
 	}
 
 	return nil
 }
 
-func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, current *plannerLabel) error {
+func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
 	if runtime.searchExpired() {
 		return nil
 	}
@@ -413,12 +420,21 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				ArrivalTime:        arrivalTime,
 			}
 
-			runtime.pushLabel(pq, &plannerLabel{
+			nextLabel := &plannerLabel{
 				stop:        toStop,
 				arrivalTime: arrivalTime,
 				vehicleLegs: current.vehicleLegs + 1,
 				routeItems:  appendRouteItem(current.routeItems, routeItem),
-			})
+			}
+			if stopMatchesStop(toStop, destinationStop) {
+				runtime.recordResult(results, nextLabel)
+				if len(results.JourneyPlans) >= runtime.config.count {
+					return nil
+				}
+				continue
+			}
+
+			runtime.pushLabel(pq, nextLabel)
 		}
 	}
 
@@ -614,6 +630,21 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 
 	runtime.bestArrivals[key] = arrivals
 	heap.Push(pq, label)
+}
+
+func (runtime *plannerRuntime) recordResult(results *ctdf.JourneyPlanResults, label *plannerLabel) {
+	if results == nil || label == nil || label.routeItems == nil {
+		return
+	}
+
+	plan := buildJourneyPlan(label)
+	key := journeyPlanKey(plan)
+	if runtime.resultKeys[key] {
+		return
+	}
+
+	results.JourneyPlans = append(results.JourneyPlans, plan)
+	runtime.resultKeys[key] = true
 }
 
 func buildJourneyPlan(label *plannerLabel) ctdf.JourneyPlan {

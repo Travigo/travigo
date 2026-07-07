@@ -66,11 +66,27 @@ func (stop *Stop) SetOtherIdentifiers(ids []string) {
 }
 
 func (stop *Stop) GetAllStopIDs() []string {
-	allStopIDs := []string{
-		stop.PrimaryIdentifier,
+	allStopIDs := make([]string, 0, 1+len(stop.OtherIdentifiers)+len(stop.Platforms))
+	seen := map[string]bool{}
+
+	addStopID := func(stopID string) {
+		if stopID == "" || seen[stopID] {
+			return
+		}
+		allStopIDs = append(allStopIDs, stopID)
+		seen[stopID] = true
 	}
 
-	allStopIDs = append(allStopIDs, stop.OtherIdentifiers...)
+	addStopID(stop.PrimaryIdentifier)
+	for _, stopID := range stop.OtherIdentifiers {
+		addStopID(stopID)
+	}
+	for _, platform := range stop.Platforms {
+		if platform == nil {
+			continue
+		}
+		addStopID(platform.PrimaryIdentifier)
+	}
 
 	return allStopIDs
 }

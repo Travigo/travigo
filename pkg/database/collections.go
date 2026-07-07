@@ -115,6 +115,9 @@ func createStopsIndexes() {
 		{
 			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
 		},
+		{
+			Keys: bson.D{{Key: "platforms.primaryidentifier", Value: 1}},
+		},
 	}
 
 	opts := options.CreateIndexes()
