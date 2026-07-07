@@ -19,7 +19,7 @@ const (
 	defaultStopTransferMaxDistanceMetres        = 500
 	defaultStopTransferMinChangeSeconds         = 60
 	defaultStopTransferWalkSpeedMetresPerSecond = 1.3
-	defaultStopTransferBatchSize                = 5000
+	defaultStopTransferBatchSize                = 10000
 	defaultStopTransferMaxNearbyTransfers       = 24
 	metresPerDegree                             = 111320.0
 )
