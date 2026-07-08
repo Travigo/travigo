@@ -18,6 +18,13 @@ type storedVehicleLocation struct {
 	Bearing  float64       `json:"bearing"`
 }
 
+const (
+	defaultRealtimeJourneyTTL = 10 * time.Minute
+	// LINX sends formation/allocation data early in the morning for every train
+	// running that day, so it must remain available before each journey appears.
+	railAllocationTTL = 24 * time.Hour
+)
+
 func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:details/%s", identifier)
 }
@@ -63,7 +70,7 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	timeoutDuration := time.Duration(realtimeJourney.TimeoutDurationMinutes) * time.Minute
+	timeoutDuration := realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes)
 
 	err = redis_client.Client.Set(
 		ctx,
@@ -120,7 +127,7 @@ func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detail
 		return err
 	}
 
-	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("allocation", identifier), detailedRailInformationJSON, 24*time.Hour).Err()
+	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("allocation", identifier), detailedRailInformationJSON, railAllocationTTL).Err()
 }
 
 func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
@@ -145,7 +152,12 @@ func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedR
 		return err
 	}
 
-	return redis_client.Client.Set(ctx, realtimeJourneyRailDetailedKey("loading", identifier), loadingInformationJSON, 24*time.Hour).Err()
+	return redis_client.Client.Set(
+		ctx,
+		realtimeJourneyRailDetailedKey("loading", identifier),
+		loadingInformationJSON,
+		realtimeJourneyTTL(ctx, identifier),
+	).Err()
 }
 
 func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {
@@ -237,26 +249,31 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 }
 
 func realtimeJourneyTTL(ctx context.Context, identifier string) time.Duration {
-	const defaultTTL = 10 * time.Minute
-
 	result := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if result.Err() != nil {
-		return defaultTTL
+		return defaultRealtimeJourneyTTL
 	}
 
 	var stored struct {
 		TimeoutDurationMinutes int `json:"to"`
 	}
 	if err := json.Unmarshal([]byte(result.Val()), &stored); err == nil && stored.TimeoutDurationMinutes > 0 {
-		return time.Duration(stored.TimeoutDurationMinutes) * time.Minute
+		return realtimeJourneyExpiration(stored.TimeoutDurationMinutes)
 	}
 
 	var legacy struct {
 		TimeoutDurationMinutes int
 	}
 	if err := json.Unmarshal([]byte(result.Val()), &legacy); err == nil && legacy.TimeoutDurationMinutes > 0 {
-		return time.Duration(legacy.TimeoutDurationMinutes) * time.Minute
+		return realtimeJourneyExpiration(legacy.TimeoutDurationMinutes)
 	}
 
-	return defaultTTL
+	return defaultRealtimeJourneyTTL
+}
+
+func realtimeJourneyExpiration(timeoutDurationMinutes int) time.Duration {
+	if timeoutDurationMinutes <= 0 {
+		return defaultRealtimeJourneyTTL
+	}
+	return time.Duration(timeoutDurationMinutes) * time.Minute
 }

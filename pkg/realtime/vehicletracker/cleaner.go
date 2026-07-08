@@ -1,10 +1,12 @@
 package vehicletracker
 
 import (
+	"context"
 	"time"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
 
@@ -22,6 +24,15 @@ func StartCleaner() {
 
 		if returned != 0 {
 			log.Info().Msgf("Cleaned %d records", returned)
+		}
+
+		removedLocations, err := realtimestore.CleanupStaleLocationIndex(context.Background())
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to clean stale realtime location index entries")
+			continue
+		}
+		if removedLocations != 0 {
+			log.Info().Int64("locations", removedLocations).Msg("Cleaned stale realtime location index entries")
 		}
 	}
 }

@@ -97,12 +97,11 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
-		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil {
-			if batchErrors := batch.Reject(); len(batchErrors) > 0 {
-				for _, err := range batchErrors {
-					log.Error().Err(err).Msg("Failed to reject realtime event")
-				}
-			}
+		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil || vehicleUpdateEvent == nil {
+			// The whole batch is acknowledged below. A malformed payload cannot
+			// become processable through retry, so retaining it in rmq's
+			// non-expiring rejected list only leaks Redis memory.
+			log.Warn().Err(err).Msg("Discarding malformed realtime event")
 			continue
 		}
 
