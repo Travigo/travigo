@@ -467,8 +467,8 @@ func railClassVehicleType(value string) string {
 }
 
 func applyRailCarriageEnrichment(carriage *ctdf.RailCarriage, enrichment ctdf.RailCarriage) {
-	if carriage.SeatingClass == "" {
-		carriage.SeatingClass = enrichment.SeatingClass
+	if len(carriage.SeatingClasses) == 0 {
+		carriage.SeatingClasses = enrichment.SeatingClasses
 	}
 	if len(carriage.Toilets) == 0 {
 		carriage.Toilets = enrichment.Toilets

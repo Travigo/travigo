@@ -104,7 +104,8 @@ func TestEnrichRailDetailedAllocationTransformsMixedUnitsByOwnLength(t *testing.
 	if enriched.Trains[0].TrainLength != 2 || len(enriched.Trains[0].Carriages[0].Toilets) != 1 {
 		t.Fatalf("expected two-car class 156 layout, got %+v", enriched.Trains[0])
 	}
-	if enriched.Trains[0].Carriages[0].SeatingClass != ctdf.JourneyDetailedRailSeatingStandard {
+	if len(enriched.Trains[0].Carriages[0].SeatingClasses) != 1 ||
+		enriched.Trains[0].Carriages[0].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingStandard {
 		t.Fatalf("expected transformed carriage seating class to be standard, got %+v", enriched.Trains[0].Carriages[0])
 	}
 
@@ -114,10 +115,35 @@ func TestEnrichRailDetailedAllocationTransformsMixedUnitsByOwnLength(t *testing.
 	if enriched.Trains[1].TrainLength != 5 || len(enriched.Trains[1].Carriages[4].Toilets) != 1 {
 		t.Fatalf("expected five-car class 720 layout, got %+v", enriched.Trains[1])
 	}
-	if enriched.Trains[1].Carriages[4].SeatingClass != ctdf.JourneyDetailedRailSeatingStandard {
+	if len(enriched.Trains[1].Carriages[4].SeatingClasses) != 1 ||
+		enriched.Trains[1].Carriages[4].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingStandard {
 		t.Fatalf("expected transformed carriage seating class to be standard, got %+v", enriched.Trains[1].Carriages[4])
 	}
 	if enriched.Trains[1].Carriages[4].ID != "720001:5" || enriched.Trains[1].Carriages[4].VehicleID != "5" {
 		t.Fatalf("expected live carriage identity to be preserved, got %+v", enriched.Trains[1].Carriages[4])
+	}
+}
+
+func TestEnrichRailTrainAllocationPreservesMixedSeatingClasses(t *testing.T) {
+	setupRailDetailedTransforms(t)
+
+	carriages := make([]ctdf.RailCarriage, 8)
+	for index := range carriages {
+		carriages[index] = ctdf.RailCarriage{ID: string(rune('1' + index)), Occupancy: -1}
+	}
+
+	enriched := enrichRailTrainAllocation(ctdf.RailTrain{
+		FleetID:   "700",
+		Carriages: carriages,
+	})
+
+	if len(enriched.Carriages[0].SeatingClasses) != 2 ||
+		enriched.Carriages[0].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingFirst ||
+		enriched.Carriages[0].SeatingClasses[1] != ctdf.JourneyDetailedRailSeatingStandard {
+		t.Fatalf("expected leading Class 700 carriage to contain first and standard seating, got %+v", enriched.Carriages[0])
+	}
+	if len(enriched.Carriages[1].SeatingClasses) != 1 ||
+		enriched.Carriages[1].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingStandard {
+		t.Fatalf("expected second Class 700 carriage to remain standard only, got %+v", enriched.Carriages[1])
 	}
 }

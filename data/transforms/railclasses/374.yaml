@@ -19,89 +19,105 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1
   - ID: "2"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "3"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "4"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "5"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "6"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "7"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "8"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "9"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "10"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "11"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "12"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "13"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "14"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "15"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "16"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
     Occupancy: -1

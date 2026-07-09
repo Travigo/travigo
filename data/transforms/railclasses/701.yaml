@@ -20,21 +20,26 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "2"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "3"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "4"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "5"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
 ---
 Type: ctdf.RailTrain
@@ -44,36 +49,46 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "2"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "3"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "4"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "5"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "6"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "7"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "8"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "9"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "10"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1

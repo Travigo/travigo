@@ -18,7 +18,8 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"

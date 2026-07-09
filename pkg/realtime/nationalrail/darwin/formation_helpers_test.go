@@ -33,8 +33,10 @@ func TestBuildDarwinRailTrainsPreservesFormationBoundaries(t *testing.T) {
 	if trains[0].Carriages[0].ID != "A" || trains[1].Carriages[0].ID != "A" {
 		t.Fatalf("expected coach IDs to be scoped by train, got %+v", trains)
 	}
-	if trains[0].Carriages[0].SeatingClass != ctdf.JourneyDetailedRailSeatingFirst ||
-		trains[1].Carriages[0].SeatingClass != ctdf.JourneyDetailedRailSeatingStandard {
+	if len(trains[0].Carriages[0].SeatingClasses) != 1 ||
+		trains[0].Carriages[0].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingFirst ||
+		len(trains[1].Carriages[0].SeatingClasses) != 1 ||
+		trains[1].Carriages[0].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingStandard {
 		t.Fatalf("expected Darwin coach class to map to seating class, got %+v", trains)
 	}
 	if trains[0].Carriages[0].CarriageType != "" || trains[1].Carriages[0].CarriageType != "" {

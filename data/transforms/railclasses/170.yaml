@@ -18,12 +18,14 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "2"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
 ---
 Type: ctdf.RailTrain
@@ -33,13 +35,17 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "First"
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "2"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "3"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1

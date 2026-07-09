@@ -27,10 +27,10 @@ func buildDarwinRailTrains(scheduleFormation ScheduleFormations) []ctdf.RailTrai
 				})
 			}
 			train.Carriages = append(train.Carriages, ctdf.RailCarriage{
-				ID:           carriage.Number,
-				SeatingClass: darwinSeatingClass(carriage.SeatingClass),
-				Toilets:      toilets,
-				Occupancy:    -1,
+				ID:             carriage.Number,
+				SeatingClasses: darwinSeatingClasses(carriage.SeatingClass),
+				Toilets:        toilets,
+				Occupancy:      -1,
 			})
 		}
 
@@ -40,16 +40,16 @@ func buildDarwinRailTrains(scheduleFormation ScheduleFormations) []ctdf.RailTrai
 	return trains
 }
 
-func darwinSeatingClass(value string) ctdf.JourneyDetailedRailSeating {
+func darwinSeatingClasses(value string) []ctdf.JourneyDetailedRailSeating {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "first", "f", "1":
-		return ctdf.JourneyDetailedRailSeatingFirst
+		return []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingFirst}
 	case "standard", "s", "2":
-		return ctdf.JourneyDetailedRailSeatingStandard
+		return []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingStandard}
 	case "":
-		return ""
+		return nil
 	default:
-		return ctdf.JourneyDetailedRailSeatingUnknown
+		return []ctdf.JourneyDetailedRailSeating{ctdf.JourneyDetailedRailSeatingUnknown}
 	}
 }
 

@@ -97,7 +97,7 @@ func TestBuildRailTrainsPreservesUnitBoundariesAndFormationDetails(t *testing.T)
 	if firstCarriage.CarriageType != "DMSL" || firstCarriage.SpecificType != "DMSL" || firstCarriage.Livery != "AT" {
 		t.Fatalf("expected vehicle presentation fields to be preserved, got %+v", firstCarriage)
 	}
-	if firstCarriage.SeatingClass != "" {
+	if len(firstCarriage.SeatingClasses) != 0 {
 		t.Fatalf("expected LINX vehicle type not to be treated as seating class, got %+v", firstCarriage)
 	}
 	if firstCarriage.Occupancy != -1 {

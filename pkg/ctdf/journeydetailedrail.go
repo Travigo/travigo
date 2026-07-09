@@ -59,10 +59,10 @@ const (
 )
 
 type RailCarriage struct {
-	ID           string                     `groups:"basic"`
-	CarriageType string                     `groups:"basic"`
-	SeatingClass JourneyDetailedRailSeating `groups:"basic"`
-	Toilets      []RailCarriageToilet       `groups:"basic"`
+	ID             string                       `groups:"basic"`
+	CarriageType   string                       `groups:"basic"`
+	SeatingClasses []JourneyDetailedRailSeating `groups:"basic"`
+	Toilets        []RailCarriageToilet         `groups:"basic"`
 
 	CarriageID             string `groups:"detailed"`
 	VehicleID              string `groups:"detailed"`

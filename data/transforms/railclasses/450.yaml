@@ -19,16 +19,22 @@ Match:
 Data:
   Carriages:
   - ID: "1"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
+    - "Standard"
     Occupancy: -1
   - ID: "2"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "3"
-    SeatingClass: "Standard"
+    SeatingClasses:
+    - "Standard"
     Occupancy: -1
   - ID: "4"
-    SeatingClass: "First"
+    SeatingClasses:
+    - "First"
+    - "Standard"
     Occupancy: -1
