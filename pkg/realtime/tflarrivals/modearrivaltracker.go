@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"sync"
@@ -74,7 +75,7 @@ func (l *ModeArrivalTracker) Run(getRoutes bool) {
 }
 
 func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
-	requestURL := fmt.Sprintf("https://api.tfl.gov.uk/mode/%s/arrivals?app_key=%s", l.Mode.ModeID, TfLAppKey)
+	requestURL := modeArrivalsURL(l.Mode.ModeID, TfLAppKey)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
 
@@ -92,6 +93,14 @@ func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
 	json.Unmarshal(jsonBytes, &lineArrivals)
 
 	return lineArrivals
+}
+
+func modeArrivalsURL(modeID string, appKey string) string {
+	query := url.Values{}
+	query.Set("count", "-1")
+	query.Set("app_key", appKey)
+
+	return fmt.Sprintf("https://api.tfl.gov.uk/mode/%s/arrivals?%s", url.PathEscape(modeID), query.Encode())
 }
 
 func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
