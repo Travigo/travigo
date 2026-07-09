@@ -60,6 +60,57 @@ func TestSaveRealtimeJourneyPreservesPositiveExpiration(t *testing.T) {
 	}
 }
 
+func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	journey := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "tfl-journey",
+		Journey: &ctdf.Journey{
+			PrimaryIdentifier: "tfl-journey",
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef:          "gb-atco-origin",
+				DestinationStopRef:     "gb-atco-destination",
+				OriginPlatform:         "1 - Northbound",
+				DestinationPlatform:    "2 - Northbound",
+				OriginArrivalTime:      time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC),
+				DestinationArrivalTime: time.Date(2026, 7, 9, 12, 2, 0, 0, time.UTC),
+				OriginDepartureTime:    time.Date(2026, 7, 9, 12, 0, 30, 0, time.UTC),
+				OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
+				DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
+			}},
+		},
+	}
+
+	if err := SaveRealtimeJourney(ctx, journey); err != nil {
+		t.Fatalf("save realtime journey: %v", err)
+	}
+
+	stored, err := FindByIdentifier(ctx, journey.PrimaryIdentifier)
+	if err != nil {
+		t.Fatalf("find realtime journey: %v", err)
+	}
+	if stored.Journey == nil || len(stored.Journey.Path) != 1 {
+		t.Fatalf("path length = %d, want 1", len(stored.Journey.Path))
+	}
+
+	pathItem := stored.Journey.Path[0]
+	if got, want := pathItem.OriginStopRef, "gb-atco-origin"; got != want {
+		t.Errorf("origin stop = %q, want %q", got, want)
+	}
+	if got, want := pathItem.DestinationStopRef, "gb-atco-destination"; got != want {
+		t.Errorf("destination stop = %q, want %q", got, want)
+	}
+	if got, want := pathItem.OriginPlatform, "1 - Northbound"; got != want {
+		t.Errorf("origin platform = %q, want %q", got, want)
+	}
+	if got, want := pathItem.DestinationArrivalTime, time.Date(2026, 7, 9, 12, 2, 0, 0, time.UTC); !got.Equal(want) {
+		t.Errorf("destination arrival = %s, want %s", got, want)
+	}
+	if got, want := pathItem.OriginActivity, []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}; len(got) != 1 || got[0] != want[0] {
+		t.Errorf("origin activity = %v, want %v", got, want)
+	}
+}
+
 func TestRailAllocationRemainsAvailableForDay(t *testing.T) {
 	server := setupMemoryTestRedis(t)
 	ctx := context.Background()
