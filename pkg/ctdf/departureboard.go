@@ -25,6 +25,19 @@ type DepartureBoard struct {
 	Time time.Time `groups:"basic,departures-llm"`
 }
 
+// BoardType identifies whether a board lists vehicles leaving or arriving at a
+// stop. An empty value remains a departure board for backwards compatibility.
+type BoardType string
+
+const (
+	BoardTypeDeparture BoardType = "departure"
+	BoardTypeArrival   BoardType = "arrival"
+)
+
+func (t BoardType) IsArrival() bool {
+	return t == BoardTypeArrival
+}
+
 type DepartureBoardRecordType string
 
 const (
@@ -41,7 +54,80 @@ type DepartureBoardRealtimeLookup struct {
 	FindByJourneyRefs func(journeyRefs []string) *RealtimeJourney
 }
 
+func boardPathStopRef(path *JourneyPathItem, boardType BoardType) string {
+	if boardType.IsArrival() {
+		return path.DestinationStopRef
+	}
+	return path.OriginStopRef
+}
+
+func boardPathTime(path *JourneyPathItem, boardType BoardType) time.Time {
+	if boardType.IsArrival() {
+		return path.DestinationArrivalTime
+	}
+	return path.OriginDepartureTime
+}
+
+func boardPathPlatform(path *JourneyPathItem, boardType BoardType) string {
+	if boardType.IsArrival() {
+		return path.DestinationPlatform
+	}
+	return path.OriginPlatform
+}
+
+func boardPathIsUnavailable(path *JourneyPathItem, boardType BoardType) bool {
+	activity := path.OriginActivity
+	var unavailableActivity JourneyPathItemActivity = JourneyPathItemActivitySetdown
+	if boardType.IsArrival() {
+		activity = path.DestinationActivity
+		unavailableActivity = JourneyPathItemActivityPickup
+	}
+	return len(activity) == 1 && activity[0] == unavailableActivity
+}
+
+func boardPathStop(path *JourneyPathItem, boardType BoardType) *Stop {
+	if boardType.IsArrival() {
+		path.GetDestinationStop()
+		return path.DestinationStop
+	}
+	path.GetOriginStop()
+	return path.OriginStop
+}
+
+func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time.Time {
+	if boardType.IsArrival() {
+		return stop.ArrivalTime
+	}
+	return stop.DepartureTime
+}
+
+func boardDestinationDisplay(journey *Journey, path *JourneyPathItem, boardType BoardType) string {
+	if !boardType.IsArrival() || journey == nil || len(journey.Path) == 0 {
+		return path.DestinationDisplay
+	}
+
+	firstPathItem := journey.Path[0]
+	if firstPathItem == nil {
+		return path.DestinationDisplay
+	}
+	firstPathItem.GetOriginStop()
+	if firstPathItem.OriginStop != nil && firstPathItem.OriginStop.PrimaryName != "" {
+		return firstPathItem.OriginStop.PrimaryName
+	}
+
+	return firstPathItem.OriginStopRef
+}
+
+// GenerateDepartureBoardFromJourneys is retained for callers that explicitly
+// need a departure board. New code should use GenerateBoardFromJourneys.
 func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup) []*DepartureBoard {
+	return GenerateBoardFromJourneys(journeys, stopRefs, dateTime, doEstimates, realtimeLookup, BoardTypeDeparture)
+}
+
+// GenerateBoardFromJourneys creates either an arrival or departure board from
+// the same scheduled journeys. The selected path endpoint controls the stop,
+// activity, platform, and scheduled/realtime time used for each record.
+func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup, boardType BoardType) []*DepartureBoard {
 	generationStart := time.Now()
 	inputJourneyCount := len(journeys)
 	journeysCollection := database.GetCollection("journeys")
@@ -56,7 +142,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 	var tooOldSkippedCount atomic.Int64
 	var prefetchedRealtimeAppliedCount atomic.Int64
 	var stopMatchedCount atomic.Int64
-	var setdownSkippedCount atomic.Int64
+	var activitySkippedCount atomic.Int64
 	var realtimeStopMatchedCount atomic.Int64
 	var cancelledCount atomic.Int64
 	var beforeStartSkippedCount atomic.Int64
@@ -92,7 +178,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 	for _, journey := range journeys {
 		p.Go(func() *DepartureBoard {
-			var stopDepartureTime time.Time
+			var stopTime time.Time
 			var stopPlatform string
 			var stopPlatformType string
 			var destinationDisplay string
@@ -106,10 +192,11 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				// between them, and the cutoff loop's early `return nil` must run before any detail
 				// work. Merging would reorder the realtime assignment relative to the cutoff check;
 				// left as two passes to preserve identical behaviour and early-return ordering.
-				// Don't even think about it if we're passed 4 hours departure on this stop
+				// Do not include board entries that are more than four hours old.
 				for _, path := range journey.Path {
-					if _, ok := stopRefsSet[path.OriginStopRef]; ok {
-						journeyDepMins := (path.OriginDepartureTime.Hour() * 60) + path.OriginDepartureTime.Minute()
+					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
+						journeyTime := boardPathTime(path, boardType)
+						journeyDepMins := (journeyTime.Hour() * 60) + journeyTime.Minute()
 						startMins := (dateTime.Hour() * 60) + dateTime.Minute()
 
 						if (startMins - journeyDepMins) > 240 {
@@ -127,15 +214,15 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				}
 
 				for _, path := range journey.Path {
-					if _, ok := stopRefsSet[path.OriginStopRef]; ok {
+					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
 						stopMatchedCount.Add(1)
-						refTime := path.OriginDepartureTime
-						stopPlatform = path.OriginPlatform
+						refTime := boardPathTime(path, boardType)
+						stopPlatform = boardPathPlatform(path, boardType)
 						stopPlatformType = "ESTIMATED"
 
-						// Ignore drop off only stops from the departure board as no one should be getting onto the vehicle at this point
-						if len(path.OriginActivity) == 1 && path.OriginActivity[0] == JourneyPathItemActivitySetdown {
-							setdownSkippedCount.Add(1)
+						// A departure needs pickup permission; an arrival needs setdown permission.
+						if boardPathIsUnavailable(path, boardType) {
+							activitySkippedCount.Add(1)
 							return nil
 						}
 
@@ -144,13 +231,13 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 							var realtimeJourneyStop *RealtimeJourneyStops
 
 							// Lookup realtime journey stop by either direct reference or other identifiers (which requires extra db call)
-							if journey.RealtimeJourney.Stops[path.OriginStopRef] != nil {
-								realtimeJourneyStop = journey.RealtimeJourney.Stops[path.OriginStopRef]
+							if journey.RealtimeJourney.Stops[boardPathStopRef(path, boardType)] != nil {
+								realtimeJourneyStop = journey.RealtimeJourney.Stops[boardPathStopRef(path, boardType)]
 							} else {
-								path.GetOriginStop()
+								boardStop := boardPathStop(path, boardType)
 
 								for stopID, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
-									if path.OriginStop.PrimaryIdentifier == stopID || slices.Contains(path.OriginStop.OtherIdentifiers, stopID) {
+									if boardStop != nil && (boardStop.PrimaryIdentifier == stopID || slices.Contains(boardStop.OtherIdentifiers, stopID)) {
 										realtimeJourneyStop = potentialRealtimeJourneyStop
 										break
 									}
@@ -164,7 +251,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 								}
 
 								if journey.RealtimeJourney.ActivelyTracked {
-									refTime = realtimeJourneyStop.DepartureTime
+									refTime = boardRealtimeStopTime(realtimeJourneyStop, boardType)
 								}
 
 								if realtimeJourneyStop.Platform != "" {
@@ -185,16 +272,16 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 							cancelledCount.Add(1)
 						}
 
-						stopDepartureTime = time.Date(
+						stopTime = time.Date(
 							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 						)
 
-						destinationDisplay = path.DestinationDisplay
+						destinationDisplay = boardDestinationDisplay(journey, path, boardType)
 						break
 					}
 				}
 
-				if stopDepartureTime.Before(dateTime) {
+				if stopTime.Before(dateTime) {
 					beforeStartSkippedCount.Add(1)
 					return nil
 				}
@@ -208,16 +295,16 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 				// This block does a Find (block journeys by serviceref + BlockNumber)
 				// plus a realtime lookup per qualifying journey. Qualification
 				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
-				// stopDepartureTime and departureBoardRecordType which are only known after the
+				// stopTime and departureBoardRecordType which are only known after the
 				// path loop above, so it can't be fully hoisted into a pre-pass. As a cheaper
 				// mitigation, both lookups are memoised per (serviceRef, BlockNumber) via
 				// blockJourneysCache/blockRealtimeCache so journeys sharing a block reuse the
 				// result instead of each issuing duplicate Mongo/realtime round trips.
 				// A fuller batch (first pass to collect qualifiers, then one Find with $in over
 				// all blocks and one realtime lookup over all refs) remains possible.
-				// If the departure is within 45 minutes then attempt to do an estimated arrival based on current vehicle realtime journey
+				// If the board entry is within 45 minutes then attempt to estimate it based on current vehicle realtime journey.
 				// We estimate the current vehicle realtime journey based on the Block Number
-				stopDepartureTimeFromNow := stopDepartureTime.Sub(dateTime).Minutes()
+				stopDepartureTimeFromNow := stopTime.Sub(dateTime).Minutes()
 				if doEstimates &&
 					departureBoardRecordType == DepartureBoardRecordTypeScheduled &&
 					stopDepartureTimeFromNow <= 45 && stopDepartureTimeFromNow >= 0 &&
@@ -264,7 +351,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 						estimateRealtimeMatchedCount.Add(1)
 						// Ignore negative offsets as we assume bus will right itself when turning over
 						if blockRealtimeJourney.Offset.Minutes() > 0 {
-							stopDepartureTime = stopDepartureTime.Add(blockRealtimeJourney.Offset)
+							stopTime = stopTime.Add(blockRealtimeJourney.Offset)
 						}
 						departureBoardRecordType = DepartureBoardRecordTypeEstimated
 						estimatedCount.Add(1)
@@ -273,7 +360,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 
 				return &DepartureBoard{
 					Journey:            journey,
-					Time:               stopDepartureTime,
+					Time:               stopTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
 					Platform:           stopPlatform,
@@ -305,7 +392,7 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		Int64("too_old_skipped", tooOldSkippedCount.Load()).
 		Int64("prefetched_realtime_applied", prefetchedRealtimeAppliedCount.Load()).
 		Int64("stop_matched", stopMatchedCount.Load()).
-		Int64("setdown_skipped", setdownSkippedCount.Load()).
+		Int64("activity_skipped", activitySkippedCount.Load()).
 		Int64("realtime_stop_matched", realtimeStopMatchedCount.Load()).
 		Int64("cancelled_records", cancelledCount.Load()).
 		Int64("before_start_skipped", beforeStartSkippedCount.Load()).
@@ -315,7 +402,8 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 		Int64("estimate_realtime_matched", estimateRealtimeMatchedCount.Load()).
 		Int64("estimated_records", estimatedCount.Load()).
 		Int("nil_results", len(departureBoardWithNil)-len(departureBoard)).
-		Int("generated_departures", len(departureBoard)).
+		Str("board_type", string(boardType)).
+		Int("generated_entries", len(departureBoard)).
 		Dur("duration", time.Since(generationStart)).
 		Msg("Departure board generation stats")
 

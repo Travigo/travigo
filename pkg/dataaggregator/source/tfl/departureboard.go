@@ -29,6 +29,15 @@ func getBackfillSource() *localdepartureboard.Source {
 }
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+	q.Type = ctdf.BoardTypeDeparture
+	return s.BoardQuery(q)
+}
+
+// BoardQuery uses TfL's per-stop predicted-arrival feed for both board modes.
+// TfL does not provide a separate predicted-departure timestamp in this feed;
+// retaining this behaviour keeps departure responses compatible while allowing
+// arrivals to use the same realtime data and scheduled backfill.
+func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",

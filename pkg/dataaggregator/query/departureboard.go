@@ -12,4 +12,5 @@ type DepartureBoard struct {
 	Count         int
 	StartDateTime time.Time
 	Filter        *bson.M
+	Type          ctdf.BoardType
 }

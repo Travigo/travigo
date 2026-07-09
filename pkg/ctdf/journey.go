@@ -177,8 +177,8 @@ type JourneyPathItem struct {
 	OriginStop      *Stop `groups:"basic"`
 	DestinationStop *Stop `groups:"basic"`
 
-	OriginPlatform      string `groups:"basic"`
-	DestinationPlatform string `groups:"basic"`
+	OriginPlatform      string `groups:"basic,departureboard-cache"`
+	DestinationPlatform string `groups:"basic,departureboard-cache"`
 
 	Distance int `groups:"basic"`
 
@@ -190,7 +190,7 @@ type JourneyPathItem struct {
 	DestinationDisplay string `groups:"basic,departureboard-cache"`
 
 	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
-	DestinationActivity []JourneyPathItemActivity `groups:"basic"`
+	DestinationActivity []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 
 	Track []Location `groups:"basic"`
 

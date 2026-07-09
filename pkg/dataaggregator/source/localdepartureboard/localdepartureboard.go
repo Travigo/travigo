@@ -31,7 +31,7 @@ func (s Source) Supports() []reflect.Type {
 func (s Source) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
 	case query.DepartureBoard:
-		return s.DepartureBoardQuery(q.(query.DepartureBoard))
+		return s.BoardQuery(q.(query.DepartureBoard))
 	default:
 		return nil, source.UnsupportedSourceError
 	}

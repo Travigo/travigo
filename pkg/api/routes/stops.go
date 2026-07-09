@@ -33,6 +33,7 @@ func StopsRouter(router fiber.Router) {
 	router.Get("/:identifier/detailed", getStopDetailed)
 	router.Get("/:identifier", getStop)
 	router.Get("/:identifier/departures", getStopDepartures)
+	router.Get("/:identifier/arrivals", getStopArrivals)
 }
 
 func listStops(c *fiber.Ctx) error {
@@ -241,6 +242,14 @@ func getStopDetailed(c *fiber.Ctx) error {
 }
 
 func getStopDepartures(c *fiber.Ctx) error {
+	return getStopBoard(c, ctdf.BoardTypeDeparture)
+}
+
+func getStopArrivals(c *fiber.Ctx) error {
+	return getStopBoard(c, ctdf.BoardTypeArrival)
+}
+
+func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	requestStart := time.Now()
 	stopIdentifier := c.Params("identifier")
 	count, err := strconv.Atoi(c.Query("count", "25"))
@@ -291,6 +300,7 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Stop:          stop,
 		Count:         count,
 		StartDateTime: startDateTime,
+		Type:          boardType,
 	})
 	departureLookupDuration := time.Since(departureLookupStart)
 	beforeSortCount := len(departureBoard)
@@ -341,8 +351,9 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Int("requested_count", count).
 		Time("start_datetime", startDateTime).
 		Bool("llm", isLLM == "true").
-		Int("departures_before_sort", beforeSortCount).
-		Int("departures_after_truncate", afterTruncateCount).
+		Str("board_type", string(boardType)).
+		Int("entries_before_sort", beforeSortCount).
+		Int("entries_after_truncate", afterTruncateCount).
 		Int("nil_departure_items", nilDepartureItems).
 		Int("destination_fallbacks", destinationFallbacks).
 		Int("destination_service_overrides_applied", destinationServiceOverridesApplied).
@@ -351,13 +362,13 @@ func getStopDepartures(c *fiber.Ctx) error {
 		Int("reused_operators", reusedOperators).
 		Int("reused_services", reusedServices).
 		Dur("stop_lookup_duration", stopLookupDuration).
-		Dur("departure_lookup_duration", departureLookupDuration).
+		Dur("board_lookup_duration", departureLookupDuration).
 		Dur("sort_duration", sortDuration).
 		Dur("destination_display_duration", destinationDisplayDuration).
 		Dur("transform_duration", transformDuration).
 		Dur("marshal_duration", marshalDuration).
 		Dur("total_duration", time.Since(requestStart)).
-		Msg("Stop departures response stats")
+		Msg("Stop board response stats")
 
 	return c.JSON(departureBoardReduced)
 }

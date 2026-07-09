@@ -22,6 +22,11 @@ import (
 )
 
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+	q.Type = ctdf.BoardTypeDeparture
+	return s.BoardQuery(q)
+}
+
+func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	queryStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
 
@@ -48,8 +53,16 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	currentTime := time.Now()
 
-	baseCacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
-	journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
+	boardType := q.Type
+	if boardType == "" {
+		boardType = ctdf.BoardTypeDeparture
+	}
+	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
+	stopField := "path.originstopref"
+	if boardType.IsArrival() {
+		stopField = "path.destinationstopref"
+	}
+	journeyQuery := bson.M{stopField: bson.M{"$in": allStopIDs}}
 	if q.Filter != nil {
 		journeyQuery = bson.M{
 			"$and": bson.A{
@@ -74,7 +87,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 	realtimeLookupTodayDuration := time.Since(currentTime)
 
 	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateDepartureBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday)
+	departureBoardToday := ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
 		Int("journeys", len(journeysToday)).
@@ -104,7 +117,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 		realtimeLookupTomorrowDuration := time.Since(currentTime)
 
 		currentTime = time.Now()
-		departureBoardTomorrow := ctdf.GenerateDepartureBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow)
+		departureBoardTomorrow := ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
 			Int("journeys", len(journeysTomorrow)).

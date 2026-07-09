@@ -24,7 +24,7 @@ func (t Source) Supports() []reflect.Type {
 func (t Source) Lookup(q any) (interface{}, error) {
 	switch q.(type) {
 	case query.DepartureBoard:
-		return t.DepartureBoardQuery(q.(query.DepartureBoard))
+		return t.BoardQuery(q.(query.DepartureBoard))
 	case query.Journey:
 		return t.JourneyQuery(q.(query.Journey))
 	}
