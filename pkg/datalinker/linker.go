@@ -4,11 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"regexp"
 	"sort"
+	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -73,8 +72,6 @@ func (l Linker[T]) Run() {
 			log.Error().Err(err).Msg("Failed to decode aggregatedRecords")
 		}
 
-		// pretty.Println(aggregatedRecords)
-
 		var identifiers []string
 
 		for _, record := range aggregatedRecords.Records {
@@ -90,20 +87,12 @@ func (l Linker[T]) Run() {
 	log.Info().Msg("Fetching aggregate records finished")
 
 	log.Info().Msg("Data linking started")
-
-	pretty.Println(len(mergeGroups))
-	for i := 0; i < len(mergeGroups); i++ {
-		for j := i + 1; j < len(mergeGroups); j++ {
-			if util.SlicesOverlap(mergeGroups[i], mergeGroups[j]) {
-				log.Debug().Msgf("Array %d and Array %d have overlapping values\n", i, j)
-
-				mergeGroups[i] = util.RemoveDuplicateStrings(append(mergeGroups[i], mergeGroups[j]...), []string{})
-				mergeGroups[j] = []string{}
-			}
-		}
+	mergeGroups = mergeOverlappingIdentifierGroups(mergeGroups)
+	primaryRecordsByIdentifier, err := loadLinkerPrimaryRecords[T](context.Background(), rawCollection, mergeGroups)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to batch load linker records")
 	}
 
-	manualMergeRegex := regexp.MustCompile("travigo-internalmerge-")
 	for _, mergeGroup := range mergeGroups {
 		if len(mergeGroup) == 0 {
 			continue
@@ -112,19 +101,16 @@ func (l Linker[T]) Run() {
 		// Filter for manual ones
 		var mergeGroupFiltered []string
 		for _, id := range mergeGroup {
-			if !manualMergeRegex.MatchString(id) {
+			if !strings.Contains(id, "travigo-internalmerge-") {
 				mergeGroupFiltered = append(mergeGroupFiltered, id)
 			}
 		}
 
-		// Get the primary records so we can do the actual merging with them
+		// Get the primary records so we can do the actual merging with them.
+		// They were loaded in batches before this loop to avoid one MongoDB read per ID.
 		var primaryRecords []T
 		for _, id := range mergeGroupFiltered {
-			var record T
-
-			cursor := rawCollection.FindOne(context.Background(), bson.M{"primaryidentifier": id})
-			err := cursor.Decode(&record)
-			if err == nil {
+			if record, ok := primaryRecordsByIdentifier[id]; ok {
 				primaryRecords = append(primaryRecords, record)
 			}
 		}
@@ -166,8 +152,6 @@ func (l Linker[T]) Run() {
 		insertModel.SetDocument(bsonRep)
 		operations = append(operations, insertModel)
 
-		pretty.Println(mergeGroupFiltered)
-		pretty.Println(len(primaryRecords))
 	}
 
 	log.Info().Msg("Data linking finished")
@@ -188,4 +172,110 @@ func (l Linker[T]) Run() {
 	copyCollection(stagingCollectionName, liveCollectionName)
 
 	compactLinkedCollections(context.Background(), rawCollectionName, liveCollectionName)
+}
+
+type identifierMergeGroup struct {
+	identifiers []string
+	seen        map[string]struct{}
+}
+
+func mergeOverlappingIdentifierGroups(groups [][]string) [][]string {
+	mergedGroups := make([]identifierMergeGroup, 0, len(groups))
+	groupByIdentifier := map[string]int{}
+
+	for _, group := range groups {
+		matchingGroups := map[int]struct{}{}
+		for _, identifier := range group {
+			if groupIndex, ok := groupByIdentifier[identifier]; ok {
+				matchingGroups[groupIndex] = struct{}{}
+			}
+		}
+
+		baseIndex := -1
+		for groupIndex := range matchingGroups {
+			if baseIndex == -1 || groupIndex < baseIndex {
+				baseIndex = groupIndex
+			}
+		}
+		if baseIndex == -1 {
+			baseIndex = len(mergedGroups)
+			mergedGroups = append(mergedGroups, identifierMergeGroup{seen: map[string]struct{}{}})
+		}
+
+		for groupIndex := range matchingGroups {
+			if groupIndex == baseIndex || len(mergedGroups[groupIndex].identifiers) == 0 {
+				continue
+			}
+			for _, identifier := range mergedGroups[groupIndex].identifiers {
+				if _, exists := mergedGroups[baseIndex].seen[identifier]; !exists {
+					mergedGroups[baseIndex].seen[identifier] = struct{}{}
+					mergedGroups[baseIndex].identifiers = append(mergedGroups[baseIndex].identifiers, identifier)
+				}
+				groupByIdentifier[identifier] = baseIndex
+			}
+			mergedGroups[groupIndex].identifiers = nil
+		}
+
+		for _, identifier := range group {
+			if _, exists := mergedGroups[baseIndex].seen[identifier]; !exists {
+				mergedGroups[baseIndex].seen[identifier] = struct{}{}
+				mergedGroups[baseIndex].identifiers = append(mergedGroups[baseIndex].identifiers, identifier)
+			}
+			groupByIdentifier[identifier] = baseIndex
+		}
+	}
+
+	result := make([][]string, 0, len(mergedGroups))
+	for _, group := range mergedGroups {
+		if len(group.identifiers) > 0 {
+			result = append(result, group.identifiers)
+		}
+	}
+	return result
+}
+
+func loadLinkerPrimaryRecords[T ctdf.LinkableRecord](ctx context.Context, collection *mongo.Collection, groups [][]string) (map[string]T, error) {
+	identifiers := []string{}
+	seenIdentifiers := map[string]struct{}{}
+	for _, group := range groups {
+		for _, identifier := range group {
+			if strings.Contains(identifier, "travigo-internalmerge-") {
+				continue
+			}
+			if _, seen := seenIdentifiers[identifier]; seen {
+				continue
+			}
+			seenIdentifiers[identifier] = struct{}{}
+			identifiers = append(identifiers, identifier)
+		}
+	}
+
+	recordsByIdentifier := make(map[string]T, len(identifiers))
+	const batchSize = 1000
+	for start := 0; start < len(identifiers); start += batchSize {
+		end := start + batchSize
+		if end > len(identifiers) {
+			end = len(identifiers)
+		}
+
+		cursor, err := collection.Find(ctx, bson.M{"primaryidentifier": bson.M{"$in": identifiers[start:end]}})
+		if err != nil {
+			return nil, err
+		}
+		for cursor.Next(ctx) {
+			var record T
+			if err := cursor.Decode(&record); err != nil {
+				cursor.Close(ctx)
+				return nil, err
+			}
+			recordsByIdentifier[record.GetPrimaryIdentifier()] = record
+		}
+		if err := cursor.Err(); err != nil {
+			cursor.Close(ctx)
+			return nil, err
+		}
+		cursor.Close(ctx)
+	}
+
+	return recordsByIdentifier, nil
 }
