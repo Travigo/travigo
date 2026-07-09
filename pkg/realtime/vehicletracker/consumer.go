@@ -12,6 +12,7 @@ import (
 	"github.com/eko/gocache/lib/v4/cache"
 	"github.com/eko/gocache/lib/v4/store"
 	redisstore "github.com/eko/gocache/store/redis/v4"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
@@ -25,18 +26,30 @@ var identificationCache *cache.Cache[string]
 
 const numConsumers = 5
 const batchSize = 200
+const identificationCacheTTL = 90 * time.Minute
 
-type localJourneyIDMap struct {
-	JourneyID   string
-	LastUpdated time.Time
-}
+var touchIdentificationMapping = redis.NewScript(`
+local journey_id = redis.call("HGET", KEYS[1], "journey_id")
+if not journey_id then
+  return {"", "missing"}
+end
+if journey_id == "N/A" then
+  return {"", "suppressed"}
+end
 
-func (j localJourneyIDMap) MarshalBinary() ([]byte, error) {
-	return json.Marshal(j)
-}
+local last_updated = tonumber(redis.call("HGET", KEYS[1], "last_updated")) or 0
+local incoming_updated = tonumber(ARGV[1])
+if incoming_updated <= last_updated then
+  return {"", "stale"}
+end
+
+redis.call("HSET", KEYS[1], "last_updated", ARGV[1])
+redis.call("PEXPIRE", KEYS[1], ARGV[2])
+return {journey_id, "updated"}
+`)
 
 func CreateIdentificationCache() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(90*time.Minute))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(identificationCacheTTL))
 
 	identificationCache = cache.New[string](redisStore)
 }
@@ -232,11 +245,15 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 	operatorRef := identifyingInformation["OperatorRef"]
 
-	var journeyID string
+	journeyID, mappingFound, err := touchExistingIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, vehicleUpdateEvent.RecordedAt)
+	if err != nil {
+		log.Warn().Err(err).Str("local_id", vehicleUpdateEvent.LocalID).Msg("Failed to read realtime identification mapping")
+	}
+	if mappingFound {
+		return journeyID
+	}
 
-	cachedJourneyMapping, _ := identificationCache.Get(context.Background(), vehicleUpdateEvent.LocalID)
-
-	if cachedJourneyMapping == "" {
+	{
 		var journey string
 		var err error
 
@@ -245,7 +262,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
 			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
 			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
-				identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
+				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
 				return ""
 			}
 
@@ -287,7 +304,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 		if err != nil {
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, "N/A")
+			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
 
 			// Set cross dataset ID
 			if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
@@ -332,12 +349,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		}
 		journeyID = journey
 
-		journeyMapJson, _ := json.Marshal(localJourneyIDMap{
-			JourneyID:   journeyID,
-			LastUpdated: vehicleUpdateEvent.RecordedAt,
-		})
-
-		identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, string(journeyMapJson))
+		storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, journeyID, vehicleUpdateEvent.RecordedAt)
 
 		// Set cross dataset ID
 		if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
@@ -358,26 +370,43 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		})
 
 		elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
-	} else if cachedJourneyMapping == "N/A" {
-		return ""
-	} else {
-		var journeyMap localJourneyIDMap
-		json.Unmarshal([]byte(cachedJourneyMapping), &journeyMap)
-
-		// skip this journey if hasnt changed
-		if vehicleUpdateEvent.RecordedAt.After(journeyMap.LastUpdated) {
-			// Update the last updated time
-			journeyMap.LastUpdated = vehicleUpdateEvent.RecordedAt
-
-			journeyMapJson, _ := json.Marshal(journeyMap)
-
-			identificationCache.Set(context.Background(), vehicleUpdateEvent.LocalID, string(journeyMapJson))
-		} else {
-			return ""
-		}
-
-		journeyID = journeyMap.JourneyID
 	}
 
 	return journeyID
+}
+
+func realtimeIdentificationMappingKey(localID string) string {
+	return fmt.Sprintf("realtime-identification:%s", localID)
+}
+
+func touchExistingIdentificationMapping(ctx context.Context, localID string, recordedAt time.Time) (string, bool, error) {
+	result, err := touchIdentificationMapping.Run(
+		ctx,
+		redis_client.Client,
+		[]string{realtimeIdentificationMappingKey(localID)},
+		recordedAt.UnixNano(),
+		identificationCacheTTL.Milliseconds(),
+	).StringSlice()
+	if err != nil {
+		return "", false, err
+	}
+	if len(result) != 2 {
+		return "", false, nil
+	}
+
+	return result[0], result[1] != "missing", nil
+}
+
+func storeIdentificationMapping(ctx context.Context, localID string, journeyID string, recordedAt time.Time) {
+	_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(ctx, realtimeIdentificationMappingKey(localID), map[string]interface{}{
+			"journey_id":   journeyID,
+			"last_updated": recordedAt.UnixNano(),
+		})
+		pipe.Expire(ctx, realtimeIdentificationMappingKey(localID), identificationCacheTTL)
+		return nil
+	})
+	if err != nil {
+		log.Warn().Err(err).Str("local_id", localID).Msg("Failed to store realtime identification mapping")
+	}
 }
