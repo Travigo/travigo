@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/travigo/travigo/pkg/dataaggregator"
@@ -131,6 +133,8 @@ type basicService struct {
 	TransportType        ctdf.TransportType
 }
 
+const railDepartureBoardWarmConcurrency = 4
+
 func indexStopsFromMongo(indexName string) {
 	now := time.Now()
 	stopsCollection := database.GetCollection("stops")
@@ -139,6 +143,32 @@ func indexStopsFromMongo(indexName string) {
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch stops for indexing")
 		return
+	}
+	defer cursor.Close(context.Background())
+
+	railWarmJobs := make(chan *ctdf.Stop, railDepartureBoardWarmConcurrency)
+	var railWarmGroup sync.WaitGroup
+	var railWarmRequested atomic.Int64
+	var railWarmCompleted atomic.Int64
+	var railWarmErrors atomic.Int64
+	for worker := 0; worker < railDepartureBoardWarmConcurrency; worker++ {
+		railWarmGroup.Add(1)
+		go func() {
+			defer railWarmGroup.Done()
+			for stop := range railWarmJobs {
+				_, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
+					Stop:          stop,
+					Count:         1,
+					StartDateTime: now,
+				})
+				if err != nil {
+					railWarmErrors.Add(1)
+					log.Warn().Err(err).Str("stop", stop.PrimaryIdentifier).Msg("Failed to warm rail departure board cache")
+					continue
+				}
+				railWarmCompleted.Add(1)
+			}
+		}()
 	}
 
 	totalStops := 0
@@ -173,13 +203,8 @@ func indexStopsFromMongo(indexName string) {
 
 		// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
 		if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
-			go func() {
-				dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
-					Stop:          stop,
-					Count:         1,
-					StartDateTime: now,
-				})
-			}()
+			railWarmRequested.Add(1)
+			railWarmJobs <- stop
 		}
 
 		for _, service := range services {
@@ -213,6 +238,8 @@ func indexStopsFromMongo(indexName string) {
 	if err := cursor.Err(); err != nil {
 		log.Error().Err(err).Msg("Failed while iterating stops for indexing")
 	}
+	close(railWarmJobs)
+	railWarmGroup.Wait()
 
 	log.Info().
 		Int("total_stops", totalStops).
@@ -220,6 +247,9 @@ func indexStopsFromMongo(indexName string) {
 		Int("rail_indexed_stops", railIndexedStops).
 		Int("inactive_skipped", inactiveSkipped).
 		Int("rail_inactive_skipped", railInactiveSkipped).
+		Int64("rail_cache_warm_requested", railWarmRequested.Load()).
+		Int64("rail_cache_warm_completed", railWarmCompleted.Load()).
+		Int64("rail_cache_warm_errors", railWarmErrors.Load()).
 		Msg("Sent stop index requests to queue")
 }
 
