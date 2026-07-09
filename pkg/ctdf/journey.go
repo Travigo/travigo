@@ -202,6 +202,10 @@ func (jpi *JourneyPathItem) GetReferences() {
 	jpi.GetDestinationStop()
 }
 func (jpi *JourneyPathItem) GetOriginStop() {
+	if jpi.OriginStop != nil {
+		return
+	}
+
 	stopsCollection := database.GetCollection("stops")
 	stopsCollection.FindOne(context.Background(), bson.M{
 		"$or": bson.A{
@@ -211,6 +215,10 @@ func (jpi *JourneyPathItem) GetOriginStop() {
 	}).Decode(&jpi.OriginStop)
 }
 func (jpi *JourneyPathItem) GetDestinationStop() {
+	if jpi.DestinationStop != nil {
+		return
+	}
+
 	stopsCollection := database.GetCollection("stops")
 	stopsCollection.FindOne(context.Background(), bson.M{
 		"$or": bson.A{

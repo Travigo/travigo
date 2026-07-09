@@ -2,7 +2,6 @@ package routes
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -36,13 +35,32 @@ type realtimeJourneyMinimised struct {
 	VehicleBearing  float64
 }
 
-// TODO this should be using Sherrif instead of this dodgy json marhsall unmarshall
 func newRealtimeJourneyMinimised(realtimeJourney *ctdf.RealtimeJourney) realtimeJourneyMinimised {
-	realtimeJourneyMinimised := realtimeJourneyMinimised{}
-	bytes, _ := json.Marshal(realtimeJourney)
-	json.Unmarshal(bytes, &realtimeJourneyMinimised)
+	minimised := realtimeJourneyMinimised{}
+	if realtimeJourney == nil {
+		return minimised
+	}
 
-	return realtimeJourneyMinimised
+	minimised.VehicleLocation = realtimeJourney.VehicleLocation
+	minimised.VehicleBearing = realtimeJourney.VehicleBearing
+	if realtimeJourney.Journey == nil {
+		return minimised
+	}
+
+	minimised.Journey.PrimaryIdentifier = realtimeJourney.Journey.PrimaryIdentifier
+	minimised.Journey.DestinationDisplay = realtimeJourney.Journey.DestinationDisplay
+	if realtimeJourney.Journey.Service != nil {
+		minimised.Journey.Service = &struct {
+			ServiceName string
+		}{ServiceName: realtimeJourney.Journey.Service.ServiceName}
+	}
+	if realtimeJourney.Journey.Operator != nil {
+		minimised.Journey.Operator = &struct {
+			PrimaryName string
+		}{PrimaryName: realtimeJourney.Journey.Operator.PrimaryName}
+	}
+
+	return minimised
 }
 
 func listRealtimeJourney(c *fiber.Ctx) error {
@@ -64,18 +82,46 @@ func listRealtimeJourney(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	}
+	populateRealtimeJourneyListReferences(realtimeJourneyResults)
 
 	for _, realtimeJourney := range realtimeJourneyResults {
-		if realtimeJourney.IsActive() {
-			realtimeJourney.Journey.GetService()
-			realtimeJourney.Journey.GetOperator()
-
+		if realtimeJourney.IsActive() && realtimeJourney.Journey != nil {
 			realtimeJourneys = append(realtimeJourneys, newRealtimeJourneyMinimised(realtimeJourney))
 		}
 	}
 
 	c.JSON(realtimeJourneys)
 	return nil
+}
+
+func populateRealtimeJourneyListReferences(realtimeJourneys []*ctdf.RealtimeJourney) {
+	operatorRefs := map[string]struct{}{}
+	serviceRefs := map[string]struct{}{}
+	for _, realtimeJourney := range realtimeJourneys {
+		if realtimeJourney == nil || realtimeJourney.Journey == nil {
+			continue
+		}
+		if realtimeJourney.Journey.Operator == nil && realtimeJourney.Journey.OperatorRef != "" {
+			operatorRefs[realtimeJourney.Journey.OperatorRef] = struct{}{}
+		}
+		if realtimeJourney.Journey.Service == nil && realtimeJourney.Journey.ServiceRef != "" {
+			serviceRefs[realtimeJourney.Journey.ServiceRef] = struct{}{}
+		}
+	}
+
+	operatorsByID := loadOperatorsByReferences(operatorRefs)
+	servicesByID := loadServicesByReferences(serviceRefs)
+	for _, realtimeJourney := range realtimeJourneys {
+		if realtimeJourney == nil || realtimeJourney.Journey == nil {
+			continue
+		}
+		if realtimeJourney.Journey.Operator == nil {
+			realtimeJourney.Journey.Operator = operatorsByID[realtimeJourney.Journey.OperatorRef]
+		}
+		if realtimeJourney.Journey.Service == nil {
+			realtimeJourney.Journey.Service = servicesByID[realtimeJourney.Journey.ServiceRef]
+		}
+	}
 }
 
 func getRealtimeJourney(c *fiber.Ctx) error {

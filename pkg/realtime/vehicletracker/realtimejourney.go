@@ -16,7 +16,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
 
-	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyIdentifier)
+	realtimeJourney, _ := realtimestore.FindForUpdate(context.Background(), realtimeJourneyIdentifier)
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 
 	newRealtimeJourney := false
@@ -276,9 +276,9 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	}
 
 	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
-		_ = realtimestore.UpdateLocation(
+		_ = realtimestore.UpdateLocationForRealtimeJourney(
 			context.Background(),
-			realtimeJourney.PrimaryIdentifier,
+			realtimeJourney,
 			vehicleUpdateEvent.VehicleLocationUpdate.Location,
 			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
 		)

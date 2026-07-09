@@ -98,18 +98,31 @@ func listStops(c *fiber.Ctx) error {
 		stops = append(stops, stop)
 	}
 
-	wg := sync.WaitGroup{}
-	for _, stop := range stops {
-		wg.Add(1)
-		go func(stop *ctdf.Stop) {
-			stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-				Stop: stop,
-			})
-			wg.Done()
-
-			transforms.Transform(stop.Services, 1)
-		}(stop)
+	const maxConcurrentServiceLookups = 8
+	workerCount := maxConcurrentServiceLookups
+	if len(stops) < workerCount {
+		workerCount = len(stops)
 	}
+
+	jobs := make(chan *ctdf.Stop)
+	wg := sync.WaitGroup{}
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for stop := range jobs {
+				services, _ := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+					Stop: stop,
+				})
+				transforms.Transform(services, 1)
+				stop.Services = services
+			}
+		}()
+	}
+	for _, stop := range stops {
+		jobs <- stop
+	}
+	close(jobs)
 	wg.Wait()
 
 	reducedStops, _ := sheriff.Marshal(&sheriff.Options{
@@ -478,8 +491,26 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 	transformedServices := 0
 	reusedOperators := 0
 	reusedServices := 0
-	operatorsByID := map[string]*ctdf.Operator{}
-	servicesByID := map[string]*ctdf.Service{}
+	operatorRefs := map[string]struct{}{}
+	serviceRefs := map[string]struct{}{}
+
+	for _, item := range departureBoard {
+		if item == nil || item.Journey == nil {
+			continue
+		}
+
+		if item.Journey.Operator == nil && item.Journey.OperatorRef != "" {
+			operatorRefs[item.Journey.OperatorRef] = struct{}{}
+		}
+		if item.Journey.Service == nil && item.Journey.ServiceRef != "" {
+			serviceRefs[item.Journey.ServiceRef] = struct{}{}
+		}
+	}
+
+	operatorsByID := loadOperatorsByReferences(operatorRefs)
+	servicesByID := loadServicesByReferences(serviceRefs)
+	transformedOperatorPointers := map[*ctdf.Operator]struct{}{}
+	transformedServicePointers := map[*ctdf.Service]struct{}{}
 
 	for _, item := range departureBoard {
 		if item == nil || item.Journey == nil {
@@ -491,23 +522,15 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 		if operatorKey == "" && item.Journey.Operator != nil {
 			operatorKey = item.Journey.Operator.PrimaryIdentifier
 		}
-		if operatorKey != "" {
-			if operator := operatorsByID[operatorKey]; operator != nil {
-				item.Journey.Operator = operator
+		if item.Journey.Operator == nil && operatorKey != "" {
+			item.Journey.Operator = operatorsByID[operatorKey]
+		}
+		if item.Journey.Operator != nil {
+			if _, alreadyTransformed := transformedOperatorPointers[item.Journey.Operator]; alreadyTransformed {
 				reusedOperators++
 			} else {
-				item.Journey.GetOperator()
-				if item.Journey.Operator != nil {
-					transforms.Transform(item.Journey.Operator, 1)
-					transformedOperators++
-					operatorsByID[operatorKey] = item.Journey.Operator
-					operatorsByID[item.Journey.Operator.PrimaryIdentifier] = item.Journey.Operator
-				}
-			}
-		} else {
-			item.Journey.GetOperator()
-			if item.Journey.Operator != nil {
 				transforms.Transform(item.Journey.Operator, 1)
+				transformedOperatorPointers[item.Journey.Operator] = struct{}{}
 				transformedOperators++
 			}
 		}
@@ -516,29 +539,99 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 		if serviceKey == "" && item.Journey.Service != nil {
 			serviceKey = item.Journey.Service.PrimaryIdentifier
 		}
-		if serviceKey != "" {
-			if service := servicesByID[serviceKey]; service != nil {
-				item.Journey.Service = service
+		if item.Journey.Service == nil && serviceKey != "" {
+			item.Journey.Service = servicesByID[serviceKey]
+		}
+		if item.Journey.Service != nil {
+			if _, alreadyTransformed := transformedServicePointers[item.Journey.Service]; alreadyTransformed {
 				reusedServices++
 			} else {
-				item.Journey.GetService()
-				if item.Journey.Service != nil {
-					transforms.Transform(item.Journey.Service, 1)
-					transformedServices++
-					servicesByID[serviceKey] = item.Journey.Service
-					servicesByID[item.Journey.Service.PrimaryIdentifier] = item.Journey.Service
-				}
-			}
-		} else {
-			item.Journey.GetService()
-			if item.Journey.Service != nil {
 				transforms.Transform(item.Journey.Service, 1)
+				transformedServicePointers[item.Journey.Service] = struct{}{}
 				transformedServices++
 			}
 		}
 	}
 
 	return nilDepartureItems, transformedOperators, transformedServices, reusedOperators, reusedServices
+}
+
+func loadOperatorsByReferences(refs map[string]struct{}) map[string]*ctdf.Operator {
+	identifiers := departureBoardReferenceIdentifiers(refs)
+	operatorsByID := make(map[string]*ctdf.Operator, len(identifiers))
+	if len(identifiers) == 0 {
+		return operatorsByID
+	}
+
+	cursor, err := database.GetCollection("operators").Find(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+		},
+	})
+	if err != nil {
+		log.Error().Err(err).Int("references", len(identifiers)).Msg("Failed to batch load departure board operators")
+		return operatorsByID
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var operator ctdf.Operator
+		if err := cursor.Decode(&operator); err != nil {
+			log.Error().Err(err).Msg("Failed to decode departure board operator")
+			continue
+		}
+
+		operatorsByID[operator.PrimaryIdentifier] = &operator
+		for _, identifier := range operator.OtherIdentifiers {
+			operatorsByID[identifier] = &operator
+		}
+	}
+
+	return operatorsByID
+}
+
+func loadServicesByReferences(refs map[string]struct{}) map[string]*ctdf.Service {
+	identifiers := departureBoardReferenceIdentifiers(refs)
+	servicesByID := make(map[string]*ctdf.Service, len(identifiers))
+	if len(identifiers) == 0 {
+		return servicesByID
+	}
+
+	cursor, err := database.GetCollection("services").Find(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+		},
+	})
+	if err != nil {
+		log.Error().Err(err).Int("references", len(identifiers)).Msg("Failed to batch load departure board services")
+		return servicesByID
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var service ctdf.Service
+		if err := cursor.Decode(&service); err != nil {
+			log.Error().Err(err).Msg("Failed to decode departure board service")
+			continue
+		}
+
+		servicesByID[service.PrimaryIdentifier] = &service
+		for _, identifier := range service.OtherIdentifiers {
+			servicesByID[identifier] = &service
+		}
+	}
+
+	return servicesByID
+}
+
+func departureBoardReferenceIdentifiers(refs map[string]struct{}) []string {
+	identifiers := make([]string, 0, len(refs))
+	for identifier := range refs {
+		identifiers = append(identifiers, identifier)
+	}
+	return identifiers
 }
 
 func searchStops(c *fiber.Ctx) error {

@@ -42,7 +42,18 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		return nil, err
 	}
 
-	serviceOpts := options.FindOne().SetProjection(bson.D{
+	identifiers := make([]string, 0, len(serviceRefs))
+	for _, serviceRef := range serviceRefs {
+		if identifier, ok := serviceRef.(string); ok && identifier != "" {
+			identifiers = append(identifiers, identifier)
+		}
+	}
+	if len(identifiers) == 0 {
+		cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
+		return services, nil
+	}
+
+	serviceOpts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "otheridentifiers", Value: 0},
@@ -50,36 +61,36 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		bson.E{Key: "stopnameoverrides", Value: 0},
 	})
 
-	for _, serviceRef := range serviceRefs {
-		var service *ctdf.Service
-		servicesCollection.FindOne(context.Background(), bson.M{
-			"$or": bson.A{
-				bson.M{"primaryidentifier": serviceRef},
-				bson.M{"otheridentifiers": serviceRef},
-			}}, serviceOpts).Decode(&service)
+	cursor, err := servicesCollection.Find(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+		},
+	}, serviceOpts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
 
-		if service != nil {
-			transforms.Transform(service, 1)
-
-			primaryExists := false
-
-			for _, existingService := range services {
-				if existingService.PrimaryIdentifier == service.PrimaryIdentifier {
-					primaryExists = true
-					break
-				}
-			}
-
-			if !primaryExists {
-				services = append(services, service)
-			}
+	seenServices := make(map[string]struct{}, len(identifiers))
+	for cursor.Next(context.Background()) {
+		var service ctdf.Service
+		if err := cursor.Decode(&service); err != nil {
+			return nil, err
 		}
+		if _, seen := seenServices[service.PrimaryIdentifier]; seen {
+			continue
+		}
+
+		transforms.Transform(&service, 1)
+		services = append(services, &service)
+		seenServices[service.PrimaryIdentifier] = struct{}{}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
 	}
 
-	// Save into cache only if not zero
-	if len(services) > 0 {
-		cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
-	}
+	cachedresults.Set(s.CachedResults, cacheItemPath, services, 24*time.Hour)
 
 	return services, nil
 }

@@ -172,3 +172,55 @@ func TestCleanupStaleLocationIndexKeepsLiveLocations(t *testing.T) {
 		t.Fatalf("expected only live member, got %v", members)
 	}
 }
+
+func TestFindActiveWithinBoundsBatchesDetailsAndLocations(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	journey := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "active",
+		ActivelyTracked:        true,
+		ModificationDateTime:   time.Now(),
+		TimeoutDurationMinutes: 10,
+		Journey:                &ctdf.Journey{PrimaryIdentifier: "journey"},
+	}
+	if err := SaveRealtimeJourney(ctx, journey); err != nil {
+		t.Fatalf("save realtime journey: %v", err)
+	}
+	if err := UpdateLocation(ctx, journey.PrimaryIdentifier, ctdf.Location{
+		Type:        "Point",
+		Coordinates: []float64{-0.1, 51.5},
+	}, 90); err != nil {
+		t.Fatalf("save realtime journey location: %v", err)
+	}
+	if err := redis_client.Client.GeoAdd(ctx, realtimeJourneyLocationGeoIndexKey(), &redis.GeoLocation{
+		Name:      "missing-details",
+		Longitude: -0.1,
+		Latitude:  51.5,
+	}).Err(); err != nil {
+		t.Fatalf("seed stale location index entry: %v", err)
+	}
+
+	journeys, err := findActiveWithinBoundsForIDs(ctx, realtimeJourneyBounds{
+		bottomLeftLon: -0.2,
+		bottomLeftLat: 51.4,
+		topRightLon:   0.0,
+		topRightLat:   51.6,
+	}, []string{journey.PrimaryIdentifier, "missing-details"})
+	if err != nil {
+		t.Fatalf("find active realtime journeys: %v", err)
+	}
+	if len(journeys) != 1 || journeys[0].PrimaryIdentifier != journey.PrimaryIdentifier {
+		t.Fatalf("expected active journey only, got %#v", journeys)
+	}
+	if journeys[0].VehicleBearing != 90 || len(journeys[0].VehicleLocation.Coordinates) != 2 {
+		t.Fatalf("expected location overlay from batched read, got %#v", journeys[0].VehicleLocation)
+	}
+
+	members, err := redis_client.Client.ZRange(ctx, realtimeJourneyLocationGeoIndexKey(), 0, -1).Result()
+	if err != nil {
+		t.Fatalf("read location index: %v", err)
+	}
+	if len(members) != 1 || members[0] != journey.PrimaryIdentifier {
+		t.Fatalf("expected stale member removal, got %v", members)
+	}
+}

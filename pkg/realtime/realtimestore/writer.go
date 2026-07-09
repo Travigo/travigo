@@ -72,18 +72,12 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 
 	timeoutDuration := realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes)
 
-	err = redis_client.Client.Set(
-		ctx,
-		realtimeJourneyDetailsKey(realtimeJourney.PrimaryIdentifier),
-		realtimeJourneyJSON,
-		timeoutDuration,
-	).Err()
-
+	_, err = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, realtimeJourneyDetailsKey(realtimeJourney.PrimaryIdentifier), realtimeJourneyJSON, timeoutDuration)
+		queueRealtimeJourneyMappings(ctx, pipe, realtimeJourney, timeoutDuration)
+		return nil
+	})
 	if err != nil {
-		return err
-	}
-
-	if err := SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
 		return err
 	}
 
@@ -97,20 +91,22 @@ func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.Real
 		return errors.New("realtime journey is required")
 	}
 
-	timeoutDuration := realtimeJourneyTTL(ctx, realtimeJourney.PrimaryIdentifier)
+	timeoutDuration := realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes)
+	_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		queueRealtimeJourneyMappings(ctx, pipe, realtimeJourney, timeoutDuration)
+		return nil
+	})
+	return err
+}
+
+func queueRealtimeJourneyMappings(ctx context.Context, pipe redis.Pipeliner, realtimeJourney *ctdf.RealtimeJourney, timeoutDuration time.Duration) {
 	if realtimeJourney.Journey != nil && realtimeJourney.Journey.PrimaryIdentifier != "" {
-		if err := redis_client.Client.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err(); err != nil {
-			return err
-		}
+		pipe.Set(ctx, realtimeJourneyMappingKey("travigo-journeyid", realtimeJourney.Journey.PrimaryIdentifier), realtimeJourney.PrimaryIdentifier, timeoutDuration)
 	}
 
 	for mappingType, identifier := range realtimeJourney.OtherIdentifiers {
-		if err := redis_client.Client.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration).Err(); err != nil {
-			return err
-		}
+		pipe.Set(ctx, realtimeJourneyMappingKey(mappingType, identifier), realtimeJourney.PrimaryIdentifier, timeoutDuration)
 	}
-
-	return nil
 }
 
 func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
@@ -247,6 +243,18 @@ func UpdateLocationDescription(ctx context.Context, identifier string, descripti
 }
 
 func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64) error {
+	return updateLocation(ctx, identifier, location, bearing, realtimeJourneyTTL(ctx, identifier))
+}
+
+func UpdateLocationForRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney, location ctdf.Location, bearing float64) error {
+	if realtimeJourney == nil {
+		return errors.New("realtime journey is required")
+	}
+
+	return updateLocation(ctx, realtimeJourney.PrimaryIdentifier, location, bearing, realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes))
+}
+
+func updateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64, timeoutDuration time.Duration) error {
 	locationJSON, err := json.Marshal(storedVehicleLocation{
 		Location: location,
 		Bearing:  bearing,
@@ -255,19 +263,21 @@ func UpdateLocation(ctx context.Context, identifier string, location ctdf.Locati
 		return err
 	}
 
-	if err := redis_client.Client.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, realtimeJourneyTTL(ctx, identifier)).Err(); err != nil {
-		return err
-	}
+	_, err = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.Set(ctx, realtimeJourneyLocationKey(identifier), locationJSON, timeoutDuration)
+		if location.Type != "Point" || len(location.Coordinates) < 2 {
+			pipe.ZRem(ctx, realtimeJourneyLocationGeoIndexKey(), identifier)
+			return nil
+		}
 
-	if location.Type != "Point" || len(location.Coordinates) < 2 {
-		return redis_client.Client.ZRem(ctx, realtimeJourneyLocationGeoIndexKey(), identifier).Err()
-	}
-
-	return redis_client.Client.GeoAdd(ctx, realtimeJourneyLocationGeoIndexKey(), &redis.GeoLocation{
-		Name:      identifier,
-		Longitude: location.Coordinates[0],
-		Latitude:  location.Coordinates[1],
-	}).Err()
+		pipe.GeoAdd(ctx, realtimeJourneyLocationGeoIndexKey(), &redis.GeoLocation{
+			Name:      identifier,
+			Longitude: location.Coordinates[0],
+			Latitude:  location.Coordinates[1],
+		})
+		return nil
+	})
+	return err
 }
 
 func realtimeJourneyTTL(ctx context.Context, identifier string) time.Duration {

@@ -221,6 +221,9 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 		{
+			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
+		},
+		{
 			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},
 		},
 		{

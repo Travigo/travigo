@@ -23,6 +23,8 @@ type realtimeJourneyBounds struct {
 	topRightLat   float64
 }
 
+const realtimeJourneyReadBatchSize = 1000
+
 func FindByMapping(ctx context.Context, mappingType string, identifier string) (*ctdf.RealtimeJourney, error) {
 	redisJourneyMapping, err := GetRealtimeJourneyMappingFromRedis(ctx, mappingType, identifier)
 	if err != nil {
@@ -264,22 +266,75 @@ func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.Re
 		return nil, err
 	}
 
+	return findActiveWithinBoundsForIDs(ctx, bounds, realtimeJourneyIDs)
+}
+
+func findActiveWithinBoundsForIDs(ctx context.Context, bounds realtimeJourneyBounds, realtimeJourneyIDs []string) ([]*ctdf.RealtimeJourney, error) {
 	realtimeJourneys := make([]*ctdf.RealtimeJourney, 0, len(realtimeJourneyIDs))
-	for _, realtimeJourneyID := range realtimeJourneyIDs {
-		realtimeJourney, err := FindByIdentifier(ctx, realtimeJourneyID)
-		if err != nil || realtimeJourney == nil {
-			removeRealtimeJourneyFromLocationIndex(ctx, realtimeJourneyID)
-			continue
-		}
-		if !realtimeJourney.IsActive() {
-			removeRealtimeJourneyFromLocationIndex(ctx, realtimeJourneyID)
-			continue
-		}
-		if !bounds.contains(realtimeJourney.VehicleLocation) {
-			continue
+	staleRealtimeJourneyIDs := make([]interface{}, 0)
+	for start := 0; start < len(realtimeJourneyIDs); start += realtimeJourneyReadBatchSize {
+		end := start + realtimeJourneyReadBatchSize
+		if end > len(realtimeJourneyIDs) {
+			end = len(realtimeJourneyIDs)
 		}
 
-		realtimeJourneys = append(realtimeJourneys, realtimeJourney)
+		batchIDs := realtimeJourneyIDs[start:end]
+		detailKeys := make([]string, 0, len(batchIDs))
+		locationKeys := make([]string, 0, len(batchIDs))
+		for _, realtimeJourneyID := range batchIDs {
+			detailKeys = append(detailKeys, realtimeJourneyDetailsKey(realtimeJourneyID))
+			locationKeys = append(locationKeys, realtimeJourneyLocationKey(realtimeJourneyID))
+		}
+
+		var detailCommand, locationCommand *redis.SliceCmd
+		_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+			detailCommand = pipe.MGet(ctx, detailKeys...)
+			locationCommand = pipe.MGet(ctx, locationKeys...)
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		detailValues, err := detailCommand.Result()
+		if err != nil {
+			return nil, err
+		}
+		locationValues, err := locationCommand.Result()
+		if err != nil {
+			return nil, err
+		}
+
+		for index, detailValue := range detailValues {
+			detailsJSON, ok := redisString(detailValue)
+			if !ok || detailsJSON == "" {
+				staleRealtimeJourneyIDs = append(staleRealtimeJourneyIDs, batchIDs[index])
+				continue
+			}
+
+			realtimeJourney, err := decodeStoredRealtimeJourney(ctx, []byte(detailsJSON), false)
+			if err != nil || realtimeJourney == nil || !realtimeJourney.IsActive() {
+				staleRealtimeJourneyIDs = append(staleRealtimeJourneyIDs, batchIDs[index])
+				continue
+			}
+
+			if locationJSON, ok := redisString(locationValues[index]); ok && locationJSON != "" {
+				var vehicleLocation storedVehicleLocation
+				if err := json.Unmarshal([]byte(locationJSON), &vehicleLocation); err == nil {
+					realtimeJourney.VehicleLocation = vehicleLocation.Location
+					realtimeJourney.VehicleBearing = vehicleLocation.Bearing
+				}
+			}
+
+			if !bounds.contains(realtimeJourney.VehicleLocation) {
+				continue
+			}
+
+			realtimeJourneys = append(realtimeJourneys, realtimeJourney)
+		}
+	}
+
+	if len(staleRealtimeJourneyIDs) > 0 {
+		_ = redis_client.Client.ZRem(ctx, realtimeJourneyLocationGeoIndexKey(), staleRealtimeJourneyIDs...).Err()
 	}
 
 	return realtimeJourneys, nil
@@ -556,10 +611,30 @@ func GetRealtimeJourneyMappingFromRedis(ctx context.Context, mappingType string,
 }
 
 func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
-	return findByIdentifier(ctx, identifier, false)
+	realtimeJourney, err := findStoredByIdentifier(ctx, identifier, false)
+	if err != nil {
+		return nil, err
+	}
+
+	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
+	return realtimeJourney, nil
 }
 
-func findByIdentifier(ctx context.Context, identifier string, hydrateJourney bool) (*ctdf.RealtimeJourney, error) {
+// FindForUpdate avoids the rail allocation/loading reads that a vehicle update
+// does not use, while retaining the location overlays that must be preserved by
+// the following full realtime-journey write.
+func FindForUpdate(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+	realtimeJourney, err := findStoredByIdentifier(ctx, identifier, false)
+	if err != nil {
+		return nil, err
+	}
+
+	ApplyLocation(ctx, realtimeJourney)
+	ApplyLocationDescription(ctx, realtimeJourney)
+	return realtimeJourney, nil
+}
+
+func findStoredByIdentifier(ctx context.Context, identifier string, hydrateJourney bool) (*ctdf.RealtimeJourney, error) {
 	realtimeJourneyResult := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if realtimeJourneyResult.Err() != nil {
 		return nil, realtimeJourneyResult.Err()
@@ -569,8 +644,6 @@ func findByIdentifier(ctx context.Context, identifier string, hydrateJourney boo
 	if err != nil {
 		return nil, err
 	}
-
-	ApplyRealtimeJourneyOverlays(ctx, realtimeJourney)
 
 	return realtimeJourney, nil
 }
