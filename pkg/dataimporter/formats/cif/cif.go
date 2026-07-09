@@ -24,6 +24,7 @@ import (
 )
 
 var stopTIPLOCCache = map[string]*ctdf.Stop{}
+var missingStopTIPLOCCache = map[string]struct{}{}
 var daysOfWeek = []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
 var failedStops []string
 
@@ -104,7 +105,11 @@ func (c *CommonInterfaceFormat) ParseFile(reader io.Reader) error {
 
 func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	stopTIPLOCCache = map[string]*ctdf.Stop{}
+	missingStopTIPLOCCache = map[string]struct{}{}
 	failedStops = nil
+	if err := c.preloadTIPLOCStops(context.Background()); err != nil {
+		log.Warn().Err(err).Msg("Failed to preload CIF TIPLOC stops")
+	}
 
 	journeys := map[string]*ctdf.Journey{}
 	journeysTrainUIDOnly := map[string][]*ctdf.Journey{}
@@ -559,6 +564,9 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 	if cacheValue != nil {
 		return cacheValue
 	}
+	if _, missing := missingStopTIPLOCCache[tiploc]; missing {
+		return nil
+	}
 
 	stopCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
@@ -571,8 +579,92 @@ func (c *CommonInterfaceFormat) getStopFromTIPLOC(tiploc string) *ctdf.Stop {
 	}
 
 	stopTIPLOCCache[tiploc] = stop
+	if stop == nil {
+		missingStopTIPLOCCache[tiploc] = struct{}{}
+	}
 
 	return stop
+}
+
+func (c *CommonInterfaceFormat) preloadTIPLOCStops(ctx context.Context) error {
+	tiplocs := c.referencedTIPLOCs()
+	if len(tiplocs) == 0 {
+		return nil
+	}
+
+	identifiers := make([]string, 0, len(tiplocs)*2)
+	for tiploc := range tiplocs {
+		identifiers = append(identifiers, fmt.Sprintf("gb-tiploc-%s", tiploc))
+		if crs := c.TIPLOCToCrsMap[tiploc]; crs != "" {
+			identifiers = append(identifiers, fmt.Sprintf("gb-crs-%s", crs))
+		}
+	}
+
+	cursor, err := database.GetCollection("stops").Find(ctx, bson.M{"otheridentifiers": bson.M{"$in": identifiers}})
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+
+	stopsByIdentifier := map[string]*ctdf.Stop{}
+	for cursor.Next(ctx) {
+		stop := &ctdf.Stop{}
+		if err := cursor.Decode(stop); err != nil {
+			return err
+		}
+		for _, identifier := range stop.OtherIdentifiers {
+			stopsByIdentifier[identifier] = stop
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+
+	for tiploc := range tiplocs {
+		stop := stopsByIdentifier[fmt.Sprintf("gb-tiploc-%s", tiploc)]
+		if stop == nil && c.TIPLOCToCrsMap[tiploc] != "" {
+			stop = stopsByIdentifier[fmt.Sprintf("gb-crs-%s", c.TIPLOCToCrsMap[tiploc])]
+		}
+		if stop == nil {
+			missingStopTIPLOCCache[tiploc] = struct{}{}
+			continue
+		}
+		stopTIPLOCCache[tiploc] = stop
+	}
+
+	return nil
+}
+
+func (c *CommonInterfaceFormat) referencedTIPLOCs() map[string]struct{} {
+	tiplocs := map[string]struct{}{}
+	add := func(tiploc string) {
+		if tiploc != "" {
+			tiplocs[tiploc] = struct{}{}
+		}
+	}
+
+	for _, trainDef := range c.TrainDefinitionSets {
+		if trainDef == nil {
+			continue
+		}
+		add(strings.TrimSpace(trainDef.OriginLocation.Location))
+		for _, location := range trainDef.IntermediateLocations {
+			if location.PublicArrivalTime != "0000" {
+				add(normaliseTIPLOC(location.Location))
+			}
+		}
+		add(normaliseTIPLOC(trainDef.TerminatingLocation.Location))
+	}
+
+	return tiplocs
+}
+
+func normaliseTIPLOC(tiploc string) string {
+	tiploc = strings.TrimSpace(tiploc)
+	if len(tiploc) == 8 && tiploc[7] >= '2' && tiploc[7] <= '9' {
+		return strings.TrimSpace(tiploc[:7])
+	}
+	return tiploc
 }
 
 func convertStopActivity(activity string) []ctdf.JourneyPathItemActivity {
