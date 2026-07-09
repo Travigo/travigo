@@ -35,14 +35,23 @@ func Set(c *Cache, key string, object any, expiration time.Duration) {
 		log.Error().Err(err).Msg("Failed to marshal cached result")
 		return
 	}
-	compressedObject := cacheZstdEncoder.EncodeAll(marshalledObject, nil)
+	var compressed bytes.Buffer
+	gzipWriter := gzip.NewWriter(&compressed)
+	if _, err := gzipWriter.Write(marshalledObject); err != nil {
+		log.Error().Err(err).Msg("Failed to gzip cached result")
+		return
+	}
+	if err := gzipWriter.Close(); err != nil {
+		log.Error().Err(err).Msg("Failed to close cached result gzip writer")
+		return
+	}
 
 	// TODO(low-risk): store []byte to avoid copies. The eko/gocache store
 	// is typed cache.Cache[string], so the value type must be string here; switching to
 	// []byte would require changing the Cache struct's generic type and all call sites
 	// (a wider refactor), so the string(...) copy on Set and the []byte(...) copy on Get
 	// are left as-is.
-	c.Cache.Set(context.Background(), key, string(compressedObject), store.WithExpiration(expiration))
+	c.Cache.Set(context.Background(), key, compressed.String(), store.WithExpiration(expiration))
 }
 
 func Get[T any](c *Cache, key string) (T, error) {
