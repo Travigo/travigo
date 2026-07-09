@@ -13,8 +13,8 @@ type Formation struct {
 }
 
 type FormationCoach struct {
-	Number string `xml:"coachNumber,attr"`
-	Class  string `xml:"coachClass,attr"`
+	Number       string `xml:"coachNumber,attr"`
+	SeatingClass string `xml:"coachClass,attr"`
 
 	Toilets []FormationCoachToilet `xml:"toilet"`
 }

@@ -76,3 +76,39 @@ func TestTransformFiltersByGroup(t *testing.T) {
 		t.Fatalf("expected custom transform group to apply, got %q", stop.PrimaryName)
 	}
 }
+
+func TestTransformMatchesEachRailTrainLengthIndependently(t *testing.T) {
+	originalTransforms := transforms
+	t.Cleanup(func() {
+		transforms = originalTransforms
+	})
+
+	transforms = []TransformDefinition{
+		{
+			Type:  "ctdf.RailTrain",
+			Match: map[string]string{"VehicleType": "class-a", "TrainLength": "2"},
+			Data:  map[string]interface{}{"VehicleTypeName": "Two car"},
+		},
+		{
+			Type:  "ctdf.RailTrain",
+			Match: map[string]string{"VehicleType": "class-b", "TrainLength": "5"},
+			Data:  map[string]interface{}{"VehicleTypeName": "Five car"},
+		},
+	}
+
+	detailed := &ctdf.JourneyDetailedRail{
+		Trains: []ctdf.RailTrain{
+			{VehicleType: "class-a", TrainLength: 2},
+			{VehicleType: "class-b", TrainLength: 5},
+		},
+	}
+
+	Transform(detailed, 1)
+
+	if detailed.Trains[0].VehicleTypeName != "Two car" {
+		t.Fatalf("expected two-car transform on first train, got %q", detailed.Trains[0].VehicleTypeName)
+	}
+	if detailed.Trains[1].VehicleTypeName != "Five car" {
+		t.Fatalf("expected five-car transform on second train, got %q", detailed.Trains[1].VehicleTypeName)
+	}
+}

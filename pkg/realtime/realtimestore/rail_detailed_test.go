@@ -37,111 +37,87 @@ func setupRailDetailedTransforms(t *testing.T) {
 	})
 }
 
-func TestMergeRailDetailedOverlaysLoadingOntoAllocation(t *testing.T) {
+func TestMergeRailDetailedScopesLoadingToTrain(t *testing.T) {
 	merged := mergeRailDetailed(
 		ctdf.JourneyDetailedRail{
-			TrainLength: 2,
-			Carriages: []ctdf.RailCarriage{
-				{ID: "front:A", CarriageID: "vehicle-a", FleetID: "700", Occupancy: -1},
-				{ID: "front:B", CarriageID: "vehicle-b", FleetID: "700", Occupancy: -1},
+			Trains: []ctdf.RailTrain{
+				{
+					ID:          "front",
+					TrainLength: 1,
+					Carriages:   []ctdf.RailCarriage{{ID: "A", VehicleID: "vehicle-a", Occupancy: -1}},
+				},
+				{
+					ID:          "rear",
+					TrainLength: 1,
+					Carriages:   []ctdf.RailCarriage{{ID: "A", VehicleID: "vehicle-b", Occupancy: -1}},
+				},
 			},
 		},
 		ctdf.JourneyDetailedRail{
-			Carriages: []ctdf.RailCarriage{
-				{ID: "front:B", Occupancy: 42},
+			Trains: []ctdf.RailTrain{
+				{ID: "rear", Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: 42}}},
 			},
 		},
 	)
 
-	if merged.TrainLength != 2 {
-		t.Fatalf("expected train length to come from allocation, got %d", merged.TrainLength)
+	if merged.Trains[0].Carriages[0].Occupancy != -1 {
+		t.Fatalf("expected front train occupancy to remain unknown")
 	}
-	if merged.Carriages[0].CarriageID != "vehicle-a" || merged.Carriages[1].CarriageID != "vehicle-b" {
-		t.Fatalf("expected allocation vehicle details to be preserved, got %+v", merged.Carriages)
+	if merged.Trains[1].Carriages[0].Occupancy != 42 {
+		t.Fatalf("expected loading to overlay rear train, got %+v", merged.Trains[1])
 	}
-	if merged.Carriages[0].Occupancy != -1 {
-		t.Fatalf("expected untouched carriage occupancy to remain unknown, got %d", merged.Carriages[0].Occupancy)
-	}
-	if merged.Carriages[1].Occupancy != 42 {
-		t.Fatalf("expected loading occupancy to overlay matching carriage, got %d", merged.Carriages[1].Occupancy)
+	if merged.Trains[1].Carriages[0].VehicleID != "vehicle-b" {
+		t.Fatalf("expected allocation identity to be preserved, got %+v", merged.Trains[1].Carriages[0])
 	}
 }
 
-func TestEnrichRailDetailedAllocationAppliesRailClassTransformsWithoutReplacingLiveCarriages(t *testing.T) {
+func TestEnrichRailDetailedAllocationTransformsMixedUnitsByOwnLength(t *testing.T) {
 	setupRailDetailedTransforms(t)
 
 	enriched := enrichRailDetailedAllocation(ctdf.JourneyDetailedRail{
-		Carriages: []ctdf.RailCarriage{
-			{ID: "700001:vehicle-1", CarriageID: "vehicle-1", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-2", CarriageID: "vehicle-2", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-3", CarriageID: "vehicle-3", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-4", CarriageID: "vehicle-4", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-5", CarriageID: "vehicle-5", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-6", CarriageID: "vehicle-6", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-7", CarriageID: "vehicle-7", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-8", CarriageID: "vehicle-8", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-9", CarriageID: "vehicle-9", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-10", CarriageID: "vehicle-10", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-11", CarriageID: "vehicle-11", FleetID: "700", Occupancy: -1},
-			{ID: "700001:vehicle-12", CarriageID: "vehicle-12", FleetID: "700", Occupancy: -1},
+		Trains: []ctdf.RailTrain{
+			{
+				ID:      "156406",
+				FleetID: "156",
+				Carriages: []ctdf.RailCarriage{
+					{ID: "156406:1", VehicleID: "1", Occupancy: -1},
+					{ID: "156406:2", VehicleID: "2", Occupancy: -1},
+				},
+			},
+			{
+				ID:      "720001",
+				FleetID: "720",
+				Carriages: []ctdf.RailCarriage{
+					{ID: "720001:1", VehicleID: "1", Occupancy: -1},
+					{ID: "720001:2", VehicleID: "2", Occupancy: -1},
+					{ID: "720001:3", VehicleID: "3", Occupancy: -1},
+					{ID: "720001:4", VehicleID: "4", Occupancy: -1},
+					{ID: "720001:5", VehicleID: "5", Occupancy: -1},
+				},
+			},
 		},
 	})
 
-	if enriched.VehicleType != "gb-railclass-700" {
-		t.Fatalf("expected vehicle type to be inferred from allocation, got %s", enriched.VehicleType)
+	if enriched.Trains[0].VehicleType != "gb-railclass-156" || enriched.Trains[0].VehicleTypeName != "Class 156" {
+		t.Fatalf("expected class 156 transform on first train, got %+v", enriched.Trains[0])
 	}
-	if enriched.VehicleTypeName != "Class 700" {
-		t.Fatalf("expected class 700 transform to apply, got %s", enriched.VehicleTypeName)
+	if enriched.Trains[0].TrainLength != 2 || len(enriched.Trains[0].Carriages[0].Toilets) != 1 {
+		t.Fatalf("expected two-car class 156 layout, got %+v", enriched.Trains[0])
 	}
-	if enriched.PowerType != "Electric" {
-		t.Fatalf("expected class 700 power type to apply, got %s", enriched.PowerType)
+	if enriched.Trains[0].Carriages[0].SeatingClass != ctdf.JourneyDetailedRailSeatingStandard {
+		t.Fatalf("expected transformed carriage seating class to be standard, got %+v", enriched.Trains[0].Carriages[0])
 	}
-	if enriched.SpeedKMH != 160 {
-		t.Fatalf("expected class 700 speed to apply, got %d", enriched.SpeedKMH)
-	}
-	if len(enriched.Carriages) != 12 {
-		t.Fatalf("expected live allocation carriage list to be preserved, got %d", len(enriched.Carriages))
-	}
-	if enriched.Carriages[1].ID != "700001:vehicle-2" || enriched.Carriages[1].CarriageID != "vehicle-2" {
-		t.Fatalf("expected live carriage identity to be preserved, got %+v", enriched.Carriages[1])
-	}
-	if len(enriched.Carriages[1].Toilets) != 1 || enriched.Carriages[1].Toilets[0].Type != "Standard" {
-		t.Fatalf("expected standard toilet on carriage 2, got %+v", enriched.Carriages[1].Toilets)
-	}
-	if len(enriched.Carriages[6].Toilets) != 1 || enriched.Carriages[6].Toilets[0].Type != "Accessible" {
-		t.Fatalf("expected accessible toilet on carriage 7, got %+v", enriched.Carriages[6].Toilets)
-	}
-	if len(enriched.Carriages[10].Toilets) != 1 || enriched.Carriages[10].Toilets[0].Type != "Standard" {
-		t.Fatalf("expected standard toilet on carriage 11, got %+v", enriched.Carriages[10].Toilets)
-	}
-}
 
-func TestEnrichRailDetailedAllocationAppliesLengthSpecificCarriageAmenities(t *testing.T) {
-	setupRailDetailedTransforms(t)
-
-	enriched := enrichRailDetailedAllocation(ctdf.JourneyDetailedRail{
-		Carriages: []ctdf.RailCarriage{
-			{ID: "720001:vehicle-1", CarriageID: "vehicle-1", FleetID: "720", Occupancy: -1},
-			{ID: "720001:vehicle-2", CarriageID: "vehicle-2", FleetID: "720", Occupancy: -1},
-			{ID: "720001:vehicle-3", CarriageID: "vehicle-3", FleetID: "720", Occupancy: -1},
-			{ID: "720001:vehicle-4", CarriageID: "vehicle-4", FleetID: "720", Occupancy: -1},
-			{ID: "720001:vehicle-5", CarriageID: "vehicle-5", FleetID: "720", Occupancy: -1},
-		},
-	})
-
-	if enriched.VehicleTypeName != "Class 720" {
-		t.Fatalf("expected class 720 transform to apply, got %s", enriched.VehicleTypeName)
+	if enriched.Trains[1].VehicleType != "gb-railclass-720" || enriched.Trains[1].VehicleTypeName != "Class 720" {
+		t.Fatalf("expected class 720 transform on second train, got %+v", enriched.Trains[1])
 	}
-	if !enriched.AirConditioning || !enriched.WiFi || !enriched.Toilets || !enriched.PowerPlugs {
-		t.Fatalf("expected class 720 amenities to apply, got %+v", enriched)
+	if enriched.Trains[1].TrainLength != 5 || len(enriched.Trains[1].Carriages[4].Toilets) != 1 {
+		t.Fatalf("expected five-car class 720 layout, got %+v", enriched.Trains[1])
 	}
-	if enriched.Carriages[1].ID != "720001:vehicle-2" || enriched.Carriages[1].Class != "Standard" {
-		t.Fatalf("expected live carriage identity and transform class on carriage 2, got %+v", enriched.Carriages[1])
+	if enriched.Trains[1].Carriages[4].SeatingClass != ctdf.JourneyDetailedRailSeatingStandard {
+		t.Fatalf("expected transformed carriage seating class to be standard, got %+v", enriched.Trains[1].Carriages[4])
 	}
-	if len(enriched.Carriages[1].Toilets) != 1 || enriched.Carriages[1].Toilets[0].Type != "Standard" {
-		t.Fatalf("expected standard toilet on carriage 2, got %+v", enriched.Carriages[1].Toilets)
-	}
-	if len(enriched.Carriages[4].Toilets) != 1 || enriched.Carriages[4].Toilets[0].Type != "Accessible" {
-		t.Fatalf("expected accessible toilet on carriage 5, got %+v", enriched.Carriages[4].Toilets)
+	if enriched.Trains[1].Carriages[4].ID != "720001:5" || enriched.Trains[1].Carriages[4].VehicleID != "5" {
+		t.Fatalf("expected live carriage identity to be preserved, got %+v", enriched.Trains[1].Carriages[4])
 	}
 }

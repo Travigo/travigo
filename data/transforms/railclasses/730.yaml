@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-730"
 Data:
@@ -10,7 +10,7 @@ Data:
   DisabledAccess: true
   BicycleSpaces: true
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-730"
   TrainLength: 3
@@ -18,16 +18,16 @@ Data:
   SpeedKMH: 145
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-730"
   TrainLength: 5
@@ -35,17 +35,17 @@ Data:
   SpeedKMH: 177
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "4"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "5"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1

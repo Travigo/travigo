@@ -114,12 +114,14 @@ func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.Real
 }
 
 func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
-	if len(detailedRailInformation.Carriages) == 0 {
+	if railDetailedCarriageCount(detailedRailInformation) == 0 {
 		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey("allocation", identifier)).Err()
 	}
 
-	for carriageIndex := range detailedRailInformation.Carriages {
-		detailedRailInformation.Carriages[carriageIndex].Occupancy = -1
+	for trainIndex := range detailedRailInformation.Trains {
+		for carriageIndex := range detailedRailInformation.Trains[trainIndex].Carriages {
+			detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].Occupancy = -1
+		}
 	}
 
 	detailedRailInformationJSON, err := json.Marshal(detailedRailInformation)
@@ -132,18 +134,30 @@ func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detail
 
 func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedRailInformation ctdf.JourneyDetailedRail) error {
 	loadingInformation := ctdf.JourneyDetailedRail{}
-	for _, carriage := range detailedRailInformation.Carriages {
-		if carriage.Occupancy < 0 {
-			continue
+	for _, train := range detailedRailInformation.Trains {
+		loadingTrain := ctdf.RailTrain{
+			ID:       train.ID,
+			Position: train.Position,
 		}
 
-		loadingInformation.Carriages = append(loadingInformation.Carriages, ctdf.RailCarriage{
-			ID:        carriage.ID,
-			Occupancy: carriage.Occupancy,
-		})
+		for _, carriage := range train.Carriages {
+			if carriage.Occupancy < 0 {
+				continue
+			}
+
+			loadingTrain.Carriages = append(loadingTrain.Carriages, ctdf.RailCarriage{
+				ID:        carriage.ID,
+				VehicleID: carriage.VehicleID,
+				Occupancy: carriage.Occupancy,
+			})
+		}
+
+		if len(loadingTrain.Carriages) > 0 {
+			loadingInformation.Trains = append(loadingInformation.Trains, loadingTrain)
+		}
 	}
 
-	if len(loadingInformation.Carriages) == 0 {
+	if len(loadingInformation.Trains) == 0 {
 		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey("loading", identifier)).Err()
 	}
 
@@ -158,6 +172,14 @@ func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedR
 		loadingInformationJSON,
 		realtimeJourneyTTL(ctx, identifier),
 	).Err()
+}
+
+func railDetailedCarriageCount(detailedRailInformation ctdf.JourneyDetailedRail) int {
+	count := 0
+	for _, train := range detailedRailInformation.Trains {
+		count += len(train.Carriages)
+	}
+	return count
 }
 
 func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {

@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-139"
 Data:
@@ -14,12 +14,12 @@ Data:
   DisabledAccess: true
   BicycleSpaces: false
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-139"
   TrainLength: 1
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1

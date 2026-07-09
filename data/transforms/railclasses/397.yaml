@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-397"
 Data:
@@ -14,28 +14,28 @@ Data:
   DisabledAccess: true
   BicycleSpaces: true
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-397"
   TrainLength: 5
 Data:
   Carriages:
   - ID: "1"
-    Class: "First"
+    SeatingClass: "First"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "4"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "5"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1

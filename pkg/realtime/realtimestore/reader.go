@@ -382,10 +382,18 @@ func getRailDetailedPart(ctx context.Context, detailType string, identifier stri
 }
 
 func enrichRailDetailedAllocation(allocation ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
-	allocation = inferRailDetailedAllocationFields(allocation)
-	originalCarriages := append([]ctdf.RailCarriage(nil), allocation.Carriages...)
-	enriched := allocation
-	transforms.Transform(&enriched, 1)
+	for trainIndex := range allocation.Trains {
+		allocation.Trains[trainIndex] = enrichRailTrainAllocation(allocation.Trains[trainIndex])
+	}
+
+	return allocation
+}
+
+func enrichRailTrainAllocation(train ctdf.RailTrain) ctdf.RailTrain {
+	train = inferRailTrainAllocationFields(train)
+	originalCarriages := append([]ctdf.RailCarriage(nil), train.Carriages...)
+	enriched := train
+	transforms.Transform(&enriched, 0)
 
 	if len(originalCarriages) == 0 || len(enriched.Carriages) == 0 {
 		return enriched
@@ -408,29 +416,31 @@ func enrichRailDetailedAllocation(allocation ctdf.JourneyDetailedRail) ctdf.Jour
 	return enriched
 }
 
-func inferRailDetailedAllocationFields(allocation ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
-	if allocation.TrainLength == 0 {
-		allocation.TrainLength = len(allocation.Carriages)
+func inferRailTrainAllocationFields(train ctdf.RailTrain) ctdf.RailTrain {
+	if train.TrainLength == 0 {
+		train.TrainLength = len(train.Carriages)
 	}
-	if allocation.VehicleType != "" {
-		return allocation
+	if train.VehicleType != "" {
+		return train
 	}
 
-	for _, carriage := range allocation.Carriages {
-		vehicleType := railClassVehicleType(carriage.FleetID)
-		if vehicleType == "" {
-			vehicleType = railClassVehicleType(carriage.CarriageType)
-		}
+	train.VehicleType = railClassVehicleType(train.FleetID)
+	if train.VehicleType != "" {
+		return train
+	}
+
+	for _, carriage := range train.Carriages {
+		vehicleType := railClassVehicleType(carriage.CarriageType)
 		if vehicleType == "" {
 			vehicleType = railClassVehicleType(carriage.SpecificType)
 		}
 		if vehicleType != "" {
-			allocation.VehicleType = vehicleType
-			return allocation
+			train.VehicleType = vehicleType
+			return train
 		}
 	}
 
-	return allocation
+	return train
 }
 
 func railClassVehicleType(value string) string {
@@ -457,8 +467,8 @@ func railClassVehicleType(value string) string {
 }
 
 func applyRailCarriageEnrichment(carriage *ctdf.RailCarriage, enrichment ctdf.RailCarriage) {
-	if carriage.Class == "" {
-		carriage.Class = enrichment.Class
+	if carriage.SeatingClass == "" {
+		carriage.SeatingClass = enrichment.SeatingClass
 	}
 	if len(carriage.Toilets) == 0 {
 		carriage.Toilets = enrichment.Toilets
@@ -468,21 +478,71 @@ func applyRailCarriageEnrichment(carriage *ctdf.RailCarriage, enrichment ctdf.Ra
 func mergeRailDetailed(allocation ctdf.JourneyDetailedRail, loading ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
 	merged := allocation
 
-	carriageIndexes := map[string]int{}
-	for carriageIndex, carriage := range merged.Carriages {
-		carriageIndexes[carriage.ID] = carriageIndex
-	}
-
-	for _, loadingCarriage := range loading.Carriages {
-		if carriageIndex, ok := carriageIndexes[loadingCarriage.ID]; ok {
-			merged.Carriages[carriageIndex].Occupancy = loadingCarriage.Occupancy
+	for _, loadingTrain := range loading.Trains {
+		trainIndex := matchingRailTrainIndex(merged.Trains, loadingTrain)
+		if trainIndex >= 0 {
+			mergeRailTrainLoading(&merged.Trains[trainIndex], loadingTrain)
 			continue
 		}
 
-		merged.Carriages = append(merged.Carriages, loadingCarriage)
+		merged.Trains = append(merged.Trains, loadingTrain)
 	}
 
 	return merged
+}
+
+func matchingRailTrainIndex(trains []ctdf.RailTrain, loadingTrain ctdf.RailTrain) int {
+	if loadingTrain.ID != "" {
+		for trainIndex := range trains {
+			if trains[trainIndex].ID == loadingTrain.ID {
+				return trainIndex
+			}
+		}
+		if len(trains) == 1 && trains[0].ID == "" {
+			return 0
+		}
+		return -1
+	}
+
+	if loadingTrain.Position > 0 {
+		for trainIndex := range trains {
+			if trains[trainIndex].Position == loadingTrain.Position {
+				return trainIndex
+			}
+		}
+	}
+
+	if len(trains) == 1 {
+		return 0
+	}
+
+	return -1
+}
+
+func mergeRailTrainLoading(train *ctdf.RailTrain, loading ctdf.RailTrain) {
+	carriageIndexes := map[string]int{}
+	vehicleIndexes := map[string]int{}
+	for carriageIndex, carriage := range train.Carriages {
+		if carriage.ID != "" {
+			carriageIndexes[carriage.ID] = carriageIndex
+		}
+		if carriage.VehicleID != "" {
+			vehicleIndexes[carriage.VehicleID] = carriageIndex
+		}
+	}
+
+	for _, loadingCarriage := range loading.Carriages {
+		carriageIndex, found := carriageIndexes[loadingCarriage.ID]
+		if !found && loadingCarriage.VehicleID != "" {
+			carriageIndex, found = vehicleIndexes[loadingCarriage.VehicleID]
+		}
+		if found {
+			train.Carriages[carriageIndex].Occupancy = loadingCarriage.Occupancy
+			continue
+		}
+
+		train.Carriages = append(train.Carriages, loadingCarriage)
+	}
 }
 
 // Temporary name it FromRedis to avoid confusion with the mongo version of this function

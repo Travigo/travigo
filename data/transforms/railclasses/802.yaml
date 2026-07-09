@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-802"
 Data:
@@ -14,80 +14,80 @@ Data:
   DisabledAccess: true
   BicycleSpaces: true
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-802"
   TrainLength: 5
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "4"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "5"
-    Class: "First"
+    SeatingClass: "First"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-802"
   TrainLength: 9
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
     - Type: "Standard"
   - ID: "4"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "5"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "6"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "7"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "8"
-    Class: "First"
+    SeatingClass: "First"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
   - ID: "9"
-    Class: "First"
+    SeatingClass: "First"
     Occupancy: -1
     Toilets:
     - Type: "Accessible"

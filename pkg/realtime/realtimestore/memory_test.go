@@ -64,7 +64,7 @@ func TestRailAllocationRemainsAvailableForDay(t *testing.T) {
 	server := setupMemoryTestRedis(t)
 	ctx := context.Background()
 	detailed := ctdf.JourneyDetailedRail{
-		Carriages: []ctdf.RailCarriage{{ID: "A"}},
+		Trains: []ctdf.RailTrain{{ID: "unit-1", Carriages: []ctdf.RailCarriage{{ID: "A"}}}},
 	}
 
 	if err := UpdateRailDetailedAllocation(ctx, "rail-journey", detailed); err != nil {
@@ -89,7 +89,7 @@ func TestRailLoadingUsesRealtimeJourneyExpiration(t *testing.T) {
 	}
 
 	detailed := ctdf.JourneyDetailedRail{
-		Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: 42}},
+		Trains: []ctdf.RailTrain{{ID: "unit-1", Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: 42}}}},
 	}
 	if err := UpdateRailDetailedLoading(ctx, journey.PrimaryIdentifier, detailed); err != nil {
 		t.Fatalf("update rail loading: %v", err)
@@ -99,6 +99,40 @@ func TestRailLoadingUsesRealtimeJourneyExpiration(t *testing.T) {
 	key := realtimeJourneyRailDetailedKey("loading", journey.PrimaryIdentifier)
 	if ttl := server.TTL(key); ttl != expected {
 		t.Fatalf("expected TTL %s, got %s", expected, ttl)
+	}
+}
+
+func TestRailDetailedRedisRoundTripKeepsLoadingScopedToTrain(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	allocation := ctdf.JourneyDetailedRail{
+		Trains: []ctdf.RailTrain{
+			{ID: "front", Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: -1}}},
+			{ID: "rear", Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: -1}}},
+		},
+	}
+	loading := ctdf.JourneyDetailedRail{
+		Trains: []ctdf.RailTrain{
+			{ID: "rear", Carriages: []ctdf.RailCarriage{{ID: "A", Occupancy: 64}}},
+		},
+	}
+
+	if err := UpdateRailDetailedAllocation(ctx, "coupled-service", allocation); err != nil {
+		t.Fatalf("update rail allocation: %v", err)
+	}
+	if err := UpdateRailDetailedLoading(ctx, "coupled-service", loading); err != nil {
+		t.Fatalf("update rail loading: %v", err)
+	}
+
+	detailed, err := GetRailDetailed(ctx, "coupled-service")
+	if err != nil {
+		t.Fatalf("get rail detailed: %v", err)
+	}
+	if detailed.Trains[0].Carriages[0].Occupancy != -1 {
+		t.Fatalf("expected front coach A to remain unknown")
+	}
+	if detailed.Trains[1].Carriages[0].Occupancy != 64 {
+		t.Fatalf("expected rear coach A loading to survive Redis round trip")
 	}
 }
 

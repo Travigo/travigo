@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-141_144"
 Data:
@@ -14,35 +14,35 @@ Data:
   DisabledAccess: false
   BicycleSpaces: false
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-141_144"
   TrainLength: 2
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-141_144"
   TrainLength: 3
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
     Toilets:
     - Type: "Standard"

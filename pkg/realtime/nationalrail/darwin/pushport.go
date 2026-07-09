@@ -455,7 +455,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).
 				Msg("Updated formation")
 
-			realtimeJourney.DetailedRailInformation.Carriages = buildDarwinRailCarriages(scheduleFormation)
+			realtimeJourney.DetailedRailInformation.Trains = buildDarwinRailTrains(scheduleFormation)
 
 			realtimestore.UpdateRailDetailedAllocation(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation)
 		}
@@ -483,15 +483,22 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			totalOccupancy := 0
 			totalCapacity := 0
 
-			for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
-				totalCapacity += 100
-				totalOccupancy += carriage.Occupancy
+			for _, train := range realtimeJourney.DetailedRailInformation.Trains {
+				for _, carriage := range train.Carriages {
+					if carriage.Occupancy < 0 {
+						continue
+					}
+					totalCapacity += 100
+					totalOccupancy += carriage.Occupancy
+				}
 			}
 
-			realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
-				OccupancyAvailable:       true,
-				ActualValues:             false,
-				TotalPercentageOccupancy: int((float64(totalOccupancy) / float64(totalCapacity)) * 100),
+			if totalCapacity > 0 {
+				realtimeJourney.Occupancy = ctdf.RealtimeJourneyOccupancy{
+					OccupancyAvailable:       true,
+					ActualValues:             false,
+					TotalPercentageOccupancy: int((float64(totalOccupancy) / float64(totalCapacity)) * 100),
+				}
 			}
 
 			realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)

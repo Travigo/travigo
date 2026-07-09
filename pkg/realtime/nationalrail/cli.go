@@ -12,6 +12,7 @@ import (
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/darwin"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/linxconsist"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/nrod"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
 	"github.com/urfave/cli/v2"
@@ -40,6 +41,7 @@ func RegisterCLI() *cli.Command {
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}
+					migrateLegacyRailDetailedAllocations(c.Context)
 
 					log.Info().Msg("Starting National Rail Darwin Push Port train tracker")
 
@@ -76,6 +78,7 @@ func RegisterCLI() *cli.Command {
 					if err := redis_client.Connect(); err != nil {
 						return err
 					}
+					migrateLegacyRailDetailedAllocations(c.Context)
 
 					brokers := env["TRAVIGO_LINX_CONSIST_KAFKA_BROKERS"]
 					if brokers == "" {
@@ -156,4 +159,19 @@ func RegisterCLI() *cli.Command {
 			},
 		},
 	}
+}
+
+func migrateLegacyRailDetailedAllocations(ctx context.Context) {
+	stats, err := realtimestore.MigrateLegacyRailDetailedAllocations(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("Legacy rail allocation migration scan failed")
+		return
+	}
+
+	log.Info().
+		Int("scanned", stats.Scanned).
+		Int("migrated", stats.Migrated).
+		Int("skipped", stats.Skipped).
+		Int("failed", stats.Failed).
+		Msg("Legacy rail allocation migration complete")
 }

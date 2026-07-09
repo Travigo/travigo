@@ -74,7 +74,7 @@ func GetRealtimeJourneys() RealtimeJourneyStats {
 						features["OccupancyActualValues"] += 1
 					}
 				}
-				if len(realtimeJourney.DetailedRailInformation.Carriages) > 0 {
+				if railDetailedCarriageCount(realtimeJourney.DetailedRailInformation) > 0 {
 					features["DetailedRailInformationCarriages"] += 1
 				}
 			} else {

@@ -41,13 +41,13 @@ func ParseTrainIdentifier(message PassengerTrainConsistMessage) LinxTrainIdentif
 	return identifier
 }
 
-func BuildRailCarriages(message PassengerTrainConsistMessage) []ctdf.RailCarriage {
+func BuildRailTrains(message PassengerTrainConsistMessage) []ctdf.RailTrain {
 	allocations := append([]Allocation(nil), message.Allocations...)
 	sort.SliceStable(allocations, func(i, j int) bool {
 		return allocations[i].ResourceGroupPosition < allocations[j].ResourceGroupPosition
 	})
 
-	carriages := []ctdf.RailCarriage{}
+	trains := make([]ctdf.RailTrain, 0, len(allocations))
 	for _, allocation := range allocations {
 		vehicles := append([]Vehicle(nil), allocation.ResourceGroup.Vehicles...)
 		sort.SliceStable(vehicles, func(i, j int) bool {
@@ -60,18 +60,28 @@ func BuildRailCarriages(message PassengerTrainConsistMessage) []ctdf.RailCarriag
 			}
 		}
 
+		train := ctdf.RailTrain{
+			ID:                  allocation.ResourceGroup.ResourceGroupID,
+			Position:            allocation.ResourceGroupPosition,
+			AllocationSequence:  allocation.AllocationSequenceNumber,
+			ValidFrom:           allocation.AllocationOriginDateTime,
+			ValidUntil:          allocation.AllocationDestinationDateTime,
+			Reversed:            strings.EqualFold(allocation.Reversed, "Y"),
+			FleetID:             allocation.ResourceGroup.FleetID,
+			ResourceGroupType:   allocation.ResourceGroup.TypeOfResource,
+			ResourceGroupStatus: allocation.ResourceGroup.ResourceGroupStatus,
+			TrainLength:         len(vehicles),
+			Carriages:           make([]ctdf.RailCarriage, 0, len(vehicles)),
+		}
+
 		for position, vehicle := range vehicles {
-			carriages = append(carriages, ctdf.RailCarriage{
-				ID:           fmt.Sprintf("%s:%s", allocation.ResourceGroup.ResourceGroupID, vehicle.VehicleID),
-				CarriageType: carriageType(allocation.ResourceGroup, vehicle),
-				CarriageID:   vehicle.VehicleID,
-				VehicleID:    allocation.ResourceGroup.ResourceGroupID,
-				// ResourceGroupType:      allocation.ResourceGroup.TypeOfResource,
-				// ResourceGroupStatus:    allocation.ResourceGroup.ResourceGroupStatus,
-				// ResourceGroupPosition:  allocation.ResourceGroupPosition,
+			train.Carriages = append(train.Carriages, ctdf.RailCarriage{
+				ID:              fmt.Sprintf("%s:%s", allocation.ResourceGroup.ResourceGroupID, vehicle.VehicleID),
+				CarriageType:    carriageType(vehicle),
+				CarriageID:      vehicle.VehicleID,
+				VehicleID:       vehicle.VehicleID,
 				VehiclePosition: position + 1,
 				// PlannedResourceGroup:   vehicle.PlannedResourceGroup,
-				FleetID:      allocation.ResourceGroup.FleetID,
 				SpecificType: vehicle.SpecificType,
 				Livery:       vehicle.Livery,
 				// Decor:                  vehicle.Decor,
@@ -85,15 +95,14 @@ func BuildRailCarriages(message PassengerTrainConsistMessage) []ctdf.RailCarriag
 				Occupancy: -1,
 			})
 		}
+
+		trains = append(trains, train)
 	}
 
-	return carriages
+	return trains
 }
 
-func carriageType(resourceGroup ResourceGroup, vehicle Vehicle) string {
-	if resourceGroup.FleetID != "" {
-		return resourceGroup.FleetID
-	}
+func carriageType(vehicle Vehicle) string {
 	if vehicle.SpecificType != "" {
 		return vehicle.SpecificType
 	}

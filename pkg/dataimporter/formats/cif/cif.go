@@ -395,11 +395,13 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 
 	////// Detailed rail information //////
 	detailedRailInformation := ctdf.JourneyDetailedRail{
-		AirConditioning: strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "R"),
-
 		ReservationRequired:     strings.Contains(trainDef.BasicSchedule.Reservations, "A"),
 		ReservationBikeRequired: strings.Contains(trainDef.BasicSchedule.Reservations, "E"),
 		ReservationRecommended:  strings.Contains(trainDef.BasicSchedule.Reservations, "R"),
+	}
+	railTrain := ctdf.RailTrain{
+		Position:        1,
+		AirConditioning: strings.Contains(trainDef.BasicSchedule.OperatingCharacteristics, "R"),
 	}
 
 	// Seating type
@@ -464,14 +466,14 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 
 	// Speed
 	speedMPH, _ := strconv.Atoi(trainDef.BasicSchedule.Speed)
-	detailedRailInformation.SpeedKMH = int(float64(speedMPH) * 1.60934)
+	railTrain.SpeedKMH = int(float64(speedMPH) * 1.60934)
 
 	// Train class
 	trimmedTimingLoad := strings.TrimSpace(trainDef.BasicSchedule.TimingLoad)
 	trimmedPowerType := strings.TrimSpace(trainDef.BasicSchedule.PowerType)
 	trainClass := "unknown"
 	if trainDef.BasicSchedule.PowerType == "DMU" || trainDef.BasicSchedule.PowerType == "DEM" || trainDef.BasicSchedule.PowerType == "D  " {
-		detailedRailInformation.PowerType = "Diesel"
+		railTrain.PowerType = "Diesel"
 
 		switch trimmedTimingLoad {
 		case "69":
@@ -496,7 +498,7 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 			trainClass = trimmedTimingLoad
 		}
 	} else if trainDef.BasicSchedule.PowerType == "EMU" || trainDef.BasicSchedule.PowerType == "E  " {
-		detailedRailInformation.PowerType = "Electric"
+		railTrain.PowerType = "Electric"
 
 		switch trimmedTimingLoad {
 		case "AT":
@@ -514,16 +516,17 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		}
 	} else if trainDef.BasicSchedule.PowerType == "HST" {
 		trainClass = "HST"
-		detailedRailInformation.PowerType = "Diesel"
+		railTrain.PowerType = "Diesel"
 	}
 
-	detailedRailInformation.VehicleType = fmt.Sprintf("gb-railclass-%s", trainClass)
+	railTrain.VehicleType = fmt.Sprintf("gb-railclass-%s", trainClass)
 
 	// Rail replacement bus
 	if trainDef.BasicSchedule.TrainCategory == "BR" {
 		detailedRailInformation.ReplacementBus = true
-		detailedRailInformation.VehicleType = "gb-railclass-REPLACEMENTBUS"
+		railTrain.VehicleType = "gb-railclass-REPLACEMENTBUS"
 	}
+	detailedRailInformation.Trains = []ctdf.RailTrain{railTrain}
 
 	// Put it all together
 	journey := &ctdf.Journey{

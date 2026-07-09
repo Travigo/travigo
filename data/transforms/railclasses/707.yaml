@@ -1,5 +1,5 @@
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-707"
 Data:
@@ -11,24 +11,24 @@ Data:
   PowerPlugs: true
   DisabledAccess: true
 ---
-Type: ctdf.JourneyDetailedRail
+Type: ctdf.RailTrain
 Match:
   VehicleType: "gb-railclass-707"
   TrainLength: 5
 Data:
   Carriages:
   - ID: "1"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "2"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "3"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "4"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1
   - ID: "5"
-    Class: "Standard"
+    SeatingClass: "Standard"
     Occupancy: -1

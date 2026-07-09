@@ -26,11 +26,14 @@ func TestParseTrainIdentifierFromCore(t *testing.T) {
 	}
 }
 
-func TestBuildRailCarriagesPreservesFormationDetails(t *testing.T) {
-	carriages := BuildRailCarriages(PassengerTrainConsistMessage{
+func TestBuildRailTrainsPreservesUnitBoundariesAndFormationDetails(t *testing.T) {
+	trains := BuildRailTrains(PassengerTrainConsistMessage{
 		Allocations: []Allocation{
 			{
-				ResourceGroupPosition: 2,
+				AllocationSequenceNumber:      2,
+				AllocationOriginDateTime:      "2026-07-09T12:00:00",
+				AllocationDestinationDateTime: "2026-07-09T13:00:00",
+				ResourceGroupPosition:         2,
 				ResourceGroup: ResourceGroup{
 					ResourceGroupID: "150234",
 					FleetID:         "150/2",
@@ -68,22 +71,39 @@ func TestBuildRailCarriagesPreservesFormationDetails(t *testing.T) {
 		},
 	})
 
-	if len(carriages) != 3 {
-		t.Fatalf("expected 3 carriages, got %d", len(carriages))
+	if len(trains) != 2 {
+		t.Fatalf("expected 2 trains, got %d", len(trains))
 	}
-	if carriages[0].ID != "156406:52406" {
-		t.Fatalf("expected reversed leading carriage 156406:52406, got %s", carriages[0].ID)
+	if trains[0].ID != "156406" || trains[0].FleetID != "156" || trains[0].Position != 1 {
+		t.Fatalf("expected first resource group to remain a separate train, got %+v", trains[0])
 	}
-	if carriages[0].CarriageID != "52406" || carriages[0].VehicleID != "156406" {
-		t.Fatalf("expected vehicle and resource group ids to be preserved, got %+v", carriages[0])
+	if trains[1].ID != "150234" || trains[1].TrainLength != 1 {
+		t.Fatalf("expected second resource group to remain a separate train, got %+v", trains[1])
 	}
-	if carriages[0].FleetID != "156" || carriages[0].SpecificType != "DMSL" || carriages[0].Livery != "AT" {
-		t.Fatalf("expected vehicle presentation fields to be preserved, got %+v", carriages[0])
+	if trains[1].AllocationSequence != 2 || trains[1].ValidFrom != "2026-07-09T12:00:00" || trains[1].ValidUntil != "2026-07-09T13:00:00" {
+		t.Fatalf("expected allocation journey portion to be preserved, got %+v", trains[1])
 	}
-	if carriages[0].Occupancy != -1 {
-		t.Fatalf("expected occupancy to be unknown, got %d", carriages[0].Occupancy)
+	if !trains[0].Reversed {
+		t.Fatalf("expected reversed allocation state to be preserved")
 	}
-	if carriages[2].LengthMM != 20000 {
-		t.Fatalf("expected metres to be converted to mm, got %d", carriages[2].LengthMM)
+
+	firstCarriage := trains[0].Carriages[0]
+	if firstCarriage.ID != "156406:52406" {
+		t.Fatalf("expected reversed leading carriage 156406:52406, got %s", firstCarriage.ID)
+	}
+	if firstCarriage.CarriageID != "52406" || firstCarriage.VehicleID != "52406" {
+		t.Fatalf("expected carriage vehicle id to be preserved, got %+v", firstCarriage)
+	}
+	if firstCarriage.CarriageType != "DMSL" || firstCarriage.SpecificType != "DMSL" || firstCarriage.Livery != "AT" {
+		t.Fatalf("expected vehicle presentation fields to be preserved, got %+v", firstCarriage)
+	}
+	if firstCarriage.SeatingClass != "" {
+		t.Fatalf("expected LINX vehicle type not to be treated as seating class, got %+v", firstCarriage)
+	}
+	if firstCarriage.Occupancy != -1 {
+		t.Fatalf("expected occupancy to be unknown, got %d", firstCarriage.Occupancy)
+	}
+	if trains[1].Carriages[0].LengthMM != 20000 {
+		t.Fatalf("expected metres to be converted to mm, got %d", trains[1].Carriages[0].LengthMM)
 	}
 }

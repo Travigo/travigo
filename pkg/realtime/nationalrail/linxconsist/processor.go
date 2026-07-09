@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kr/pretty"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
@@ -80,22 +79,7 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 	} else if err := realtimestore.SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
 		return err
 	}
-	realtimeJourney.DetailedRailInformation.Carriages = BuildRailCarriages(message)
-	realtimeJourney.DetailedRailInformation.TrainLength = len(realtimeJourney.DetailedRailInformation.Carriages)
-
-	// Extract Vehicle IDs from the carriages and store them in the DetailedRailInformation
-	mappedVehicleIDs := make(map[string]struct{})
-	for _, carriage := range realtimeJourney.DetailedRailInformation.Carriages {
-		mappedVehicleIDs[carriage.VehicleID] = struct{}{}
-	}
-
-	vehicleIDs := make([]string, 0, len(mappedVehicleIDs))
-	for vehicleID := range mappedVehicleIDs {
-		vehicleIDs = append(vehicleIDs, vehicleID)
-	}
-
-	realtimeJourney.DetailedRailInformation.VehicleIDs = vehicleIDs
-	pretty.Println(vehicleIDs)
+	realtimeJourney.DetailedRailInformation.Trains = BuildRailTrains(message)
 
 	if err := realtimestore.UpdateRailDetailedAllocation(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.DetailedRailInformation); err != nil {
 		return err
@@ -105,10 +89,19 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 		Str("realtimejourney", realtimeJourney.PrimaryIdentifier).
 		Str("trainuid", identifier.TrainUID).
 		Str("core", identifier.Core).
-		Int("carriages", len(realtimeJourney.DetailedRailInformation.Carriages)).
+		Int("trains", len(realtimeJourney.DetailedRailInformation.Trains)).
+		Int("carriages", railCarriageCount(realtimeJourney.DetailedRailInformation.Trains)).
 		Msg("Updated LINX passenger train consist")
 
 	return nil
+}
+
+func railCarriageCount(trains []ctdf.RailTrain) int {
+	count := 0
+	for _, train := range trains {
+		count += len(train.Carriages)
+	}
+	return count
 }
 
 func createRealtimeJourney(ctx context.Context, realtimeJourneyID string, identifier LinxTrainIdentifier, datasource *ctdf.DataSourceReference, now time.Time) (*ctdf.RealtimeJourney, error) {
