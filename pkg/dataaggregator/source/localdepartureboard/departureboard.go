@@ -48,7 +48,7 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 
 	currentTime := time.Now()
 
-	baseCacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/v2/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
+	baseCacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/%s", q.Stop.PrimaryIdentifier, filterHashString)
 	journeyQuery := bson.M{"path.originstopref": bson.M{"$in": allStopIDs}}
 	if q.Filter != nil {
 		journeyQuery = bson.M{
