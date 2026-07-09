@@ -118,6 +118,10 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 			stopNameOverrides[fmt.Sprintf(ctdf.GBStopIDFormat, stopPoint.AtcoCode)] = stopPoint.CommonName
 		}
 	}
+	existingServicesByID, err := preloadTransXChangeServices(context.Background(), servicesCollection, doc, operatorLocalMapping)
+	if err != nil {
+		return err
+	}
 
 	// There should be so few services (probably just 1) services defined per document that there is no point of batch processing them
 	for _, txcService := range doc.Services {
@@ -226,16 +230,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 			// Check if we want to add this service to the list of MongoDB operations
 			bsonRep, _ := bson.Marshal(ctdfService)
 
-			// TODO(high-risk, NOT APPLIED): this issues one MongoDB FindOne round-trip per
-			// service+line record (network latency dominates for large documents). To fix,
-			// prefetch existing services for this document in a single query before the loop
-			// (e.g. find all services_raw whose primaryidentifier is in the set of identifiers
-			// this document will produce) into a map[primaryidentifier]*ctdf.Service, then look
-			// up locally here. Left as-is because it is an architectural change to the DB access
-			// pattern and the existing insert-vs-replace decision logic below must be preserved
-			// exactly (including the ModificationDateTime/Year()==0/DataSource.Timestamp checks).
-			var existingCtdfService *ctdf.Service
-			servicesCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfService.PrimaryIdentifier}).Decode(&existingCtdfService)
+			existingCtdfService := existingServicesByID[ctdfService.PrimaryIdentifier]
 
 			if existingCtdfService == nil {
 				insertModel := mongo.NewInsertOneModel()
@@ -302,6 +297,10 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				doc.VehicleJourneys = append(doc.VehicleJourneys, &copiedJourney)
 			}
 		}
+	}
+	existingJourneysByID, err := preloadTransXChangeJourneys(context.Background(), journeysCollection, doc.VehicleJourneys, servicesReferences, operatorLocalMapping)
+	if err != nil {
+		return err
 	}
 
 	var journeyOperationInsert uint64
@@ -684,16 +683,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 				bsonRep, _ := bson.Marshal(ctdfJourney)
 
-				// TODO(high-risk): one MongoDB FindOne round-trip per journey record,
-				// run concurrently across batch goroutines but still one query per journey. To fix,
-				// prefetch the existing journeys for this document in a single query (all journeys
-				// whose primaryidentifier is in the set this document produces) into a shared
-				// map[primaryidentifier]*ctdf.Journey before launching the batch goroutines, then do
-				// local map lookups here. Left as-is because it is an architectural change to the DB
-				// access pattern and the insert-vs-replace decision logic below (the
-				// ModificationDateTime/Year()==0/DataSource.Timestamp checks) must be preserved exactly.
-				var existingCtdfJourney *ctdf.Journey
-				journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier}).Decode(&existingCtdfJourney)
+				existingCtdfJourney := existingJourneysByID[ctdfJourney.PrimaryIdentifier]
 
 				if existingCtdfJourney == nil {
 					insertModel := mongo.NewInsertOneModel()
@@ -734,4 +724,89 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	log.Info().Msgf("Successfully imported into MongoDB")
 
 	return nil
+}
+
+func preloadTransXChangeServices(ctx context.Context, collection *mongo.Collection, doc *TransXChange, operatorLocalMapping map[string]string) (map[string]*ctdf.Service, error) {
+	identifiers := []string{}
+	for _, service := range doc.Services {
+		operatorRef := transXChangeOperatorRef(operatorLocalMapping, service.RegisteredOperatorRef)
+		for _, line := range service.Lines {
+			identifiers = append(identifiers, fmt.Sprintf("%s:%s:%s", operatorRef, service.ServiceCode, line.ID))
+		}
+	}
+
+	return loadExistingTransXChangeRecords[ctdf.Service](ctx, collection, identifiers)
+}
+
+func preloadTransXChangeJourneys(ctx context.Context, collection *mongo.Collection, vehicleJourneys []*VehicleJourney, services map[string]*Service, operatorLocalMapping map[string]string) (map[string]*ctdf.Journey, error) {
+	identifiers := []string{}
+	for _, vehicleJourney := range vehicleJourneys {
+		serviceRef := fmt.Sprintf("%s:%s", vehicleJourney.ServiceRef, vehicleJourney.LineRef)
+		service := services[serviceRef]
+		if service == nil {
+			continue
+		}
+
+		operatorReference := vehicleJourney.OperatorRef
+		if operatorReference == "" {
+			operatorReference = service.RegisteredOperatorRef
+		}
+		operatorRef := transXChangeOperatorRef(operatorLocalMapping, operatorReference)
+		identifiers = append(identifiers, fmt.Sprintf("%s:%s:%s:%s:%s", operatorRef, serviceRef, vehicleJourney.VehicleJourneyCode, vehicleJourney.JourneyPatternRef, vehicleJourney.Operational.TicketMachine.JourneyCode))
+	}
+
+	return loadExistingTransXChangeRecords[ctdf.Journey](ctx, collection, identifiers)
+}
+
+func transXChangeOperatorRef(operatorLocalMapping map[string]string, operatorReference string) string {
+	operatorRef := operatorLocalMapping[operatorReference]
+	if operatorRef != "" {
+		return operatorRef
+	}
+	if len(operatorLocalMapping) == 1 {
+		for _, mappedOperatorRef := range operatorLocalMapping {
+			return mappedOperatorRef
+		}
+	}
+	return "TRAVIGO:INTERNAL:NOREF"
+}
+
+func loadExistingTransXChangeRecords[T ctdf.Service | ctdf.Journey](ctx context.Context, collection *mongo.Collection, identifiers []string) (map[string]*T, error) {
+	uniqueIdentifiers := map[string]struct{}{}
+	for _, identifier := range identifiers {
+		if identifier != "" {
+			uniqueIdentifiers[identifier] = struct{}{}
+		}
+	}
+	if len(uniqueIdentifiers) == 0 {
+		return map[string]*T{}, nil
+	}
+
+	queryIdentifiers := make([]string, 0, len(uniqueIdentifiers))
+	for identifier := range uniqueIdentifiers {
+		queryIdentifiers = append(queryIdentifiers, identifier)
+	}
+	cursor, err := collection.Find(ctx, bson.M{"primaryidentifier": bson.M{"$in": queryIdentifiers}})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	recordsByID := make(map[string]*T, len(queryIdentifiers))
+	for cursor.Next(ctx) {
+		record := new(T)
+		if err := cursor.Decode(record); err != nil {
+			return nil, err
+		}
+
+		var identifier string
+		switch value := any(record).(type) {
+		case *ctdf.Service:
+			identifier = value.PrimaryIdentifier
+		case *ctdf.Journey:
+			identifier = value.PrimaryIdentifier
+		}
+		recordsByID[identifier] = record
+	}
+	return recordsByID, cursor.Err()
 }
