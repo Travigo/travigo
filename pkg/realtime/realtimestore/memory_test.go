@@ -224,3 +224,60 @@ func TestFindActiveWithinBoundsBatchesDetailsAndLocations(t *testing.T) {
 		t.Fatalf("expected stale member removal, got %v", members)
 	}
 }
+
+func TestTFLDepartureBoardIndexReplacesStopsAndBatchesReads(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	now := time.Now().Round(time.Second)
+	journey := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "tfl-journey",
+		ModificationDateTime:   now,
+		TimeoutDurationMinutes: 10,
+		Journey:                &ctdf.Journey{PrimaryIdentifier: "journey"},
+		Stops: map[string]*ctdf.RealtimeJourneyStops{
+			"stop-a": {
+				StopRef:       "stop-a",
+				TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+				ArrivalTime:   now.Add(5 * time.Minute),
+				DepartureTime: now.Add(5 * time.Minute),
+			},
+		},
+	}
+	if err := SaveRealtimeJourney(ctx, journey); err != nil {
+		t.Fatalf("save realtime journey: %v", err)
+	}
+	if err := IndexTFLDepartureBoardJourney(ctx, journey); err != nil {
+		t.Fatalf("index TFL departure board journey: %v", err)
+	}
+
+	journey.Stops = map[string]*ctdf.RealtimeJourneyStops{
+		"stop-b": {
+			StopRef:       "stop-b",
+			TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+			ArrivalTime:   now.Add(10 * time.Minute),
+			DepartureTime: now.Add(10 * time.Minute),
+		},
+	}
+	if err := SaveRealtimeJourney(ctx, journey); err != nil {
+		t.Fatalf("resave realtime journey: %v", err)
+	}
+	if err := IndexTFLDepartureBoardJourney(ctx, journey); err != nil {
+		t.Fatalf("reindex TFL departure board journey: %v", err)
+	}
+
+	oldStopIDs, err := redis_client.Client.ZRange(ctx, tflDepartureBoardStopKey("stop-a"), 0, -1).Result()
+	if err != nil {
+		t.Fatalf("read old stop index: %v", err)
+	}
+	if len(oldStopIDs) != 0 {
+		t.Fatalf("expected old stop index to be empty, got %v", oldStopIDs)
+	}
+
+	departures, err := FindTFLDepartureBoardJourneys(ctx, []string{"stop-b"}, now)
+	if err != nil {
+		t.Fatalf("find TFL departure board journeys: %v", err)
+	}
+	if len(departures) != 1 || departures[0].PrimaryIdentifier != journey.PrimaryIdentifier {
+		t.Fatalf("expected indexed TFL journey, got %#v", departures)
+	}
+}

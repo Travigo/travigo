@@ -188,54 +188,48 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 	if err != nil {
 		return err
 	}
-	for _, stopID := range previousStopIDs {
-		if err := redis_client.Client.ZRem(ctx, tflDepartureBoardStopKey(stopID), realtimeJourney.PrimaryIdentifier).Err(); err != nil {
-			return err
-		}
-	}
-	if len(previousStopIDs) > 0 {
-		if err := redis_client.Client.Del(ctx, indexedStopsKey).Err(); err != nil {
-			return err
-		}
-	}
-
 	cleanupBefore := strconv.FormatInt(time.Now().Add(-30*time.Second).Unix(), 10)
 	currentStopIDs := make([]interface{}, 0, len(realtimeJourney.Stops))
+	type indexedStop struct {
+		identifier string
+		arrival    time.Time
+	}
+	indexedStops := make([]indexedStop, 0, len(realtimeJourney.Stops))
 
 	for stopID, stop := range realtimeJourney.Stops {
 		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || stop.ArrivalTime.IsZero() {
 			continue
 		}
 
-		key := tflDepartureBoardStopKey(stopID)
-		if err := redis_client.Client.ZRemRangeByScore(ctx, key, "-inf", cleanupBefore).Err(); err != nil {
-			return err
-		}
-
-		if err := redis_client.Client.ZAdd(ctx, key, redis.Z{
-			Score:  float64(stop.ArrivalTime.Unix()),
-			Member: realtimeJourney.PrimaryIdentifier,
-		}).Err(); err != nil {
-			return err
-		}
-
-		if err := redis_client.Client.Expire(ctx, key, time.Hour).Err(); err != nil {
-			return err
-		}
-
+		indexedStops = append(indexedStops, indexedStop{identifier: stopID, arrival: stop.ArrivalTime})
 		currentStopIDs = append(currentStopIDs, stopID)
 	}
 
-	if len(currentStopIDs) > 0 {
-		if err := redis_client.Client.SAdd(ctx, indexedStopsKey, currentStopIDs...).Err(); err != nil {
-			return err
+	_, err = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, stopID := range previousStopIDs {
+			pipe.ZRem(ctx, tflDepartureBoardStopKey(stopID), realtimeJourney.PrimaryIdentifier)
 		}
-		if err := redis_client.Client.Expire(ctx, indexedStopsKey, time.Hour).Err(); err != nil {
-			return err
+		if len(previousStopIDs) > 0 {
+			pipe.Del(ctx, indexedStopsKey)
 		}
-	}
 
-	return nil
+		for _, stop := range indexedStops {
+			key := tflDepartureBoardStopKey(stop.identifier)
+			pipe.ZRemRangeByScore(ctx, key, "-inf", cleanupBefore)
+			pipe.ZAdd(ctx, key, redis.Z{
+				Score:  float64(stop.arrival.Unix()),
+				Member: realtimeJourney.PrimaryIdentifier,
+			})
+			pipe.Expire(ctx, key, time.Hour)
+		}
+
+		if len(currentStopIDs) > 0 {
+			pipe.SAdd(ctx, indexedStopsKey, currentStopIDs...)
+			pipe.Expire(ctx, indexedStopsKey, time.Hour)
+		}
+		return nil
+	})
+	return err
 }
 
 func UpdateLocationDescription(ctx context.Context, identifier string, description string) error {

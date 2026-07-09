@@ -212,16 +212,24 @@ func FindTFLDepartureBoardJourneys(ctx context.Context, stopIDs []string, from t
 	seenRealtimeJourneyIDs := map[string]struct{}{}
 	var realtimeJourneyIDs []string
 
-	for _, stopID := range stopIDs {
-		key := tflDepartureBoardStopKey(stopID)
-		if err := redis_client.Client.ZRemRangeByScore(ctx, key, "-inf", minScore).Err(); err != nil {
-			return nil, err
+	rangeCommands := make([]*redis.StringSliceCmd, 0, len(stopIDs))
+	_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for _, stopID := range stopIDs {
+			key := tflDepartureBoardStopKey(stopID)
+			pipe.ZRemRangeByScore(ctx, key, "-inf", minScore)
+			rangeCommands = append(rangeCommands, pipe.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+				Min: minScore,
+				Max: "+inf",
+			}))
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
 
-		ids, err := redis_client.Client.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-			Min: minScore,
-			Max: "+inf",
-		}).Result()
+	for _, rangeCommand := range rangeCommands {
+		ids, err := rangeCommand.Result()
 		if err != nil {
 			return nil, err
 		}
@@ -236,17 +244,46 @@ func FindTFLDepartureBoardJourneys(ctx context.Context, stopIDs []string, from t
 		}
 	}
 
-	realtimeJourneys := make([]ctdf.RealtimeJourney, 0, len(realtimeJourneyIDs))
-	for _, realtimeJourneyID := range realtimeJourneyIDs {
-		realtimeJourney, err := FindByIdentifier(ctx, realtimeJourneyID)
-		if err != nil {
-			continue
+	return findStoredRealtimeJourneys(ctx, realtimeJourneyIDs)
+}
+
+func findStoredRealtimeJourneys(ctx context.Context, identifiers []string) ([]ctdf.RealtimeJourney, error) {
+	journeysByID := make(map[string]*ctdf.RealtimeJourney, len(identifiers))
+	for start := 0; start < len(identifiers); start += realtimeJourneyReadBatchSize {
+		end := start + realtimeJourneyReadBatchSize
+		if end > len(identifiers) {
+			end = len(identifiers)
 		}
 
-		realtimeJourneys = append(realtimeJourneys, *realtimeJourney)
+		keys := make([]string, 0, end-start)
+		for _, identifier := range identifiers[start:end] {
+			keys = append(keys, realtimeJourneyDetailsKey(identifier))
+		}
+		values, err := redis_client.Client.MGet(ctx, keys...).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		for index, value := range values {
+			data, ok := redisString(value)
+			if !ok || data == "" {
+				continue
+			}
+
+			journey, err := decodeStoredRealtimeJourney(ctx, []byte(data), false)
+			if err == nil && journey != nil {
+				journeysByID[identifiers[start+index]] = journey
+			}
+		}
 	}
 
-	return realtimeJourneys, nil
+	journeys := make([]ctdf.RealtimeJourney, 0, len(journeysByID))
+	for _, identifier := range identifiers {
+		if journey := journeysByID[identifier]; journey != nil {
+			journeys = append(journeys, *journey)
+		}
+	}
+	return journeys, nil
 }
 
 func FindActiveWithinBounds(ctx context.Context, boundsQuery bson.M) ([]*ctdf.RealtimeJourney, error) {
