@@ -242,18 +242,15 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			realtimeJourney.OtherIdentifiers["nationalrailrid"] = schedule.RID
 		}
 
-		// Calculate the new stops
-		scheduleStops := []ScheduleStop{
-			schedule.Origin,
-		}
-		scheduleStops = append(scheduleStops, schedule.Intermediate...)
-		scheduleStops = append(scheduleStops, schedule.Destination)
-
 		cancelCount := 0
 		resolvedScheduleStopCount := 0
 		scheduleCancellations := map[string]bool{}
 
-		for scheduleStopIndex, scheduleStop := range scheduleStops {
+		for scheduleStopIndex, scheduleStop := range schedule.Locations {
+			if !scheduleStop.isPassengerCall() {
+				continue
+			}
+
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", scheduleStop.Tiploc))
 
 			if stop == nil {
@@ -268,6 +265,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Str("uid", schedule.UID).
 				Str("ssd", schedule.SSD).
 				Int("schedule_stop_index", scheduleStopIndex).
+				Str("schedule_stop_type", scheduleStop.Type).
 				Str("tiploc", scheduleStop.Tiploc).
 				Str("stop_ref", stop.PrimaryIdentifier).
 				Str("stop_name", stop.PrimaryName).
