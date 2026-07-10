@@ -2,6 +2,7 @@ package gtfs
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -37,6 +38,38 @@ type Schedule struct {
 	// for O(1) lookups instead of a linear scan of every translation per record.
 	translationIndex map[string]string
 }
+
+type journeyTrackStore struct {
+	dataset    datasets.DataSet
+	datasource *ctdf.DataSourceReference
+	refs       map[string]string
+	queue      DatabaseBatchProcessingQueue
+}
+
+func newJourneyTrackStore(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) *journeyTrackStore {
+	store := &journeyTrackStore{dataset: dataset, datasource: datasource, refs: map[string]string{}, queue: NewDatabaseBatchProcessingQueue("journey_tracks", time.Second, time.Minute, 3000)}
+	store.queue.Process()
+	return store
+}
+
+func (store *journeyTrackStore) Reference(track []ctdf.Location) string {
+	if len(track) < 2 {
+		return ""
+	}
+	encoded, _ := bson.Marshal(track)
+	hash := fmt.Sprintf("%x", sha256.Sum256(encoded))
+	if ref := store.refs[hash]; ref != "" {
+		return ref
+	}
+	ref := fmt.Sprintf("%s-journey-track-%s", store.dataset.Identifier, hash)
+	store.refs[hash] = ref
+	object := &ctdf.JourneyTrack{PrimaryIdentifier: ref, Track: track, DataSource: store.datasource, CreationDateTime: time.Now(), ModificationDateTime: time.Now()}
+	update := mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": ref}).SetUpdate(bson.M{"$set": object}).SetUpsert(true)
+	store.queue.Add(update)
+	return ref
+}
+
+func (store *journeyTrackStore) Wait() { store.queue.Wait() }
 
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	gtfs.fileMap = map[string]string{}
@@ -298,6 +331,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	if err != nil {
 		return err
 	}
+	trackStore := newJourneyTrackStore(dataset, datasource)
+	shapeTrackRefs := make(map[string]string, len(shapeTracks))
+	for shapeID, track := range shapeTracks {
+		shapeTrackRefs[shapeID] = trackStore.Reference(track)
+	}
 
 	//// Transfers ////
 	if _, exists := g.fileMap["transfers.txt"]; exists {
@@ -458,6 +496,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			// Shape tracks are immutable, so journeys sharing a shape can reuse the
 			// same slice until they have been serialised by the batch queue.
 			journey.Track = shapeTracks[t.ShapeID]
+			journey.TrackRef = shapeTrackRefs[t.ShapeID]
 		}
 
 		return journey
@@ -590,6 +629,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			// the same geometry again at journey level. If splitting fails, the
 			// complete journey track is intentionally retained as the fallback.
 			journey.Track = nil
+			journey.TrackRef = ""
+			for _, path := range journey.Path {
+				path.TrackRef = trackStore.Reference(path.Track)
+				path.Track = nil
+			}
 		}
 
 		// TODO fix transforms here
@@ -626,6 +670,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Wait()
 	}
+	trackStore.Wait()
 
 	log.Info().Msg("Finished Journeys")
 

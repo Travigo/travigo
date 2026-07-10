@@ -40,6 +40,7 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	if err := hydrateDestinationStops(journey); err != nil {
 		log.Warn().Err(err).Str("journey", journeyID).Msg("Failed to hydrate journey destination stops")
 	}
+	journey.GetTracks()
 
 	journey.GetService()
 

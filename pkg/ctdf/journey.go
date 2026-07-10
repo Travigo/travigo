@@ -41,6 +41,7 @@ type Journey struct {
 	DepartureTimezone    string    `groups:"basic,departureboard-cache" bson:",omitempty"`
 
 	Track     []Location         `groups:"detailed" bson:",omitempty"`
+	TrackRef  string             `groups:"internal" bson:",omitempty"`
 	Frequency []JourneyFrequency `groups:"detailed" bson:",omitempty"`
 
 	DestinationDisplay  string   `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
@@ -90,6 +91,7 @@ func (j *Journey) GetDeepReferences() {
 			wg.Done()
 		}(path)
 	}
+	j.GetTracks()
 
 	wg.Wait()
 }
@@ -197,7 +199,8 @@ type JourneyPathItem struct {
 	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 	DestinationActivity []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 
-	Track []Location `groups:"basic"`
+	Track    []Location `groups:"basic"`
+	TrackRef string     `groups:"internal" bson:",omitempty"`
 
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
 }

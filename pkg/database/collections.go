@@ -213,10 +213,16 @@ func createOperatorsIndexes() {
 }
 
 func createJourneysIndexes() {
+	journeyTracksCollection := GetCollection("journey_tracks")
+	_, err := journeyTracksCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating journey track indexes")
+	}
+
 	// Services
 	servicesCollection := GetCollection("services")
 	serviceNameOperatorRefIndexName := "ServiceNameOperatorRef"
-	_, err := servicesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+	_, err = servicesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{
 			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},

@@ -242,6 +242,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		}
 		if dataset.SupportedObjects.Journeys {
 			cleanupOldRecords("journeys", datasource)
+			cleanupOldRecords("journey_tracks", datasource)
 		}
 	}
 
