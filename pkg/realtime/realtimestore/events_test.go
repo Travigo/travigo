@@ -67,6 +67,40 @@ func TestRealtimeJourneyEventsDetectsCreatedJourney(t *testing.T) {
 	}
 }
 
+func TestRealtimeJourneyEventsDetectsOverlayCreated(t *testing.T) {
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	current := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "realtime-test",
+		SuppressFromDepartures: true,
+		ReplacedByJourneyRef:   "overlay-journey",
+	}
+
+	events := realtimeJourneyEvents(nil, current, true, now)
+	if len(events) != 2 {
+		t.Fatalf("expected created and overlay events, got %d", len(events))
+	}
+	if events[1].Type != ctdf.EventTypeRealtimeJourneyOverlayCreated {
+		t.Fatalf("expected overlay-created event, got %s", events[1].Type)
+	}
+}
+
+func TestRealtimeJourneyEventsDoesNotRepeatExistingOverlay(t *testing.T) {
+	previous := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "realtime-test",
+		SuppressFromDepartures: true,
+		ReplacedByJourneyRef:   "overlay-journey",
+	}
+	current := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "realtime-test",
+		SuppressFromDepartures: true,
+		ReplacedByJourneyRef:   "overlay-journey",
+	}
+
+	if events := realtimeJourneyEvents(previous, current, true, time.Now()); len(events) != 0 {
+		t.Fatalf("expected no repeated overlay-created event, got %#v", events)
+	}
+}
+
 func TestRealtimeJourneyEventsIgnoresUnknownPreviousState(t *testing.T) {
 	current := &ctdf.RealtimeJourney{
 		PrimaryIdentifier: "realtime-test",

@@ -12,39 +12,43 @@ import (
 )
 
 type storedRealtimeJourney struct {
-	PrimaryIdentifier      string                              `json:"id"`
-	OtherIdentifiers       map[string]string                   `json:"oi,omitempty"`
-	ActivelyTracked        bool                                `json:"at"`
-	Journey                *storedJourney                      `json:"j,omitempty"`
-	Service                *storedService                      `json:"s,omitempty"`
-	JourneyRunDate         time.Time                           `json:"jrd,omitempty"`
-	CreationDateTime       time.Time                           `json:"cdt,omitempty"`
-	ModificationDateTime   time.Time                           `json:"mdt"`
-	TimeoutDurationMinutes int                                 `json:"to,omitempty"`
-	DataSource             *ctdf.DataSourceReference           `json:"ds,omitempty"`
-	VehicleLocation        *ctdf.Location                      `json:"vl,omitempty"`
-	VehicleLocationDesc    string                              `json:"vld,omitempty"`
-	VehicleBearing         float64                             `json:"vb,omitempty"`
-	DepartedStopRef        string                              `json:"dep,omitempty"`
-	NextStopRef            string                              `json:"next,omitempty"`
-	Stops                  map[string]*storedRealtimeStop      `json:"st,omitempty"`
-	Offset                 time.Duration                       `json:"off,omitempty"`
-	Reliability            ctdf.RealtimeJourneyReliabilityType `json:"rel,omitempty"`
-	VehicleRef             string                              `json:"veh,omitempty"`
-	Cancelled              bool                                `json:"can,omitempty"`
-	Occupancy              *ctdf.RealtimeJourneyOccupancy      `json:"occ,omitempty"`
-	DetailedRail           *ctdf.JourneyDetailedRail           `json:"rail,omitempty"`
+	PrimaryIdentifier          string                              `json:"id"`
+	OtherIdentifiers           map[string]string                   `json:"oi,omitempty"`
+	ActivelyTracked            bool                                `json:"at"`
+	Journey                    *storedJourney                      `json:"j,omitempty"`
+	Service                    *storedService                      `json:"s,omitempty"`
+	JourneyRunDate             time.Time                           `json:"jrd,omitempty"`
+	CreationDateTime           time.Time                           `json:"cdt,omitempty"`
+	ModificationDateTime       time.Time                           `json:"mdt"`
+	TimeoutDurationMinutes     int                                 `json:"to,omitempty"`
+	DataSource                 *ctdf.DataSourceReference           `json:"ds,omitempty"`
+	VehicleLocation            *ctdf.Location                      `json:"vl,omitempty"`
+	VehicleLocationDesc        string                              `json:"vld,omitempty"`
+	VehicleBearing             float64                             `json:"vb,omitempty"`
+	DepartedStopRef            string                              `json:"dep,omitempty"`
+	NextStopRef                string                              `json:"next,omitempty"`
+	Stops                      map[string]*storedRealtimeStop      `json:"st,omitempty"`
+	Offset                     time.Duration                       `json:"off,omitempty"`
+	Reliability                ctdf.RealtimeJourneyReliabilityType `json:"rel,omitempty"`
+	VehicleRef                 string                              `json:"veh,omitempty"`
+	Cancelled                  bool                                `json:"can,omitempty"`
+	SuppressFromDepartures     bool                                `json:"sfd,omitempty"`
+	SuppressFromDepartureDates []string                            `json:"sfdd,omitempty"`
+	ReplacedByJourneyRef       string                              `json:"rbr,omitempty"`
+	Occupancy                  *ctdf.RealtimeJourneyOccupancy      `json:"occ,omitempty"`
+	DetailedRail               *ctdf.JourneyDetailedRail           `json:"rail,omitempty"`
 }
 
 type storedJourney struct {
-	PrimaryIdentifier  string                  `json:"id"`
-	ServiceRef         string                  `json:"sr,omitempty"`
-	Service            *storedService          `json:"s,omitempty"`
-	OperatorRef        string                  `json:"or,omitempty"`
-	Operator           *storedOperator         `json:"op,omitempty"`
-	DepartureTimezone  string                  `json:"tz,omitempty"`
-	DestinationDisplay string                  `json:"dest,omitempty"`
-	Path               []storedJourneyPathItem `json:"p,omitempty"`
+	PrimaryIdentifier   string                  `json:"id"`
+	ServiceRef          string                  `json:"sr,omitempty"`
+	Service             *storedService          `json:"s,omitempty"`
+	OperatorRef         string                  `json:"or,omitempty"`
+	Operator            *storedOperator         `json:"op,omitempty"`
+	DepartureTimezone   string                  `json:"tz,omitempty"`
+	DestinationDisplay  string                  `json:"dest,omitempty"`
+	ReplacesJourneyRefs []string                `json:"rep,omitempty"`
+	Path                []storedJourneyPathItem `json:"p,omitempty"`
 }
 
 // storedJourneyPathItem retains route information without embedding full stop
@@ -95,25 +99,28 @@ func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *store
 	}
 
 	stored := &storedRealtimeJourney{
-		PrimaryIdentifier:      realtimeJourney.PrimaryIdentifier,
-		OtherIdentifiers:       realtimeJourney.OtherIdentifiers,
-		ActivelyTracked:        realtimeJourney.ActivelyTracked,
-		Journey:                storedJourneyFromCTDF(realtimeJourney.Journey, realtimeJourney.PrimaryIdentifier),
-		Service:                storedServiceFromCTDF(realtimeJourney.Service),
-		JourneyRunDate:         realtimeJourney.JourneyRunDate,
-		CreationDateTime:       realtimeJourney.CreationDateTime,
-		ModificationDateTime:   realtimeJourney.ModificationDateTime,
-		TimeoutDurationMinutes: realtimeJourney.TimeoutDurationMinutes,
-		DataSource:             realtimeJourney.DataSource,
-		VehicleLocationDesc:    realtimeJourney.VehicleLocationDescription,
-		VehicleBearing:         realtimeJourney.VehicleBearing,
-		DepartedStopRef:        realtimeJourney.DepartedStopRef,
-		NextStopRef:            realtimeJourney.NextStopRef,
-		Stops:                  storedRealtimeStopsFromCTDF(realtimeJourney.Stops),
-		Offset:                 realtimeJourney.Offset,
-		Reliability:            realtimeJourney.Reliability,
-		VehicleRef:             realtimeJourney.VehicleRef,
-		Cancelled:              realtimeJourney.Cancelled,
+		PrimaryIdentifier:          realtimeJourney.PrimaryIdentifier,
+		OtherIdentifiers:           realtimeJourney.OtherIdentifiers,
+		ActivelyTracked:            realtimeJourney.ActivelyTracked,
+		Journey:                    storedJourneyFromCTDF(realtimeJourney.Journey, realtimeJourney.PrimaryIdentifier),
+		Service:                    storedServiceFromCTDF(realtimeJourney.Service),
+		JourneyRunDate:             realtimeJourney.JourneyRunDate,
+		CreationDateTime:           realtimeJourney.CreationDateTime,
+		ModificationDateTime:       realtimeJourney.ModificationDateTime,
+		TimeoutDurationMinutes:     realtimeJourney.TimeoutDurationMinutes,
+		DataSource:                 realtimeJourney.DataSource,
+		VehicleLocationDesc:        realtimeJourney.VehicleLocationDescription,
+		VehicleBearing:             realtimeJourney.VehicleBearing,
+		DepartedStopRef:            realtimeJourney.DepartedStopRef,
+		NextStopRef:                realtimeJourney.NextStopRef,
+		Stops:                      storedRealtimeStopsFromCTDF(realtimeJourney.Stops),
+		Offset:                     realtimeJourney.Offset,
+		Reliability:                realtimeJourney.Reliability,
+		VehicleRef:                 realtimeJourney.VehicleRef,
+		Cancelled:                  realtimeJourney.Cancelled,
+		SuppressFromDepartures:     realtimeJourney.SuppressFromDepartures,
+		SuppressFromDepartureDates: realtimeJourney.SuppressFromDepartureDates,
+		ReplacedByJourneyRef:       realtimeJourney.ReplacedByJourneyRef,
 	}
 
 	if realtimeJourney.VehicleLocation.Type != "" {
@@ -133,12 +140,13 @@ func storedJourneyFromCTDF(journey *ctdf.Journey, realtimeJourneyID string) *sto
 	}
 
 	stored := &storedJourney{
-		PrimaryIdentifier:  journey.PrimaryIdentifier,
-		ServiceRef:         journey.ServiceRef,
-		OperatorRef:        journey.OperatorRef,
-		DepartureTimezone:  journey.DepartureTimezone,
-		DestinationDisplay: journey.DestinationDisplay,
-		Path:               storedJourneyPathFromCTDF(journey.Path),
+		PrimaryIdentifier:   journey.PrimaryIdentifier,
+		ServiceRef:          journey.ServiceRef,
+		OperatorRef:         journey.OperatorRef,
+		DepartureTimezone:   journey.DepartureTimezone,
+		DestinationDisplay:  journey.DestinationDisplay,
+		ReplacesJourneyRefs: journey.ReplacesJourneyRefs,
+		Path:                storedJourneyPathFromCTDF(journey.Path),
 	}
 
 	if journey.PrimaryIdentifier == realtimeJourneyID {
@@ -256,6 +264,9 @@ func (stored *storedRealtimeJourney) toCTDF(ctx context.Context, hydrateJourney 
 		Reliability:                stored.Reliability,
 		VehicleRef:                 stored.VehicleRef,
 		Cancelled:                  stored.Cancelled,
+		SuppressFromDepartures:     stored.SuppressFromDepartures,
+		SuppressFromDepartureDates: stored.SuppressFromDepartureDates,
+		ReplacedByJourneyRef:       stored.ReplacedByJourneyRef,
 	}
 
 	if stored.VehicleLocation != nil {
@@ -283,14 +294,15 @@ func (stored *storedJourney) toCTDF() *ctdf.Journey {
 	}
 
 	return &ctdf.Journey{
-		PrimaryIdentifier:  stored.PrimaryIdentifier,
-		ServiceRef:         stored.ServiceRef,
-		Service:            stored.Service.toCTDF(),
-		OperatorRef:        stored.OperatorRef,
-		Operator:           stored.Operator.toCTDF(),
-		DepartureTimezone:  stored.DepartureTimezone,
-		DestinationDisplay: stored.DestinationDisplay,
-		Path:               stored.path(),
+		PrimaryIdentifier:   stored.PrimaryIdentifier,
+		ServiceRef:          stored.ServiceRef,
+		Service:             stored.Service.toCTDF(),
+		OperatorRef:         stored.OperatorRef,
+		Operator:            stored.Operator.toCTDF(),
+		DepartureTimezone:   stored.DepartureTimezone,
+		DestinationDisplay:  stored.DestinationDisplay,
+		ReplacesJourneyRefs: stored.ReplacesJourneyRefs,
+		Path:                stored.path(),
 	}
 }
 

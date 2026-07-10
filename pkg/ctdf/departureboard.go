@@ -177,6 +177,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	var availabilityMatchedCount atomic.Int64
 	var tooOldSkippedCount atomic.Int64
 	var prefetchedRealtimeAppliedCount atomic.Int64
+	var replacementSuppressedCount atomic.Int64
 	var stopMatchedCount atomic.Int64
 	var activitySkippedCount atomic.Int64
 	var realtimeStopMatchedCount atomic.Int64
@@ -244,9 +245,13 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					}
 				}
 
-				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.IsActive()) {
+				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.SuppressFromDepartures || prefetchedRealtimeJourney.IsActive()) {
 					journey.RealtimeJourney = prefetchedRealtimeJourney
 					prefetchedRealtimeAppliedCount.Add(1)
+				}
+				if journey.RealtimeJourney != nil && journey.RealtimeJourney.SuppressesBoardAt(dateTime) {
+					replacementSuppressedCount.Add(1)
+					return nil
 				}
 
 				for _, path := range journey.Path {
@@ -428,6 +433,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		Int64("availability_matched", availabilityMatchedCount.Load()).
 		Int64("too_old_skipped", tooOldSkippedCount.Load()).
 		Int64("prefetched_realtime_applied", prefetchedRealtimeAppliedCount.Load()).
+		Int64("replacement_suppressed", replacementSuppressedCount.Load()).
 		Int64("stop_matched", stopMatchedCount.Load()).
 		Int64("activity_skipped", activitySkippedCount.Load()).
 		Int64("realtime_stop_matched", realtimeStopMatchedCount.Load()).

@@ -81,20 +81,33 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 
 	if previous == nil {
 		log.Info().Str("id", current.PrimaryIdentifier).Msg("RealtimeJourney has been created")
-		return append(events, ctdf.Event{
+		events = append(events, ctdf.Event{
 			Type:      ctdf.EventTypeRealtimeJourneyCreated,
 			Timestamp: timestamp,
 			Body:      *current,
 		})
-	}
-
-	if current.Cancelled && !previous.Cancelled {
+	} else if current.Cancelled && !previous.Cancelled {
 		log.Info().Str("id", current.PrimaryIdentifier).Msg("RealtimeJourney has been cancelled")
 		events = append(events, ctdf.Event{
 			Type:      ctdf.EventTypeRealtimeJourneyCancelled,
 			Timestamp: timestamp,
 			Body:      *current,
 		})
+	}
+	if current.SuppressFromDepartures && (previous == nil || !previous.SuppressFromDepartures || previous.ReplacedByJourneyRef != current.ReplacedByJourneyRef) {
+		log.Info().
+			Str("id", current.PrimaryIdentifier).
+			Str("replaced_by", current.ReplacedByJourneyRef).
+			Msg("RealtimeJourney overlay has been created")
+		events = append(events, ctdf.Event{
+			Type:      ctdf.EventTypeRealtimeJourneyOverlayCreated,
+			Timestamp: timestamp,
+			Body:      *current,
+		})
+	}
+
+	if previous == nil {
+		return events
 	}
 
 	for id, currentStop := range current.Stops {

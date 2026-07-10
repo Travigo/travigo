@@ -43,7 +43,8 @@ type Journey struct {
 	Track     []Location         `groups:"detailed" bson:",omitempty"`
 	Frequency []JourneyFrequency `groups:"detailed" bson:",omitempty"`
 
-	DestinationDisplay string `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	DestinationDisplay  string   `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	ReplacesJourneyRefs []string `groups:"basic,departureboard-cache" bson:",omitempty"`
 
 	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 

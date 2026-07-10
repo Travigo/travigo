@@ -44,6 +44,14 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		// if eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"] != nil {
 		// 	eventNotificationData.Message = fmt.Sprintf("%s %s", eventNotificationData.Message, eventBody["Annotations"].(map[string]interface{})["CancelledReasonText"])
 		// }
+	case ctdf.EventTypeRealtimeJourneyOverlayCreated:
+		eventNotificationData.Title = "Journey replaced"
+		replacementRef, _ := eventBody["ReplacedByJourneyRef"].(string)
+		if replacementRef == "" {
+			eventNotificationData.Message = "A journey has been replaced by an amended service."
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("A journey has been replaced by %s.", replacementRef)
+		}
 	case ctdf.EventTypeRealtimeJourneyPlatformSet, ctdf.EventTypeRealtimeJourneyPlatformChanged:
 		eventNotificationData.Title = "Platform Update"
 

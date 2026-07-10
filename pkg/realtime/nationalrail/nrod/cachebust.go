@@ -22,7 +22,7 @@ func cacheBustJourney(journey *ctdf.Journey) {
 	stopIDs = util.RemoveDuplicateStrings(stopIDs, []string{})
 
 	for _, stopID := range stopIDs {
-		cacheItemPath := fmt.Sprintf("cachedresults/departureboardjourneys/%s/*", stopID)
-		cachedresults.DeletePrefix(cacheItemPath)
+		cachedresults.DeletePrefix(fmt.Sprintf("cachedresults/departureboardjourneys/%s/*", stopID))
+		cachedresults.DeletePrefix(fmt.Sprintf("cachedresults/arrivalboardjourneys/%s/*", stopID))
 	}
 }

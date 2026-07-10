@@ -20,6 +20,7 @@ const (
 	EventTypeRealtimeJourneyPlatformSet         = "RealtimeJourneyPlatformSet"
 	EventTypeRealtimeJourneyPlatformChanged     = "RealtimeJourneyPlatformChanged"
 	EventTypeRealtimeJourneyCancelled           = "RealtimeJourneyCancelled"
+	EventTypeRealtimeJourneyOverlayCreated      = "RealtimeJourneyOverlayCreated"
 	EventTypeRealtimeJourneyLocationTextChanged = "RealtimeJourneyLocationTextChanged"
 	EventTypeRealtimeJourneyNextStopChanged     = "RealtimeJourneyNextStopChanged"
 )

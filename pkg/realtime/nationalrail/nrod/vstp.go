@@ -49,7 +49,7 @@ func (v *VSTPMessage) Process(stompClient *StompClient) {
 		case "C":
 			v.processCancellation()
 		case "O":
-			log.Warn().Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring VSTP overlay; overlay handling is not implemented")
+			v.processOverlay()
 		default:
 			log.Warn().Str("stp", v.VSTP.Schedule.STP).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring unsupported VSTP STP indicator")
 		}
@@ -58,6 +58,111 @@ func (v *VSTPMessage) Process(stompClient *StompClient) {
 	default:
 		log.Error().Str("transaction", v.VSTP.Schedule.TransactionType).Msg("Unhandled VSTP transaction")
 	}
+}
+
+func (v *VSTPMessage) processOverlay() {
+	// An overlay is itself a short-notice journey, then suppresses the matching
+	// permanent journey only for the dates the overlay runs.
+	v.processCreate()
+
+	startDate, err := time.Parse("2006-01-02", v.VSTP.Schedule.StartDate)
+	if err != nil {
+		log.Error().Err(err).Msg("invalid VSTP overlay start date")
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", v.VSTP.Schedule.EndDate)
+	if err != nil {
+		log.Error().Err(err).Msg("invalid VSTP overlay end date")
+		return
+	}
+
+	journeysCollection := database.GetCollection("journeys")
+	overlayJourneyID := v.vstpJourneyID()
+	var overlayJourney ctdf.Journey
+	if err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": overlayJourneyID}).Decode(&overlayJourney); err != nil {
+		log.Error().Err(err).Str("journey", overlayJourneyID).Msg("Failed to load created VSTP overlay journey")
+		return
+	}
+
+	now := time.Now()
+	timeoutDurationMinutes := vstpRealtimeTimeoutMinutes(endDate, now)
+	if timeoutDurationMinutes <= 0 {
+		log.Warn().Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring expired VSTP overlay")
+		return
+	}
+
+	cursor, err := journeysCollection.Find(context.Background(), bson.M{
+		"datasource.datasetid":      "gb-nationalrail-timetable",
+		"otheridentifiers.TrainUID": v.VSTP.Schedule.TrainUID,
+	})
+	if err != nil {
+		log.Error().Err(err).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Failed to find permanent journey for VSTP overlay")
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	replacedJourneyRefs := make([]string, 0)
+	for cursor.Next(context.Background()) {
+		var journey ctdf.Journey
+		if err := cursor.Decode(&journey); err != nil {
+			log.Error().Err(err).Msg("Failed to decode permanent journey for VSTP overlay")
+			continue
+		}
+		suppressedDates := vstpMatchingServiceDates(&journey, startDate, endDate, v.VSTP.Schedule.DayRuns)
+		if len(suppressedDates) == 0 {
+			continue
+		}
+
+		journey.GetService()
+		realtimeJourney := &ctdf.RealtimeJourney{
+			PrimaryIdentifier:          fmt.Sprintf("gb-nationalrail-vstp-overlay-%s:%s:%s", v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, journey.PrimaryIdentifier),
+			TimeoutDurationMinutes:     timeoutDurationMinutes,
+			ActivelyTracked:            true,
+			Journey:                    &journey,
+			JourneyRunDate:             startDate,
+			CreationDateTime:           now,
+			ModificationDateTime:       now,
+			Reliability:                ctdf.RealtimeJourneyReliabilityExternalProvided,
+			Service:                    journey.Service,
+			Stops:                      map[string]*ctdf.RealtimeJourneyStops{},
+			SuppressFromDepartures:     true,
+			SuppressFromDepartureDates: suppressedDates,
+			ReplacedByJourneyRef:       overlayJourney.PrimaryIdentifier,
+			DataSource: &ctdf.DataSourceReference{
+				OriginalFormat: "JSON-CIF",
+				ProviderName:   "Network Rail",
+				ProviderID:     "gb-networkrail",
+				DatasetID:      "gb-networkrail-vstp",
+				Timestamp:      fmt.Sprintf("%d", now.Unix()),
+			},
+		}
+		if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+			log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to save VSTP overlay suppression realtime journey")
+			continue
+		}
+		replacedJourneyRefs = append(replacedJourneyRefs, journey.PrimaryIdentifier)
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Failed while reading permanent journeys for VSTP overlay")
+	}
+
+	if _, err := journeysCollection.UpdateOne(
+		context.Background(),
+		bson.M{"primaryidentifier": overlayJourney.PrimaryIdentifier},
+		bson.M{"$set": bson.M{"replacesjourneyrefs": replacedJourneyRefs}},
+	); err != nil {
+		log.Error().Err(err).Str("journey", overlayJourney.PrimaryIdentifier).Msg("Failed to record VSTP overlay replacement references")
+	}
+
+	log.Info().
+		Str("trainuid", v.VSTP.Schedule.TrainUID).
+		Str("overlay", overlayJourney.PrimaryIdentifier).
+		Int("replaced_journeys", len(replacedJourneyRefs)).
+		Msg("Applied VSTP overlay")
+}
+
+func (v *VSTPMessage) vstpJourneyID() string {
+	return fmt.Sprintf("gb-rail-vstp-%s:%s:%s:%s", v.VSTP.Schedule.TrainUID, v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, v.VSTP.Schedule.STP)
 }
 
 func (v *VSTPMessage) processCancellation() {
@@ -138,16 +243,24 @@ func (v *VSTPMessage) processCancellation() {
 }
 
 func journeyRunsDuringVSTPCancellation(journey *ctdf.Journey, startDate, endDate time.Time, daysRun string) bool {
+	return len(vstpMatchingServiceDates(journey, startDate, endDate, daysRun)) > 0
+}
+
+func vstpMatchingServiceDates(journey *ctdf.Journey, startDate, endDate time.Time, daysRun string) []string {
+	matchingDates := make([]string, 0)
+	if journey == nil || journey.Availability == nil {
+		return matchingDates
+	}
 	for date := startDate; !date.After(endDate); date = date.AddDate(0, 0, 1) {
 		weekdayIndex := convertWeekday(date)
 		if weekdayIndex >= len(daysRun) || daysRun[weekdayIndex] != '1' {
 			continue
 		}
 		if journey.Availability.MatchDate(date) {
-			return true
+			matchingDates = append(matchingDates, date.Format(ctdf.YearMonthDayFormat))
 		}
 	}
-	return false
+	return matchingDates
 }
 
 func vstpRealtimeTimeoutMinutes(endDate, now time.Time) int {
@@ -168,7 +281,7 @@ func (v *VSTPMessage) processCreate() {
 			continue
 		}
 
-		journeyID := fmt.Sprintf("gb-rail-vstp-%s:%s:%s:%s", v.VSTP.Schedule.TrainUID, v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, v.VSTP.Schedule.STP)
+		journeyID := v.vstpJourneyID()
 
 		// Convert it to a CIF Definition Set
 		startDate, err := time.Parse("2006-01-02", v.VSTP.Schedule.StartDate)

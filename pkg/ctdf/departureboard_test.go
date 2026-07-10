@@ -104,3 +104,17 @@ func TestDeduplicateBoardEntriesPrefersFirstRecord(t *testing.T) {
 		t.Fatal("expected realtime record to take precedence over its scheduled duplicate")
 	}
 }
+
+func TestRealtimeJourneySuppressesBoardOnlyOnReplacementDates(t *testing.T) {
+	realtimeJourney := &RealtimeJourney{
+		SuppressFromDepartures:     true,
+		SuppressFromDepartureDates: []string{"2026-07-10"},
+	}
+
+	if !realtimeJourney.SuppressesBoardAt(time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)) {
+		t.Fatal("expected listed replacement date to suppress board entry")
+	}
+	if realtimeJourney.SuppressesBoardAt(time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)) {
+		t.Fatal("unexpected suppression outside listed replacement dates")
+	}
+}

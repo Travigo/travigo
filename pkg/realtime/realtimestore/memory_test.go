@@ -60,6 +60,36 @@ func TestSaveRealtimeJourneyPreservesPositiveExpiration(t *testing.T) {
 	}
 }
 
+func TestSaveRealtimeJourneyPreservesOverlayReplacementFields(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	journey := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:          "overlay-suppression",
+		SuppressFromDepartures:     true,
+		SuppressFromDepartureDates: []string{"2026-07-10"},
+		ReplacedByJourneyRef:       "overlay-journey",
+		Journey: &ctdf.Journey{
+			PrimaryIdentifier:   "base-journey",
+			ReplacesJourneyRefs: []string{"older-journey"},
+		},
+	}
+
+	if err := SaveRealtimeJourney(ctx, journey); err != nil {
+		t.Fatalf("save realtime journey: %v", err)
+	}
+
+	stored, err := FindByIdentifier(ctx, journey.PrimaryIdentifier)
+	if err != nil {
+		t.Fatalf("find realtime journey: %v", err)
+	}
+	if !stored.SuppressFromDepartures || stored.ReplacedByJourneyRef != "overlay-journey" {
+		t.Fatalf("overlay replacement fields were not preserved: %#v", stored)
+	}
+	if stored.Journey == nil || len(stored.Journey.ReplacesJourneyRefs) != 1 || stored.Journey.ReplacesJourneyRefs[0] != "older-journey" {
+		t.Fatalf("journey replacement references were not preserved: %#v", stored.Journey)
+	}
+}
+
 func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 	setupMemoryTestRedis(t)
 	ctx := context.Background()

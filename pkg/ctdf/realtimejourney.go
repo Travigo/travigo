@@ -44,10 +44,33 @@ type RealtimeJourney struct {
 
 	Cancelled bool `groups:"basic"`
 
+	// SuppressFromDepartures hides this journey from both stop-board modes for
+	// the listed service dates when it has been replaced by an STP overlay.
+	SuppressFromDepartures     bool     `groups:"internal"`
+	SuppressFromDepartureDates []string `groups:"internal"`
+	ReplacedByJourneyRef       string   `groups:"basic"`
+
 	Occupancy RealtimeJourneyOccupancy `groups:"detailed"`
 
 	// Detailed realtime journey information
 	DetailedRailInformation JourneyDetailedRail `groups:"detailed"`
+}
+
+func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {
+	if r == nil || !r.SuppressFromDepartures {
+		return false
+	}
+	if len(r.SuppressFromDepartureDates) == 0 {
+		return true
+	}
+
+	serviceDate := date.Format(YearMonthDayFormat)
+	for _, suppressedDate := range r.SuppressFromDepartureDates {
+		if suppressedDate == serviceDate {
+			return true
+		}
+	}
+	return false
 }
 
 type RealtimeJourneyOccupancy struct {

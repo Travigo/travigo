@@ -19,6 +19,9 @@ func TestJourneyRunsDuringVSTPCancellationHonoursDaysRun(t *testing.T) {
 	if journeyRunsDuringVSTPCancellation(journey, monday, monday, "0000000") {
 		t.Fatal("VSTP cancellation with no operating days should not match")
 	}
+	if got := vstpMatchingServiceDates(journey, monday, monday.AddDate(0, 0, 1), "1000000"); len(got) != 1 || got[0] != "2026-07-06" {
+		t.Fatalf("matching VSTP dates = %#v, want only 2026-07-06", got)
+	}
 }
 
 func TestVSTPRealtimeTimeoutMinutesUsesVSTPExpiryWindow(t *testing.T) {
