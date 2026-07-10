@@ -24,7 +24,7 @@ var cacheZstdEncoder, _ = zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedFa
 var cacheZstdDecoder, _ = zstd.NewReader(nil)
 
 func (c *Cache) Setup() {
-	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(12*time.Hour))
+	redisStore := redisstore.NewRedis(redis_client.Client, store.WithExpiration(4*time.Hour))
 
 	c.Cache = cache.New[string](redisStore)
 }
