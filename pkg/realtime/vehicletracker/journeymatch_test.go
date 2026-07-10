@@ -36,10 +36,20 @@ func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 }
 
 func TestSelectLocationCandidateRequiresClearWinner(t *testing.T) {
-	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10}, {journeyID: "b", distance: 20}}); got != "" {
+	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10, score: 10}, {journeyID: "b", distance: 20, score: 20}}); got != "" {
 		t.Fatalf("got %q, want no ambiguous match", got)
 	}
-	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10}, {journeyID: "b", distance: 50}}); got != "a" {
+	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10, score: 10}, {journeyID: "b", distance: 50, score: 50}}); got != "a" {
 		t.Fatalf("got %q, want a", got)
+	}
+}
+
+func TestScoreLocationCandidatePrefersForwardProgressOnSameJourney(t *testing.T) {
+	history := &vehicleJourneyHistory{JourneyID: "same", Progress: 0.5}
+	if got := scoreLocationCandidate(100, 0.6, "same", history); got >= 100 {
+		t.Fatalf("forward same-journey score = %f", got)
+	}
+	if got := scoreLocationCandidate(100, 0.2, "same", history); got <= 100 {
+		t.Fatalf("backwards same-journey score = %f", got)
 	}
 }
