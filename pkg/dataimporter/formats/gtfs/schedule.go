@@ -28,10 +28,9 @@ type Schedule struct {
 	calendarMapping     map[string]*Calendar
 	calendarDateMapping map[string][]*CalendarDate
 
-	ctdfServices map[string]*ctdf.Service
-	routeMap     map[string]Route
-
-	Shapes []Shape
+	ctdfServices  map[string]*ctdf.Service
+	routeMap      map[string]Route
+	stopLocations map[string]ctdf.Location
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
@@ -146,6 +145,42 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 	return nil
 }
 
+// loadShapeTracks reads shapes.txt into the representation used by journeys. It
+// deliberately does not retain a second []Shape copy of the file: shapes can be
+// large, and the resulting track slices are shared by all trips using a shape.
+func (g *Schedule) loadShapeTracks() (map[string][]ctdf.Location, error) {
+	shapeTracks := map[string][]ctdf.Location{}
+	if _, exists := g.fileMap["shapes.txt"]; !exists {
+		log.Debug().Msg("GTFS feed does not contain shapes.txt")
+		return shapeTracks, nil
+	}
+
+	shapePoints := map[string][]Shape{}
+	if err := importObject[Shape](g, "shapes.txt", "shapes", false, func(shape Shape) (any, string) {
+		shapePoints[shape.ID] = append(shapePoints[shape.ID], shape)
+		return nil, ""
+	}); err != nil {
+		return nil, err
+	}
+
+	for shapeID, points := range shapePoints {
+		sort.Slice(points, func(i, j int) bool {
+			return points[i].PointSequence < points[j].PointSequence
+		})
+
+		track := make([]ctdf.Location, 0, len(points))
+		for _, point := range points {
+			track = append(track, ctdf.Location{
+				Type:        "Point",
+				Coordinates: []float64{point.PointLongitude, point.PointLatitude},
+			})
+		}
+		shapeTracks[shapeID] = track
+	}
+
+	return shapeTracks, nil
+}
+
 func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
@@ -188,6 +223,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 
 	//// Stops ////
+	g.stopLocations = map[string]ctdf.Location{}
 	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
 		timezone := s.Timezone
 
@@ -210,6 +246,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			Active:   true,
 			Timezone: timezone,
 		}
+		g.stopLocations[s.ID] = *ctdfStop.Location
 
 		return ctdfStop, stopID
 	})
@@ -229,10 +266,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Shapes ////
-	////// TODO RE-ADD SHAPES
-	shapsMapping := map[string][]*Shape{}
-	for _, shape := range g.Shapes {
-		shapsMapping[shape.ID] = append(shapsMapping[shape.ID], &shape)
+	shapeTracks, err := g.loadShapeTracks()
+	if err != nil {
+		return err
 	}
 
 	//// Routes / Services ////
@@ -281,8 +317,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	//// Journeys / Trips ////
 	gtfsTrips := map[string]Trip{}
-	fullJourneyTracks := map[string][]ctdf.Location{}
-
 	// PERF(medium-risk): cache the parsed+formatted calendar date-range condition
 	// value keyed by calendar ServiceID. Many trips share the same calendar, and the
 	// original code re-parsed calendar.Start/calendar.End via time.Parse for every
@@ -363,24 +397,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		if t.ShapeID != "" {
-			journeyTrack := []ctdf.Location{}
-
-			shapes := shapsMapping[t.ShapeID]
-
-			// Make sure its in order
-			sort.Slice(shapes, func(i, j int) bool {
-				return shapes[i].PointSequence < shapes[j].PointSequence
-			})
-
-			for _, shape := range shapes {
-				journeyTrack = append(journeyTrack, ctdf.Location{
-					Type:        "Point",
-					Coordinates: []float64{shape.PointLongitude, shape.PointLatitude},
-				})
-			}
-
-			fullJourneyTracks[t.ID] = journeyTrack
-			journey.Track = journeyTrack
+			// Shape tracks are immutable, so journeys sharing a shape can reuse the
+			// same slice until they have been serialised by the batch queue.
+			journey.Track = shapeTracks[t.ShapeID]
 		}
 
 		return journey
@@ -506,6 +525,13 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			if index == 1 {
 				journey.DepartureTime = originDeparturelTime
 			}
+		}
+
+		if len(journey.Track) > 1 && assignJourneyPathTracks(journey.Path, stopTimes, g.stopLocations, journey.Track) {
+			// Every leg now owns an accurate slice of the shape, so avoid storing
+			// the same geometry again at journey level. If splitting fails, the
+			// complete journey track is intentionally retained as the fallback.
+			journey.Track = nil
 		}
 
 		// TODO fix transforms here
