@@ -42,29 +42,86 @@ type Schedule struct {
 type journeyTrackStore struct {
 	dataset    datasets.DataSet
 	datasource *ctdf.DataSourceReference
-	refs       map[string]string
 	queue      DatabaseBatchProcessingQueue
 	unique     int
 	reused     int
 }
 
+const (
+	journeyTrackBatchSize      = 100
+	maxPathPatternCacheEntries = 50000
+	maxShapeSnapCacheEntries   = 100000
+)
+
+type boundedPathPatternCache struct {
+	entries   map[[sha256.Size]byte]bool
+	order     [][sha256.Size]byte
+	next      int
+	max       int
+	evictions int
+}
+
+func newBoundedPathPatternCache(max int) *boundedPathPatternCache {
+	return &boundedPathPatternCache{
+		entries: make(map[[sha256.Size]byte]bool, max),
+		order:   make([][sha256.Size]byte, 0, max),
+		max:     max,
+	}
+}
+
+func (cache *boundedPathPatternCache) Get(key [sha256.Size]byte) (bool, bool) {
+	split, exists := cache.entries[key]
+	return split, exists
+}
+
+func (cache *boundedPathPatternCache) Put(key [sha256.Size]byte, split bool) {
+	if cache.max <= 0 {
+		return
+	}
+	if _, exists := cache.entries[key]; exists {
+		cache.entries[key] = split
+		return
+	}
+	if len(cache.order) < cache.max {
+		cache.order = append(cache.order, key)
+	} else {
+		delete(cache.entries, cache.order[cache.next])
+		cache.order[cache.next] = key
+		cache.next = (cache.next + 1) % cache.max
+		cache.evictions++
+	}
+	cache.entries[key] = split
+}
+
+func journeyPathPatternHash(shapeID string, stopTimes []StopTime) [sha256.Size]byte {
+	hasher := sha256.New()
+	_, _ = io.WriteString(hasher, shapeID)
+	for _, stopTime := range stopTimes {
+		_, _ = hasher.Write([]byte{'\x00'})
+		_, _ = io.WriteString(hasher, stopTime.StopID)
+	}
+	var hash [sha256.Size]byte
+	copy(hash[:], hasher.Sum(nil))
+	return hash
+}
+
 func newJourneyTrackStore(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) *journeyTrackStore {
-	store := &journeyTrackStore{dataset: dataset, datasource: datasource, refs: map[string]string{}, queue: NewDatabaseBatchProcessingQueue("journey_tracks", time.Second, time.Minute, 3000)}
+	store := &journeyTrackStore{dataset: dataset, datasource: datasource, queue: NewDatabaseBatchProcessingQueue("journey_tracks", time.Second, time.Minute, journeyTrackBatchSize)}
 	store.queue.Process()
 	return store
+}
+
+func (store *journeyTrackStore) Identifier(key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("%s-journey-track-%x", store.dataset.Identifier, hash)
 }
 
 func (store *journeyTrackStore) Reference(key string, track []ctdf.Location) string {
 	if len(track) < 2 {
 		return ""
 	}
-	if ref := store.refs[key]; ref != "" {
-		store.reused++
-		return ref
-	}
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
-	ref := fmt.Sprintf("%s-journey-track-%s", store.dataset.Identifier, hash)
-	store.refs[key] = ref
+	hash := sha256.Sum256([]byte(key))
+	ref := fmt.Sprintf("%s-journey-track-%x", store.dataset.Identifier, hash)
 	store.unique++
 	object := &ctdf.JourneyTrack{PrimaryIdentifier: ref, Track: track, DataSource: store.datasource, CreationDateTime: time.Now(), ModificationDateTime: time.Now()}
 	update := mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": ref}).SetUpdate(bson.M{"$set": object}).SetUpsert(true)
@@ -213,6 +270,7 @@ func (g *Schedule) loadShapeTracks() (map[string][]ctdf.Location, error) {
 			})
 		}
 		shapeTracks[shapeID] = track
+		delete(shapePoints, shapeID)
 	}
 
 	return shapeTracks, nil
@@ -339,12 +397,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	for shapeID, track := range shapeTracks {
 		shapeTrackRefs[shapeID] = trackStore.Reference("shape:"+shapeID, track)
 	}
-	shapeSnapCaches := make(map[string]map[string]cachedTrackSnap, len(shapeTracks))
-	type cachedPathTracks struct {
-		refs  []string
-		split bool
-	}
-	pathTrackCache := map[string]cachedPathTracks{}
+	shapeSnapCaches := make(map[string]map[string]cachedTrackSnap)
+	shapeSnapCacheEntries := 0
+	shapeSnapCacheEvictions := 0
+	pathTrackCache := newBoundedPathPatternCache(maxPathPatternCacheEntries)
 	pathPatternCacheHits := 0
 	pathPatternCacheMisses := 0
 
@@ -635,48 +691,49 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 		}
 
-		patternBuilder := strings.Builder{}
-		patternBuilder.Grow(len(trip.ShapeID) + len(stopTimes)*12)
-		patternBuilder.WriteString(trip.ShapeID)
-		for _, stopTime := range stopTimes {
-			patternBuilder.WriteByte('\x00')
-			patternBuilder.WriteString(stopTime.StopID)
-		}
-		patternKey := patternBuilder.String()
-		cachedPattern, patternCached := pathTrackCache[patternKey]
+		patternHash := journeyPathPatternHash(trip.ShapeID, stopTimes)
+		patternSplit, patternCached := pathTrackCache.Get(patternHash)
 		if patternCached {
 			pathPatternCacheHits++
-			if cachedPattern.split && len(cachedPattern.refs) == len(journey.Path) {
-				trackStore.reused += len(cachedPattern.refs)
+			if patternSplit {
+				trackStore.reused += len(journey.Path)
 				journey.Track = nil
 				journey.TrackRef = ""
 				for index, path := range journey.Path {
-					path.TrackRef = cachedPattern.refs[index]
+					path.TrackRef = trackStore.Identifier(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index))
 				}
 			}
 		} else if len(journey.Track) > 1 {
 			pathPatternCacheMisses++
-			snapCache := shapeSnapCaches[trip.ShapeID]
-			if snapCache == nil {
-				snapCache = map[string]cachedTrackSnap{}
-				shapeSnapCaches[trip.ShapeID] = snapCache
+			var snapCache map[string]cachedTrackSnap
+			if len(stopTimes) <= maxShapeSnapCacheEntries {
+				if shapeSnapCacheEntries+len(stopTimes) > maxShapeSnapCacheEntries {
+					shapeSnapCaches = make(map[string]map[string]cachedTrackSnap)
+					shapeSnapCacheEntries = 0
+					shapeSnapCacheEvictions++
+				}
+				snapCache = shapeSnapCaches[trip.ShapeID]
+				if snapCache == nil {
+					snapCache = map[string]cachedTrackSnap{}
+					shapeSnapCaches[trip.ShapeID] = snapCache
+				}
 			}
+			snapCacheEntriesBefore := len(snapCache)
 			if assignJourneyPathTracksCached(journey.Path, stopTimes, g.stopLocations, journey.Track, snapCache) {
+				shapeSnapCacheEntries += len(snapCache) - snapCacheEntriesBefore
 				// Every leg now owns an accurate slice of the shape, so avoid storing
 				// the same geometry again at journey level. If splitting fails, the
 				// complete journey track is intentionally retained as the fallback.
 				journey.Track = nil
 				journey.TrackRef = ""
-				patternHash := fmt.Sprintf("%x", sha256.Sum256([]byte(patternKey)))
-				refs := make([]string, len(journey.Path))
 				for index, path := range journey.Path {
-					path.TrackRef = trackStore.Reference(fmt.Sprintf("shape-leg:%s:%s:%d", trip.ShapeID, patternHash, index), path.Track)
-					refs[index] = path.TrackRef
+					path.TrackRef = trackStore.Reference(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index), path.Track)
 					path.Track = nil
 				}
-				pathTrackCache[patternKey] = cachedPathTracks{refs: refs, split: true}
+				pathTrackCache.Put(patternHash, true)
 			} else {
-				pathTrackCache[patternKey] = cachedPathTracks{}
+				shapeSnapCacheEntries += len(snapCache) - snapCacheEntriesBefore
+				pathTrackCache.Put(patternHash, false)
 			}
 		}
 
@@ -695,6 +752,15 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 		// Insert
 		if dataset.SupportedObjects.Journeys {
+			// Geometry is persisted exclusively in journey_tracks. Keep the
+			// in-memory fallback available for this import, but never write the
+			// legacy embedded fields back to MongoDB.
+			journey.Track = nil
+			for _, path := range journey.Path {
+				if path != nil {
+					path.Track = nil
+				}
+			}
 			bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
 			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
@@ -715,16 +781,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Wait()
 	}
 	trackStore.Wait()
-	snapCacheEntries := 0
-	for _, snapCache := range shapeSnapCaches {
-		snapCacheEntries += len(snapCache)
-	}
 	log.Info().Str("dataset", dataset.Identifier).
 		Int("unique_tracks", trackStore.unique).
 		Int("reused_tracks", trackStore.reused).
-		Int("snap_cache_entries", snapCacheEntries).
+		Int("snap_cache_entries", shapeSnapCacheEntries).
+		Int("snap_cache_evictions", shapeSnapCacheEvictions).
 		Int("path_pattern_hits", pathPatternCacheHits).
 		Int("path_pattern_misses", pathPatternCacheMisses).
+		Int("path_pattern_cache_evictions", pathTrackCache.evictions).
 		Msg("Finished GTFS journey track processing")
 
 	log.Info().Msg("Finished Journeys")

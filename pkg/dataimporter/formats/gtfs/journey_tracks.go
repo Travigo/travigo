@@ -25,7 +25,8 @@ type trackSnap struct {
 }
 
 type cachedTrackSnap struct {
-	snap     trackSnap
+	segment  int
+	fraction float64
 	distance float64
 	ok       bool
 }
@@ -52,15 +53,16 @@ func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []Sto
 		cached, exists := snapCache[stopTime.StopID]
 		if !exists {
 			snap, distance, ok := closestTrackSnap(stopLocation, journeyTrack)
-			cached = cachedTrackSnap{snap: snap, distance: distance, ok: ok}
+			cached = cachedTrackSnap{segment: snap.segment, fraction: snap.fraction, distance: distance, ok: ok}
 			if snapCache != nil {
 				snapCache[stopTime.StopID] = cached
 			}
 		}
-		snap, distance, ok := cached.snap, cached.distance, cached.ok
+		distance, ok := cached.distance, cached.ok
 		if !ok || distance > maxStopShapeDistanceMetres {
 			return false
 		}
+		snap := newTrackSnap(cached.segment, cached.fraction, journeyTrack)
 		if index > 0 && snap.position <= snaps[index-1].position {
 			return false
 		}

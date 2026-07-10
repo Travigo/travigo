@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const maxBatchItems = 5000
+const defaultBatchItems = 5000
 
 func flushBatch(collection *mongo.Collection, b *DatabaseBatchProcessingQueue, batchItems []mongo.WriteModel) {
 	b.lastItemProcessed = time.Now()
@@ -22,10 +22,14 @@ func flushBatch(collection *mongo.Collection, b *DatabaseBatchProcessingQueue, b
 }
 
 func NewDatabaseBatchProcessingQueue(collection string, batchTimeout time.Duration, emptyTimeout time.Duration, batchSize int) DatabaseBatchProcessingQueue {
+	if batchSize <= 0 {
+		batchSize = defaultBatchItems
+	}
 	return DatabaseBatchProcessingQueue{
 		Collection:        collection,
 		BatchTimeout:      batchTimeout,
 		EmptyTimeout:      emptyTimeout,
+		BatchSize:         batchSize,
 		items:             make(chan mongo.WriteModel, batchSize),
 		lastItemProcessed: time.Now(),
 	}
@@ -35,6 +39,7 @@ type DatabaseBatchProcessingQueue struct {
 	Collection   string
 	BatchTimeout time.Duration
 	EmptyTimeout time.Duration
+	BatchSize    int
 
 	items             chan (mongo.WriteModel)
 	lastItemProcessed time.Time
@@ -61,7 +66,7 @@ func (b *DatabaseBatchProcessingQueue) Process() {
 				case i := <-b.items:
 					batchItems = append(batchItems, i)
 
-					if len(batchItems) >= maxBatchItems {
+					if len(batchItems) >= b.BatchSize {
 						flushBatch(realtimeJourneysCollection, b, batchItems)
 						batchItems = []mongo.WriteModel{}
 					}

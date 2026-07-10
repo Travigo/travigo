@@ -14,7 +14,7 @@ import (
 
 const (
 	defaultRedisMemorySample  = 250
-	maxRedisMemorySample      = 1000
+	maxRedisMemorySample      = 10000000
 	maxRedisMemoryPerCategory = 50
 	redisMemoryScanCount      = 500
 	redisMemoryTimeout        = 5 * time.Second
@@ -72,7 +72,7 @@ func redisMemory(c *fiber.Ctx) error {
 		parsed, err := strconv.Atoi(rawSample)
 		if err != nil || parsed < 1 || parsed > maxRedisMemorySample {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "sample must be an integer between 1 and 1000",
+				"error": "sample must be an integer between 1 and 10000000",
 			})
 		}
 		sampleLimit = parsed
