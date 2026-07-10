@@ -48,6 +48,49 @@ func matchJourneyPosition(journey *ctdf.Journey, vehicle ctdf.Location) (journey
 	return journeyPositionMatch{PathIndex: pathIndex, LegProgress: legProgress, JourneyProgress: globalProgress, DistanceMetres: distance, UsedGlobalTrack: true}, true
 }
 
+// matchJourneyPositionWithStopFallback keeps identified journeys trackable when
+// their source feed has no shape geometry. Candidate discovery deliberately uses
+// matchJourneyPosition only: nearest stops are too weak a signal to identify an
+// otherwise unknown trip.
+func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
+	if match, ok := matchJourneyPosition(journey, vehicle); ok {
+		return match, true
+	}
+	if journey == nil || vehicle.Type != "Point" || len(vehicle.Coordinates) < 2 {
+		return journeyPositionMatch{}, false
+	}
+
+	closestPathIndex := -1
+	closestDistance := math.Inf(1)
+	for index, path := range journey.Path {
+		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil {
+			continue
+		}
+		distance := vehicle.Distance(path.DestinationStop.Location)
+		if distance < closestDistance {
+			closestPathIndex = index
+			closestDistance = distance
+		}
+	}
+	if closestPathIndex < 0 {
+		return journeyPositionMatch{}, false
+	}
+
+	progress := 0.5
+	if closestPathIndex > 0 {
+		previous := journey.Path[closestPathIndex-1]
+		current := journey.Path[closestPathIndex]
+		if previous != nil && previous.DestinationStop != nil && previous.DestinationStop.Location != nil && current != nil && current.DestinationStop != nil && current.DestinationStop.Location != nil {
+			previousDistance := vehicle.Distance(previous.DestinationStop.Location)
+			currentDistance := vehicle.Distance(current.DestinationStop.Location)
+			if total := previousDistance + currentDistance; total > 0 {
+				progress = previousDistance / total
+			}
+		}
+	}
+	return journeyPositionMatch{PathIndex: closestPathIndex, LegProgress: progress, JourneyProgress: (float64(closestPathIndex) + progress) / float64(len(journey.Path)), DistanceMetres: closestDistance, UsedGlobalTrack: true}, true
+}
+
 func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, float64) {
 	previous := 0.0
 	for index, path := range journey.Path {

@@ -25,6 +25,23 @@ func TestMatchJourneyPositionUsesDistanceAlongLeg(t *testing.T) {
 	}
 }
 
+func TestMatchJourneyPositionFallsBackToStopPairWithoutTrack(t *testing.T) {
+	firstStop := &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0, 51}}}
+	secondStop := &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0.01, 51}}}
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{DestinationStop: firstStop},
+		{DestinationStop: secondStop},
+	}}
+
+	match, ok := matchJourneyPositionWithStopFallback(journey, ctdf.Location{Type: "Point", Coordinates: []float64{0.0075, 51}})
+	if !ok {
+		t.Fatal("expected stop fallback match")
+	}
+	if match.PathIndex != 1 || !match.UsedGlobalTrack || match.LegProgress < 0.7 || match.LegProgress > 0.8 {
+		t.Fatalf("got %#v", match)
+	}
+}
+
 func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 	serviceDate := time.Date(2026, time.July, 10, 0, 0, 0, 0, time.UTC)
 	encoded := time.Date(0, time.January, 2, 1, 30, 0, 0, time.UTC)

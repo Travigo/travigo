@@ -59,7 +59,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 	// Calculate everything based on location if we aren't provided with updates
 	if len(vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates) == 0 && vehicleUpdateEvent.VehicleLocationUpdate.Location.Type == "Point" {
-		position, matched := matchJourneyPosition(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location)
+		position, matched := matchJourneyPositionWithStopFallback(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location)
 		if !matched || position.PathIndex < 0 || position.PathIndex >= len(realtimeJourney.Journey.Path) {
 			return errors.New("unable to match vehicle location to journey track")
 		}
