@@ -60,18 +60,18 @@ type Trip struct {
 }
 
 type StopTime struct {
-	TripID        string `csv:"trip_id"`
-	ArrivalTime   string `csv:"arrival_time"`
-	DepartureTime string `csv:"departure_time"`
-	StopID        string `csv:"stop_id"`
-	StopHeadsign  string `csv:"stop_headsign"`
-	StopSequence  int    `csv:"stop_sequence"`
-	PickupType    int8   `csv:"pickup_type"`
-	DropOffType   int8   `csv:"drop_off_type"`
-	// ContinuousPickup       string  `csv:"continuous_pickup"`
-	// ContinuousDropOff      string  `csv:"continuous_drop_off"`
-	// ShapeDistanceTravelled float64 `csv:"shape_dist_traveled"`
-	// Timepoint              string  `csv:"timepoint"`
+	TripID                 string  `csv:"trip_id"`
+	ArrivalTime            string  `csv:"arrival_time"`
+	DepartureTime          string  `csv:"departure_time"`
+	StopID                 string  `csv:"stop_id"`
+	StopHeadsign           string  `csv:"stop_headsign"`
+	StopSequence           int     `csv:"stop_sequence"`
+	PickupType             int8    `csv:"pickup_type"`
+	DropOffType            int8    `csv:"drop_off_type"`
+	ContinuousPickup       int8    `csv:"continuous_pickup"`
+	ContinuousDropOff      int8    `csv:"continuous_drop_off"`
+	ShapeDistanceTravelled float64 `csv:"shape_dist_traveled"`
+	Timepoint              int8    `csv:"timepoint"`
 }
 
 type Calendar struct {
@@ -127,6 +127,17 @@ type Frequency struct {
 	EndTime        string `csv:"end_time"`
 	HeadwaySeconds int    `csv:"headway_secs"`
 	ExactTimes     string `csv:"exact_times"`
+}
+
+type Transfer struct {
+	FromStopID      string `csv:"from_stop_id"`
+	ToStopID        string `csv:"to_stop_id"`
+	TransferType    int8   `csv:"transfer_type"`
+	MinTransferTime int    `csv:"min_transfer_time"`
+	FromRouteID     string `csv:"from_route_id"`
+	ToRouteID       string `csv:"to_route_id"`
+	FromTripID      string `csv:"from_trip_id"`
+	ToTripID        string `csv:"to_trip_id"`
 }
 
 type Shape struct {

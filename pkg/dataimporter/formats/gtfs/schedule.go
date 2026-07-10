@@ -31,6 +31,7 @@ type Schedule struct {
 	ctdfServices  map[string]*ctdf.Service
 	routeMap      map[string]Route
 	stopLocations map[string]ctdf.Location
+	frequencies   map[string][]ctdf.JourneyFrequency
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
@@ -202,6 +203,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			DataSource:           datasource,
 			PrimaryName:          g.GetTranslation("agency", "agency_name", "en", a.Name),
 			Website:              a.URL,
+			Email:                a.Email,
+			PhoneNumber:          a.Phone,
 		}
 
 		g.Agencies = append(g.Agencies, a)
@@ -239,12 +242,20 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
 			PrimaryName:          g.GetTranslation("stops", "stop_name", "en", s.Name),
+			Descriptor:           s.Description,
+			Website:              s.URL,
+			LocationType:         s.Type,
+			PlatformCode:         s.PlatformCode,
+			WheelchairBoarding:   s.Wheelchair,
 			Location: &ctdf.Location{
 				Type:        "Point",
 				Coordinates: []float64{s.Longitude, s.Latitude},
 			},
 			Active:   true,
 			Timezone: timezone,
+		}
+		if s.Parent != "" {
+			ctdfStop.Associations = append(ctdfStop.Associations, &ctdf.Association{Type: "stop_group", AssociatedIdentifier: fmt.Sprintf("%s-stopgroup-%s", dataset.Identifier, s.Parent)})
 		}
 		g.stopLocations[s.ID] = *ctdfStop.Location
 
@@ -265,10 +276,49 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return nil, ""
 	})
 
+	//// Frequencies ////
+	g.frequencies = map[string][]ctdf.JourneyFrequency{}
+	if _, exists := g.fileMap["frequencies.txt"]; exists {
+		if err := importObject[Frequency](g, "frequencies.txt", "frequencies", false, func(f Frequency) (any, string) {
+			start, startErr := parseGTFSTime(f.StartTime)
+			end, endErr := parseGTFSTime(f.EndTime)
+			if startErr != nil || endErr != nil {
+				log.Warn().Str("trip", f.TripID).Msg("Skipping GTFS frequency with invalid time")
+				return nil, ""
+			}
+			g.frequencies[f.TripID] = append(g.frequencies[f.TripID], ctdf.JourneyFrequency{StartTime: start, EndTime: end, HeadwaySeconds: f.HeadwaySeconds, ExactTimes: parseExactTimes(f.ExactTimes)})
+			return nil, ""
+		}); err != nil {
+			return err
+		}
+	}
+
 	//// Shapes ////
 	shapeTracks, err := g.loadShapeTracks()
 	if err != nil {
 		return err
+	}
+
+	//// Transfers ////
+	if _, exists := g.fileMap["transfers.txt"]; exists {
+		if err := importObject[Transfer](g, "transfers.txt", "stop_transfers", true, func(t Transfer) (any, string) {
+			fromStopRef := gtfsStopReference(dataset.Identifier, t.FromStopID)
+			toStopRef := gtfsStopReference(dataset.Identifier, t.ToStopID)
+			identifier := fmt.Sprintf("%s-%s-%s-%s-%s-%s", fromStopRef, toStopRef, t.FromRouteID, t.ToRouteID, t.FromTripID, t.ToTripID)
+			transfer := &ctdf.StopTransfer{
+				PrimaryIdentifier: identifier,
+				FromStopRef:       fromStopRef, ToStopRef: toStopRef,
+				FromRouteRef: fmt.Sprintf("%s-service-%s", dataset.Identifier, t.FromRouteID),
+				ToRouteRef:   fmt.Sprintf("%s-service-%s", dataset.Identifier, t.ToRouteID),
+				FromTripRef:  fmt.Sprintf("%s-journey-%s", dataset.Identifier, t.FromTripID),
+				ToTripRef:    fmt.Sprintf("%s-journey-%s", dataset.Identifier, t.ToTripID),
+				Type:         convertTransferType(t.TransferType), MinChangeDurationSeconds: t.MinTransferTime,
+				CreationDateTime: time.Now(), ModificationDateTime: time.Now(), DataSource: datasource,
+			}
+			return transfer, identifier
+		}); err != nil {
+			return err
+		}
 	}
 
 	//// Routes / Services ////
@@ -301,6 +351,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
 			ServiceName:          serviceName,
+			Description:          r.Description,
+			Website:              r.URL,
+			NetworkRef:           r.NetworkID,
 			OperatorRef:          operatorRef,
 			Routes:               []ctdf.Route{},
 			BrandColour:          r.Colour,
@@ -386,10 +439,15 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ServiceRef:           serviceID,
 			OperatorRef:          operatorRef,
 			// Direction:            trip.DirectionID,
-			DestinationDisplay: g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
-			DepartureTimezone:  agenciesMap[g.routeMap[t.RouteID].AgencyID].Timezone,
-			Availability:       availability,
-			Path:               []*ctdf.JourneyPathItem{},
+			Direction:            strconv.FormatBool(t.DirectionID),
+			ShortName:            t.Name,
+			WheelchairAccessible: t.WheelchairAccessible,
+			BikesAllowed:         t.BikesAllowed,
+			Frequency:            g.frequencies[t.ID],
+			DestinationDisplay:   g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
+			DepartureTimezone:    agenciesMap[g.routeMap[t.RouteID].AgencyID].Timezone,
+			Availability:         availability,
+			Path:                 []*ctdf.JourneyPathItem{},
 		}
 
 		if t.BlockID != "" {
@@ -463,15 +521,15 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			stopTime := stopTimes[index]
 			previousStopTime := stopTimes[index-1]
 
-			originArrivalTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.ArrivalTime))
+			originArrivalTime, err := parseGTFSTime(previousStopTime.ArrivalTime)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to parse previousStopTime.ArrivalTime")
 			}
-			originDeparturelTime, err := time.Parse("15:04:05", fixTimestamp(previousStopTime.DepartureTime))
+			originDeparturelTime, err := parseGTFSTime(previousStopTime.DepartureTime)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to parse previousStopTime.DepartureTime")
 			}
-			destinationArrivalTime, err := time.Parse("15:04:05", fixTimestamp(stopTime.ArrivalTime))
+			destinationArrivalTime, err := parseGTFSTime(stopTime.ArrivalTime)
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to parse stopTime.ArrivalTime")
 			}
@@ -624,23 +682,49 @@ func convertTransportType(intType int) ctdf.TransportType {
 	}
 }
 
-func fixTimestamp(timestamp string) string {
+func parseGTFSTime(timestamp string) (time.Time, error) {
 	splitTimestamp := strings.Split(timestamp, ":")
-
 	if len(splitTimestamp) != 3 {
-		return timestamp
+		return time.Time{}, fmt.Errorf("invalid GTFS time %q", timestamp)
 	}
-
 	hour, err := strconv.Atoi(splitTimestamp[0])
 	if err != nil {
-		return timestamp
+		return time.Time{}, err
 	}
+	minute, minuteErr := strconv.Atoi(splitTimestamp[1])
+	second, secondErr := strconv.Atoi(splitTimestamp[2])
+	if minuteErr != nil || secondErr != nil || hour < 0 || minute < 0 || minute > 59 || second < 0 || second > 59 {
+		return time.Time{}, fmt.Errorf("invalid GTFS time %q", timestamp)
+	}
+	return time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(hour)*time.Hour + time.Duration(minute)*time.Minute + time.Duration(second)*time.Second), nil
+}
 
-	if hour >= 24 {
-		splitTimestamp[0] = fmt.Sprintf("%d", hour%24)
+func parseExactTimes(value string) int8 {
+	parsed, err := strconv.ParseInt(value, 10, 8)
+	if err != nil {
+		return 0
+	}
+	return int8(parsed)
+}
 
-		return strings.Join(splitTimestamp, ":")
-	} else {
-		return timestamp
+func gtfsStopReference(datasetIdentifier string, stopID string) string {
+	if strings.Contains(datasetIdentifier, "gb-dft-bods-gtfs-schedule-") {
+		return fmt.Sprintf("gb-atco-%s", stopID)
+	}
+	return fmt.Sprintf("%s-stop-%s", datasetIdentifier, stopID)
+}
+
+func convertTransferType(value int8) ctdf.StopTransferType {
+	switch value {
+	case 1:
+		return ctdf.StopTransferTypeTimed
+	case 2:
+		return ctdf.StopTransferTypeMinimumTime
+	case 3:
+		return ctdf.StopTransferTypeForbidden
+	case 4:
+		return ctdf.StopTransferTypeInSeat
+	default:
+		return ctdf.StopTransferTypeRecommended
 	}
 }

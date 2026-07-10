@@ -33,11 +33,15 @@ type Journey struct {
 	OperatorRef string    `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
 
-	Direction         string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
-	DepartureTime     time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
-	DepartureTimezone string    `groups:"basic,departureboard-cache" bson:",omitempty"`
+	Direction            string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
+	ShortName            string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
+	WheelchairAccessible int8      `groups:"detailed" bson:",omitempty"`
+	BikesAllowed         int8      `groups:"detailed" bson:",omitempty"`
+	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	DepartureTimezone    string    `groups:"basic,departureboard-cache" bson:",omitempty"`
 
-	Track []Location `groups:"detailed" bson:",omitempty"`
+	Track     []Location         `groups:"detailed" bson:",omitempty"`
+	Frequency []JourneyFrequency `groups:"detailed" bson:",omitempty"`
 
 	DestinationDisplay string `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 
@@ -195,6 +199,13 @@ type JourneyPathItem struct {
 	Track []Location `groups:"basic"`
 
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
+}
+
+type JourneyFrequency struct {
+	StartTime      time.Time `groups:"detailed" bson:",omitempty"`
+	EndTime        time.Time `groups:"detailed" bson:",omitempty"`
+	HeadwaySeconds int       `groups:"detailed" bson:",omitempty"`
+	ExactTimes     int8      `groups:"detailed" bson:",omitempty"`
 }
 
 func (jpi *JourneyPathItem) GetReferences() {

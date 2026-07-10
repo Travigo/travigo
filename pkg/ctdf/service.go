@@ -15,6 +15,9 @@ type Service struct {
 	DataSource *DataSourceReference `groups:"detailed"`
 
 	ServiceName string `groups:"basic,search,search-llm,stop-llm,departures-llm"`
+	Description string `groups:"detailed" bson:",omitempty"`
+	Website     string `groups:"detailed" bson:",omitempty"`
+	NetworkRef  string `groups:"detailed" bson:",omitempty"`
 
 	OperatorRef string `groups:"basic"`
 	// Operator *Operator

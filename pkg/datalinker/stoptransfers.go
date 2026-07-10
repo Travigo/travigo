@@ -490,7 +490,7 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 
 	for _, key := range keys {
 		candidate := transfers[key]
-		identifier := fmt.Sprintf(ctdf.StopTransferIDFormat, candidate.key.from, candidate.key.to)
+		identifier := fmt.Sprintf("generated-"+ctdf.StopTransferIDFormat, candidate.key.from, candidate.key.to)
 		transfer := ctdf.StopTransfer{
 			PrimaryIdentifier:                 identifier,
 			FromStopRef:                       candidate.key.from,
@@ -532,7 +532,8 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	// populated throughout the rebuild, so concurrent readers (the journey
 	// planner) never see an empty transfers set.
 	deleted, err := stopTransfersCollection.DeleteMany(ctx, bson.M{
-		"modificationdatetime": bson.M{"$lt": now},
+		"datasource.originalformat": "travigo-stop-transfer-generator",
+		"modificationdatetime":      bson.M{"$lt": now},
 	})
 	if err != nil {
 		return err

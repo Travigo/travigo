@@ -18,9 +18,13 @@ type Stop struct {
 
 	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
 
-	PrimaryName    string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	Descriptor     string          `groups:"basic,search" bson:",omitempty"`
-	TransportTypes []TransportType `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
+	PrimaryName        string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
+	Descriptor         string          `groups:"basic,search" bson:",omitempty"`
+	Website            string          `groups:"detailed" bson:",omitempty"`
+	LocationType       string          `groups:"detailed" bson:",omitempty"`
+	PlatformCode       string          `groups:"basic" bson:",omitempty"` // The public platform/stand label.
+	WheelchairBoarding string          `groups:"detailed" bson:",omitempty"`
+	TransportTypes     []TransportType `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
 
 	Timezone string `groups:"basic" bson:",omitempty"`
 
@@ -33,7 +37,7 @@ type Stop struct {
 	Associations []*Association `groups:"detailed" bson:",omitempty"`
 
 	Platforms []*StopPlatform `groups:"detailed" bson:",omitempty"`
-	// Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
+	Entrances []*StopEntrance `groups:"detailed" bson:",omitempty"`
 }
 
 type StopPlatform struct {

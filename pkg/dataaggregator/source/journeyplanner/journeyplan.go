@@ -373,11 +373,21 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 		return err
 	}
 
+	forbidden := map[string]bool{}
+	for _, transfer := range transfers {
+		if transfer != nil && transfer.Type == ctdf.StopTransferTypeForbidden {
+			forbidden[transfer.FromStopRef+"\x00"+transfer.ToStopRef] = true
+		}
+	}
+
 	for _, transfer := range transfers {
 		if runtime.searchExpired() {
 			return nil
 		}
-		if transfer == nil || transfer.ToStopRef == "" {
+		if transfer == nil || transfer.ToStopRef == "" || transfer.Type == ctdf.StopTransferTypeForbidden || !transferAppliesToLabel(transfer, current) {
+			continue
+		}
+		if forbidden[transfer.FromStopRef+"\x00"+transfer.ToStopRef] {
 			continue
 		}
 		if transfer.DistanceMetres > runtime.config.maxTransferDistance {
@@ -443,6 +453,28 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 	}
 
 	return nil
+}
+
+// Route/trip-restricted GTFS transfers must match the service just used. A
+// destination restriction is enforced conservatively here: this planner cannot
+// yet constrain the next boarding search by route/trip, so it must not offer a
+// potentially invalid transfer.
+func transferAppliesToLabel(transfer *ctdf.StopTransfer, current *plannerLabel) bool {
+	if transfer.ToRouteRef != "" || transfer.ToTripRef != "" {
+		return false
+	}
+	if transfer.FromRouteRef == "" && transfer.FromTripRef == "" {
+		return true
+	}
+	if current == nil || current.routeItems == nil || current.routeItems.item.Journey == nil {
+		return false
+	}
+
+	journey := current.routeItems.item.Journey
+	if transfer.FromRouteRef != "" && transfer.FromRouteRef != journey.ServiceRef {
+		return false
+	}
+	return transfer.FromTripRef == "" || transfer.FromTripRef == journey.PrimaryIdentifier
 }
 
 func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
