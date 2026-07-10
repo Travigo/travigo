@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -24,8 +25,8 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 	if event == nil || event.VehicleLocationUpdate == nil || event.VehicleLocationUpdate.Location.Type != "Point" {
 		return ""
 	}
-	serviceID := consumer.identifyService(sourceType, information)
-	if serviceID == "" {
+	serviceIDs := consumer.locationCandidateServiceIDs(sourceType, information, event.RecordedAt)
+	if len(serviceIDs) == 0 {
 		return ""
 	}
 	serviceDate, err := time.Parse("2006-01-02", event.VehicleLocationUpdate.Timeframe)
@@ -33,7 +34,7 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		serviceDate = event.RecordedAt
 	}
 
-	cursor, err := database.GetCollection("journeys").Find(context.Background(), bson.M{"serviceref": serviceID}, options.Find().SetProjection(bson.M{"primaryidentifier": 1, "availability": 1}).SetLimit(maxLocationCandidates))
+	cursor, err := database.GetCollection("journeys").Find(context.Background(), bson.M{"serviceref": bson.M{"$in": serviceIDs}}, options.Find().SetProjection(bson.M{"primaryidentifier": 1, "availability": 1}).SetLimit(maxLocationCandidates))
 	if err != nil {
 		return ""
 	}
@@ -58,6 +59,19 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		}
 	}
 	return selectLocationCandidate(candidates)
+}
+
+func (consumer *BatchConsumer) locationCandidateServiceIDs(sourceType string, information map[string]string, observedAt time.Time) []string {
+	if sourceType == "siri-vm" {
+		identifier := identifiers.SiriVM{IdentifyingInformation: information, CurrentTime: observedAt}
+		services, _ := identifier.IdentifyServices()
+		return services
+	}
+	serviceID := consumer.identifyService(sourceType, information)
+	if serviceID == "" {
+		return nil
+	}
+	return []string{serviceID}
 }
 
 func selectLocationCandidate(candidates []locationJourneyCandidate) string {

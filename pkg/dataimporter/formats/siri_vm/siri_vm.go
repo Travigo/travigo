@@ -68,11 +68,14 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 
 	originRef := fmt.Sprintf(ctdf.GBStopIDFormat, vehicle.MonitoredVehicleJourney.OriginRef)
 	localJourneyID := fmt.Sprintf(
-		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s",
+		"SIRI-VM:LOCALJOURNEYID:%s:%s:%s:%s:%s:%s:%s",
 		fmt.Sprintf(ctdf.OperatorNOCFormat, operatorRef),
 		vehicle.MonitoredVehicleJourney.LineRef,
 		originRef,
+		timeframe,
+		vehicleRef,
 		vehicleJourneyRef,
+		vehicle.MonitoredVehicleJourney.OriginAimedDepartureTime,
 	)
 
 	locationEvent := vehicletracker.VehicleUpdateEvent{
@@ -215,7 +218,13 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		}
 	}
 
-	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-VM response")
+	log.Info().
+		Str("dataset", dataset.Identifier).
+		Int64("withtrip", submittedRecords).
+		Int64("withlocation", submittedRecords).
+		Int64("submitted", submittedRecords).
+		Int64("total", retrievedRecords).
+		Msg("Submitted vehicle updates")
 
 	// Wait for queue to empty
 	checkQueueSize()

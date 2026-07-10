@@ -9,6 +9,7 @@ type RealtimeIdentifyFailureElasticEvent struct {
 
 	Success    bool
 	FailReason string
+	Outcome    string
 
 	Operator string
 	Service  string

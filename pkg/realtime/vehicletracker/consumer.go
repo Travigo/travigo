@@ -250,6 +250,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		log.Warn().Err(err).Str("local_id", vehicleUpdateEvent.LocalID).Msg("Failed to read realtime identification mapping")
 	}
 	if mappingFound {
+		consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, journeyID != "" && journeyID != "N/A", "cached")
 		return journeyID
 	}
 
@@ -263,18 +264,14 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
 			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
 				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
-				return ""
-			}
-
-			// TODO only exists here if siri-vm only comes from the 1 source
-			failedVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("failedvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
-			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && failedVehicleID == "" {
+				consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs")
 				return ""
 			}
 
 			// perform the actual sirivm
 			journeyIdentifier := identifiers.SiriVM{
 				IdentifyingInformation: identifyingInformation,
+				CurrentTime:            vehicleUpdateEvent.RecordedAt,
 			}
 			journey, err = journeyIdentifier.IdentifyJourney()
 
@@ -305,6 +302,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		if err != nil {
 			if locationJourneyID := consumer.identifyJourneyFromLocation(vehicleUpdateEvent, sourceType, identifyingInformation); locationJourneyID != "" {
 				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, locationJourneyID, vehicleUpdateEvent.RecordedAt)
+				consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, true, "location_matched")
 				return locationJourneyID
 			}
 
@@ -340,6 +338,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 				Success:    false,
 				FailReason: errorCode,
+				Outcome:    "unmatched",
 
 				Operator: operatorRef,
 				Service:  identifyingInformation["PublishedLineName"],
@@ -366,6 +365,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			Timestamp: currentTime,
 
 			Success: true,
+			Outcome: "matched",
 
 			Operator: operatorRef,
 			Service:  identifyingInformation["PublishedLineName"],
@@ -382,6 +382,21 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 func realtimeIdentificationMappingKey(localID string) string {
 	return fmt.Sprintf("realtime-identification:%s", localID)
+}
+
+func (consumer *BatchConsumer) recordSiriIdentificationOutcome(event *VehicleUpdateEvent, information map[string]string, success bool, outcome string) {
+	if event == nil || event.SourceType != "siri-vm" {
+		return
+	}
+	year, week := event.RecordedAt.ISOWeek()
+	index := fmt.Sprintf("realtime-identify-events-%d-%d", year, week)
+	payload, err := json.Marshal(RealtimeIdentifyFailureElasticEvent{
+		Timestamp: event.RecordedAt, Success: success, Outcome: outcome,
+		Operator: information["OperatorRef"], Service: information["PublishedLineName"], Trip: information["VehicleJourneyRef"], SourceType: event.SourceType,
+	})
+	if err == nil {
+		elastic_client.IndexRequest(index, bytes.NewReader(payload))
+	}
 }
 
 func touchExistingIdentificationMapping(ctx context.Context, localID string, recordedAt time.Time) (string, bool, error) {

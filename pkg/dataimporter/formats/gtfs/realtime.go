@@ -323,6 +323,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 
 	log.Info().
+		Str("dataset", dataset.Identifier).
 		Int("withtrip", withTripID).
 		Int("withlocation", withLocation).
 		Int("withtripupdate", withTripUpdate).
