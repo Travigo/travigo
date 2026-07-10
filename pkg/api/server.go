@@ -36,5 +36,7 @@ func SetupServer(listen string) error {
 
 	routes.DatasourcesRouter(group.Group("/datasources"))
 
+	routes.RedisRouter(group.Group("/redis", EnsureValidToken()))
+
 	return webApp.Listen(listen)
 }
