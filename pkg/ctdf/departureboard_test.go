@@ -90,3 +90,17 @@ func TestIsBoardJourneyCancelled(t *testing.T) {
 		t.Fatal("journey without a cancellation signal should not be cancelled")
 	}
 }
+
+func TestDeduplicateBoardEntriesPrefersFirstRecord(t *testing.T) {
+	realtime := &DepartureBoard{Journey: &Journey{PrimaryIdentifier: "journey-1"}, Type: DepartureBoardRecordTypeCancelled}
+	scheduledDuplicate := &DepartureBoard{Journey: &Journey{PrimaryIdentifier: "journey-1"}, Type: DepartureBoardRecordTypeScheduled}
+	other := &DepartureBoard{Journey: &Journey{PrimaryIdentifier: "journey-2"}}
+
+	entries := DeduplicateBoardEntries([]*DepartureBoard{realtime, scheduledDuplicate, other})
+	if len(entries) != 2 {
+		t.Fatalf("deduplicated entries = %d, want 2", len(entries))
+	}
+	if entries[0] != realtime {
+		t.Fatal("expected realtime record to take precedence over its scheduled duplicate")
+	}
+}

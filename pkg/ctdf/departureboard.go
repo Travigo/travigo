@@ -68,6 +68,26 @@ func IsBoardJourneyCancelled(journey *Journey, realtimeJourney *RealtimeJourney,
 	return cancelledByAlert
 }
 
+// DeduplicateBoardEntries keeps the first board record for each journey. This
+// lets a realtime record take precedence over a scheduled backfill record.
+func DeduplicateBoardEntries(entries []*DepartureBoard) []*DepartureBoard {
+	seenJourneyIDs := make(map[string]struct{}, len(entries))
+	deduplicated := make([]*DepartureBoard, 0, len(entries))
+	for _, entry := range entries {
+		if entry == nil || entry.Journey == nil || entry.Journey.PrimaryIdentifier == "" {
+			deduplicated = append(deduplicated, entry)
+			continue
+		}
+		journeyID := entry.Journey.PrimaryIdentifier
+		if _, seen := seenJourneyIDs[journeyID]; seen {
+			continue
+		}
+		seenJourneyIDs[journeyID] = struct{}{}
+		deduplicated = append(deduplicated, entry)
+	}
+	return deduplicated
+}
+
 func boardPathStopRef(path *JourneyPathItem, boardType BoardType) string {
 	if boardType.IsArrival() {
 		return path.DestinationStopRef
@@ -396,6 +416,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 			departureBoard = append(departureBoard, i)
 		}
 	}
+	departureBoard = DeduplicateBoardEntries(departureBoard)
 
 	log.Debug().
 		Int("input_journeys", inputJourneyCount).

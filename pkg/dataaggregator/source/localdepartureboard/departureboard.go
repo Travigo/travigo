@@ -83,7 +83,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		Msg("Departure board journeys loaded - today")
 
 	currentTime = time.Now()
-	realtimeLookupToday := s.realtimeLookup(journeysToday)
+	realtimeLookupToday := s.realtimeLookup(journeysToday, q.StartDateTime)
 	realtimeLookupTodayDuration := time.Since(currentTime)
 
 	currentTime = time.Now()
@@ -113,7 +113,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			Msg("Departure board journeys loaded - tomorrow")
 
 		currentTime = time.Now()
-		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow)
+		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow, dayAfterDateTime)
 		realtimeLookupTomorrowDuration := time.Since(currentTime)
 
 		currentTime = time.Now()
@@ -142,7 +142,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	return departureBoard, nil
 }
 
-func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRealtimeLookup {
+func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time) *ctdf.DepartureBoardRealtimeLookup {
 	lookupStart := time.Now()
 	journeyIDs := make([]string, 0, len(journeys))
 	for _, journey := range journeys {
@@ -156,7 +156,7 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRea
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query realtime journeys")
 	}
-	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, time.Now())
+	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, serviceDate, time.Now())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
 	}

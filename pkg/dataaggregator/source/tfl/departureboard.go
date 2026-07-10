@@ -85,7 +85,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			journeyIDs = append(journeyIDs, realtimeJourneys[index].Journey.PrimaryIdentifier)
 		}
 	}
-	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, now)
+	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, q.StartDateTime, now)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
 	}
@@ -150,6 +150,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	}
 
 	log.Debug().Str("Length", time.Now().Sub(generateDeparteBoardStart).String()).Msg("Generate TfL departure board from realtime journeys")
+	departureBoard = ctdf.DeduplicateBoardEntries(departureBoard)
 
 	// If the realtime data doesnt provide enough to cover our request then fill in with the local departure board
 	remainingCount := q.Count - len(departureBoard)
@@ -167,5 +168,5 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		}
 	}
 
-	return departureBoard, nil
+	return ctdf.DeduplicateBoardEntries(departureBoard), nil
 }

@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -11,26 +12,27 @@ import (
 // ActiveJourneyCancellationAlertIDs returns the journey identifiers matched by
 // currently valid JourneyCancelled service alerts. The caller supplies the
 // candidate IDs so board generation performs one bounded lookup per board.
-func ActiveJourneyCancellationAlertIDs(ctx context.Context, journeyIDs []string, now time.Time) (map[string]struct{}, error) {
+func ActiveJourneyCancellationAlertIDs(ctx context.Context, journeyIDs []string, serviceDate time.Time, now time.Time) (map[string]struct{}, error) {
 	cancelledJourneyIDs := make(map[string]struct{})
 	if len(journeyIDs) == 0 {
 		return cancelledJourneyIDs, nil
 	}
 
-	journeyIDSet := make(map[string]struct{}, len(journeyIDs))
+	journeyIDByAlertIdentifier := make(map[string]string, len(journeyIDs)*2)
 	for _, journeyID := range journeyIDs {
 		if journeyID != "" {
-			journeyIDSet[journeyID] = struct{}{}
+			journeyIDByAlertIdentifier[journeyID] = journeyID
+			journeyIDByAlertIdentifier[fmt.Sprintf("DAYINSTANCEOF:%s:%s", serviceDate.Format(YearMonthDayFormat), journeyID)] = journeyID
 		}
 	}
-	if len(journeyIDSet) == 0 {
+	if len(journeyIDByAlertIdentifier) == 0 {
 		return cancelledJourneyIDs, nil
 	}
 
 	collection := database.GetCollection("service_alerts")
 	cursor, err := collection.Find(ctx, bson.M{
 		"alerttype":          ServiceAlertTypeJourneyCancelled,
-		"matchedidentifiers": bson.M{"$in": journeyIDs},
+		"matchedidentifiers": bson.M{"$in": mapKeys(journeyIDByAlertIdentifier)},
 		"validfrom":          bson.M{"$lt": now},
 		"validuntil":         bson.M{"$gt": now},
 	})
@@ -45,11 +47,19 @@ func ActiveJourneyCancellationAlertIDs(ctx context.Context, journeyIDs []string,
 			return nil, err
 		}
 		for _, identifier := range alert.MatchedIdentifiers {
-			if _, found := journeyIDSet[identifier]; found {
-				cancelledJourneyIDs[identifier] = struct{}{}
+			if journeyID, found := journeyIDByAlertIdentifier[identifier]; found {
+				cancelledJourneyIDs[journeyID] = struct{}{}
 			}
 		}
 	}
 
 	return cancelledJourneyIDs, cursor.Err()
+}
+
+func mapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
 }
