@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -24,7 +25,6 @@ import (
 
 const (
 	osmStopCollectionName    = "osm_stops"
-	defaultOverpassEndpoint  = "https://overpass-api.de/api/interpreter"
 	defaultOverpassTimeout   = 90 * time.Second
 	defaultRailSearchRadius  = 700
 	defaultBusSearchRadius   = 150
@@ -33,6 +33,21 @@ const (
 
 type overpassResponse struct {
 	Elements []overpassElement `json:"elements"`
+	Remark   string            `json:"remark"`
+}
+
+type overpassEndpoint struct {
+	URL      string
+	Supports func(*ctdf.Location) bool
+}
+
+var publicOverpassEndpoints = []overpassEndpoint{
+	{URL: "https://overpass-api.de/api/interpreter"},
+	{URL: "https://maps.mail.ru/osm/tools/overpass/api/interpreter"},
+	{
+		URL:      "https://overpass.osm.ch/api/interpreter",
+		Supports: supportsSwissLocation,
+	},
 }
 
 type overpassElement struct {
@@ -107,7 +122,7 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 		return nil, err
 	}
 
-	overpassElements, err := queryOverpass(plan.overpassQuery)
+	overpassElements, endpoint, err := queryOverpass(plan.overpassQuery, plan.location)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +151,7 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 		},
 		Query: ctdf.OSMStopQuery{
 			OverpassQuery: plan.overpassQuery,
+			Endpoint:      endpoint,
 			QueriedAt:     now,
 			Location:      plan.location,
 			RadiusMetres:  plan.radiusMetres,
@@ -477,15 +493,30 @@ way(bn.platform_nodes)
 out body geom;`, radiusMetres, lat, lon)
 }
 
-func queryOverpass(overpassQuery string) ([]overpassElement, error) {
-	endpoint := defaultOverpassEndpoint
-	if envEndpoint := util.GetEnvironmentVariables()["TRAVIGO_OVERPASS_ENDPOINT"]; envEndpoint != "" {
-		endpoint = envEndpoint
-	}
+func queryOverpass(overpassQuery string, location *ctdf.Location) ([]overpassElement, string, error) {
+	return queryOverpassWithEndpoints(overpassQuery, overpassEndpointsForLocation(location))
+}
 
+func queryOverpassWithEndpoints(overpassQuery string, endpoints []string) ([]overpassElement, string, error) {
 	form := url.Values{}
 	form.Set("data", overpassQuery)
 
+	errorsByEndpoint := make([]error, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		elements, err := querySingleOverpassEndpoint(endpoint, form)
+		if err == nil && len(elements) > 0 {
+			return elements, endpoint, nil
+		}
+		if err == nil {
+			err = errors.New("returned no OSM elements")
+		}
+		errorsByEndpoint = append(errorsByEndpoint, fmt.Errorf("%s: %w", endpoint, err))
+	}
+
+	return nil, "", fmt.Errorf("all Overpass endpoints failed: %w", errors.Join(errorsByEndpoint...))
+}
+
+func querySingleOverpassEndpoint(endpoint string, form url.Values) ([]overpassElement, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultOverpassTimeout)
 	defer cancel()
 
@@ -502,17 +533,63 @@ func queryOverpass(overpassQuery string) ([]overpassElement, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("overpass returned status %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var parsed overpassResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 		return nil, err
 	}
+	if parsed.Remark != "" {
+		return nil, errors.New(parsed.Remark)
+	}
 
 	return parsed.Elements, nil
+}
+
+func overpassEndpointsForLocation(location *ctdf.Location) []string {
+	endpoints := make([]string, 0, len(publicOverpassEndpoints)+1)
+	seen := map[string]struct{}{}
+	addEndpoint := func(endpoint string) {
+		if endpoint == "" {
+			return
+		}
+		if _, exists := seen[endpoint]; exists {
+			return
+		}
+		seen[endpoint] = struct{}{}
+		endpoints = append(endpoints, endpoint)
+	}
+
+	// A configured endpoint remains preferred, but no longer turns an outage into
+	// a failed lookup when a public endpoint is available.
+	addEndpoint(util.GetEnvironmentVariables()["TRAVIGO_OVERPASS_ENDPOINT"])
+
+	publicEndpoints := make([]string, 0, len(publicOverpassEndpoints))
+	for _, endpoint := range publicOverpassEndpoints {
+		if endpoint.Supports == nil || endpoint.Supports(location) {
+			publicEndpoints = append(publicEndpoints, endpoint.URL)
+		}
+	}
+	rand.Shuffle(len(publicEndpoints), func(i int, j int) {
+		publicEndpoints[i], publicEndpoints[j] = publicEndpoints[j], publicEndpoints[i]
+	})
+	for _, endpoint := range publicEndpoints {
+		addEndpoint(endpoint)
+	}
+
+	return endpoints
+}
+
+func supportsSwissLocation(location *ctdf.Location) bool {
+	if location == nil || len(location.Coordinates) < 2 {
+		return false
+	}
+	lon := location.Coordinates[0]
+	lat := location.Coordinates[1]
+	return lat >= 45.8 && lat <= 47.9 && lon >= 5.8 && lon <= 10.6
 }
 
 func osmNWRTagLookup(key string, value string) []string {

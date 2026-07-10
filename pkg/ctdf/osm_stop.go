@@ -105,6 +105,7 @@ type OSMStopMatch struct {
 
 type OSMStopQuery struct {
 	OverpassQuery string    `groups:"internal" bson:",omitempty"`
+	Endpoint      string    `groups:"internal" bson:",omitempty"`
 	QueriedAt     time.Time `groups:"internal" bson:",omitempty"`
 	Location      *Location `groups:"internal" bson:",omitempty"`
 	RadiusMetres  int       `groups:"internal" bson:",omitempty"`

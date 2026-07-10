@@ -1,11 +1,63 @@
 package databaselookup
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
+
+func TestQueryOverpassTriesNextEndpointAfterFailure(t *testing.T) {
+	failedEndpoint := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer failedEndpoint.Close()
+
+	requestMethods := make(chan string, 1)
+	successfulEndpoint := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestMethods <- request.Method
+		writer.Header().Set("content-type", "application/json")
+		_, _ = writer.Write([]byte(`{"elements":[{"type":"node","id":1,"lat":51,"lon":0}]}`))
+	}))
+	defer successfulEndpoint.Close()
+
+	elements, endpoint, err := queryOverpassWithEndpoints("[out:json];node(1);out;", []string{failedEndpoint.URL, successfulEndpoint.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if endpoint != successfulEndpoint.URL {
+		t.Fatalf("expected successful endpoint %q, got %q", successfulEndpoint.URL, endpoint)
+	}
+	if len(elements) != 1 || elements[0].ID != 1 {
+		t.Fatalf("unexpected Overpass elements: %#v", elements)
+	}
+	if requestMethod := <-requestMethods; requestMethod != http.MethodPost {
+		t.Fatalf("expected POST request, got %s", requestMethod)
+	}
+}
+
+func TestOverpassEndpointsIncludeSwissOnlyForSwissLocations(t *testing.T) {
+	ukEndpoints := overpassEndpointsForLocation(&ctdf.Location{Coordinates: []float64{-0.263, 51.953}})
+	if slicesContain(ukEndpoints, "https://overpass.osm.ch/api/interpreter") {
+		t.Fatal("Swiss endpoint should not be queried for a UK stop")
+	}
+
+	swissEndpoints := overpassEndpointsForLocation(&ctdf.Location{Coordinates: []float64{8.54, 47.37}})
+	if !slicesContain(swissEndpoints, "https://overpass.osm.ch/api/interpreter") {
+		t.Fatal("Swiss endpoint should be queried for a Swiss stop")
+	}
+}
+
+func slicesContain(values []string, wanted string) bool {
+	for _, value := range values {
+		if value == wanted {
+			return true
+		}
+	}
+	return false
+}
 
 func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
 	query := buildOSMStopExactOverpassQuery(`  node["ref:crs"="HIT"];`)
