@@ -244,7 +244,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					}
 				}
 
-				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.IsActive() || prefetchedRealtimeJourney.Cancelled) {
+				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.IsActive()) {
 					journey.RealtimeJourney = prefetchedRealtimeJourney
 					prefetchedRealtimeAppliedCount.Add(1)
 				}

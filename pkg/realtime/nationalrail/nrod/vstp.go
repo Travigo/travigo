@@ -11,6 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/cif"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -42,12 +43,120 @@ type VSTPMessage struct {
 func (v *VSTPMessage) Process(stompClient *StompClient) {
 	switch v.VSTP.Schedule.TransactionType {
 	case "Create":
-		v.processCreate()
+		switch v.VSTP.Schedule.STP {
+		case "N":
+			v.processCreate()
+		case "C":
+			v.processCancellation()
+		case "O":
+			log.Warn().Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring VSTP overlay; overlay handling is not implemented")
+		default:
+			log.Warn().Str("stp", v.VSTP.Schedule.STP).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring unsupported VSTP STP indicator")
+		}
 	case "Delete":
 		v.processDelete()
 	default:
 		log.Error().Str("transaction", v.VSTP.Schedule.TransactionType).Msg("Unhandled VSTP transaction")
 	}
+}
+
+func (v *VSTPMessage) processCancellation() {
+	now := time.Now()
+	startDate, err := time.Parse("2006-01-02", v.VSTP.Schedule.StartDate)
+	if err != nil {
+		log.Error().Err(err).Msg("invalid VSTP cancellation start date")
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", v.VSTP.Schedule.EndDate)
+	if err != nil {
+		log.Error().Err(err).Msg("invalid VSTP cancellation end date")
+		return
+	}
+	timeoutDurationMinutes := vstpRealtimeTimeoutMinutes(endDate, now)
+	if timeoutDurationMinutes <= 0 {
+		log.Warn().Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Ignoring expired VSTP cancellation")
+		return
+	}
+
+	journeysCollection := database.GetCollection("journeys")
+	cursor, err := journeysCollection.Find(context.Background(), bson.M{
+		"datasource.datasetid":      "gb-nationalrail-timetable",
+		"otheridentifiers.TrainUID": v.VSTP.Schedule.TrainUID,
+	})
+	if err != nil {
+		log.Error().Err(err).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Failed to find permanent journey for VSTP cancellation")
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	cancelledJourneys := 0
+	for cursor.Next(context.Background()) {
+		var journey ctdf.Journey
+		if err := cursor.Decode(&journey); err != nil {
+			log.Error().Err(err).Msg("Failed to decode permanent journey for VSTP cancellation")
+			continue
+		}
+		if !journeyRunsDuringVSTPCancellation(&journey, startDate, endDate, v.VSTP.Schedule.DayRuns) {
+			continue
+		}
+
+		journey.GetService()
+		realtimeJourney := &ctdf.RealtimeJourney{
+			PrimaryIdentifier:      fmt.Sprintf("gb-nationalrail-vstp-cancellation-%s:%s:%s", v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, journey.PrimaryIdentifier),
+			TimeoutDurationMinutes: timeoutDurationMinutes,
+			ActivelyTracked:        true,
+			Journey:                &journey,
+			JourneyRunDate:         startDate,
+			CreationDateTime:       now,
+			ModificationDateTime:   now,
+			Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
+			Cancelled:              true,
+			Service:                journey.Service,
+			Stops:                  map[string]*ctdf.RealtimeJourneyStops{},
+			DataSource: &ctdf.DataSourceReference{
+				OriginalFormat: "JSON-CIF",
+				ProviderName:   "Network Rail",
+				ProviderID:     "gb-networkrail",
+				DatasetID:      "gb-networkrail-vstp",
+				Timestamp:      fmt.Sprintf("%d", now.Unix()),
+			},
+		}
+		if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+			log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to save VSTP cancellation realtime journey")
+			continue
+		}
+		cancelledJourneys++
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Failed while reading permanent journeys for VSTP cancellation")
+	}
+
+	log.Info().
+		Str("trainuid", v.VSTP.Schedule.TrainUID).
+		Int("cancelled_journeys", cancelledJourneys).
+		Msg("Applied VSTP cancellation")
+}
+
+func journeyRunsDuringVSTPCancellation(journey *ctdf.Journey, startDate, endDate time.Time, daysRun string) bool {
+	for date := startDate; !date.After(endDate); date = date.AddDate(0, 0, 1) {
+		weekdayIndex := convertWeekday(date)
+		if weekdayIndex >= len(daysRun) || daysRun[weekdayIndex] != '1' {
+			continue
+		}
+		if journey.Availability.MatchDate(date) {
+			return true
+		}
+	}
+	return false
+}
+
+func vstpRealtimeTimeoutMinutes(endDate, now time.Time) int {
+	expiresAt := endDate.Add(48 * time.Hour)
+	remaining := expiresAt.Sub(now)
+	if remaining <= 0 {
+		return 0
+	}
+	return int(remaining/time.Minute) + 1
 }
 
 func (v *VSTPMessage) processCreate() {
