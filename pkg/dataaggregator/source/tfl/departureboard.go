@@ -79,6 +79,16 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
 	}
+	journeyIDs := make([]string, 0, len(realtimeJourneys))
+	for index := range realtimeJourneys {
+		if realtimeJourneys[index].Journey != nil {
+			journeyIDs = append(journeyIDs, realtimeJourneys[index].Journey.PrimaryIdentifier)
+		}
+	}
+	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, now)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
+	}
 
 	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
 
@@ -109,11 +119,14 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			}
 
 			departure := &ctdf.DepartureBoard{
-				DestinationDisplay: realtimeJourney.Journey.DestinationDisplay,
+				DestinationDisplay: ctdf.BoardDestinationDisplay(realtimeJourney.Journey, realtimeJourney.Journey.DestinationDisplay, q.Type),
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 				Time:               scheduledTime,
 
 				Journey: realtimeJourney.Journey,
+			}
+			if ctdf.IsBoardJourneyCancelled(realtimeJourney.Journey, &realtimeJourney, cancelledJourneyIDs) {
+				departure.Type = ctdf.DepartureBoardRecordTypeCancelled
 			}
 			realtimeJourney.Journey.GetService()
 			departure.Journey.Operator = tflOperator

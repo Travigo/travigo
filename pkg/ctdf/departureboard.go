@@ -50,8 +50,22 @@ const (
 // DepartureBoardRealtimeLookup keeps realtime reads outside ctdf. realtimestore
 // imports ctdf, so ctdf cannot import realtimestore without creating a cycle.
 type DepartureBoardRealtimeLookup struct {
-	ByJourneyID       map[string]*RealtimeJourney
-	FindByJourneyRefs func(journeyRefs []string) *RealtimeJourney
+	ByJourneyID         map[string]*RealtimeJourney
+	CancelledJourneyIDs map[string]struct{}
+	FindByJourneyRefs   func(journeyRefs []string) *RealtimeJourney
+}
+
+// IsBoardJourneyCancelled applies cancellation signals that are independent of
+// whether a realtime stop update exists for the requested board stop.
+func IsBoardJourneyCancelled(journey *Journey, realtimeJourney *RealtimeJourney, cancelledJourneyIDs map[string]struct{}) bool {
+	if realtimeJourney != nil && realtimeJourney.Cancelled {
+		return true
+	}
+	if journey == nil {
+		return false
+	}
+	_, cancelledByAlert := cancelledJourneyIDs[journey.PrimaryIdentifier]
+	return cancelledByAlert
 }
 
 func boardPathStopRef(path *JourneyPathItem, boardType BoardType) string {
@@ -101,14 +115,16 @@ func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time
 	return stop.DepartureTime
 }
 
-func boardDestinationDisplay(journey *Journey, path *JourneyPathItem, boardType BoardType) string {
+// BoardDestinationDisplay returns the service destination for departures and
+// the journey origin for arrivals.
+func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardType) string {
 	if !boardType.IsArrival() || journey == nil || len(journey.Path) == 0 {
-		return path.DestinationDisplay
+		return fallback
 	}
 
 	firstPathItem := journey.Path[0]
 	if firstPathItem == nil {
-		return path.DestinationDisplay
+		return fallback
 	}
 	firstPathItem.GetOriginStop()
 	if firstPathItem.OriginStop != nil && firstPathItem.OriginStop.PrimaryName != "" {
@@ -208,7 +224,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					}
 				}
 
-				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && prefetchedRealtimeJourney.IsActive() {
+				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.IsActive() || prefetchedRealtimeJourney.Cancelled) {
 					journey.RealtimeJourney = prefetchedRealtimeJourney
 					prefetchedRealtimeAppliedCount.Add(1)
 				}
@@ -265,7 +281,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							}
 						}
 
-						if journey.RealtimeJourney != nil && journey.RealtimeJourney.Cancelled {
+						if IsBoardJourneyCancelled(journey, journey.RealtimeJourney, realtimeLookup.CancelledJourneyIDs) {
 							departureBoardRecordType = DepartureBoardRecordTypeCancelled
 						}
 						if departureBoardRecordType == DepartureBoardRecordTypeCancelled {
@@ -276,7 +292,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 						)
 
-						destinationDisplay = boardDestinationDisplay(journey, path, boardType)
+						destinationDisplay = BoardDestinationDisplay(journey, path.DestinationDisplay, boardType)
 						break
 					}
 				}

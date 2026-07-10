@@ -69,10 +69,24 @@ func TestBoardDestinationDisplayUsesJourneyOriginForArrivals(t *testing.T) {
 		{DestinationDisplay: "Final Destination"},
 	}}
 
-	if got := boardDestinationDisplay(journey, journey.Path[1], BoardTypeArrival); got != "First Stop" {
+	if got := BoardDestinationDisplay(journey, journey.Path[1].DestinationDisplay, BoardTypeArrival); got != "First Stop" {
 		t.Fatalf("arrival display = %q, want first origin stop", got)
 	}
-	if got := boardDestinationDisplay(journey, journey.Path[1], BoardTypeDeparture); got != "Final Destination" {
+	if got := BoardDestinationDisplay(journey, journey.Path[1].DestinationDisplay, BoardTypeDeparture); got != "Final Destination" {
 		t.Fatalf("departure display = %q, want path destination display", got)
+	}
+}
+
+func TestIsBoardJourneyCancelled(t *testing.T) {
+	journey := &Journey{PrimaryIdentifier: "journey-1"}
+
+	if !IsBoardJourneyCancelled(journey, &RealtimeJourney{Cancelled: true}, nil) {
+		t.Fatal("cancelled realtime journey should cancel the board entry")
+	}
+	if !IsBoardJourneyCancelled(journey, nil, map[string]struct{}{"journey-1": {}}) {
+		t.Fatal("active journey cancellation alert should cancel the board entry")
+	}
+	if IsBoardJourneyCancelled(journey, nil, nil) {
+		t.Fatal("journey without a cancellation signal should not be cancelled")
 	}
 }

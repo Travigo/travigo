@@ -156,16 +156,22 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey) *ctdf.DepartureBoardRea
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query realtime journeys")
 	}
+	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, time.Now())
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
+	}
 
 	log.Debug().
 		Int("journeys", len(journeys)).
 		Int("journey_ids", len(journeyIDs)).
 		Int("realtime_journeys", len(realtimeJourneysByJourneyID)).
+		Int("cancelled_by_alert", len(cancelledJourneyIDs)).
 		Dur("duration", time.Since(lookupStart)).
 		Msg("Prefetched realtime journeys for departure board")
 
 	return &ctdf.DepartureBoardRealtimeLookup{
-		ByJourneyID: realtimeJourneysByJourneyID,
+		ByJourneyID:         realtimeJourneysByJourneyID,
+		CancelledJourneyIDs: cancelledJourneyIDs,
 		FindByJourneyRefs: func(journeyRefs []string) *ctdf.RealtimeJourney {
 			blockLookupStart := time.Now()
 			realtimeJourney, err := realtimestore.FindCurrentByJourneyRefs(context.Background(), journeyRefs)
