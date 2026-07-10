@@ -254,17 +254,29 @@ relation(r.member_relations)->.nested_relations;
 node(w.nested_ways)->.nested_way_nodes;
 
 node.member_nodes["public_transport"="stop_position"]->.stop_positions;
+node.station["public_transport"="stop_position"]->.matched_stop_positions;
+(
+  .stop_positions;
+  .matched_stop_positions;
+)->.all_stop_positions;
 
-way(bn.stop_positions)
-  ["railway"~"^(rail|light_rail|subway|tram)$"]
+(
+  way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"];
+  way(around.all_stop_positions:15)["railway"~"^(rail|light_rail|subway|tram)$"];
+)
 ->.tracks_at_stops;
 
-way(bn.stop_positions)
+way(bn.all_stop_positions)
   ["highway"]
 ->.roads_at_stops;
 
 way.member_ways["railway"="platform"]->.platform_ways;
-node(w.platform_ways)->.platform_nodes;
+way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;
+(
+  .platform_ways;
+  .platform_ways_near_stops;
+)->.all_platform_ways;
+node(w.all_platform_ways)->.platform_nodes;
 
 way(bn.platform_nodes)
   ["railway"="platform_edge"]
@@ -337,6 +349,7 @@ way(bn.platform_nodes)
   .nested_relations;
   .tracks_at_stops;
   .roads_at_stops;
+  .all_platform_ways;
   .platform_edges_from_platforms;
   .candidate_pois;
   .candidate_parking;
@@ -365,17 +378,27 @@ relation(r.member_relations)->.nested_relations;
 node(w.nested_ways)->.nested_way_nodes;
 
 node.member_nodes["public_transport"="stop_position"]->.stop_positions;
+(
+  .stop_positions;
+)->.all_stop_positions;
 
-way(bn.stop_positions)
-  ["railway"~"^(rail|light_rail|subway|tram)$"]
+(
+  way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"];
+  way(around.all_stop_positions:15)["railway"~"^(rail|light_rail|subway|tram)$"];
+)
 ->.tracks_at_stops;
 
-way(bn.stop_positions)
+way(bn.all_stop_positions)
   ["highway"]
 ->.roads_at_stops;
 
 way.member_ways["railway"="platform"]->.platform_ways;
-node(w.platform_ways)->.platform_nodes;
+way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;
+(
+  .platform_ways;
+  .platform_ways_near_stops;
+)->.all_platform_ways;
+node(w.all_platform_ways)->.platform_nodes;
 
 way(bn.platform_nodes)
   ["railway"="platform_edge"]
@@ -446,6 +469,7 @@ way(bn.platform_nodes)
   .nested_relations;
   .tracks_at_stops;
   .roads_at_stops;
+  .all_platform_ways;
   .platform_edges_from_platforms;
   .candidate_pois;
   .candidate_parking;

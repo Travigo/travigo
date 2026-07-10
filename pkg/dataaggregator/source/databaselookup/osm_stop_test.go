@@ -1,10 +1,42 @@
 package databaselookup
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
+
+func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
+	query := buildOSMStopExactOverpassQuery(`  node["ref:crs"="HIT"];`)
+
+	for _, expected := range []string{
+		`node.station["public_transport"="stop_position"]->.matched_stop_positions;`,
+		`way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"]`,
+		`way(around.all_stop_positions:15)["railway"~"^(rail|light_rail|subway|tram)$"]`,
+		`way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;`,
+		`.all_platform_ways;`,
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected exact Overpass query to contain %q", expected)
+		}
+	}
+}
+
+func TestCoordinateOverpassQueryExpandsTracksAndPlatformsFromStopPositions(t *testing.T) {
+	query := buildOSMStopCoordinateOverpassQuery(&ctdf.Location{Coordinates: []float64{-0.263, 51.953}}, 700)
+
+	for _, expected := range []string{
+		`way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"]`,
+		`way(around.all_stop_positions:15)["railway"~"^(rail|light_rail|subway|tram)$"]`,
+		`way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;`,
+		`.all_platform_ways;`,
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("expected coordinate Overpass query to contain %q", expected)
+		}
+	}
+}
 
 func TestClassifyParkingAssociation(t *testing.T) {
 	tests := []struct {

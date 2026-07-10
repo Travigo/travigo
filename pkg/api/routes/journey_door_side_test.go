@@ -26,6 +26,42 @@ func TestCalculateTrainDoorSideUsesJourneyDirection(t *testing.T) {
 	}
 }
 
+func TestCalculateTrainDoorSideIgnoresSameNumberedUndergroundPlatform(t *testing.T) {
+	osmStop := testDoorSideOSMStop()
+	osmStop.TransportTypes = []ctdf.TransportType{ctdf.TransportTypeRail}
+	osmStop.Features = append(osmStop.Features,
+		ctdf.OSMStopFeature{
+			Type:     ctdf.OSMStopFeatureTypePlatform,
+			Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 401},
+			Ref:      "1",
+			Tags:     map[string]string{"railway": "platform", "subway": "yes"},
+			Geometry: []ctdf.Location{testLocation(0.00105, -0.001), testLocation(0.00105, 0.001)},
+		},
+		ctdf.OSMStopFeature{
+			Type:     ctdf.OSMStopFeatureTypeTrack,
+			Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 402},
+			Tags:     map[string]string{"railway": "subway"},
+			Geometry: []ctdf.Location{testLocation(0.001, -0.001), testLocation(0.001, 0.001)},
+		},
+	)
+	osmStop.Features[0].Tags = map[string]string{"railway": "platform", "train": "yes"}
+	osmStop.Features[1].Tags = map[string]string{"railway": "rail"}
+	stop := testLocation(0, 0)
+	south := testLocation(0, -0.01)
+	north := testLocation(0, 0.01)
+
+	result := calculateTrainDoorSide(osmStop, "1", stop, &south, &north)
+	if result.side != trainDoorSideLeft {
+		t.Fatalf("expected surface rail platform on the left, got %s (%s)", result.side, result.reason)
+	}
+	if result.platformElement == nil || result.platformElement.ID != 101 {
+		t.Fatalf("expected surface platform 101, got %#v", result.platformElement)
+	}
+	if result.trackElement == nil || result.trackElement.ID != 301 {
+		t.Fatalf("expected surface track 301, got %#v", result.trackElement)
+	}
+}
+
 func TestCalculateTrainDoorSideReturnsUnknownForAmbiguousIslandPlatform(t *testing.T) {
 	osmStop := &ctdf.OSMStop{Features: []ctdf.OSMStopFeature{
 		{
@@ -52,6 +88,60 @@ func TestCalculateTrainDoorSideReturnsUnknownForAmbiguousIslandPlatform(t *testi
 	result := calculateTrainDoorSide(osmStop, "3", stop, &south, &north)
 	if result.side != trainDoorSideUnknown {
 		t.Fatalf("expected ambiguous island platform to be unknown, got %s", result.side)
+	}
+}
+
+func TestCalculateTrainDoorSideUsesPlatformStopPositionForIslandPlatform(t *testing.T) {
+	osmStop := &ctdf.OSMStop{
+		TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail},
+		Features: []ctdf.OSMStopFeature{
+			{
+				Type:    ctdf.OSMStopFeatureTypeStopPosition,
+				Element: ctdf.OSMElementRef{Type: ctdf.OSMElementTypeNode, ID: 100},
+				Ref:     "7",
+				Tags:    map[string]string{"railway": "stop", "train": "yes", "ref": "7"},
+				Location: func() *ctdf.Location {
+					location := testLocation(-0.00005, 0)
+					return &location
+				}(),
+			},
+			{
+				Type:    ctdf.OSMStopFeatureTypePlatform,
+				Element: ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 201},
+				Ref:     "7",
+				Tags:    map[string]string{"railway": "platform", "train": "yes"},
+				Geometry: []ctdf.Location{
+					testLocation(-0.00004, -0.001),
+					testLocation(0.00001, -0.001),
+					testLocation(0.00001, 0.001),
+					testLocation(-0.00004, 0.001),
+					testLocation(-0.00004, -0.001),
+				},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 301},
+				Tags:     map[string]string{"railway": "rail"},
+				Geometry: []ctdf.Location{testLocation(-0.00005, -0.001), testLocation(-0.00005, 0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 302},
+				Tags:     map[string]string{"railway": "rail"},
+				Geometry: []ctdf.Location{testLocation(0.00002, -0.001), testLocation(0.00002, 0.001)},
+			},
+		},
+	}
+	stop := testLocation(0, 0)
+	south := testLocation(0, -0.01)
+	north := testLocation(0, 0.01)
+
+	result := calculateTrainDoorSide(osmStop, "7", stop, &south, &north)
+	if result.side != trainDoorSideRight {
+		t.Fatalf("expected platform east of the identified track to be on the right, got %s (%s)", result.side, result.reason)
+	}
+	if result.trackElement == nil || result.trackElement.ID != 301 {
+		t.Fatalf("expected stop-position track 301, got %#v", result.trackElement)
 	}
 }
 

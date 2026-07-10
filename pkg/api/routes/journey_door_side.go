@@ -237,12 +237,13 @@ type projectedPoint struct {
 }
 
 type trackMatch struct {
-	featureIndex  int
-	distance      float64
-	trackPoint    projectedPoint
-	platformPoint projectedPoint
-	segmentStart  projectedPoint
-	segmentEnd    projectedPoint
+	trackFeatureIndex    int
+	platformFeatureIndex int
+	distance             float64
+	trackPoint           projectedPoint
+	platformPoint        projectedPoint
+	segmentStart         projectedPoint
+	segmentEnd           projectedPoint
 }
 
 func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation ctdf.Location, previousLocation *ctdf.Location, nextLocation *ctdf.Location) doorSideCalculation {
@@ -252,7 +253,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		return unknown
 	}
 
-	platformIndexes := matchingPlatformFeatureIndexes(osmStop.Features, platform)
+	platformIndexes := matchingPlatformFeatureIndexes(osmStop.Features, platform, osmStop.TransportTypes)
 	if len(platformIndexes) == 0 {
 		unknown.reason = "The platform could not be matched to an OSM platform"
 		return unknown
@@ -260,8 +261,17 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 
 	trackIndexes := make([]int, 0, len(osmStop.Features))
 	for index, feature := range osmStop.Features {
-		if feature.Type == ctdf.OSMStopFeatureTypeTrack && len(feature.Geometry) >= 2 {
+		if feature.Type == ctdf.OSMStopFeatureTypeTrack && len(feature.Geometry) >= 2 && featureMatchesTransport(feature, osmStop.TransportTypes) {
 			trackIndexes = append(trackIndexes, index)
+		}
+	}
+	// Sparse OSM records do not always tag the mode. In that case, retain the
+	// unfiltered tracks rather than failing a calculation that was possible before.
+	if len(trackIndexes) == 0 {
+		for index, feature := range osmStop.Features {
+			if feature.Type == ctdf.OSMStopFeatureTypeTrack && len(feature.Geometry) >= 2 {
+				trackIndexes = append(trackIndexes, index)
+			}
 		}
 	}
 	if len(trackIndexes) == 0 {
@@ -275,17 +285,23 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		unknown.reason = "Journey direction could not be determined from adjacent stops"
 		return unknown
 	}
+	trackWasIdentifiedByStopPosition := false
+	if stopPositionTrackIndex, found := trackIndexForPlatformStopPosition(osmStop.Features, platform, osmStop.TransportTypes, trackIndexes, referenceLatitude); found {
+		trackIndexes = []int{stopPositionTrackIndex}
+		trackWasIdentifiedByStopPosition = true
+	}
 
 	matches := make([]trackMatch, 0, len(platformIndexes)*len(trackIndexes))
 	for _, platformIndex := range platformIndexes {
-		platformPoints := featureProjectedPoints(osmStop.Features[platformIndex], referenceLatitude)
+		platformPoints := platformProjectedPoints(osmStop.Features[platformIndex], referenceLatitude)
 		if len(platformPoints) == 0 {
 			continue
 		}
 		for _, trackIndex := range trackIndexes {
 			trackPoints := featureProjectedPoints(osmStop.Features[trackIndex], referenceLatitude)
 			if match, found := closestTrackMatch(platformPoints, trackPoints); found {
-				match.featureIndex = trackIndex
+				match.trackFeatureIndex = trackIndex
+				match.platformFeatureIndex = platformIndex
 				matches = append(matches, match)
 			}
 		}
@@ -297,9 +313,9 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 
 	sort.Slice(matches, func(i, j int) bool { return matches[i].distance < matches[j].distance })
 	best := matches[0]
-	platformFeature := osmStop.Features[platformIndexes[0]]
+	platformFeature := osmStop.Features[best.platformFeatureIndex]
 	platformElement := platformFeature.Element
-	trackElement := osmStop.Features[best.featureIndex].Element
+	trackElement := osmStop.Features[best.trackFeatureIndex].Element
 	unknown.platformElement = &platformElement
 	unknown.trackElement = &trackElement
 
@@ -307,7 +323,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		unknown.reason = "The nearest OSM track is too far from the matched platform"
 		return unknown
 	}
-	if platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge && hasCompetingTrack(matches, best) {
+	if !trackWasIdentifiedByStopPosition && platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge && hasCompetingTrack(matches, best) {
 		unknown.reason = "The platform is similarly close to tracks on both sides"
 		return unknown
 	}
@@ -351,7 +367,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 	return result
 }
 
-func matchingPlatformFeatureIndexes(features []ctdf.OSMStopFeature, platform string) []int {
+func matchingPlatformFeatureIndexes(features []ctdf.OSMStopFeature, platform string, transportTypes []ctdf.TransportType) []int {
 	wanted := platformTokens(platform)
 	if len(wanted) == 0 {
 		return nil
@@ -374,9 +390,74 @@ func matchingPlatformFeatureIndexes(features []ctdf.OSMStopFeature, platform str
 		}
 	}
 	if len(edges) > 0 {
-		return edges
+		return preferTransportFeatures(features, edges, transportTypes)
 	}
-	return platforms
+	return preferTransportFeatures(features, platforms, transportTypes)
+}
+
+func preferTransportFeatures(features []ctdf.OSMStopFeature, indexes []int, transportTypes []ctdf.TransportType) []int {
+	preferred := make([]int, 0, len(indexes))
+	for _, index := range indexes {
+		if featureMatchesTransport(features[index], transportTypes) {
+			preferred = append(preferred, index)
+		}
+	}
+	if len(preferred) > 0 {
+		return preferred
+	}
+	return indexes
+}
+
+func featureMatchesTransport(feature ctdf.OSMStopFeature, transportTypes []ctdf.TransportType) bool {
+	railway := strings.ToLower(feature.Tags["railway"])
+	for _, transportType := range transportTypes {
+		switch transportType {
+		case ctdf.TransportTypeRail:
+			if railway == "rail" || strings.EqualFold(feature.Tags["train"], "yes") {
+				return true
+			}
+		case ctdf.TransportTypeMetro:
+			if railway == "subway" || strings.EqualFold(feature.Tags["subway"], "yes") {
+				return true
+			}
+		case ctdf.TransportTypeTram:
+			if railway == "tram" || strings.EqualFold(feature.Tags["tram"], "yes") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func trackIndexForPlatformStopPosition(features []ctdf.OSMStopFeature, platform string, transportTypes []ctdf.TransportType, trackIndexes []int, referenceLatitude float64) (int, bool) {
+	wanted := platformTokens(platform)
+	bestTrackIndex := -1
+	bestDistance := math.Inf(1)
+
+	for _, feature := range features {
+		if feature.Type != ctdf.OSMStopFeatureTypeStopPosition || feature.Location == nil ||
+			!validLocation(*feature.Location) || !featureMatchesTransport(feature, transportTypes) ||
+			!platformTokenSetsIntersect(wanted, []string{feature.Ref, feature.LocalRef, feature.Tags["ref"], feature.Tags["local_ref"]}) {
+			continue
+		}
+
+		stopPosition := projectLocation(*feature.Location, referenceLatitude)
+		for _, trackIndex := range trackIndexes {
+			trackPoints := featureProjectedPoints(features[trackIndex], referenceLatitude)
+			for segmentIndex := 0; segmentIndex < len(trackPoints)-1; segmentIndex++ {
+				trackPoint := closestPointOnSegment(stopPosition, trackPoints[segmentIndex], trackPoints[segmentIndex+1])
+				distance := pointDistance(stopPosition, trackPoint)
+				if distance < bestDistance {
+					bestDistance = distance
+					bestTrackIndex = trackIndex
+				}
+			}
+		}
+	}
+
+	// Stop positions should lie on the railway way. Allow a little OSM drawing
+	// imprecision, but do not use a remote or incorrectly grouped node.
+	return bestTrackIndex, bestTrackIndex >= 0 && bestDistance <= 5
 }
 
 func platformTokenSetsIntersect(wanted map[string]struct{}, values []string) bool {
@@ -449,6 +530,37 @@ func featureProjectedPoints(feature ctdf.OSMStopFeature, referenceLatitude float
 	return points
 }
 
+func platformProjectedPoints(feature ctdf.OSMStopFeature, referenceLatitude float64) []projectedPoint {
+	points := featureProjectedPoints(feature, referenceLatitude)
+	if feature.Type != ctdf.OSMStopFeatureTypePlatform || len(points) < 4 || pointDistance(points[0], points[len(points)-1]) > 0.1 {
+		return points
+	}
+
+	if centroid, ok := polygonCentroid(points); ok {
+		return []projectedPoint{centroid}
+	}
+	return points
+}
+
+func polygonCentroid(points []projectedPoint) (projectedPoint, bool) {
+	var twiceArea float64
+	var xNumerator float64
+	var yNumerator float64
+	for index := 0; index < len(points)-1; index++ {
+		cross := points[index].x*points[index+1].y - points[index+1].x*points[index].y
+		twiceArea += cross
+		xNumerator += (points[index].x + points[index+1].x) * cross
+		yNumerator += (points[index].y + points[index+1].y) * cross
+	}
+	if math.Abs(twiceArea) < 0.01 {
+		return projectedPoint{}, false
+	}
+	return projectedPoint{
+		x: xNumerator / (3 * twiceArea),
+		y: yNumerator / (3 * twiceArea),
+	}, true
+}
+
 func closestTrackMatch(platformPoints []projectedPoint, trackPoints []projectedPoint) (trackMatch, bool) {
 	if len(platformPoints) == 0 || len(trackPoints) < 2 {
 		return trackMatch{}, false
@@ -472,7 +584,7 @@ func closestTrackMatch(platformPoints []projectedPoint, trackPoints []projectedP
 
 func hasCompetingTrack(matches []trackMatch, best trackMatch) bool {
 	for _, match := range matches[1:] {
-		if match.featureIndex == best.featureIndex {
+		if match.platformFeatureIndex != best.platformFeatureIndex || match.trackFeatureIndex == best.trackFeatureIndex {
 			continue
 		}
 		return match.distance-best.distance < 1.5 || match.distance < best.distance*1.2
