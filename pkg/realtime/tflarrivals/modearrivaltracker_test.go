@@ -21,3 +21,14 @@ func TestModeArrivalsURLRequestsAllPredictionsPerStop(t *testing.T) {
 		t.Errorf("app_key = %q, want %q", got, want)
 	}
 }
+
+func TestModeArrivalsURLLimitsBusPredictionsPerStop(t *testing.T) {
+	requestURL, err := url.Parse(modeArrivalsURL("bus", "test-key"))
+	if err != nil {
+		t.Fatalf("parse request URL: %v", err)
+	}
+
+	if got, want := requestURL.Query().Get("count"), "10"; got != want {
+		t.Errorf("count = %q, want %q", got, want)
+	}
+}

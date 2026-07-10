@@ -97,10 +97,20 @@ func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
 
 func modeArrivalsURL(modeID string, appKey string) string {
 	query := url.Values{}
-	query.Set("count", "-1")
+	query.Set("count", modeArrivalsCount(modeID))
 	query.Set("app_key", appKey)
 
 	return fmt.Sprintf("https://api.tfl.gov.uk/mode/%s/arrivals?%s", url.PathEscape(modeID), query.Encode())
+}
+
+func modeArrivalsCount(modeID string) string {
+	// The bus mode has far more stops than the other TfL modes. Retain enough
+	// predictions for a useful board while keeping the frequent bus poll small.
+	if modeID == "bus" {
+		return "10"
+	}
+
+	return "-1"
 }
 
 func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
