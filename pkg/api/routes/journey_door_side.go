@@ -50,6 +50,7 @@ type journeyStopDoorSideResponse struct {
 
 type journeyStopVisit struct {
 	stopRef           string
+	journeyStopIndex  int
 	previousStopRef   string
 	nextStopRef       string
 	scheduledPlatform string
@@ -91,7 +92,7 @@ func getJourneyStopDoorSide(c *fiber.Ctx) error {
 	realtimeJourney, realtimeErr := realtimestore.FindCurrentForJourney(context.Background(), journey.PrimaryIdentifier)
 	if realtimeErr != nil {
 		log.Debug().Err(realtimeErr).Str("journey", journey.PrimaryIdentifier).Msg("Could not query realtime platform for train door side")
-	} else if realtimePlatform := findRealtimePlatform(realtimeJourney, stop, visit.stopRef); realtimePlatform != "" {
+	} else if realtimePlatform := findRealtimePlatform(realtimeJourney, stop, visit.stopRef, visit.journeyStopIndex); realtimePlatform != "" {
 		platform = realtimePlatform
 		platformSource = trainDoorPlatformRealtime
 	}
@@ -166,7 +167,7 @@ func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber in
 			continue
 		}
 
-		visit := journeyStopVisit{stopRef: stopRef}
+		visit := journeyStopVisit{stopRef: stopRef, journeyStopIndex: index}
 		if index > 0 {
 			visit.previousStopRef = refs[index-1]
 			visit.scheduledPlatform = journey.Path[index-1].DestinationPlatform
@@ -183,7 +184,7 @@ func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber in
 	return journeyStopVisit{}, fmt.Errorf("stop is not visit %d in this journey", visitNumber)
 }
 
-func findRealtimePlatform(realtimeJourney *ctdf.RealtimeJourney, stop *ctdf.Stop, journeyStopRef string) string {
+func findRealtimePlatform(realtimeJourney *ctdf.RealtimeJourney, stop *ctdf.Stop, journeyStopRef string, journeyStopIndex int) string {
 	if realtimeJourney == nil {
 		return ""
 	}
@@ -194,9 +195,8 @@ func findRealtimePlatform(realtimeJourney *ctdf.RealtimeJourney, stop *ctdf.Stop
 		stopIDs[stopID] = struct{}{}
 	}
 
-	// Direct map lookups cover the normal case without scanning all realtime stops.
 	for stopID := range stopIDs {
-		if realtimeStop := realtimeJourney.Stops[stopID]; realtimeStop != nil && strings.TrimSpace(realtimeStop.Platform) != "" {
+		if realtimeStop := realtimeJourney.RealtimeStop(stopID, journeyStopIndex); realtimeStop != nil && strings.TrimSpace(realtimeStop.Platform) != "" {
 			return strings.TrimSpace(realtimeStop.Platform)
 		}
 	}
@@ -204,7 +204,7 @@ func findRealtimePlatform(realtimeJourney *ctdf.RealtimeJourney, stop *ctdf.Stop
 		if realtimeStop == nil {
 			continue
 		}
-		if _, matches := stopIDs[realtimeStop.StopRef]; matches && strings.TrimSpace(realtimeStop.Platform) != "" {
+		if _, matches := stopIDs[realtimeStop.StopRef]; matches && realtimeStop.JourneyStopIndex == journeyStopIndex && strings.TrimSpace(realtimeStop.Platform) != "" {
 			return strings.TrimSpace(realtimeStop.Platform)
 		}
 	}

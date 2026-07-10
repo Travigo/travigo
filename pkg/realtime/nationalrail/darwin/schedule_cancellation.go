@@ -2,7 +2,13 @@ package darwin
 
 import "github.com/travigo/travigo/pkg/ctdf"
 
-func applyDarwinScheduleCancellationState(realtimeJourney *ctdf.RealtimeJourney, scheduleCancellations map[string]bool) {
+type darwinScheduleCancellation struct {
+	stopRef          string
+	journeyStopIndex int
+	cancelled        bool
+}
+
+func applyDarwinScheduleCancellationState(realtimeJourney *ctdf.RealtimeJourney, scheduleCancellations map[string]darwinScheduleCancellation) {
 	if realtimeJourney.Stops == nil {
 		realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
 	}
@@ -17,13 +23,12 @@ func applyDarwinScheduleCancellationState(realtimeJourney *ctdf.RealtimeJourney,
 		realtimeStop.Cancelled = false
 	}
 
-	for stopRef, cancelled := range scheduleCancellations {
-		if realtimeJourney.Stops[stopRef] == nil {
-			realtimeJourney.Stops[stopRef] = &ctdf.RealtimeJourneyStops{
-				StopRef: stopRef,
-			}
+	for _, cancellation := range scheduleCancellations {
+		stop := realtimeJourney.RealtimeStop(cancellation.stopRef, cancellation.journeyStopIndex)
+		if stop == nil {
+			stop = &ctdf.RealtimeJourneyStops{StopRef: cancellation.stopRef, JourneyStopIndex: cancellation.journeyStopIndex}
 		}
-		realtimeJourney.Stops[stopRef].StopRef = stopRef
-		realtimeJourney.Stops[stopRef].Cancelled = cancelled
+		stop.Cancelled = cancellation.cancelled
+		realtimeJourney.SetRealtimeStop(stop)
 	}
 }

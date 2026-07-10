@@ -73,20 +73,23 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	}
 
 	if m.EventType == "DEPARTURE" {
-		for _, path := range realtimeJourney.Journey.Path {
+		for pathIndex, path := range realtimeJourney.Journey.Path {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
+				journeyStop := realtimeJourney.RealtimeStop(path.OriginStopRef, pathIndex)
+				if journeyStop != nil && !journeyStop.DepartureTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
+					continue
+				}
 				realtimeJourney.DepartedStopRef = path.OriginStopRef
 				realtimeJourney.NextStopRef = path.DestinationStopRef
 				realtimeJourney.DepartedStop = path.OriginStop
 				realtimeJourney.NextStop = path.DestinationStop
 
-				if realtimeJourney.Stops[locationStop.PrimaryIdentifier] == nil {
-					realtimeJourney.Stops[locationStop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+				if journeyStop == nil {
+					journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.OriginStopRef, JourneyStopIndex: pathIndex}
 				}
-
-				realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
-				realtimeJourney.Stops[locationStop.PrimaryIdentifier].DepartureTime = now
-				realtimeJourney.Stops[locationStop.PrimaryIdentifier].TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+				journeyStop.DepartureTime = now
+				journeyStop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+				realtimeJourney.SetRealtimeStop(journeyStop)
 
 				break
 			}
@@ -94,11 +97,23 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Departed %s", locationStop.PrimaryName))
 	} else if m.EventType == "ARRIVAL" {
-		if realtimeJourney.Stops[locationStop.PrimaryIdentifier] == nil {
-			realtimeJourney.Stops[locationStop.PrimaryIdentifier] = &ctdf.RealtimeJourneyStops{}
+		for pathIndex, path := range realtimeJourney.Journey.Path {
+			journeyStopIndex := pathIndex + 1
+			if path.DestinationStopRef != locationStop.PrimaryIdentifier && !util.ContainsString(locationStop.OtherIdentifiers, path.DestinationStopRef) {
+				continue
+			}
+			journeyStop := realtimeJourney.RealtimeStop(path.DestinationStopRef, journeyStopIndex)
+			if journeyStop != nil && !journeyStop.ArrivalTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
+				continue
+			}
+			if journeyStop == nil {
+				journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.DestinationStopRef, JourneyStopIndex: journeyStopIndex}
+			}
+			journeyStop.ArrivalTime = now
+			journeyStop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+			realtimeJourney.SetRealtimeStop(journeyStop)
+			break
 		}
-		realtimeJourney.Stops[locationStop.PrimaryIdentifier].StopRef = locationStop.PrimaryIdentifier
-		realtimeJourney.Stops[locationStop.PrimaryIdentifier].ArrivalTime = now
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Arrived at %s", locationStop.PrimaryName))
 

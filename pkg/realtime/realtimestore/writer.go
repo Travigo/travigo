@@ -204,14 +204,20 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 		arrival    time.Time
 	}
 	indexedStops := make([]indexedStop, 0, len(realtimeJourney.Stops))
+	earliestIndexedStops := make(map[string]time.Time, len(realtimeJourney.Stops))
 
-	for stopID, stop := range realtimeJourney.Stops {
+	for _, stop := range realtimeJourney.Stops {
 		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || stop.ArrivalTime.IsZero() {
 			continue
 		}
 
-		indexedStops = append(indexedStops, indexedStop{identifier: stopID, arrival: stop.ArrivalTime})
-		currentStopIDs = append(currentStopIDs, stopID)
+		if arrival, ok := earliestIndexedStops[stop.StopRef]; !ok || stop.ArrivalTime.Before(arrival) {
+			earliestIndexedStops[stop.StopRef] = stop.ArrivalTime
+		}
+	}
+	for stopRef, arrival := range earliestIndexedStops {
+		indexedStops = append(indexedStops, indexedStop{identifier: stopRef, arrival: arrival})
+		currentStopIDs = append(currentStopIDs, stopRef)
 	}
 
 	_, err = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {

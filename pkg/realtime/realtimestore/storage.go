@@ -85,12 +85,13 @@ type storedOperator struct {
 }
 
 type storedRealtimeStop struct {
-	StopRef       string                           `json:"sr,omitempty"`
-	Platform      string                           `json:"p,omitempty"`
-	ArrivalTime   time.Time                        `json:"a,omitempty"`
-	DepartureTime time.Time                        `json:"d,omitempty"`
-	TimeType      ctdf.RealtimeJourneyStopTimeType `json:"t,omitempty"`
-	Cancelled     bool                             `json:"c,omitempty"`
+	StopRef          string                           `json:"sr,omitempty"`
+	JourneyStopIndex int                              `json:"si,omitempty"`
+	Platform         string                           `json:"p,omitempty"`
+	ArrivalTime      time.Time                        `json:"a,omitempty"`
+	DepartureTime    time.Time                        `json:"d,omitempty"`
+	TimeType         ctdf.RealtimeJourneyStopTimeType `json:"t,omitempty"`
+	Cancelled        bool                             `json:"c,omitempty"`
 }
 
 func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *storedRealtimeJourney {
@@ -227,12 +228,13 @@ func storedRealtimeStopsFromCTDF(stops map[string]*ctdf.RealtimeJourneyStops) ma
 		}
 
 		storedStops[key] = &storedRealtimeStop{
-			StopRef:       stop.StopRef,
-			Platform:      stop.Platform,
-			ArrivalTime:   stop.ArrivalTime,
-			DepartureTime: stop.DepartureTime,
-			TimeType:      stop.TimeType,
-			Cancelled:     stop.Cancelled,
+			StopRef:          stop.StopRef,
+			JourneyStopIndex: stop.JourneyStopIndex,
+			Platform:         stop.Platform,
+			ArrivalTime:      stop.ArrivalTime,
+			DepartureTime:    stop.DepartureTime,
+			TimeType:         stop.TimeType,
+			Cancelled:        stop.Cancelled,
 		}
 	}
 
@@ -372,12 +374,13 @@ func (stored *storedRealtimeJourney) realtimeStops() map[string]*ctdf.RealtimeJo
 		}
 
 		stops[key] = &ctdf.RealtimeJourneyStops{
-			StopRef:       stop.StopRef,
-			Platform:      stop.Platform,
-			ArrivalTime:   stop.ArrivalTime,
-			DepartureTime: stop.DepartureTime,
-			TimeType:      stop.TimeType,
-			Cancelled:     stop.Cancelled,
+			StopRef:          stop.StopRef,
+			JourneyStopIndex: stop.JourneyStopIndex,
+			Platform:         stop.Platform,
+			ArrivalTime:      stop.ArrivalTime,
+			DepartureTime:    stop.DepartureTime,
+			TimeType:         stop.TimeType,
+			Cancelled:        stop.Cancelled,
 		}
 	}
 

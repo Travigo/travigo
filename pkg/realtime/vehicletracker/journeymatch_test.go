@@ -52,6 +52,20 @@ func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 	}
 }
 
+func TestJourneyStopOccurrenceIndexHandlesRepeatedStop(t *testing.T) {
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "waterloo", DestinationStopRef: "vauxhall"},
+		{OriginStopRef: "vauxhall", DestinationStopRef: "waterloo"},
+		{OriginStopRef: "waterloo", DestinationStopRef: "clapham"},
+	}}
+	if got := journeyStopOccurrenceIndex(journey, "waterloo", 0); got != 0 {
+		t.Fatalf("expected first Waterloo call at 0, got %d", got)
+	}
+	if got := journeyStopOccurrenceIndex(journey, "waterloo", 1); got != 2 {
+		t.Fatalf("expected second Waterloo call at 2, got %d", got)
+	}
+}
+
 func TestSelectLocationCandidateRequiresClearWinner(t *testing.T) {
 	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10, score: 10}, {journeyID: "b", distance: 20, score: 20}}); got != "" {
 		t.Fatalf("got %q, want no ambiguous match", got)

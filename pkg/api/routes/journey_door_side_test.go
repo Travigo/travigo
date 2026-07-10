@@ -64,8 +64,19 @@ func TestFindRealtimePlatformMatchesStopAliases(t *testing.T) {
 		"unrelated-map-key": {StopRef: "station-alias", Platform: "4"},
 	}}
 
-	if platform := findRealtimePlatform(realtimeJourney, stop, "station"); platform != "4" {
+	if platform := findRealtimePlatform(realtimeJourney, stop, "station", 0); platform != "4" {
 		t.Fatalf("expected realtime platform 4, got %q", platform)
+	}
+}
+
+func TestFindRealtimePlatformSelectsRepeatedStopVisit(t *testing.T) {
+	stop := &ctdf.Stop{PrimaryIdentifier: "station"}
+	realtimeJourney := &ctdf.RealtimeJourney{}
+	realtimeJourney.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "station", JourneyStopIndex: 0, Platform: "1"})
+	realtimeJourney.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "station", JourneyStopIndex: 3, Platform: "4"})
+
+	if platform := findRealtimePlatform(realtimeJourney, stop, "station", 3); platform != "4" {
+		t.Fatalf("expected second visit platform 4, got %q", platform)
 	}
 }
 

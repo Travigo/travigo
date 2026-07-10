@@ -14,6 +14,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 var (
@@ -98,13 +99,13 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		timedOut := (now.Sub(realtimeJourney.ModificationDateTime)).Minutes() > 2
 
 		if !timedOut {
-			realtimeJourneyStop := realtimeJourney.Stops[q.Stop.PrimaryIdentifier]
-			if realtimeJourneyStop == nil {
-				for _, stopID := range allStopIDS {
-					if realtimeJourney.Stops[stopID] != nil {
-						realtimeJourneyStop = realtimeJourney.Stops[stopID]
-						break
-					}
+			var realtimeJourneyStop *ctdf.RealtimeJourneyStops
+			for _, candidate := range realtimeJourney.Stops {
+				if candidate == nil || !util.ContainsString(allStopIDS, candidate.StopRef) || candidate.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+					continue
+				}
+				if realtimeJourneyStop == nil || candidate.ArrivalTime.Before(realtimeJourneyStop.ArrivalTime) {
+					realtimeJourneyStop = candidate
 				}
 			}
 			if realtimeJourneyStop == nil || realtimeJourneyStop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {

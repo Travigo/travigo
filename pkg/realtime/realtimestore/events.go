@@ -115,7 +115,11 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 			continue
 		}
 
-		previousStop := previous.Stops[id]
+		stopRef := currentStop.StopRef
+		if stopRef == "" {
+			stopRef = id
+		}
+		previousStop := previous.RealtimeStop(stopRef, currentStop.JourneyStopIndex)
 		if previousStop == nil {
 			continue
 		}
@@ -133,9 +137,10 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 				Type:      ctdf.EventTypeRealtimeJourneyPlatformSet,
 				Timestamp: timestamp,
 				Body: map[string]interface{}{
-					"RealtimeJourney": *current,
-					"Stop":            id,
-					"NewPlatform":     newPlatform,
+					"RealtimeJourney":  *current,
+					"Stop":             stopRef,
+					"JourneyStopIndex": currentStop.JourneyStopIndex,
+					"NewPlatform":      newPlatform,
 				},
 			})
 		} else if oldPlatform != "" && newPlatform != oldPlatform {
@@ -149,10 +154,11 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 				Type:      ctdf.EventTypeRealtimeJourneyPlatformChanged,
 				Timestamp: timestamp,
 				Body: map[string]interface{}{
-					"RealtimeJourney": *current,
-					"Stop":            id,
-					"OldPlatform":     oldPlatform,
-					"NewPlatform":     newPlatform,
+					"RealtimeJourney":  *current,
+					"Stop":             stopRef,
+					"JourneyStopIndex": currentStop.JourneyStopIndex,
+					"OldPlatform":      oldPlatform,
+					"NewPlatform":      newPlatform,
 				},
 			})
 		}

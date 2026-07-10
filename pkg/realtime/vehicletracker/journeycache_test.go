@@ -4,25 +4,7 @@ import (
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/travigo/travigo/pkg/ctdf"
 )
-
-func TestBuildPathByOriginStopRef(t *testing.T) {
-	path := []*ctdf.JourneyPathItem{
-		{OriginStopRef: "stop-a", DestinationStopRef: "stop-b"},
-		{OriginStopRef: "stop-b", DestinationStopRef: "stop-c"},
-	}
-
-	pathByOrigin := buildPathByOriginStopRef(path)
-
-	if pathByOrigin["stop-a"] != path[0] {
-		t.Fatal("expected stop-a to map to first path item")
-	}
-	if pathByOrigin["stop-b"] != path[1] {
-		t.Fatal("expected stop-b to map to second path item")
-	}
-}
 
 func TestPruneJourneyCacheLockedRemovesOldestEntries(t *testing.T) {
 	consumer := &BatchConsumer{

@@ -108,6 +108,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			continue
 		}
 
+		stopOccurrences := map[string]int{}
 		for _, location := range trainStatus.Locations {
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", location.TPL))
 
@@ -116,13 +117,19 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				continue
 			}
 
-			journeyStop := realtimeJourney.Stops[stop.PrimaryIdentifier]
+			journeyStopIndex := darwinJourneyStopOccurrenceIndex(realtimeJourney.Journey, stop, stopOccurrences[stop.PrimaryIdentifier])
+			if journeyStopIndex < 0 {
+				continue
+			}
+			stopOccurrences[stop.PrimaryIdentifier]++
+			journeyStop := realtimeJourney.RealtimeStop(stop.PrimaryIdentifier, journeyStopIndex)
 			journeyStopUpdated := false
 
-			if realtimeJourney.Stops[stop.PrimaryIdentifier] == nil {
+			if journeyStop == nil {
 				journeyStop = &ctdf.RealtimeJourneyStops{
-					StopRef:  stop.PrimaryIdentifier,
-					TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+					StopRef:          stop.PrimaryIdentifier,
+					JourneyStopIndex: journeyStopIndex,
+					TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 				}
 			}
 			journeyStop.StopRef = stop.PrimaryIdentifier
@@ -151,7 +158,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			}
 
 			if journeyStopUpdated {
-				realtimeJourney.Stops[stop.PrimaryIdentifier] = journeyStop
+				realtimeJourney.SetRealtimeStop(journeyStop)
 			}
 		}
 
@@ -244,12 +251,15 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 
 		cancelCount := 0
 		resolvedScheduleStopCount := 0
-		scheduleCancellations := map[string]bool{}
+		scheduleCancellations := map[string]darwinScheduleCancellation{}
+		passengerStopIndex := 0
 
 		for scheduleStopIndex, scheduleStop := range schedule.Locations {
 			if !scheduleStop.isPassengerCall() {
 				continue
 			}
+			journeyStopIndex := passengerStopIndex
+			passengerStopIndex++
 
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", scheduleStop.Tiploc))
 
@@ -274,11 +284,11 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				Str("wta", scheduleStop.WorkingArrival).
 				Str("wtd", scheduleStop.WorkingDeparture).
 				Str("cancelled", scheduleStop.Cancelled).
-				Bool("existing_cancelled", realtimeJourney.Stops[stop.PrimaryIdentifier] != nil && realtimeJourney.Stops[stop.PrimaryIdentifier].Cancelled).
+				Bool("existing_cancelled", realtimeJourney.RealtimeStop(stop.PrimaryIdentifier, journeyStopIndex) != nil && realtimeJourney.RealtimeStop(stop.PrimaryIdentifier, journeyStopIndex).Cancelled).
 				Msg("Darwin schedule stop cancellation state")
 
 			resolvedScheduleStopCount += 1
-			scheduleCancellations[stop.PrimaryIdentifier] = scheduleStop.Cancelled == "true"
+			scheduleCancellations[ctdf.RealtimeJourneyStopKey(stop.PrimaryIdentifier, journeyStopIndex)] = darwinScheduleCancellation{stopRef: stop.PrimaryIdentifier, journeyStopIndex: journeyStopIndex, cancelled: scheduleStop.Cancelled == "true"}
 			if scheduleStop.Cancelled == "true" {
 				cancelCount += 1
 			}

@@ -254,7 +254,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					return nil
 				}
 
-				for _, path := range journey.Path {
+				for pathIndex, path := range journey.Path {
 					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
 						stopMatchedCount.Add(1)
 						refTime := boardPathTime(path, boardType)
@@ -272,13 +272,17 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							var realtimeJourneyStop *RealtimeJourneyStops
 
 							// Lookup realtime journey stop by either direct reference or other identifiers (which requires extra db call)
-							if journey.RealtimeJourney.Stops[boardPathStopRef(path, boardType)] != nil {
-								realtimeJourneyStop = journey.RealtimeJourney.Stops[boardPathStopRef(path, boardType)]
+							journeyStopIndex := pathIndex
+							if boardType == BoardTypeArrival {
+								journeyStopIndex++
+							}
+							if stop := journey.RealtimeJourney.RealtimeStop(boardPathStopRef(path, boardType), journeyStopIndex); stop != nil {
+								realtimeJourneyStop = stop
 							} else {
 								boardStop := boardPathStop(path, boardType)
 
-								for stopID, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
-									if boardStop != nil && (boardStop.PrimaryIdentifier == stopID || slices.Contains(boardStop.OtherIdentifiers, stopID)) {
+								for _, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
+									if potentialRealtimeJourneyStop != nil && boardStop != nil && (boardStop.PrimaryIdentifier == potentialRealtimeJourneyStop.StopRef || slices.Contains(boardStop.OtherIdentifiers, potentialRealtimeJourneyStop.StopRef)) && potentialRealtimeJourneyStop.JourneyStopIndex == journeyStopIndex {
 										realtimeJourneyStop = potentialRealtimeJourneyStop
 										break
 									}

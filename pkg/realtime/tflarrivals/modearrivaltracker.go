@@ -257,7 +257,16 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	// Add new predictions to the realtime journey
 	platformMatchRegex, _ := regexp.Compile(`(\w+) (?:- )?Platform (\d+)`)
-	updatedStops := map[string]bool{}
+	previousStops := realtimeJourney.Stops
+	realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
+	predictionIndex := 0
+	var earliestPrediction time.Time
+	for _, stop := range previousStops {
+		if stop != nil && stop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
+			realtimeJourney.Stops[fmt.Sprintf("historical-%d", predictionIndex)] = stop
+			predictionIndex++
+		}
+	}
 	for _, prediction := range predictions {
 		stop := getStopFromTfLStop(prediction.NaptanID)
 
@@ -271,6 +280,9 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 		stopTimezone, _ := time.LoadLocation(stop.Timezone)
 		scheduledTime = scheduledTime.In(stopTimezone)
+		if earliestPrediction.IsZero() || scheduledTime.Before(earliestPrediction) {
+			earliestPrediction = scheduledTime
+		}
 
 		platform := prediction.PlatformName
 		platformMatches := platformMatchRegex.FindStringSubmatch(platform)
@@ -281,7 +293,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			platform = ""
 		}
 
-		realtimeJourney.Stops[stopID] = &ctdf.RealtimeJourneyStops{
+		realtimeJourney.Stops[fmt.Sprintf("prediction-%d", predictionIndex)] = &ctdf.RealtimeJourneyStops{
 			StopRef:       stopID,
 			TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			ArrivalTime:   scheduledTime,
@@ -290,18 +302,15 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			Platform: platform,
 		}
 
-		updatedStops[stopID] = true
+		predictionIndex++
 	}
-
-	// Iterate over stops in the realtime journey and any that arent included in this update get changed to historical
-	for key, stop := range realtimeJourney.Stops {
-		if !updatedStops[stop.StopRef] {
-			stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+	for _, stop := range previousStops {
+		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || earliestPrediction.IsZero() || !stop.ArrivalTime.Before(earliestPrediction) {
+			continue
 		}
-
-		if key != "" {
-			realtimeJourney.Stops[key] = stop
-		}
+		stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+		realtimeJourney.Stops[fmt.Sprintf("historical-%d", predictionIndex)] = stop
+		predictionIndex++
 	}
 
 	// Order the realtime journey stops by arrival time in ascending order
@@ -315,6 +324,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 		return aTime.Before(bTime)
 	})
+	realtimeJourney.Stops = make(map[string]*ctdf.RealtimeJourneyStops, len(realtimeJourneyStops))
+	for index, stop := range realtimeJourneyStops {
+		stop.JourneyStopIndex = index
+		realtimeJourney.SetRealtimeStop(stop)
+	}
 
 	// Get all the naptan ids this realtime journey stops contains in order of arrival
 	var journeyOrderedNaptanIDs []string
@@ -427,7 +441,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// Also set the stop arrival times to be the same as the estimates
 	realtimeJourney.DepartedStopRef = ""
 	for i, item := range vehicleJourneyPath {
-		realtimeStop := realtimeJourney.Stops[item.OriginStopRef]
+		realtimeStop := realtimeJourney.RealtimeStop(item.OriginStopRef, i)
 
 		var referenceItem *ctdf.JourneyPathItem
 		if i == 0 {

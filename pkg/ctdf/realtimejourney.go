@@ -1,6 +1,7 @@
 package ctdf
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -147,7 +148,10 @@ func (r *RealtimeJourney) IsActive() bool {
 
 type RealtimeJourneyStops struct {
 	StopRef string `groups:"basic"`
-	Stop    *Stop  `groups:"basic" bson:"-"`
+	// JourneyStopIndex identifies this call in the ordered journey stop list.
+	// Stop references are not unique on circular journeys.
+	JourneyStopIndex int   `groups:"basic"`
+	Stop             *Stop `groups:"basic" bson:"-"`
 
 	Platform string `groups:"basic"`
 
@@ -157,6 +161,63 @@ type RealtimeJourneyStops struct {
 	TimeType RealtimeJourneyStopTimeType `groups:"basic"`
 
 	Cancelled bool `groups:"basic"`
+}
+
+func RealtimeJourneyStopKey(stopRef string, journeyStopIndex int) string {
+	return fmt.Sprintf("%s@%d", stopRef, journeyStopIndex)
+}
+
+// RealtimeStop returns a stop call by occurrence. It also reads the historic
+// stop-ref-keyed representation so journeys already in storage remain usable.
+func (r *RealtimeJourney) RealtimeStop(stopRef string, journeyStopIndex int) *RealtimeJourneyStops {
+	if r == nil {
+		return nil
+	}
+	if stop := r.Stops[RealtimeJourneyStopKey(stopRef, journeyStopIndex)]; stop != nil {
+		return stop
+	}
+	for _, stop := range r.Stops {
+		if stop != nil && stop.StopRef == stopRef && stop.JourneyStopIndex == journeyStopIndex {
+			return stop
+		}
+	}
+	// A legacy record contains no occurrence information. It is safe at a
+	// unique stop, or at the first call of a repeated stop.
+	if legacyStop := r.Stops[stopRef]; legacyStop != nil && r.legacyStopCanMatch(stopRef, journeyStopIndex) {
+		return legacyStop
+	}
+	return nil
+}
+
+func (r *RealtimeJourney) legacyStopCanMatch(stopRef string, journeyStopIndex int) bool {
+	if r.Journey == nil || len(r.Journey.Path) == 0 {
+		return true
+	}
+	matchCount := 0
+	firstMatchIndex := -1
+	if r.Journey.Path[0].OriginStopRef == stopRef {
+		firstMatchIndex = 0
+		matchCount++
+	}
+	for index, path := range r.Journey.Path {
+		if path.DestinationStopRef == stopRef {
+			if firstMatchIndex < 0 {
+				firstMatchIndex = index + 1
+			}
+			matchCount++
+		}
+	}
+	return matchCount <= 1 || journeyStopIndex == firstMatchIndex
+}
+
+func (r *RealtimeJourney) SetRealtimeStop(stop *RealtimeJourneyStops) {
+	if r == nil || stop == nil || stop.StopRef == "" {
+		return
+	}
+	if r.Stops == nil {
+		r.Stops = map[string]*RealtimeJourneyStops{}
+	}
+	r.Stops[RealtimeJourneyStopKey(stop.StopRef, stop.JourneyStopIndex)] = stop
 }
 
 type RealtimeJourneyStopTimeType string

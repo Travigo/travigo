@@ -129,39 +129,52 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 				}
 			}
 
-			journeyStopUpdates[path.DestinationStopRef] = &ctdf.RealtimeJourneyStops{
-				StopRef:  path.DestinationStopRef,
-				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+			stopUpdate := &ctdf.RealtimeJourneyStops{
+				StopRef:          path.DestinationStopRef,
+				JourneyStopIndex: i + 1,
+				TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 
 				ArrivalTime:   arrivalTime,
 				DepartureTime: departureTime,
 			}
+			journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
 		}
 	} else {
+		nextOccurrence := map[string]int{}
 		for _, stopUpdate := range vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates {
+			journeyStopIndex := journeyStopOccurrenceIndex(realtimeJourney.Journey, stopUpdate.StopID, nextOccurrence[stopUpdate.StopID])
+			if journeyStopIndex < 0 {
+				continue
+			}
+			nextOccurrence[stopUpdate.StopID]++
 			arrivalTime := stopUpdate.ArrivalTime
 			departureTime := stopUpdate.DepartureTime
+			var scheduledArrivalTime, scheduledDepartureTime time.Time
+			if journeyStopIndex < len(realtimeJourney.Journey.Path) {
+				scheduledArrivalTime = realtimeJourney.Journey.Path[journeyStopIndex].OriginArrivalTime
+				scheduledDepartureTime = realtimeJourney.Journey.Path[journeyStopIndex].OriginDepartureTime
+			} else {
+				lastPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
+				scheduledArrivalTime = lastPath.DestinationArrivalTime
+				scheduledDepartureTime = lastPath.DestinationArrivalTime
+			}
 
 			if arrivalTime.Year() == 1970 {
-				path := cachedJourney.PathByOriginStopRef[stopUpdate.StopID]
-				if path != nil {
-					arrivalTime = path.OriginArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
-				}
+				arrivalTime = scheduledArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
 			}
 			if departureTime.Year() == 1970 {
-				path := cachedJourney.PathByOriginStopRef[stopUpdate.StopID]
-				if path != nil {
-					departureTime = path.OriginDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
-				}
+				departureTime = scheduledDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
 			}
 
-			journeyStopUpdates[stopUpdate.StopID] = &ctdf.RealtimeJourneyStops{
-				StopRef:  stopUpdate.StopID,
-				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+			realtimeStop := &ctdf.RealtimeJourneyStops{
+				StopRef:          stopUpdate.StopID,
+				JourneyStopIndex: journeyStopIndex,
+				TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 
 				ArrivalTime:   arrivalTime,
 				DepartureTime: departureTime,
 			}
+			journeyStopUpdates[ctdf.RealtimeJourneyStopKey(realtimeStop.StopRef, realtimeStop.JourneyStopIndex)] = realtimeStop
 		}
 
 		closestPathTime := 9999999 * time.Minute
@@ -173,7 +186,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to parse realtime time frame")
 		}
-		for _, path := range realtimeJourney.Journey.Path {
+		for pathIndex, path := range realtimeJourney.Journey.Path {
 			refTime := time.Date(
 				realtimeTimeframe.Year(),
 				realtimeTimeframe.Month(),
@@ -185,8 +198,8 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 				journeyTimezone,
 			)
 
-			if journeyStopUpdates[path.OriginStopRef] != nil {
-				refTime = journeyStopUpdates[path.OriginStopRef].ArrivalTime
+			if update := journeyStopUpdates[ctdf.RealtimeJourneyStopKey(path.OriginStopRef, pathIndex)]; update != nil {
+				refTime = update.ArrivalTime
 			}
 
 			if refTime.Before(now) && now.Sub(refTime) < closestPathTime {
@@ -229,17 +242,6 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		realtimeJourney.Offset = offset
 	}
 
-	if realtimeJourney.NextStopRef != closestDistanceJourneyPath.DestinationStopRef {
-		journeyStopUpdates[realtimeJourney.NextStopRef] = &ctdf.RealtimeJourneyStops{
-			StopRef:  realtimeJourney.NextStopRef,
-			TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
-
-			// TODO this should obviously be a different time
-			ArrivalTime:   currentTime,
-			DepartureTime: currentTime,
-		}
-	}
-
 	for key, stopUpdate := range journeyStopUpdates {
 		if key != "" {
 			if realtimeJourney.Stops[key] == nil {
@@ -252,6 +254,22 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	return nil
+}
+
+func journeyStopOccurrenceIndex(journey *ctdf.Journey, stopRef string, occurrence int) int {
+	seen := 0
+	for index, path := range journey.Path {
+		if path.OriginStopRef == stopRef {
+			if seen == occurrence {
+				return index
+			}
+			seen++
+		}
+	}
+	if len(journey.Path) > 0 && journey.Path[len(journey.Path)-1].DestinationStopRef == stopRef && seen == occurrence {
+		return len(journey.Path)
+	}
+	return -1
 }
 
 func serviceTimeOnDate(serviceDate time.Time, serviceTime time.Time, location *time.Location) time.Time {

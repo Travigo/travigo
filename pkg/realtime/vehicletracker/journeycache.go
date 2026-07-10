@@ -14,9 +14,8 @@ import (
 const trackedJourneyCacheMaxEntries = 1000
 
 type cachedTrackedJourney struct {
-	Journey             *ctdf.Journey
-	PathByOriginStopRef map[string]*ctdf.JourneyPathItem
-	LastUsed            time.Time
+	Journey  *ctdf.Journey
+	LastUsed time.Time
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
@@ -45,9 +44,8 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	journey.GetService()
 
 	cachedJourney = &cachedTrackedJourney{
-		Journey:             journey,
-		PathByOriginStopRef: buildPathByOriginStopRef(journey.Path),
-		LastUsed:            now,
+		Journey:  journey,
+		LastUsed: now,
 	}
 
 	consumer.journeyCacheMu.Lock()
@@ -125,17 +123,6 @@ func hydrateDestinationStops(journey *ctdf.Journey) error {
 	}
 
 	return nil
-}
-
-func buildPathByOriginStopRef(path []*ctdf.JourneyPathItem) map[string]*ctdf.JourneyPathItem {
-	pathByOriginStopRef := make(map[string]*ctdf.JourneyPathItem, len(path))
-	for _, pathItem := range path {
-		if pathItem.OriginStopRef != "" {
-			pathByOriginStopRef[pathItem.OriginStopRef] = pathItem
-		}
-	}
-
-	return pathByOriginStopRef
 }
 
 func (consumer *BatchConsumer) loadLocation(name string) *time.Location {

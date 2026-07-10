@@ -118,14 +118,17 @@ func TestRealtimeJourneyEventsDetectsPlatformSetAndChanged(t *testing.T) {
 		PrimaryIdentifier: "realtime-test",
 		Stops: map[string]*ctdf.RealtimeJourneyStops{
 			"stop-a": {
+				StopRef:  "stop-a",
 				Platform: "",
 				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			},
 			"stop-b": {
+				StopRef:  "stop-b",
 				Platform: "1",
 				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			},
 			"stop-c": {
+				StopRef:  "stop-c",
 				Platform: "2",
 				TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
 			},
@@ -135,18 +138,22 @@ func TestRealtimeJourneyEventsDetectsPlatformSetAndChanged(t *testing.T) {
 		PrimaryIdentifier: "realtime-test",
 		Stops: map[string]*ctdf.RealtimeJourneyStops{
 			"stop-a": {
+				StopRef:  "stop-a",
 				Platform: "4",
 				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			},
 			"stop-b": {
+				StopRef:  "stop-b",
 				Platform: "3",
 				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			},
 			"stop-c": {
+				StopRef:  "stop-c",
 				Platform: "5",
 				TimeType: ctdf.RealtimeJourneyStopTimeHistorical,
 			},
 			"stop-d": {
+				StopRef:  "stop-d",
 				Platform: "6",
 				TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			},
@@ -167,16 +174,60 @@ func TestRealtimeJourneyEventsDetectsPlatformSetAndChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("expected platform set event")
 	}
-	assertPlatformEventBody(t, platformSet, "stop-a", "", "4")
+	assertPlatformEventBody(t, platformSet, "stop-a", 0, "", "4")
 
 	platformChanged, ok := eventsByType[ctdf.EventTypeRealtimeJourneyPlatformChanged]
 	if !ok {
 		t.Fatal("expected platform changed event")
 	}
-	assertPlatformEventBody(t, platformChanged, "stop-b", "1", "3")
+	assertPlatformEventBody(t, platformChanged, "stop-b", 0, "1", "3")
 }
 
-func assertPlatformEventBody(t *testing.T, event ctdf.Event, stop string, oldPlatform string, newPlatform string) {
+func TestRealtimeJourneyEventsDistinguishRepeatedStopCalls(t *testing.T) {
+	previous := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Stops: map[string]*ctdf.RealtimeJourneyStops{}}
+	current := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Stops: map[string]*ctdf.RealtimeJourneyStops{}}
+	for _, index := range []int{0, 3} {
+		previous.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "waterloo", JourneyStopIndex: index, Platform: "1", TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+		current.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "waterloo", JourneyStopIndex: index, Platform: "2", TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+	}
+
+	events := realtimeJourneyEvents(previous, current, true, time.Now())
+	if len(events) != 2 {
+		t.Fatalf("expected a platform event for both Waterloo calls, got %d", len(events))
+	}
+	seenIndexes := map[int]bool{}
+	for _, event := range events {
+		body := event.Body.(map[string]interface{})
+		if body["Stop"] != "waterloo" {
+			t.Fatalf("expected physical stop ref in event, got %v", body["Stop"])
+		}
+		seenIndexes[body["JourneyStopIndex"].(int)] = true
+	}
+	if !seenIndexes[0] || !seenIndexes[3] {
+		t.Fatalf("expected occurrence indexes 0 and 3, got %v", seenIndexes)
+	}
+}
+
+func TestRealtimeJourneyEventsCompareLegacyPreviousStop(t *testing.T) {
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "waterloo"}}}
+	previous := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "realtime-test",
+		Journey:           journey,
+		Stops: map[string]*ctdf.RealtimeJourneyStops{
+			"waterloo": {StopRef: "waterloo", Platform: "1", TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture},
+		},
+	}
+	current := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Journey: journey}
+	current.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "waterloo", JourneyStopIndex: 1, Platform: "2", TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+
+	events := realtimeJourneyEvents(previous, current, true, time.Now())
+	if len(events) != 1 {
+		t.Fatalf("expected platform change across legacy migration, got %d events", len(events))
+	}
+	assertPlatformEventBody(t, events[0], "waterloo", 1, "1", "2")
+}
+
+func assertPlatformEventBody(t *testing.T, event ctdf.Event, stop string, journeyStopIndex int, oldPlatform string, newPlatform string) {
 	t.Helper()
 
 	body, ok := event.Body.(map[string]interface{})
@@ -185,6 +236,9 @@ func assertPlatformEventBody(t *testing.T, event ctdf.Event, stop string, oldPla
 	}
 	if body["Stop"] != stop {
 		t.Fatalf("expected stop %s, got %v", stop, body["Stop"])
+	}
+	if body["JourneyStopIndex"] != journeyStopIndex {
+		t.Fatalf("expected journey stop index %d, got %v", journeyStopIndex, body["JourneyStopIndex"])
 	}
 	if body["NewPlatform"] != newPlatform {
 		t.Fatalf("expected new platform %s, got %v", newPlatform, body["NewPlatform"])

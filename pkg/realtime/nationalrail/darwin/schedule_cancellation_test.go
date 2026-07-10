@@ -19,15 +19,15 @@ func TestApplyDarwinScheduleCancellationStateClearsStaleCancellations(t *testing
 		},
 	}
 
-	applyDarwinScheduleCancellationState(realtimeJourney, map[string]bool{
-		"tmr-stop-cambridge-north": true,
-		"tmr-stop-cambridge":       false,
+	applyDarwinScheduleCancellationState(realtimeJourney, map[string]darwinScheduleCancellation{
+		"north":     {stopRef: "tmr-stop-cambridge-north", cancelled: true},
+		"cambridge": {stopRef: "tmr-stop-cambridge", cancelled: false},
 	})
 
-	if !realtimeJourney.Stops["tmr-stop-cambridge-north"].Cancelled {
+	if !realtimeJourney.RealtimeStop("tmr-stop-cambridge-north", 0).Cancelled {
 		t.Fatal("expected Cambridge North cancellation to be applied")
 	}
-	if realtimeJourney.Stops["tmr-stop-cambridge"].Cancelled {
+	if realtimeJourney.RealtimeStop("tmr-stop-cambridge", 0).Cancelled {
 		t.Fatal("expected stale Cambridge cancellation to be cleared")
 	}
 }
