@@ -13,7 +13,8 @@ var TfLAppKey string
 type TrackerManager struct {
 	Modes []*TfLMode
 
-	RuntimeJourneyFilter func(string, string) bool
+	RuntimeJourneyFilter         RuntimeJourneyFilter
+	RuntimeJourneyFilterProvider RuntimeJourneyFilterProvider
 }
 
 func (t TrackerManager) Run(getRoutes bool) {
@@ -57,7 +58,8 @@ func (t TrackerManager) Run(getRoutes bool) {
 					Mode:        mode,
 					RefreshRate: mode.ArrivalRefreshRate,
 
-					RuntimeJourneyFilter: t.RuntimeJourneyFilter,
+					RuntimeJourneyFilter:         t.RuntimeJourneyFilter,
+					RuntimeJourneyFilterProvider: t.RuntimeJourneyFilterProvider,
 				}
 
 				modeArrivalTracker.Run(getRoutes)

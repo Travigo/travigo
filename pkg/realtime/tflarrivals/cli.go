@@ -1,7 +1,6 @@
 package tflarrivals
 
 import (
-	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 func RegisterCLI() *cli.Command {
@@ -138,17 +136,11 @@ func RegisterCLI() *cli.Command {
 								TransportType:      ctdf.TransportTypeBus,
 								TrackArrivals:      true,
 								TrackDisruptions:   false,
-								ArrivalRefreshRate: 30 * time.Second,
+								ArrivalRefreshRate: 45 * time.Second,
 							},
 						},
 
-						RuntimeJourneyFilter: func(lineID string, tripID string) bool {
-							tflTrackerCollection := database.GetCollection("tfl_tracker")
-
-							count, _ := tflTrackerCollection.CountDocuments(context.Background(), bson.M{"line": lineID, "tripid": tripID})
-
-							return count != 0
-						},
+						RuntimeJourneyFilterProvider: loadTFLTrackerRuntimeJourneyFilter,
 					}
 					trackerManager.Run(false)
 

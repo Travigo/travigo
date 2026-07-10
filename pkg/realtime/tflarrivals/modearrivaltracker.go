@@ -27,8 +27,14 @@ type ModeArrivalTracker struct {
 	Mode        *TfLMode
 	RefreshRate time.Duration
 
-	RuntimeJourneyFilter func(string, string) bool
+	RuntimeJourneyFilter         RuntimeJourneyFilter
+	RuntimeJourneyFilterProvider RuntimeJourneyFilterProvider
 }
+
+type RuntimeJourneyFilter func(string, string) bool
+type RuntimeJourneyFilterProvider func(context.Context) (RuntimeJourneyFilter, error)
+
+const modeArrivalMaxConcurrentJourneys = 32
 
 func (l *ModeArrivalTracker) Run(getRoutes bool) {
 	// if l.Line.Service == nil {
@@ -91,6 +97,9 @@ func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
 
 	var lineArrivals []ArrivalPrediction
 	json.Unmarshal(jsonBytes, &lineArrivals)
+	if l.Mode.ModeID == "bus" {
+		cacheBusArrivals(lineArrivals)
+	}
 
 	return lineArrivals
 }
@@ -107,7 +116,7 @@ func modeArrivalsCount(modeID string) string {
 	// The bus mode has far more stops than the other TfL modes. Retain enough
 	// predictions for a useful board while keeping the frequent bus poll small.
 	if modeID == "bus" {
-		return "10"
+		return "8"
 	}
 
 	return "-1"
@@ -115,6 +124,18 @@ func modeArrivalsCount(modeID string) string {
 
 func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 	startTime := time.Now()
+	runtimeJourneyFilter := l.RuntimeJourneyFilter
+	if l.RuntimeJourneyFilterProvider != nil {
+		var err error
+		runtimeJourneyFilter, err = l.RuntimeJourneyFilterProvider(context.Background())
+		if err != nil {
+			log.Error().Err(err).Str("id", l.Mode.ModeID).Msg("Failed to load runtime journey filter")
+			return
+		}
+	}
+	if runtimeJourneyFilter == nil {
+		runtimeJourneyFilter = func(string, string) bool { return true }
+	}
 
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: "tfl-json",
@@ -124,7 +145,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 		Timestamp:      fmt.Sprint(startTime.Unix()),
 	}
 
-	p := pool.NewWithResults[struct{}]()
+	p := pool.NewWithResults[struct{}]().WithMaxGoroutines(modeArrivalMaxConcurrentJourneys)
 
 	// Group all the arrivals predictions that are part of the same journey
 	groupedLineArrivals := map[string][]ArrivalPrediction{}
@@ -143,7 +164,7 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 
 	// Generate RealtimeJourneys for each group
 	for realtimeJourneyID, predictions := range groupedLineArrivals {
-		if l.RuntimeJourneyFilter(predictions[0].LineID, predictions[0].TripID) {
+		if runtimeJourneyFilter(predictions[0].LineID, predictions[0].TripID) {
 			realtimeJourneyID := realtimeJourneyID
 			predictions := predictions
 

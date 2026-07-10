@@ -388,6 +388,9 @@ func createJourneysIndexes() {
 			Keys:    bson.D{{Key: "creationdatetime", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(4 * 3600), // Expire after 4 hours
 		},
+		{
+			Keys: bson.D{{Key: "line", Value: 1}, {Key: "tripid", Value: 1}},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
