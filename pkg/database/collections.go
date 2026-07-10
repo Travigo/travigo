@@ -164,7 +164,7 @@ func createStopsIndexes() {
 	stopGroupsCollection := GetCollection("stop_groups")
 	stopGroupsIndex := []mongo.IndexModel{
 		{
-			Keys: bson.D{{Key: "identifier", Value: 1}},
+			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
 		},
 	}
 
