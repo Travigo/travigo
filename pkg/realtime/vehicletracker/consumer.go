@@ -303,6 +303,11 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		}
 
 		if err != nil {
+			if locationJourneyID := consumer.identifyJourneyFromLocation(vehicleUpdateEvent, sourceType, identifyingInformation); locationJourneyID != "" {
+				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, locationJourneyID, vehicleUpdateEvent.RecordedAt)
+				return locationJourneyID
+			}
+
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
 

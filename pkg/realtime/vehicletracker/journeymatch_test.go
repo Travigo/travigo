@@ -34,3 +34,12 @@ func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 }
+
+func TestSelectLocationCandidateRequiresClearWinner(t *testing.T) {
+	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10}, {journeyID: "b", distance: 20}}); got != "" {
+		t.Fatalf("got %q, want no ambiguous match", got)
+	}
+	if got := selectLocationCandidate([]locationJourneyCandidate{{journeyID: "a", distance: 10}, {journeyID: "b", distance: 50}}); got != "a" {
+		t.Fatalf("got %q, want a", got)
+	}
+}
