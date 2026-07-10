@@ -24,10 +24,20 @@ type trackSnap struct {
 	fraction float64
 }
 
+type cachedTrackSnap struct {
+	snap     trackSnap
+	distance float64
+	ok       bool
+}
+
 // assignJourneyPathTracks splits a journey shape at each stop. A split is only
 // applied when every stop can be snapped near the shape in its travel order;
 // otherwise Path tracks are left empty and Journey.Track remains the fallback.
 func assignJourneyPathTracks(path []*ctdf.JourneyPathItem, stopTimes []StopTime, stopLocations map[string]ctdf.Location, journeyTrack []ctdf.Location) bool {
+	return assignJourneyPathTracksCached(path, stopTimes, stopLocations, journeyTrack, nil)
+}
+
+func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []StopTime, stopLocations map[string]ctdf.Location, journeyTrack []ctdf.Location, snapCache map[string]cachedTrackSnap) bool {
 	if len(path) == 0 || len(path) != len(stopTimes)-1 || len(journeyTrack) < 2 {
 		return false
 	}
@@ -39,7 +49,15 @@ func assignJourneyPathTracks(path []*ctdf.JourneyPathItem, stopTimes []StopTime,
 			return false
 		}
 
-		snap, distance, ok := closestTrackSnap(stopLocation, journeyTrack)
+		cached, exists := snapCache[stopTime.StopID]
+		if !exists {
+			snap, distance, ok := closestTrackSnap(stopLocation, journeyTrack)
+			cached = cachedTrackSnap{snap: snap, distance: distance, ok: ok}
+			if snapCache != nil {
+				snapCache[stopTime.StopID] = cached
+			}
+		}
+		snap, distance, ok := cached.snap, cached.distance, cached.ok
 		if !ok || distance > maxStopShapeDistanceMetres {
 			return false
 		}

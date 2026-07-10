@@ -44,6 +44,8 @@ type journeyTrackStore struct {
 	datasource *ctdf.DataSourceReference
 	refs       map[string]string
 	queue      DatabaseBatchProcessingQueue
+	unique     int
+	reused     int
 }
 
 func newJourneyTrackStore(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) *journeyTrackStore {
@@ -52,17 +54,18 @@ func newJourneyTrackStore(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	return store
 }
 
-func (store *journeyTrackStore) Reference(track []ctdf.Location) string {
+func (store *journeyTrackStore) Reference(key string, track []ctdf.Location) string {
 	if len(track) < 2 {
 		return ""
 	}
-	encoded, _ := bson.Marshal(track)
-	hash := fmt.Sprintf("%x", sha256.Sum256(encoded))
-	if ref := store.refs[hash]; ref != "" {
+	if ref := store.refs[key]; ref != "" {
+		store.reused++
 		return ref
 	}
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(key)))
 	ref := fmt.Sprintf("%s-journey-track-%s", store.dataset.Identifier, hash)
-	store.refs[hash] = ref
+	store.refs[key] = ref
+	store.unique++
 	object := &ctdf.JourneyTrack{PrimaryIdentifier: ref, Track: track, DataSource: store.datasource, CreationDateTime: time.Now(), ModificationDateTime: time.Now()}
 	update := mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": ref}).SetUpdate(bson.M{"$set": object}).SetUpsert(true)
 	store.queue.Add(update)
@@ -334,8 +337,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	trackStore := newJourneyTrackStore(dataset, datasource)
 	shapeTrackRefs := make(map[string]string, len(shapeTracks))
 	for shapeID, track := range shapeTracks {
-		shapeTrackRefs[shapeID] = trackStore.Reference(track)
+		shapeTrackRefs[shapeID] = trackStore.Reference("shape:"+shapeID, track)
 	}
+	shapeSnapCaches := make(map[string]map[string]cachedTrackSnap, len(shapeTracks))
+	type cachedPathTracks struct {
+		refs  []string
+		split bool
+	}
+	pathTrackCache := map[string]cachedPathTracks{}
+	pathPatternCacheHits := 0
+	pathPatternCacheMisses := 0
 
 	//// Transfers ////
 	if _, exists := g.fileMap["transfers.txt"]; exists {
@@ -624,15 +635,48 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 		}
 
-		if len(journey.Track) > 1 && assignJourneyPathTracks(journey.Path, stopTimes, g.stopLocations, journey.Track) {
-			// Every leg now owns an accurate slice of the shape, so avoid storing
-			// the same geometry again at journey level. If splitting fails, the
-			// complete journey track is intentionally retained as the fallback.
-			journey.Track = nil
-			journey.TrackRef = ""
-			for _, path := range journey.Path {
-				path.TrackRef = trackStore.Reference(path.Track)
-				path.Track = nil
+		patternBuilder := strings.Builder{}
+		patternBuilder.Grow(len(trip.ShapeID) + len(stopTimes)*12)
+		patternBuilder.WriteString(trip.ShapeID)
+		for _, stopTime := range stopTimes {
+			patternBuilder.WriteByte('\x00')
+			patternBuilder.WriteString(stopTime.StopID)
+		}
+		patternKey := patternBuilder.String()
+		cachedPattern, patternCached := pathTrackCache[patternKey]
+		if patternCached {
+			pathPatternCacheHits++
+			if cachedPattern.split && len(cachedPattern.refs) == len(journey.Path) {
+				trackStore.reused += len(cachedPattern.refs)
+				journey.Track = nil
+				journey.TrackRef = ""
+				for index, path := range journey.Path {
+					path.TrackRef = cachedPattern.refs[index]
+				}
+			}
+		} else if len(journey.Track) > 1 {
+			pathPatternCacheMisses++
+			snapCache := shapeSnapCaches[trip.ShapeID]
+			if snapCache == nil {
+				snapCache = map[string]cachedTrackSnap{}
+				shapeSnapCaches[trip.ShapeID] = snapCache
+			}
+			if assignJourneyPathTracksCached(journey.Path, stopTimes, g.stopLocations, journey.Track, snapCache) {
+				// Every leg now owns an accurate slice of the shape, so avoid storing
+				// the same geometry again at journey level. If splitting fails, the
+				// complete journey track is intentionally retained as the fallback.
+				journey.Track = nil
+				journey.TrackRef = ""
+				patternHash := fmt.Sprintf("%x", sha256.Sum256([]byte(patternKey)))
+				refs := make([]string, len(journey.Path))
+				for index, path := range journey.Path {
+					path.TrackRef = trackStore.Reference(fmt.Sprintf("shape-leg:%s:%s:%d", trip.ShapeID, patternHash, index), path.Track)
+					refs[index] = path.TrackRef
+					path.Track = nil
+				}
+				pathTrackCache[patternKey] = cachedPathTracks{refs: refs, split: true}
+			} else {
+				pathTrackCache[patternKey] = cachedPathTracks{}
 			}
 		}
 
@@ -671,6 +715,17 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Wait()
 	}
 	trackStore.Wait()
+	snapCacheEntries := 0
+	for _, snapCache := range shapeSnapCaches {
+		snapCacheEntries += len(snapCache)
+	}
+	log.Info().Str("dataset", dataset.Identifier).
+		Int("unique_tracks", trackStore.unique).
+		Int("reused_tracks", trackStore.reused).
+		Int("snap_cache_entries", snapCacheEntries).
+		Int("path_pattern_hits", pathPatternCacheHits).
+		Int("path_pattern_misses", pathPatternCacheMisses).
+		Msg("Finished GTFS journey track processing")
 
 	log.Info().Msg("Finished Journeys")
 
