@@ -29,12 +29,11 @@ type StopTransfer struct {
 
 	Type StopTransferType `groups:"basic,detailed" bson:",omitempty"`
 
-	DistanceMetres                    int     `groups:"basic,detailed" bson:",omitempty"`
-	WalkDurationSeconds               int     `groups:"basic,detailed" bson:",omitempty"`
-	MinChangeDurationSeconds          int     `groups:"basic,detailed" bson:",omitempty"`
-	TotalDurationSeconds              int     `groups:"basic,detailed" bson:",omitempty"`
-	GeneratedRadiusMetres             int     `groups:"detailed" bson:",omitempty"`
-	GeneratedWalkSpeedMetresPerSecond float64 `groups:"detailed" bson:",omitempty"`
+	DistanceMetres           int `groups:"basic,detailed" bson:",omitempty"`
+	WalkDurationSeconds      int `groups:"basic,detailed" bson:",omitempty"`
+	MinChangeDurationSeconds int `groups:"basic,detailed" bson:",omitempty"`
+	TotalDurationSeconds     int `groups:"basic,detailed" bson:",omitempty"`
+	GeneratedRadiusMetres    int `groups:"detailed" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`

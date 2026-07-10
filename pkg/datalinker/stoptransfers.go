@@ -492,19 +492,18 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 		candidate := transfers[key]
 		identifier := fmt.Sprintf("generated-"+ctdf.StopTransferIDFormat, candidate.key.from, candidate.key.to)
 		transfer := ctdf.StopTransfer{
-			PrimaryIdentifier:                 identifier,
-			FromStopRef:                       candidate.key.from,
-			ToStopRef:                         candidate.key.to,
-			Type:                              candidate.transferType,
-			DistanceMetres:                    candidate.distanceMetres,
-			WalkDurationSeconds:               candidate.walkDurationSeconds,
-			MinChangeDurationSeconds:          candidate.minChangeDurationSeconds,
-			TotalDurationSeconds:              candidate.totalDurationSeconds,
-			GeneratedRadiusMetres:             candidate.generatedRadiusMetres,
-			GeneratedWalkSpeedMetresPerSecond: config.WalkSpeedMetresPerSec,
-			CreationDateTime:                  now,
-			ModificationDateTime:              now,
-			DataSource:                        datasource,
+			PrimaryIdentifier:        identifier,
+			FromStopRef:              candidate.key.from,
+			ToStopRef:                candidate.key.to,
+			Type:                     candidate.transferType,
+			DistanceMetres:           candidate.distanceMetres,
+			WalkDurationSeconds:      candidate.walkDurationSeconds,
+			MinChangeDurationSeconds: candidate.minChangeDurationSeconds,
+			TotalDurationSeconds:     candidate.totalDurationSeconds,
+			GeneratedRadiusMetres:    candidate.generatedRadiusMetres,
+			CreationDateTime:         now,
+			ModificationDateTime:     now,
+			DataSource:               datasource,
 		}
 
 		updateModel := mongo.NewReplaceOneModel().
