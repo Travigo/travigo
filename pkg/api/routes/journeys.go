@@ -14,6 +14,7 @@ import (
 )
 
 func JourneysRouter(router fiber.Router) {
+	router.Get("/:identifier/stops/:stop_identifier/door-side", getJourneyStopDoorSide)
 	router.Get("/:identifier", getJourney)
 }
 
