@@ -59,68 +59,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 	// Calculate everything based on location if we aren't provided with updates
 	if len(vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates) == 0 && vehicleUpdateEvent.VehicleLocationUpdate.Location.Type == "Point" {
-		closestDistance := 999999999999.0
-		var closestDistanceJourneyPathIndex int
-		var closestDistanceJourneyPathPercentComplete float64 // TODO: this is a hack, replace with actual distance
-
-		// Attempt to calculate using closest journey track
-		for i, journeyPathItem := range realtimeJourney.Journey.Path {
-			journeyPathClosestDistance := 99999999999999.0 // TODO do this better
-
-			for i := 0; i < len(journeyPathItem.Track)-1; i++ {
-				a := journeyPathItem.Track[i]
-				b := journeyPathItem.Track[i+1]
-
-				distance := vehicleUpdateEvent.VehicleLocationUpdate.Location.DistanceFromLine(a, b)
-
-				if distance < journeyPathClosestDistance {
-					journeyPathClosestDistance = distance
-				}
-			}
-
-			if journeyPathClosestDistance < closestDistance {
-				closestDistance = journeyPathClosestDistance
-				closestDistanceJourneyPath = journeyPathItem
-				closestDistanceJourneyPathIndex = i
-
-				// TODO: this is a hack, replace with actual distance
-				// this is a rough estimation based on what part of path item track we are on
-				closestDistanceJourneyPathPercentComplete = float64(i) / float64(len(journeyPathItem.Track))
-			}
+		position, matched := matchJourneyPosition(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location)
+		if !matched || position.PathIndex < 0 || position.PathIndex >= len(realtimeJourney.Journey.Path) {
+			return errors.New("unable to match vehicle location to journey track")
 		}
-
-		// If we fail to identify closest journey path item using track use fallback stop location method
-		if closestDistanceJourneyPath == nil {
-			closestDistance = 999999999999.0
-			for i, journeyPathItem := range realtimeJourney.Journey.Path {
-				if journeyPathItem.DestinationStop == nil {
-					return errors.New(fmt.Sprintf("Cannot get stop %s", journeyPathItem.DestinationStopRef))
-				}
-
-				distance := journeyPathItem.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
-
-				if distance < closestDistance {
-					closestDistance = distance
-					closestDistanceJourneyPath = journeyPathItem
-					closestDistanceJourneyPathIndex = i
-				}
-			}
-
-			if closestDistanceJourneyPathIndex == 0 {
-				// TODO this seems a bit hacky but I dont think we care much if we're on the first item
-				closestDistanceJourneyPathPercentComplete = 0.5
-			} else {
-				previousJourneyPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
-
-				if previousJourneyPath.DestinationStop == nil {
-					return errors.New(fmt.Sprintf("Cannot get stop %s", previousJourneyPath.DestinationStopRef))
-				}
-
-				previousJourneyPathDistance := previousJourneyPath.DestinationStop.Location.Distance(&vehicleUpdateEvent.VehicleLocationUpdate.Location)
-
-				closestDistanceJourneyPathPercentComplete = (1 + ((previousJourneyPathDistance - closestDistance) / (previousJourneyPathDistance + closestDistance))) / 2
-			}
-
+		closestDistanceJourneyPathIndex := position.PathIndex
+		closestDistanceJourneyPath = realtimeJourney.Journey.Path[position.PathIndex]
+		closestDistanceJourneyPathPercentComplete := position.LegProgress
+		if position.UsedGlobalTrack {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
 		} else {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
@@ -139,26 +85,8 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
 
 		// Get the arrival & departure times with date of the journey
-		destinationArrivalTimeWithDate := time.Date(
-			realtimeTimeframe.Year(),
-			realtimeTimeframe.Month(),
-			realtimeTimeframe.Day(),
-			closestDistanceJourneyPath.DestinationArrivalTime.Hour(),
-			closestDistanceJourneyPath.DestinationArrivalTime.Minute(),
-			closestDistanceJourneyPath.DestinationArrivalTime.Second(),
-			closestDistanceJourneyPath.DestinationArrivalTime.Nanosecond(),
-			journeyTimezone,
-		)
-		originDepartureTimeWithDate := time.Date(
-			realtimeTimeframe.Year(),
-			realtimeTimeframe.Month(),
-			realtimeTimeframe.Day(),
-			closestDistanceJourneyPath.OriginDepartureTime.Hour(),
-			closestDistanceJourneyPath.OriginDepartureTime.Minute(),
-			closestDistanceJourneyPath.OriginDepartureTime.Second(),
-			closestDistanceJourneyPath.OriginDepartureTime.Nanosecond(),
-			journeyTimezone,
-		)
+		destinationArrivalTimeWithDate := serviceTimeOnDate(realtimeTimeframe, closestDistanceJourneyPath.DestinationArrivalTime, journeyTimezone)
+		originDepartureTimeWithDate := serviceTimeOnDate(realtimeTimeframe, closestDistanceJourneyPath.OriginDepartureTime, journeyTimezone)
 
 		// How long it take to travel between origin & destination
 		currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
@@ -175,7 +103,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		offset = currentTime.Sub(currentPathPositionExpectedTime).Round(10 * time.Second)
 
 		// If the offset is too small then just turn it to zero so we can mark buses as on time
-		if offset.Seconds() <= 45 {
+		if absDuration(offset) <= 45*time.Second {
 			offset = time.Duration(0)
 		}
 
@@ -321,4 +249,20 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	return nil
+}
+
+func serviceTimeOnDate(serviceDate time.Time, serviceTime time.Time, location *time.Location) time.Time {
+	if location == nil {
+		location = time.Local
+	}
+	serviceDayStart := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 0, 0, 0, 0, location)
+	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
+	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
+}
+
+func absDuration(value time.Duration) time.Duration {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
