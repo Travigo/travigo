@@ -28,6 +28,7 @@ func buildDarwinRailTrains(scheduleFormation ScheduleFormations) []ctdf.RailTrai
 			}
 			train.Carriages = append(train.Carriages, ctdf.RailCarriage{
 				ID:             carriage.Number,
+				VehicleRole:    ctdf.RailCarriageVehicleRolePassenger,
 				SeatingClasses: darwinSeatingClasses(carriage.SeatingClass),
 				Toilets:        toilets,
 				Occupancy:      -1,
@@ -82,8 +83,9 @@ func applyDarwinFormationLoading(realtimeJourney *ctdf.RealtimeJourney, formatio
 
 		if !carriageFound {
 			train.Carriages = append(train.Carriages, ctdf.RailCarriage{
-				ID:        loading.CoachNumber,
-				Occupancy: occupancy,
+				ID:          loading.CoachNumber,
+				VehicleRole: ctdf.RailCarriageVehicleRolePassenger,
+				Occupancy:   occupancy,
 			})
 		}
 	}

@@ -70,14 +70,15 @@ func BuildRailTrains(message PassengerTrainConsistMessage) []ctdf.RailTrain {
 			FleetID:             allocation.ResourceGroup.FleetID,
 			ResourceGroupType:   allocation.ResourceGroup.TypeOfResource,
 			ResourceGroupStatus: allocation.ResourceGroup.ResourceGroupStatus,
-			TrainLength:         len(vehicles),
 			Carriages:           make([]ctdf.RailCarriage, 0, len(vehicles)),
 		}
 
 		for position, vehicle := range vehicles {
-			train.Carriages = append(train.Carriages, ctdf.RailCarriage{
+			role := vehicleRole(allocation.ResourceGroup.FleetID, vehicle)
+			carriage := ctdf.RailCarriage{
 				ID:              fmt.Sprintf("%s:%s", allocation.ResourceGroup.ResourceGroupID, vehicle.VehicleID),
 				CarriageType:    carriageType(vehicle),
+				VehicleRole:     role,
 				CarriageID:      vehicle.VehicleID,
 				VehicleID:       vehicle.VehicleID,
 				VehiclePosition: position + 1,
@@ -93,13 +94,82 @@ func BuildRailTrains(message PassengerTrainConsistMessage) []ctdf.RailTrain {
 				SeatCount:              vehicle.NumberOfSeats,
 				// MaximumSpeedMPH:        vehicle.MaximumSpeed,
 				Occupancy: -1,
-			})
+			}
+			if carriage.CountsTowardsTrainLength() {
+				train.TrainLength++
+			}
+			train.Carriages = append(train.Carriages, carriage)
 		}
 
 		trains = append(trains, train)
 	}
 
 	return trains
+}
+
+func vehicleRole(fleetID string, vehicle Vehicle) ctdf.RailCarriageVehicleRole {
+	typeOfVehicle := normaliseVehicleType(vehicle.TypeOfVehicle)
+	specificType := normaliseVehicleType(vehicle.SpecificType)
+
+	if isPowerCarVehicle(fleetID, vehicle, typeOfVehicle, specificType) {
+		return ctdf.RailCarriageVehicleRolePowerCar
+	}
+
+	if vehicle.NumberOfSeats > 0 {
+		return ctdf.RailCarriageVehicleRolePassenger
+	}
+
+	switch typeOfVehicle {
+	case "c", "coach", "carriage":
+		return ctdf.RailCarriageVehicleRolePassenger
+	}
+
+	return ctdf.RailCarriageVehicleRoleUnknown
+}
+
+func isPowerCarVehicle(fleetID string, vehicle Vehicle, typeOfVehicle string, specificType string) bool {
+	if strings.Contains(typeOfVehicle, "power") || strings.Contains(specificType, "power") {
+		return true
+	}
+
+	if vehicle.NumberOfSeats == 0 {
+		switch typeOfVehicle {
+		case "l", "loco", "locomotive":
+			return true
+		}
+		switch specificType {
+		case "pc", "pp", "pwr", "powercar", "power-car", "powerpack", "power-pack", "power module", "power-module":
+			return true
+		}
+	}
+
+	fleetClass := leadingDigits(fleetID)
+	if (fleetClass == "755" || fleetClass == "756") && vehicle.NumberOfSeats == 0 {
+		lengthMM := lengthInMM(vehicle.Length)
+		if lengthMM > 0 && lengthMM < 10000 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func normaliseVehicleType(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func leadingDigits(value string) string {
+	digits := ""
+	for _, char := range value {
+		if char >= '0' && char <= '9' {
+			digits += string(char)
+			continue
+		}
+		if digits != "" {
+			break
+		}
+	}
+	return digits
 }
 
 func carriageType(vehicle Vehicle) string {

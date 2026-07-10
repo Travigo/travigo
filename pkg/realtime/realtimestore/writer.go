@@ -117,6 +117,9 @@ func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detail
 	for trainIndex := range detailedRailInformation.Trains {
 		for carriageIndex := range detailedRailInformation.Trains[trainIndex].Carriages {
 			detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].Occupancy = -1
+			if detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].VehicleRole == "" {
+				detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].VehicleRole = ctdf.RailCarriageVehicleRoleUnknown
+			}
 		}
 	}
 
@@ -141,10 +144,16 @@ func UpdateRailDetailedLoading(ctx context.Context, identifier string, detailedR
 				continue
 			}
 
+			vehicleRole := carriage.VehicleRole
+			if vehicleRole == "" {
+				vehicleRole = ctdf.RailCarriageVehicleRolePassenger
+			}
+
 			loadingTrain.Carriages = append(loadingTrain.Carriages, ctdf.RailCarriage{
-				ID:        carriage.ID,
-				VehicleID: carriage.VehicleID,
-				Occupancy: carriage.Occupancy,
+				ID:          carriage.ID,
+				VehicleID:   carriage.VehicleID,
+				VehicleRole: vehicleRole,
+				Occupancy:   carriage.Occupancy,
 			})
 		}
 

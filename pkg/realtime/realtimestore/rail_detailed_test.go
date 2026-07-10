@@ -147,3 +147,38 @@ func TestEnrichRailTrainAllocationPreservesMixedSeatingClasses(t *testing.T) {
 		t.Fatalf("expected second Class 700 carriage to remain standard only, got %+v", enriched.Carriages[1])
 	}
 }
+
+func TestEnrichRailTrainAllocationAppliesCarriageTransformsAcrossPassengerCarriages(t *testing.T) {
+	setupRailDetailedTransforms(t)
+
+	enriched := enrichRailTrainAllocation(ctdf.RailTrain{
+		FleetID: "755/4",
+		Carriages: []ctdf.RailCarriage{
+			{ID: "755401:1", VehicleID: "1", VehicleRole: ctdf.RailCarriageVehicleRolePassenger, Occupancy: -1},
+			{ID: "755401:2", VehicleID: "2", VehicleRole: ctdf.RailCarriageVehicleRolePassenger, Occupancy: -1},
+			{ID: "755401:P", VehicleID: "P", VehicleRole: ctdf.RailCarriageVehicleRolePowerCar, Occupancy: -1},
+			{ID: "755401:3", VehicleID: "3", VehicleRole: ctdf.RailCarriageVehicleRolePassenger, Occupancy: -1},
+			{ID: "755401:4", VehicleID: "4", VehicleRole: ctdf.RailCarriageVehicleRolePassenger, Occupancy: -1},
+		},
+	})
+
+	if enriched.TrainLength != 4 {
+		t.Fatalf("expected passenger train length 4, got %+v", enriched)
+	}
+	if len(enriched.Carriages) != 5 {
+		t.Fatalf("expected power car to remain in physical carriage list, got %+v", enriched.Carriages)
+	}
+	if len(enriched.Carriages[0].Toilets) != 1 {
+		t.Fatalf("expected first passenger carriage to receive 755/4 layout, got %+v", enriched.Carriages[0])
+	}
+	if len(enriched.Carriages[2].SeatingClasses) != 0 || len(enriched.Carriages[2].Toilets) != 0 {
+		t.Fatalf("expected power car to be skipped by passenger layout transform, got %+v", enriched.Carriages[2])
+	}
+	if len(enriched.Carriages[3].SeatingClasses) != 1 ||
+		enriched.Carriages[3].SeatingClasses[0] != ctdf.JourneyDetailedRailSeatingStandard {
+		t.Fatalf("expected layout to continue after power car, got %+v", enriched.Carriages[3])
+	}
+	if enriched.Carriages[2].VehicleRole != ctdf.RailCarriageVehicleRolePowerCar {
+		t.Fatalf("expected power car role to be preserved, got %+v", enriched.Carriages[2])
+	}
+}

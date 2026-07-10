@@ -58,9 +58,22 @@ const (
 	JourneyDetailedRailSeatingUnknown  JourneyDetailedRailSeating = "Unknown"
 )
 
+type RailCarriageVehicleRole string
+
+const (
+	RailCarriageVehicleRolePassenger RailCarriageVehicleRole = "Passenger"
+	RailCarriageVehicleRolePowerCar  RailCarriageVehicleRole = "PowerCar"
+	RailCarriageVehicleRoleUnknown   RailCarriageVehicleRole = "Unknown"
+)
+
+func (carriage RailCarriage) CountsTowardsTrainLength() bool {
+	return carriage.VehicleRole != RailCarriageVehicleRolePowerCar
+}
+
 type RailCarriage struct {
 	ID             string                       `groups:"basic"`
 	CarriageType   string                       `groups:"basic"`
+	VehicleRole    RailCarriageVehicleRole      `groups:"basic"`
 	SeatingClasses []JourneyDetailedRailSeating `groups:"basic"`
 	Toilets        []RailCarriageToilet         `groups:"basic"`
 

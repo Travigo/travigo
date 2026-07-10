@@ -482,12 +482,26 @@ func enrichRailDetailedAllocation(allocation ctdf.JourneyDetailedRail) ctdf.Jour
 }
 
 func enrichRailTrainAllocation(train ctdf.RailTrain) ctdf.RailTrain {
+	for carriageIndex := range train.Carriages {
+		if train.Carriages[carriageIndex].VehicleRole == "" {
+			train.Carriages[carriageIndex].VehicleRole = ctdf.RailCarriageVehicleRoleUnknown
+		}
+	}
+
 	train = inferRailTrainAllocationFields(train)
 	originalCarriages := append([]ctdf.RailCarriage(nil), train.Carriages...)
 	enriched := train
 	transforms.Transform(&enriched, 0)
 
-	if len(originalCarriages) == 0 || len(enriched.Carriages) == 0 {
+	if len(originalCarriages) == 0 {
+		for carriageIndex := range enriched.Carriages {
+			if enriched.Carriages[carriageIndex].VehicleRole == "" {
+				enriched.Carriages[carriageIndex].VehicleRole = ctdf.RailCarriageVehicleRolePassenger
+			}
+		}
+		return enriched
+	}
+	if len(enriched.Carriages) == 0 {
 		return enriched
 	}
 
@@ -497,20 +511,25 @@ func enrichRailTrainAllocation(train ctdf.RailTrain) ctdf.RailTrain {
 	}
 
 	enriched.Carriages = originalCarriages
+	transformCarriageIndex := 0
 	for carriageIndex := range enriched.Carriages {
-		if carriageIndex >= len(transformCarriages) {
+		if !enriched.Carriages[carriageIndex].CountsTowardsTrainLength() {
+			continue
+		}
+		if transformCarriageIndex >= len(transformCarriages) {
 			continue
 		}
 
-		applyRailCarriageEnrichment(&enriched.Carriages[carriageIndex], transformCarriages[carriageIndex])
+		applyRailCarriageEnrichment(&enriched.Carriages[carriageIndex], transformCarriages[transformCarriageIndex])
+		transformCarriageIndex++
 	}
 
 	return enriched
 }
 
 func inferRailTrainAllocationFields(train ctdf.RailTrain) ctdf.RailTrain {
-	if train.TrainLength == 0 {
-		train.TrainLength = len(train.Carriages)
+	if train.TrainLength == 0 || railTrainHasNonLengthCarriage(train) {
+		train.TrainLength = railTrainLength(train)
 	}
 	if train.VehicleType != "" {
 		return train
@@ -533,6 +552,25 @@ func inferRailTrainAllocationFields(train ctdf.RailTrain) ctdf.RailTrain {
 	}
 
 	return train
+}
+
+func railTrainHasNonLengthCarriage(train ctdf.RailTrain) bool {
+	for _, carriage := range train.Carriages {
+		if !carriage.CountsTowardsTrainLength() {
+			return true
+		}
+	}
+	return false
+}
+
+func railTrainLength(train ctdf.RailTrain) int {
+	count := 0
+	for _, carriage := range train.Carriages {
+		if carriage.CountsTowardsTrainLength() {
+			count++
+		}
+	}
+	return count
 }
 
 func railClassVehicleType(value string) string {
@@ -630,9 +668,15 @@ func mergeRailTrainLoading(train *ctdf.RailTrain, loading ctdf.RailTrain) {
 		}
 		if found {
 			train.Carriages[carriageIndex].Occupancy = loadingCarriage.Occupancy
+			if train.Carriages[carriageIndex].VehicleRole == "" && loadingCarriage.VehicleRole != "" {
+				train.Carriages[carriageIndex].VehicleRole = loadingCarriage.VehicleRole
+			}
 			continue
 		}
 
+		if loadingCarriage.VehicleRole == "" {
+			loadingCarriage.VehicleRole = ctdf.RailCarriageVehicleRolePassenger
+		}
 		train.Carriages = append(train.Carriages, loadingCarriage)
 	}
 }

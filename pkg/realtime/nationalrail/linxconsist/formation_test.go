@@ -1,6 +1,10 @@
 package linxconsist
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/travigo/travigo/pkg/ctdf"
+)
 
 func TestParseTrainIdentifierFromCore(t *testing.T) {
 	identifier := ParseTrainIdentifier(PassengerTrainConsistMessage{
@@ -105,5 +109,44 @@ func TestBuildRailTrainsPreservesUnitBoundariesAndFormationDetails(t *testing.T)
 	}
 	if trains[1].Carriages[0].LengthMM != 20000 {
 		t.Fatalf("expected metres to be converted to mm, got %d", trains[1].Carriages[0].LengthMM)
+	}
+}
+
+func TestBuildRailTrainsClassifiesClass755PowerPackOutsidePassengerLength(t *testing.T) {
+	trains := BuildRailTrains(PassengerTrainConsistMessage{
+		Allocations: []Allocation{
+			{
+				ResourceGroupPosition: 1,
+				ResourceGroup: ResourceGroup{
+					ResourceGroupID: "755401",
+					FleetID:         "755/4",
+					TypeOfResource:  "U",
+					Vehicles: []Vehicle{
+						{VehicleID: "1", TypeOfVehicle: "C", ResourcePosition: 1, SpecificType: "DMS", Length: Measure{Value: 20000, Measure: "mm"}, NumberOfSeats: 60},
+						{VehicleID: "2", TypeOfVehicle: "C", ResourcePosition: 2, SpecificType: "MS", Length: Measure{Value: 20000, Measure: "mm"}, NumberOfSeats: 70},
+						{VehicleID: "P", TypeOfVehicle: "C", ResourcePosition: 3, SpecificType: "PP", Length: Measure{Value: 6500, Measure: "mm"}},
+						{VehicleID: "3", TypeOfVehicle: "C", ResourcePosition: 4, SpecificType: "MS", Length: Measure{Value: 20000, Measure: "mm"}, NumberOfSeats: 70},
+						{VehicleID: "4", TypeOfVehicle: "C", ResourcePosition: 5, SpecificType: "DMS", Length: Measure{Value: 20000, Measure: "mm"}, NumberOfSeats: 60},
+					},
+				},
+			},
+		},
+	})
+
+	if len(trains) != 1 {
+		t.Fatalf("expected 1 train, got %d", len(trains))
+	}
+	if trains[0].TrainLength != 4 {
+		t.Fatalf("expected passenger train length 4, got %+v", trains[0])
+	}
+	if len(trains[0].Carriages) != 5 {
+		t.Fatalf("expected physical vehicle list to retain power pack, got %+v", trains[0].Carriages)
+	}
+	if trains[0].Carriages[2].VehicleRole != ctdf.RailCarriageVehicleRolePowerCar {
+		t.Fatalf("expected middle vehicle to be a power car, got %+v", trains[0].Carriages[2])
+	}
+	if trains[0].Carriages[0].VehicleRole != ctdf.RailCarriageVehicleRolePassenger ||
+		trains[0].Carriages[4].VehicleRole != ctdf.RailCarriageVehicleRolePassenger {
+		t.Fatalf("expected seated vehicles to be passenger carriages, got %+v", trains[0].Carriages)
 	}
 }
