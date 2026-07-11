@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"math"
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -214,6 +215,24 @@ func TestDirectionalPlatformSelectsJourneyAlignedTrack(t *testing.T) {
 	}
 }
 
+func TestPolygonCentroidIsStableAtProjectedMapCoordinates(t *testing.T) {
+	points := []projectedPoint{
+		{x: 18000, y: 5_790_000},
+		{x: 18020, y: 5_790_000},
+		{x: 18020, y: 5_790_100},
+		{x: 18000, y: 5_790_100},
+		{x: 18000, y: 5_790_000},
+	}
+
+	centroid, ok := polygonCentroid(points)
+	if !ok {
+		t.Fatal("expected a valid polygon centroid")
+	}
+	if math.Abs(centroid.x-18010) > 0.001 || math.Abs(centroid.y-5_790_050) > 0.001 {
+		t.Fatalf("unexpected projected centroid: %#v", centroid)
+	}
+}
+
 func TestCalculateTrainDoorSideReturnsUnknownForAmbiguousIslandPlatform(t *testing.T) {
 	osmStop := &ctdf.OSMStop{Features: []ctdf.OSMStopFeature{
 		{
@@ -294,6 +313,45 @@ func TestCalculateTrainDoorSideUsesPlatformStopPositionForIslandPlatform(t *test
 	}
 	if result.trackElement == nil || result.trackElement.ID != 301 {
 		t.Fatalf("expected stop-position track 301, got %#v", result.trackElement)
+	}
+}
+
+func TestStopPositionTrackMatchOverridesLongPlatformCentroidDistance(t *testing.T) {
+	stopPosition := testLocation(0, 0)
+	osmStop := &ctdf.OSMStop{
+		TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail},
+		Features: []ctdf.OSMStopFeature{
+			{
+				Type:     ctdf.OSMStopFeatureTypeStopPosition,
+				Ref:      "1",
+				Tags:     map[string]string{"railway": "stop", "train": "yes", "ref": "1"},
+				Location: &stopPosition,
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypePlatform,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 100},
+				Ref:      "1",
+				Tags:     map[string]string{"railway": "platform", "train": "yes"},
+				Geometry: []ctdf.Location{testLocation(0.0004, -0.001), testLocation(0.0004, 0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 200},
+				Tags:     map[string]string{"railway": "rail"},
+				Geometry: []ctdf.Location{testLocation(0, -0.001), testLocation(0, 0.001)},
+			},
+		},
+	}
+	stop := testLocation(0, 0)
+	south := testLocation(0, -0.01)
+	north := testLocation(0, 0.01)
+
+	result := calculateTrainDoorSide(osmStop, "1", stop, &south, &north)
+	if result.side != trainDoorSideRight {
+		t.Fatalf("expected stop-position matched track to calculate Right despite platform distance, got %s (%s)", result.side, result.reason)
+	}
+	if result.trackElement == nil || result.trackElement.ID != 200 {
+		t.Fatalf("expected stop-position track 200, got %#v", result.trackElement)
 	}
 }
 

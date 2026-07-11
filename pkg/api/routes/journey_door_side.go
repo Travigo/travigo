@@ -329,7 +329,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 	unknown.platformElement = &platformElement
 	unknown.trackElement = &trackElement
 
-	if best.distance > 30 {
+	if best.distance > 30 && !trackWasIdentifiedByStopPosition {
 		unknown.reason = "The nearest OSM track is too far from the matched platform"
 		return unknown
 	}
@@ -675,21 +675,24 @@ func platformProjectedPoints(feature ctdf.OSMStopFeature, referenceLatitude floa
 }
 
 func polygonCentroid(points []projectedPoint) (projectedPoint, bool) {
+	origin := points[0]
 	var twiceArea float64
 	var xNumerator float64
 	var yNumerator float64
 	for index := 0; index < len(points)-1; index++ {
-		cross := points[index].x*points[index+1].y - points[index+1].x*points[index].y
+		current := projectedPoint{x: points[index].x - origin.x, y: points[index].y - origin.y}
+		next := projectedPoint{x: points[index+1].x - origin.x, y: points[index+1].y - origin.y}
+		cross := current.x*next.y - next.x*current.y
 		twiceArea += cross
-		xNumerator += (points[index].x + points[index+1].x) * cross
-		yNumerator += (points[index].y + points[index+1].y) * cross
+		xNumerator += (current.x + next.x) * cross
+		yNumerator += (current.y + next.y) * cross
 	}
 	if math.Abs(twiceArea) < 0.01 {
 		return projectedPoint{}, false
 	}
 	return projectedPoint{
-		x: xNumerator / (3 * twiceArea),
-		y: yNumerator / (3 * twiceArea),
+		x: origin.x + xNumerator/(3*twiceArea),
+		y: origin.y + yNumerator/(3*twiceArea),
 	}, true
 }
 

@@ -72,10 +72,15 @@ func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
 	query := buildOSMStopExactOverpassQuery(`  node["ref:crs"="HIT"];`)
 
 	for _, expected := range []string{
+		`node.station->.station_nodes;`,
 		`node.station["public_transport"="stop_position"]->.matched_stop_positions;`,
+		`node(around.station_nodes:250)["public_transport"="stop_position"]->.nearby_stop_positions;`,
 		`way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"]`,
 		`way(around.all_stop_positions:15)["railway"~"^(rail|light_rail|subway|tram)$"]`,
 		`way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;`,
+		`way(around.station_nodes:250)["railway"="platform"]->.platform_ways_near_station;`,
+		`.platform_ways_near_station;`,
+		`.all_stop_positions;`,
 		`.all_platform_ways;`,
 	} {
 		if !strings.Contains(query, expected) {
@@ -160,6 +165,52 @@ func TestSelectOSMStopElementsKeepsIdentifierMatchedPlatformOutsideStopArea(t *t
 		}
 	}
 	t.Fatal("expected directly identifier-matched platform to survive stop-area selection")
+}
+
+func TestSelectOSMStopElementsKeepsPlatformNearSecondaryMatchedStation(t *testing.T) {
+	stop := &ctdf.Stop{
+		PrimaryIdentifier: "station",
+		OtherIdentifiers:  []string{"gb-crs-STP", "gb-crs-SPL"},
+		TransportTypes:    []ctdf.TransportType{ctdf.TransportTypeRail},
+	}
+	elements := []overpassElement{
+		{
+			Type:    string(ctdf.OSMElementTypeRelation),
+			ID:      1,
+			Tags:    map[string]string{"type": "public_transport", "public_transport": "stop_area"},
+			Members: []overpassMember{{Type: string(ctdf.OSMElementTypeNode), Ref: 10, Role: "station"}},
+		},
+		{
+			Type: string(ctdf.OSMElementTypeNode), ID: 10, Lat: 51.5327, Lon: -0.1270,
+			Tags: map[string]string{"railway": "station", "ref:crs": "STP"},
+		},
+		{
+			Type: string(ctdf.OSMElementTypeNode), ID: 20, Lat: 51.5322, Lon: -0.1276,
+			Tags: map[string]string{"railway": "station", "ref:crs": "SPL"},
+		},
+		{
+			Type: string(ctdf.OSMElementTypeWay), ID: 30,
+			Tags:     map[string]string{"railway": "platform", "public_transport": "platform", "ref": "A", "train": "yes"},
+			Geometry: []overpassPoint{{Lat: 51.5321, Lon: -0.1276}, {Lat: 51.5323, Lon: -0.1276}},
+		},
+		{
+			Type: string(ctdf.OSMElementTypeNode), ID: 40, Lat: 51.5322, Lon: -0.1275,
+			Tags: map[string]string{"railway": "stop", "public_transport": "stop_position", "ref": "A", "train": "yes"},
+		},
+	}
+
+	selected, _, _ := selectOSMStopElements(elements, stop)
+	wanted := map[int64]bool{30: false, 40: false}
+	for _, element := range selected {
+		if _, exists := wanted[element.ID]; exists {
+			wanted[element.ID] = true
+		}
+	}
+	for id, found := range wanted {
+		if !found {
+			t.Fatalf("expected secondary station element %d to survive stop-area selection", id)
+		}
+	}
 }
 
 func TestCoordinateOverpassQueryExpandsTracksAndPlatformsFromStopPositions(t *testing.T) {

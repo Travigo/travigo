@@ -25,7 +25,7 @@ import (
 
 const (
 	osmStopCollectionName    = "osm_stops"
-	osmStopQueryVersion      = 3
+	osmStopQueryVersion      = 7
 	defaultOverpassTimeout   = 90 * time.Second
 	defaultRailSearchRadius  = 700
 	defaultBusSearchRadius   = 150
@@ -261,6 +261,8 @@ func buildOSMStopExactOverpassQuery(stationLookup string) string {
 %s
 )->.station;
 
+node.station->.station_nodes;
+
 (
   relation(bn.station);
   relation(bw.station);
@@ -284,10 +286,12 @@ node(w.nested_ways)->.nested_way_nodes;
 
 node.member_nodes["public_transport"="stop_position"]->.stop_positions;
 node.station["public_transport"="stop_position"]->.matched_stop_positions;
+node(around.station_nodes:250)["public_transport"="stop_position"]->.nearby_stop_positions;
 way.station["railway"="platform"]->.matched_platform_ways;
 (
   .stop_positions;
   .matched_stop_positions;
+  .nearby_stop_positions;
 )->.all_stop_positions;
 
 (
@@ -302,9 +306,11 @@ way(bn.all_stop_positions)
 
 way.member_ways["railway"="platform"]->.platform_ways;
 way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_stops;
+way(around.station_nodes:250)["railway"="platform"]->.platform_ways_near_station;
 (
   .platform_ways;
   .platform_ways_near_stops;
+  .platform_ways_near_station;
   .matched_platform_ways;
 )->.all_platform_ways;
 node(w.all_platform_ways)->.platform_nodes;
@@ -382,6 +388,7 @@ way(bn.platform_nodes)
   .nested_nodes;
   .nested_ways;
   .nested_relations;
+  .all_stop_positions;
   .tracks_at_stops;
   .tracks_near_platforms;
   .roads_at_stops;
@@ -691,17 +698,41 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 	// NaPTAN and GTFS identifiers are often attached directly to platform ways
 	// that are missing from an otherwise valid stop_area relation.
 	stopIdentifiersByTag := buildStopIdentifiersByTag(stop)
+	matchedStationAnchors := []overpassPoint{}
 	for _, element := range elements {
 		if !elementMatchesStopIdentifiers(element, stopIdentifiersByTag) {
 			continue
 		}
 		included[overpassElementKey(element)] = true
+		if isStation(element) {
+			matchedStationAnchors = append(matchedStationAnchors, anchorPoints(element)...)
+		}
 		if isStopPosition(element) && element.Type == string(ctdf.OSMElementTypeNode) {
 			stopPositionNodeIDs[element.ID] = true
 		}
 		if isPlatform(element) {
 			for _, nodeID := range element.Nodes {
 				platformNodeIDs[nodeID] = true
+			}
+		}
+	}
+
+	// A CTDF stop can merge several OSM station sections. Keep transit features
+	// returned around every exactly matched station seed, not only the best stop_area.
+	for _, element := range elements {
+		if len(matchedStationAnchors) == 0 || !elementNearAnyPoint(element, matchedStationAnchors, 250) {
+			continue
+		}
+		if isPlatform(element) {
+			included[overpassElementKey(element)] = true
+			for _, nodeID := range element.Nodes {
+				platformNodeIDs[nodeID] = true
+			}
+		}
+		if isStopPosition(element) {
+			included[overpassElementKey(element)] = true
+			if element.Type == string(ctdf.OSMElementTypeNode) {
+				stopPositionNodeIDs[element.ID] = true
 			}
 		}
 	}
