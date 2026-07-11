@@ -28,7 +28,7 @@ shape-a,51.500,-0.142,1
 	if len(tracks) != 2 || len(tracks["shape-a"]) != 2 {
 		t.Fatalf("got tracks %#v", tracks)
 	}
-	if got, want := tracks["shape-a"][0].Coordinates, []float64{-0.142, 51.500}; got[0] != want[0] || got[1] != want[1] {
+	if got, want := tracks["shape-a"][0], (compactShapePoint{longitude: -0.142, latitude: 51.500}); got != want {
 		t.Fatalf("first shape-a point = %v, want %v", got, want)
 	}
 	if _, err := os.Stat(shapePath); !os.IsNotExist(err) {

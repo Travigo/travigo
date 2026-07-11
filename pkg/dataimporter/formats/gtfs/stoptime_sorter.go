@@ -13,7 +13,7 @@ import (
 	gtfscsv "github.com/travigo/go-csv"
 )
 
-const stopTimeSortChunkSize = 100000
+const stopTimeSortChunkSize = 25000
 
 type sortedStopTimeGroups struct {
 	chunkFiles []string

@@ -3,6 +3,8 @@ package dataimporter
 import (
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -49,6 +51,16 @@ func RegisterCLI() *cli.Command {
 						Name:  "mem-stats",
 						Usage: "Report memory & GC usage after each import (for benchmarking)",
 					},
+					&cli.IntFlag{
+						Name:  "max-cpus",
+						Usage: "Maximum number of CPU cores used by the importer",
+						Value: 1,
+					},
+					&cli.IntFlag{
+						Name:  "memory-limit-mb",
+						Usage: "Soft Go heap limit in MiB (0 disables the limit)",
+						Value: 768,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := database.Connect(); err != nil {
@@ -62,6 +74,20 @@ func RegisterCLI() *cli.Command {
 					forceImport := c.Bool("force")
 					skipCleanup := c.Bool("skip-cleanup")
 					memStats := c.Bool("mem-stats")
+					maxCPUs := c.Int("max-cpus")
+					if maxCPUs < 1 {
+						maxCPUs = 1
+					}
+					previousMaxProcs := runtime.GOMAXPROCS(maxCPUs)
+					defer runtime.GOMAXPROCS(previousMaxProcs)
+
+					memoryLimitBytes := int64(c.Int("memory-limit-mb")) * 1024 * 1024
+					if memoryLimitBytes <= 0 {
+						memoryLimitBytes = -1
+					}
+					previousMemoryLimit := debug.SetMemoryLimit(memoryLimitBytes)
+					defer debug.SetMemoryLimit(previousMemoryLimit)
+					log.Info().Int("max_cpus", maxCPUs).Int64("memory_limit_bytes", memoryLimitBytes).Msg("Configured importer resource limits")
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""

@@ -48,9 +48,10 @@ type journeyTrackStore struct {
 }
 
 const (
-	journeyTrackBatchSize      = 100
+	journeyTrackBatchSize      = 50
+	journeyBatchSize           = 250
 	maxPathPatternCacheEntries = 50000
-	maxShapeSnapCacheEntries   = 100000
+	maxShapeSnapCacheEntries   = 50000
 )
 
 type boundedPathPatternCache struct {
@@ -239,19 +240,40 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 	return nil
 }
 
-// loadShapeTracks reads shapes.txt into the representation used by journeys. It
-// deliberately does not retain a second []Shape copy of the file: shapes can be
-// large, and the resulting track slices are shared by all trips using a shape.
-func (g *Schedule) loadShapeTracks() (map[string][]ctdf.Location, error) {
-	shapeTracks := map[string][]ctdf.Location{}
+type compactShapePoint struct {
+	longitude float64
+	latitude  float64
+}
+
+type sequencedShapePoint struct {
+	compactShapePoint
+	sequence int
+}
+
+func materializeShapeTrack(points []compactShapePoint) []ctdf.Location {
+	track := make([]ctdf.Location, len(points))
+	for index, point := range points {
+		track[index] = ctdf.Location{Type: "Point", Coordinates: []float64{point.longitude, point.latitude}}
+	}
+	return track
+}
+
+// loadShapeTracks retains each point as two floats rather than a Location with
+// a string, slice header and coordinate allocation. Full CTDF tracks are only
+// materialised briefly when written or used for a new stop pattern.
+func (g *Schedule) loadShapeTracks() (map[string][]compactShapePoint, error) {
+	shapeTracks := map[string][]compactShapePoint{}
 	if _, exists := g.fileMap["shapes.txt"]; !exists {
 		log.Debug().Msg("GTFS feed does not contain shapes.txt")
 		return shapeTracks, nil
 	}
 
-	shapePoints := map[string][]Shape{}
+	shapePoints := map[string][]sequencedShapePoint{}
 	if err := importObject[Shape](g, "shapes.txt", "shapes", false, func(shape Shape) (any, string) {
-		shapePoints[shape.ID] = append(shapePoints[shape.ID], shape)
+		shapePoints[shape.ID] = append(shapePoints[shape.ID], sequencedShapePoint{
+			compactShapePoint: compactShapePoint{longitude: shape.PointLongitude, latitude: shape.PointLatitude},
+			sequence:          shape.PointSequence,
+		})
 		return nil, ""
 	}); err != nil {
 		return nil, err
@@ -259,15 +281,12 @@ func (g *Schedule) loadShapeTracks() (map[string][]ctdf.Location, error) {
 
 	for shapeID, points := range shapePoints {
 		sort.Slice(points, func(i, j int) bool {
-			return points[i].PointSequence < points[j].PointSequence
+			return points[i].sequence < points[j].sequence
 		})
 
-		track := make([]ctdf.Location, 0, len(points))
-		for _, point := range points {
-			track = append(track, ctdf.Location{
-				Type:        "Point",
-				Coordinates: []float64{point.PointLongitude, point.PointLatitude},
-			})
+		track := make([]compactShapePoint, len(points))
+		for index, point := range points {
+			track[index] = point.compactShapePoint
 		}
 		shapeTracks[shapeID] = track
 		delete(shapePoints, shapeID)
@@ -393,9 +412,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return err
 	}
 	trackStore := newJourneyTrackStore(dataset, datasource)
-	shapeTrackRefs := make(map[string]string, len(shapeTracks))
 	for shapeID, track := range shapeTracks {
-		shapeTrackRefs[shapeID] = trackStore.Reference("shape:"+shapeID, track)
+		trackStore.Reference("shape:"+shapeID, materializeShapeTrack(track))
 	}
 	shapeSnapCaches := make(map[string]map[string]cachedTrackSnap)
 	shapeSnapCacheEntries := 0
@@ -475,6 +493,18 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	//// Journeys / Trips ////
 	gtfsTrips := map[string]Trip{}
+	shapeTripUseCounts := map[string]int{}
+	tripStringPool := map[string]string{}
+	internTripString := func(value string) string {
+		if value == "" {
+			return ""
+		}
+		if interned, exists := tripStringPool[value]; exists {
+			return interned
+		}
+		tripStringPool[value] = value
+		return value
+	}
 	// PERF(medium-risk): cache the parsed+formatted calendar date-range condition
 	// value keyed by calendar ServiceID. Many trips share the same calendar, and the
 	// original code re-parsed calendar.Start/calendar.End via time.Parse for every
@@ -559,11 +589,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			journey.OtherIdentifiers["BlockNumber"] = t.BlockID
 		}
 
-		if t.ShapeID != "" {
-			// Shape tracks are immutable, so journeys sharing a shape can reuse the
-			// same slice until they have been serialised by the batch queue.
-			journey.Track = shapeTracks[t.ShapeID]
-			journey.TrackRef = shapeTrackRefs[t.ShapeID]
+		if _, exists := shapeTracks[t.ShapeID]; t.ShapeID != "" && exists {
+			journey.TrackRef = trackStore.Identifier("shape:" + t.ShapeID)
 		}
 
 		return journey
@@ -580,11 +607,20 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		if util.ContainsString(dataset.IgnoreObjects.Services.ByOperator, operatorRef) {
 			return nil, ""
 		}
+		t.RouteID = internTripString(t.RouteID)
+		t.ServiceID = internTripString(t.ServiceID)
+		t.Headsign = internTripString(t.Headsign)
+		t.BlockID = internTripString(t.BlockID)
+		t.ShapeID = internTripString(t.ShapeID)
 
 		gtfsTrips[t.ID] = t
+		if t.ShapeID != "" {
+			shapeTripUseCounts[t.ShapeID]++
+		}
 
 		return nil, ""
 	})
+	tripStringPool = nil
 
 	//// Stop Times ////
 	stopTimeGroups, err := newSortedStopTimeGroups(g.fileMap["stop_times.txt"])
@@ -594,7 +630,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	defer stopTimeGroups.Close()
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, 3000)
+	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, journeyBatchSize)
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
@@ -703,8 +739,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					path.TrackRef = trackStore.Identifier(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index))
 				}
 			}
-		} else if len(journey.Track) > 1 {
+		} else if compactTrack := shapeTracks[trip.ShapeID]; len(compactTrack) > 1 {
 			pathPatternCacheMisses++
+			journeyTrack := materializeShapeTrack(compactTrack)
 			var snapCache map[string]cachedTrackSnap
 			if len(stopTimes) <= maxShapeSnapCacheEntries {
 				if shapeSnapCacheEntries+len(stopTimes) > maxShapeSnapCacheEntries {
@@ -719,7 +756,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				}
 			}
 			snapCacheEntriesBefore := len(snapCache)
-			if assignJourneyPathTracksCached(journey.Path, stopTimes, g.stopLocations, journey.Track, snapCache) {
+			if assignJourneyPathTracksCached(journey.Path, stopTimes, g.stopLocations, journeyTrack, snapCache) {
 				shapeSnapCacheEntries += len(snapCache) - snapCacheEntriesBefore
 				// Every leg now owns an accurate slice of the shape, so avoid storing
 				// the same geometry again at journey level. If splitting fails, the
@@ -771,6 +808,17 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		delete(gtfsTrips, tripID)
+		if trip.ShapeID != "" {
+			shapeTripUseCounts[trip.ShapeID]--
+			if shapeTripUseCounts[trip.ShapeID] <= 0 {
+				delete(shapeTripUseCounts, trip.ShapeID)
+				delete(shapeTracks, trip.ShapeID)
+				if cache := shapeSnapCaches[trip.ShapeID]; cache != nil {
+					shapeSnapCacheEntries -= len(cache)
+					delete(shapeSnapCaches, trip.ShapeID)
+				}
+			}
+		}
 		return nil
 	}); err != nil {
 		return err
