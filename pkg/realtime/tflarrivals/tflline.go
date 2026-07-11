@@ -18,7 +18,8 @@ type TfLLine struct {
 	LineName      string
 	TransportType ctdf.TransportType
 
-	OrderedLineRoutes []OrderedLineRoute
+	OrderedLineRoutes    []OrderedLineRoute
+	StopOccurrenceLimits map[string]int
 
 	Service *ctdf.Service
 }
@@ -60,4 +61,5 @@ func (l *TfLLine) GetTfLRouteSequences() {
 
 		l.OrderedLineRoutes = append(l.OrderedLineRoutes, routeSequenceResponse.OrderedLineRoutes...)
 	}
+	l.StopOccurrenceLimits = tflRouteStopOccurrenceLimits(l.OrderedLineRoutes)
 }

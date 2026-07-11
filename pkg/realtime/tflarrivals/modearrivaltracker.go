@@ -258,15 +258,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// Add new predictions to the realtime journey
 	platformMatchRegex, _ := regexp.Compile(`(\w+) (?:- )?Platform (\d+)`)
 	previousStops := realtimeJourney.Stops
-	realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
-	predictionIndex := 0
-	var earliestPrediction time.Time
-	for _, stop := range previousStops {
-		if stop != nil && stop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
-			realtimeJourney.Stops[fmt.Sprintf("historical-%d", predictionIndex)] = stop
-			predictionIndex++
-		}
-	}
+	currentStops := make([]*ctdf.RealtimeJourneyStops, 0, len(predictions))
 	for _, prediction := range predictions {
 		stop := getStopFromTfLStop(prediction.NaptanID)
 
@@ -280,9 +272,6 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 		stopTimezone, _ := time.LoadLocation(stop.Timezone)
 		scheduledTime = scheduledTime.In(stopTimezone)
-		if earliestPrediction.IsZero() || scheduledTime.Before(earliestPrediction) {
-			earliestPrediction = scheduledTime
-		}
 
 		platform := prediction.PlatformName
 		platformMatches := platformMatchRegex.FindStringSubmatch(platform)
@@ -293,37 +282,19 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			platform = ""
 		}
 
-		realtimeJourney.Stops[fmt.Sprintf("prediction-%d", predictionIndex)] = &ctdf.RealtimeJourneyStops{
+		currentStops = append(currentStops, &ctdf.RealtimeJourneyStops{
 			StopRef:       stopID,
 			TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
 			ArrivalTime:   scheduledTime,
 			DepartureTime: scheduledTime,
 
 			Platform: platform,
-		}
-
-		predictionIndex++
-	}
-	for _, stop := range previousStops {
-		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || earliestPrediction.IsZero() || !stop.ArrivalTime.Before(earliestPrediction) {
-			continue
-		}
-		stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
-		realtimeJourney.Stops[fmt.Sprintf("historical-%d", predictionIndex)] = stop
-		predictionIndex++
+		})
 	}
 
-	// Order the realtime journey stops by arrival time in ascending order
-	var realtimeJourneyStops []*ctdf.RealtimeJourneyStops
-	for _, stop := range realtimeJourney.Stops {
-		realtimeJourneyStops = append(realtimeJourneyStops, stop)
-	}
-	sort.SliceStable(realtimeJourneyStops, func(a, b int) bool {
-		aTime := realtimeJourneyStops[a].ArrivalTime
-		bTime := realtimeJourneyStops[b].ArrivalTime
-
-		return aTime.Before(bTime)
-	})
+	// TfL revises the same prediction on every poll. Reconcile those revisions
+	// with existing calls instead of archiving every ETA as a new stop.
+	realtimeJourneyStops := reconcileTFLRealtimeStops(previousStops, currentStops, line.StopOccurrenceLimits)
 	realtimeJourney.Stops = make(map[string]*ctdf.RealtimeJourneyStops, len(realtimeJourneyStops))
 	for index, stop := range realtimeJourneyStops {
 		stop.JourneyStopIndex = index
@@ -420,7 +391,10 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			})
 		}
 	} else {
-		realtimeJourney.Journey.DestinationDisplay = fmt.Sprintf("[X-%d] %s", len(potentialOrderLineRouteMatches), realtimeJourney.Journey.DestinationDisplay)
+		log.Debug().
+			Str("id", realtimeJourneyID).
+			Int("route_matches", len(potentialOrderLineRouteMatches)).
+			Msg("Using prediction-derived TfL journey path")
 
 		for i := 1; i < len(journeyOrderedNaptanIDs); i++ {
 			originStop := journeyOrderedNaptanIDs[i-1]
@@ -476,6 +450,117 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	return realtimestore.IndexTFLDepartureBoardJourney(context.Background(), realtimeJourney)
+}
+
+func reconcileTFLRealtimeStops(previousStops map[string]*ctdf.RealtimeJourneyStops, currentStops []*ctdf.RealtimeJourneyStops, occurrenceLimits map[string]int) []*ctdf.RealtimeJourneyStops {
+	sortRealtimeStops(currentStops)
+
+	// Keep at most the number of occurrences that can exist on a real route.
+	// This also repairs journeys polluted by the previous snapshot-accumulation
+	// behaviour as soon as they receive another update.
+	currentCounts := map[string]int{}
+	filteredCurrentStops := make([]*ctdf.RealtimeJourneyStops, 0, len(currentStops))
+	for _, stop := range currentStops {
+		if stop == nil || stop.StopRef == "" {
+			continue
+		}
+		if currentCounts[stop.StopRef] >= tflStopOccurrenceLimit(stop.StopRef, occurrenceLimits) {
+			continue
+		}
+		currentCounts[stop.StopRef]++
+		filteredCurrentStops = append(filteredCurrentStops, stop)
+	}
+	currentStops = filteredCurrentStops
+
+	var earliestCurrent time.Time
+	for _, stop := range currentStops {
+		if earliestCurrent.IsZero() || stop.ArrivalTime.Before(earliestCurrent) {
+			earliestCurrent = stop.ArrivalTime
+		}
+	}
+
+	previous := make([]*ctdf.RealtimeJourneyStops, 0, len(previousStops))
+	for _, stop := range previousStops {
+		if stop != nil && stop.StopRef != "" {
+			previous = append(previous, stop)
+		}
+	}
+	sortRealtimeStops(previous)
+
+	remainingCurrentMatches := make(map[string]int, len(currentCounts))
+	for stopRef, count := range currentCounts {
+		remainingCurrentMatches[stopRef] = count
+	}
+	historicalCounts := map[string]int{}
+	result := make([]*ctdf.RealtimeJourneyStops, 0, len(previous)+len(currentStops))
+
+	appendHistorical := func(stop *ctdf.RealtimeJourneyStops) {
+		allowedHistorical := tflStopOccurrenceLimit(stop.StopRef, occurrenceLimits) - currentCounts[stop.StopRef]
+		if allowedHistorical <= 0 || historicalCounts[stop.StopRef] >= allowedHistorical {
+			return
+		}
+		stop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+		historicalCounts[stop.StopRef]++
+		result = append(result, stop)
+	}
+
+	for _, stop := range previous {
+		if stop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
+			appendHistorical(stop)
+		}
+	}
+	for _, stop := range previous {
+		if stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+			continue
+		}
+		if remainingCurrentMatches[stop.StopRef] > 0 {
+			// The current feed contains this occurrence, so this is an ETA
+			// revision and the new prediction replaces the old one.
+			remainingCurrentMatches[stop.StopRef]--
+			continue
+		}
+		if !earliestCurrent.IsZero() && stop.ArrivalTime.Before(earliestCurrent) {
+			appendHistorical(stop)
+		}
+	}
+
+	result = append(result, currentStops...)
+	sortRealtimeStops(result)
+	return result
+}
+
+func tflRouteStopOccurrenceLimits(routes []OrderedLineRoute) map[string]int {
+	limits := map[string]int{}
+	for _, route := range routes {
+		routeCounts := map[string]int{}
+		for _, naptanID := range route.NaptanIDs {
+			stop := getStopFromTfLStop(naptanID)
+			if stop == nil {
+				continue
+			}
+			routeCounts[stop.PrimaryIdentifier]++
+			if routeCounts[stop.PrimaryIdentifier] > limits[stop.PrimaryIdentifier] {
+				limits[stop.PrimaryIdentifier] = routeCounts[stop.PrimaryIdentifier]
+			}
+		}
+	}
+	return limits
+}
+
+func tflStopOccurrenceLimit(stopRef string, occurrenceLimits map[string]int) int {
+	if limit := occurrenceLimits[stopRef]; limit > 0 {
+		return limit
+	}
+	return 1
+}
+
+func sortRealtimeStops(stops []*ctdf.RealtimeJourneyStops) {
+	sort.SliceStable(stops, func(a, b int) bool {
+		if stops[a].ArrivalTime.Equal(stops[b].ArrivalTime) {
+			return stops[a].JourneyStopIndex < stops[b].JourneyStopIndex
+		}
+		return stops[a].ArrivalTime.Before(stops[b].ArrivalTime)
+	})
 }
 
 // TODO convert to proper cache
