@@ -181,6 +181,39 @@ func TestConnectedTrackWaysAreNotCompetingTracks(t *testing.T) {
 	}
 }
 
+func TestDirectionalPlatformSelectsJourneyAlignedTrack(t *testing.T) {
+	platform := ctdf.OSMStopFeature{
+		PrimaryName: "Northbound Platform 9",
+		Tags: map[string]string{
+			"ref:GB:tfl_uid": "940GZZLUBST-Plat09-NB-bakerloo",
+		},
+	}
+	if !platformHasDirectionHint(platform, "9 - Northbound") {
+		t.Fatal("expected TfL platform metadata to provide a direction hint")
+	}
+	if _, matches := featureLineTokens(platform, true)["bakerloo"]; !matches {
+		t.Fatal("expected TfL platform identifier to provide the Bakerloo line")
+	}
+
+	direction := projectedPoint{x: -10, y: 0}
+	matches := []trackMatch{
+		{
+			trackFeatureIndex: 1,
+			segmentStart:      projectedPoint{x: 0, y: 0},
+			segmentEnd:        projectedPoint{x: 10, y: 0},
+		},
+		{
+			trackFeatureIndex: 2,
+			segmentStart:      projectedPoint{x: 10, y: 5},
+			segmentEnd:        projectedPoint{x: 0, y: 5},
+		},
+	}
+	match, found := directionAlignedTrackMatch(matches, direction)
+	if !found || match.trackFeatureIndex != 2 {
+		t.Fatalf("expected journey-aligned track 2, got %#v (found=%t)", match, found)
+	}
+}
+
 func TestCalculateTrainDoorSideReturnsUnknownForAmbiguousIslandPlatform(t *testing.T) {
 	osmStop := &ctdf.OSMStop{Features: []ctdf.OSMStopFeature{
 		{

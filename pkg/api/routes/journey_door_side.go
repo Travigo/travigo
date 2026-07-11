@@ -316,6 +316,13 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 
 	sort.Slice(matches, func(i, j int) bool { return matches[i].distance < matches[j].distance })
 	best := matches[0]
+	trackWasIdentifiedByDirection := false
+	if platformHasDirectionHint(osmStop.Features[best.platformFeatureIndex], platform) {
+		if directionMatch, found := directionAlignedTrackMatch(competingTrackMatches(matches, best), direction); found {
+			best = directionMatch
+			trackWasIdentifiedByDirection = true
+		}
+	}
 	platformFeature := osmStop.Features[best.platformFeatureIndex]
 	platformElement := platformFeature.Element
 	trackElement := osmStop.Features[best.trackFeatureIndex].Element
@@ -327,7 +334,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		return unknown
 	}
 	competingTracksAgree := false
-	if !trackWasIdentifiedByStopPosition && platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge {
+	if !trackWasIdentifiedByStopPosition && !trackWasIdentifiedByDirection && platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge {
 		competingMatches := competingTrackMatches(matches, best)
 		if len(competingMatches) > 1 {
 			if !trackMatchesAgreeOnDoorSide(competingMatches, direction) {
@@ -473,6 +480,10 @@ func featureLineTokens(feature ctdf.OSMStopFeature, includeNote bool) map[string
 	values := []string{feature.Tags["line"], feature.Tags["route_ref"]}
 	if includeNote {
 		values = append(values, feature.Tags["note"])
+		if tflPlatformID := feature.Tags["ref:GB:tfl_uid"]; tflPlatformID != "" {
+			parts := strings.Split(tflPlatformID, "-")
+			values = append(values, parts[len(parts)-1])
+		}
 	}
 	if feature.Tags["line"] == "" {
 		values = append(values, feature.PrimaryName, feature.Tags["name"])
@@ -498,6 +509,56 @@ func featureLineTokens(feature ctdf.OSMStopFeature, includeNote bool) map[string
 		}
 	}
 	return tokens
+}
+
+func platformHasDirectionHint(feature ctdf.OSMStopFeature, platform string) bool {
+	values := []string{
+		strings.ToLower(platform),
+		strings.ToLower(feature.PrimaryName),
+		strings.ToLower(feature.Tags["name"]),
+		strings.ToLower(feature.Tags["direction"]),
+		strings.ToLower(feature.Tags["ref:GB:tfl_uid"]),
+	}
+	for _, value := range values {
+		if strings.Contains(value, "northbound") || strings.Contains(value, "southbound") ||
+			strings.Contains(value, "eastbound") || strings.Contains(value, "westbound") ||
+			strings.Contains(value, "-nb-") || strings.Contains(value, "-sb-") ||
+			strings.Contains(value, "-eb-") || strings.Contains(value, "-wb-") {
+			return true
+		}
+	}
+	return false
+}
+
+func directionAlignedTrackMatch(matches []trackMatch, direction projectedPoint) (trackMatch, bool) {
+	if len(matches) < 2 || vectorLength(direction) == 0 {
+		return trackMatch{}, false
+	}
+
+	bestIndex := -1
+	bestAlignment := -1.0
+	secondAlignment := -1.0
+	for index, match := range matches {
+		trackVector := projectedPoint{x: match.segmentEnd.x - match.segmentStart.x, y: match.segmentEnd.y - match.segmentStart.y}
+		if vectorLength(trackVector) == 0 {
+			continue
+		}
+		alignment := dot(trackVector, direction) / (vectorLength(trackVector) * vectorLength(direction))
+		if alignment > bestAlignment {
+			secondAlignment = bestAlignment
+			bestAlignment = alignment
+			bestIndex = index
+		} else if alignment > secondAlignment {
+			secondAlignment = alignment
+		}
+	}
+
+	// Raw OSM way direction is only decisive when one nearby track strongly
+	// follows the journey and the alternatives run clearly the other way.
+	if bestIndex < 0 || bestAlignment < 0.2 || secondAlignment > -0.2 {
+		return trackMatch{}, false
+	}
+	return matches[bestIndex], true
 }
 
 func trackIndexForPlatformStopPosition(features []ctdf.OSMStopFeature, platform string, transportTypes []ctdf.TransportType, trackIndexes []int, referenceLatitude float64) (int, bool) {
