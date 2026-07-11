@@ -48,10 +48,10 @@ type journeyTrackStore struct {
 }
 
 const (
-	journeyTrackBatchSize      = 50
-	journeyBatchSize           = 250
+	journeyTrackBatchSize      = 150
+	journeyBatchSize           = 750
 	maxPathPatternCacheEntries = 50000
-	maxShapeSnapCacheEntries   = 50000
+	maxShapeSnapCacheEntries   = 75000
 )
 
 type boundedPathPatternCache struct {
