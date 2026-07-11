@@ -215,6 +215,48 @@ func TestDirectionalPlatformSelectsJourneyAlignedTrack(t *testing.T) {
 	}
 }
 
+func TestDirectionalTrackFallbackHasLimitedConfidence(t *testing.T) {
+	osmStop := &ctdf.OSMStop{
+		TransportTypes: []ctdf.TransportType{ctdf.TransportTypeMetro},
+		Features: []ctdf.OSMStopFeature{
+			{
+				Type:        ctdf.OSMStopFeatureTypePlatform,
+				Element:     ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 100},
+				Ref:         "9",
+				PrimaryName: "Northbound Platform 9",
+				Tags:        map[string]string{"railway": "platform", "subway": "yes"},
+				Geometry:    []ctdf.Location{testLocation(0, -0.001), testLocation(0, 0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 201},
+				Tags:     map[string]string{"railway": "subway"},
+				Geometry: []ctdf.Location{testLocation(-0.00004, 0.001), testLocation(-0.00004, -0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 202},
+				Tags:     map[string]string{"railway": "subway"},
+				Geometry: []ctdf.Location{testLocation(0.00005, -0.001), testLocation(0.00005, 0.001)},
+			},
+		},
+	}
+	stop := testLocation(0, 0)
+	south := testLocation(0, -0.01)
+	north := testLocation(0, 0.01)
+
+	result := calculateTrainDoorSide(osmStop, "9 - Northbound", stop, &south, &north)
+	if result.side == trainDoorSideUnknown {
+		t.Fatalf("expected directional fallback to calculate a side: %s", result.reason)
+	}
+	if result.trackElement == nil || result.trackElement.ID != 202 {
+		t.Fatalf("expected journey-aligned track 202, got %#v", result.trackElement)
+	}
+	if result.confidence > 0.65 {
+		t.Fatalf("expected directional fallback confidence to be capped, got %f", result.confidence)
+	}
+}
+
 func TestPolygonCentroidIsStableAtProjectedMapCoordinates(t *testing.T) {
 	points := []projectedPoint{
 		{x: 18000, y: 5_790_000},

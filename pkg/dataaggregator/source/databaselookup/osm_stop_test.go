@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 )
 
 func TestQueryOverpassTriesNextEndpointAfterFailure(t *testing.T) {
@@ -39,11 +40,27 @@ func TestQueryOverpassTriesNextEndpointAfterFailure(t *testing.T) {
 }
 
 func TestOSMStopCacheVersion(t *testing.T) {
-	if osmStopCacheIsCurrent(&ctdf.OSMStop{}) {
+	plan := osmStopQueryPlan{overpassQuery: "query", radiusMetres: 700}
+	if osmStopCacheIsCurrent(&ctdf.OSMStop{}, plan) {
 		t.Fatal("expected an unversioned OSM stop cache entry to be stale")
 	}
-	if !osmStopCacheIsCurrent(&ctdf.OSMStop{Query: ctdf.OSMStopQuery{Version: osmStopQueryVersion}}) {
+	current := &ctdf.OSMStop{Query: ctdf.OSMStopQuery{
+		Version:       osmStopQueryVersion,
+		OverpassQuery: plan.overpassQuery,
+		RadiusMetres:  plan.radiusMetres,
+	}}
+	if !osmStopCacheIsCurrent(current, plan) {
 		t.Fatal("expected current OSM stop query version to be reusable")
+	}
+	changedRadius := plan
+	changedRadius.radiusMetres = 300
+	if osmStopCacheIsCurrent(current, changedRadius) {
+		t.Fatal("expected a different query radius to invalidate the cache")
+	}
+	changedQuery := plan
+	changedQuery.overpassQuery = "updated query"
+	if osmStopCacheIsCurrent(current, changedQuery) {
+		t.Fatal("expected changed stop identifiers to invalidate the cache query")
 	}
 }
 
@@ -73,6 +90,8 @@ func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
 
 	for _, expected := range []string{
 		`node.station->.station_nodes;`,
+		`relation.station`,
+		`["public_transport"="stop_area"]`,
 		`node.station["public_transport"="stop_position"]->.matched_stop_positions;`,
 		`node(around.station_nodes:250)["public_transport"="stop_position"]->.nearby_stop_positions;`,
 		`way(bn.all_stop_positions)["railway"~"^(rail|light_rail|subway|tram)$"]`,
@@ -86,6 +105,23 @@ func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
 		if !strings.Contains(query, expected) {
 			t.Fatalf("expected exact Overpass query to contain %q", expected)
 		}
+	}
+}
+
+func TestOSMStopQueryPlanRejectsExcessiveRadius(t *testing.T) {
+	stop := &ctdf.Stop{
+		PrimaryIdentifier: "stop",
+		Location:          &ctdf.Location{Coordinates: []float64{-0.1, 51.5}},
+	}
+
+	if _, err := buildOSMStopQueryPlan(stop, -1); err == nil {
+		t.Fatal("expected a negative radius to be rejected")
+	}
+	if _, err := buildOSMStopQueryPlan(stop, query.MaximumOSMStopRadiusMetres+1); err == nil {
+		t.Fatal("expected an excessive radius to be rejected")
+	}
+	if _, err := buildOSMStopQueryPlan(stop, query.MaximumOSMStopRadiusMetres); err != nil {
+		t.Fatalf("expected maximum radius to be accepted: %v", err)
 	}
 }
 

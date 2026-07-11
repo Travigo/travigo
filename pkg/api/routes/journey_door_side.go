@@ -385,6 +385,10 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		result.confidence = math.Min(result.confidence, 0.78)
 		result.reason = "Multiple nearby OSM tracks imply the same platform side for this journey direction"
 	}
+	if trackWasIdentifiedByDirection {
+		result.confidence = math.Min(result.confidence, 0.65)
+		result.reason = "Track selected from directional platform metadata and OSM way orientation; platform side derived from local geometry"
+	}
 	return result
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sort"
 	"strconv"
@@ -180,6 +181,11 @@ func getStopOSM(c *fiber.Ctx) error {
 			c.SendStatus(fiber.StatusBadRequest)
 			return c.JSON(fiber.Map{
 				"error": "Parameter radius_metres should be an integer",
+			})
+		}
+		if radiusMetres < 0 || radiusMetres > query.MaximumOSMStopRadiusMetres {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("Parameter radius_metres should be between 0 and %d", query.MaximumOSMStopRadiusMetres),
 			})
 		}
 	}

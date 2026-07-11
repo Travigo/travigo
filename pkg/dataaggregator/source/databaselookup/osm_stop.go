@@ -25,7 +25,7 @@ import (
 
 const (
 	osmStopCollectionName    = "osm_stops"
-	osmStopQueryVersion      = 7
+	osmStopQueryVersion      = 8
 	defaultOverpassTimeout   = 90 * time.Second
 	defaultRailSearchRadius  = 700
 	defaultBusSearchRadius   = 150
@@ -108,19 +108,19 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 	}
 
 	collection := database.GetCollection(osmStopCollectionName)
+	plan, err := buildOSMStopQueryPlan(q.Stop, q.RadiusMetres)
+	if err != nil {
+		return nil, err
+	}
+
 	if !q.ForceRefresh {
-		cachedOSMStop, err := findCachedOSMStop(collection, q.Stop)
+		cachedOSMStop, err := findCachedOSMStop(collection, q.Stop, plan)
 		if err == nil {
 			return cachedOSMStop, nil
 		}
 		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, err
 		}
-	}
-
-	plan, err := buildOSMStopQueryPlan(q.Stop, q.RadiusMetres)
-	if err != nil {
-		return nil, err
 	}
 
 	overpassElements, endpoint, err := queryOverpass(plan.overpassQuery, plan.location)
@@ -185,24 +185,31 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 	return osmStop, nil
 }
 
-func findCachedOSMStop(collection *mongo.Collection, stop *ctdf.Stop) (*ctdf.OSMStop, error) {
+func findCachedOSMStop(collection *mongo.Collection, stop *ctdf.Stop, plan osmStopQueryPlan) (*ctdf.OSMStop, error) {
 	var osmStop ctdf.OSMStop
 	err := collection.FindOne(context.Background(), bson.M{"stopref": stop.PrimaryIdentifier}).Decode(&osmStop)
 	if err != nil {
 		return nil, err
 	}
-	if !osmStopCacheIsCurrent(&osmStop) {
+	if !osmStopCacheIsCurrent(&osmStop, plan) {
 		return nil, mongo.ErrNoDocuments
 	}
 
 	return &osmStop, nil
 }
 
-func osmStopCacheIsCurrent(osmStop *ctdf.OSMStop) bool {
-	return osmStop != nil && osmStop.Query.Version == osmStopQueryVersion
+func osmStopCacheIsCurrent(osmStop *ctdf.OSMStop, plan osmStopQueryPlan) bool {
+	return osmStop != nil &&
+		osmStop.Query.Version == osmStopQueryVersion &&
+		osmStop.Query.OverpassQuery == plan.overpassQuery &&
+		osmStop.Query.RadiusMetres == plan.radiusMetres
 }
 
 func buildOSMStopQueryPlan(stop *ctdf.Stop, radiusMetres int) (osmStopQueryPlan, error) {
+	if radiusMetres < 0 || radiusMetres > query.MaximumOSMStopRadiusMetres {
+		return osmStopQueryPlan{}, fmt.Errorf("OSMStop radius must be between 0 and %d metres", query.MaximumOSMStopRadiusMetres)
+	}
+
 	crsValues := identifierValues(stop, "gb-crs-")
 	tiplocValues := identifierValues(stop, "gb-tiploc-")
 	atcoValues := identifierValues(stop, "gb-atco-")
@@ -269,9 +276,14 @@ node.station->.station_nodes;
   relation(br.station);
 )->.station_parents;
 
-relation.station_parents
-  ["type"="public_transport"]
-  ["public_transport"="stop_area"]
+(
+  relation.station
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+  relation.station_parents
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+)
 ->.stop_area;
 
 node(r.stop_area)->.member_nodes;
