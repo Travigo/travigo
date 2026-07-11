@@ -33,16 +33,15 @@ func RegisterCLI() *cli.Command {
 					if err != nil {
 						return err
 					}
-					if err := store.MarkInterruptedRuns(); err != nil {
-						return err
-					}
-
 					executor, err := NewKubernetesExecutor(config)
 					if err != nil {
 						return err
 					}
 
 					runner := NewRunner(config, store, executor)
+					if err := runner.ResumeRuns(); err != nil {
+						return err
+					}
 					server := NewServer(store, runner)
 
 					log.Info().Str("address", config.Address).Str("storage", config.StoragePath).Msg("Starting batch runner")

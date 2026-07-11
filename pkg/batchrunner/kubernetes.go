@@ -20,7 +20,7 @@ import (
 )
 
 type TaskExecutor interface {
-	RunTask(ctx context.Context, runID string, task *Task, logPath string) (int, error)
+	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool) (int, error)
 	DeleteJob(ctx context.Context, name string) error
 }
 
@@ -41,15 +41,23 @@ func NewKubernetesExecutor(config Config) (*KubernetesExecutor, error) {
 	}, nil
 }
 
-func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string) (int, error) {
-	jobName := jobNameForTask(runID, task.ID)
+func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool) (int, error) {
+	jobName := task.JobName
+	if jobName == "" {
+		jobName = jobNameForTask(runID, task.ID)
+	}
 	task.JobName = jobName
 
-	if err := e.client.createJob(ctx, e.config, jobName, runID, task); err != nil {
-		return 1, err
+	var podName string
+	var err error
+	if recovering {
+		podName, err = e.client.findRunningJobPod(ctx, jobName)
+	} else {
+		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
+			return 1, err
+		}
+		podName, err = e.client.waitForJobPod(ctx, jobName)
 	}
-
-	podName, err := e.client.waitForJobPod(ctx, jobName)
 	if err != nil {
 		return 1, err
 	}
@@ -76,6 +84,22 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 	}
 
 	return exitCode, nil
+}
+
+func (c *kubernetesClient) ensureJob(ctx context.Context, config Config, jobName string, runID string, task *Task) error {
+	job, err := c.getJob(ctx, jobName)
+	if err != nil {
+		return err
+	}
+	if job != nil {
+		return nil
+	}
+
+	err = c.createJob(ctx, config, jobName, runID, task)
+	if isKubernetesStatus(err, http.StatusConflict) {
+		return nil
+	}
+	return err
 }
 
 func (e *KubernetesExecutor) DeleteJob(ctx context.Context, name string) error {
@@ -157,6 +181,18 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 	return c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs", c.namespace), body, nil)
 }
 
+func (c *kubernetesClient) getJob(ctx context.Context, jobName string) (*kubernetesJob, error) {
+	var job kubernetesJob
+	err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", c.namespace, jobName), nil, &job)
+	if isKubernetesStatus(err, http.StatusNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &job, nil
+}
+
 func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string) (string, error) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -212,13 +248,8 @@ func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName str
 }
 
 func (c *kubernetesClient) findJobPod(ctx context.Context, jobName string) (string, error) {
-	var pods kubernetesPodList
-	path := fmt.Sprintf(
-		"/api/v1/namespaces/%s/pods?labelSelector=%s",
-		c.namespace,
-		url.QueryEscape("job-name="+jobName),
-	)
-	if err := c.doJSON(ctx, http.MethodGet, path, nil, &pods); err != nil {
+	pods, err := c.listJobPods(ctx, jobName)
+	if err != nil {
 		return "", err
 	}
 	if len(pods.Items) == 0 {
@@ -226,6 +257,35 @@ func (c *kubernetesClient) findJobPod(ctx context.Context, jobName string) (stri
 	}
 
 	return pods.Items[0].Metadata.Name, nil
+}
+
+func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string) (string, error) {
+	pods, err := c.listJobPods(ctx, jobName)
+	if err != nil {
+		return "", err
+	}
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == "Running" {
+			return pod.Metadata.Name, nil
+		}
+	}
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("cannot resume job %s: no running pod exists", jobName)
+	}
+	return "", fmt.Errorf("cannot resume job %s: pod is not running", jobName)
+}
+
+func (c *kubernetesClient) listJobPods(ctx context.Context, jobName string) (*kubernetesPodList, error) {
+	var pods kubernetesPodList
+	path := fmt.Sprintf(
+		"/api/v1/namespaces/%s/pods?labelSelector=%s",
+		c.namespace,
+		url.QueryEscape("job-name="+jobName),
+	)
+	if err := c.doJSON(ctx, http.MethodGet, path, nil, &pods); err != nil {
+		return nil, err
+	}
+	return &pods, nil
 }
 
 func (c *kubernetesClient) streamPodLogs(ctx context.Context, podName string, logPath string) {
@@ -306,7 +366,7 @@ func (c *kubernetesClient) doJSON(ctx context.Context, method string, path strin
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("kubernetes request failed: %s %s: %s: %s", method, path, resp.Status, string(data))
+		return &kubernetesAPIError{statusCode: resp.StatusCode, message: fmt.Sprintf("kubernetes request failed: %s %s: %s: %s", method, path, resp.Status, string(data))}
 	}
 
 	if out == nil {
@@ -314,6 +374,20 @@ func (c *kubernetesClient) doJSON(ctx context.Context, method string, path strin
 	}
 
 	return json.NewDecoder(resp.Body).Decode(out)
+}
+
+type kubernetesAPIError struct {
+	statusCode int
+	message    string
+}
+
+func (e *kubernetesAPIError) Error() string {
+	return e.message
+}
+
+func isKubernetesStatus(err error, statusCode int) bool {
+	var apiErr *kubernetesAPIError
+	return errors.As(err, &apiErr) && apiErr.statusCode == statusCode
 }
 
 func (c *kubernetesClient) newRequest(ctx context.Context, method string, path string, body io.Reader) (*http.Request, error) {
@@ -432,5 +506,8 @@ type kubernetesPodList struct {
 		Metadata struct {
 			Name string `json:"name"`
 		} `json:"metadata"`
+		Status struct {
+			Phase string `json:"phase"`
+		} `json:"status"`
 	} `json:"items"`
 }

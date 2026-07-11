@@ -74,6 +74,36 @@ func (r *Runner) StartRun(options RunOptions) (*Run, error) {
 	return run, nil
 }
 
+// ResumeRuns reconnects the runner to unfinished work recorded on persistent storage.
+// Kubernetes Jobs outlive this process, so running tasks attach to their existing Job.
+func (r *Runner) ResumeRuns() error {
+	runs, err := r.store.ListRuns()
+	if err != nil {
+		return err
+	}
+
+	for i := range runs {
+		run := &runs[i]
+		if run.Status != RunStatusPending && run.Status != RunStatusRunning {
+			continue
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		r.mu.Lock()
+		if _, exists := r.active[run.ID]; exists {
+			r.mu.Unlock()
+			cancel()
+			continue
+		}
+		r.active[run.ID] = cancel
+		r.mu.Unlock()
+
+		go r.executeRun(ctx, run)
+	}
+
+	return nil
+}
+
 func (r *Runner) CancelRun(id string) error {
 	r.mu.Lock()
 	cancel, ok := r.active[id]
@@ -108,9 +138,12 @@ func (r *Runner) clearActive(id string) {
 
 func (r *Runner) executeRun(ctx context.Context, run *Run) {
 	var runMu sync.Mutex
-	started := time.Now().UTC()
+	if run.StartedAt == nil {
+		started := time.Now().UTC()
+		run.StartedAt = &started
+	}
 	run.Status = RunStatusRunning
-	run.StartedAt = &started
+	run.Error = ""
 	_ = r.store.SaveRun(run)
 
 	failed := false
@@ -197,6 +230,13 @@ func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, 
 	}
 
 	for _, index := range indexes {
+		switch run.Tasks[index].Status {
+		case TaskStatusSucceeded, TaskStatusSkipped, TaskStatusCancelled:
+			continue
+		case TaskStatusFailed:
+			failed = true
+			continue
+		}
 		if ctx.Err() != nil {
 			r.markTaskCancelled(run, runMu, index, "run cancelled")
 			continue
@@ -212,6 +252,10 @@ func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, 
 func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, index int) bool {
 	now := time.Now().UTC()
 	runMu.Lock()
+	recovering := run.Tasks[index].Status == TaskStatusRunning
+	if run.Tasks[index].JobName == "" {
+		run.Tasks[index].JobName = jobNameForTask(run.ID, run.Tasks[index].ID)
+	}
 	run.Tasks[index].Status = TaskStatusRunning
 	run.Tasks[index].StartedAt = &now
 	run.Tasks[index].Error = ""
@@ -219,7 +263,7 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	_ = r.store.SaveRun(run)
 	runMu.Unlock()
 
-	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath)
+	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath, recovering)
 
 	finished := time.Now().UTC()
 	runMu.Lock()

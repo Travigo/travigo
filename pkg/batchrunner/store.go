@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 )
 
 type Store struct {
@@ -116,39 +115,6 @@ func (s *Store) ListRuns() ([]Run, error) {
 	})
 
 	return runs, nil
-}
-
-func (s *Store) MarkInterruptedRuns() error {
-	runs, err := s.ListRuns()
-	if err != nil {
-		return err
-	}
-
-	now := time.Now().UTC()
-	for i := range runs {
-		run := &runs[i]
-		if run.Status != RunStatusPending && run.Status != RunStatusRunning {
-			continue
-		}
-
-		run.Status = RunStatusFailed
-		run.FinishedAt = &now
-		run.Error = "batch runner restarted before this run completed"
-		for taskIndex := range run.Tasks {
-			if run.Tasks[taskIndex].Status != TaskStatusPending && run.Tasks[taskIndex].Status != TaskStatusRunning {
-				continue
-			}
-			run.Tasks[taskIndex].Status = TaskStatusFailed
-			run.Tasks[taskIndex].FinishedAt = &now
-			run.Tasks[taskIndex].Error = "batch runner restarted before this task completed"
-		}
-
-		if err := s.SaveRun(run); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *Store) PrepareLog(runID string, taskID string) (string, error) {
