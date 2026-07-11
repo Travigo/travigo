@@ -104,6 +104,7 @@ type OSMStopMatch struct {
 }
 
 type OSMStopQuery struct {
+	Version       int       `groups:"internal" bson:",omitempty"`
 	OverpassQuery string    `groups:"internal" bson:",omitempty"`
 	Endpoint      string    `groups:"internal" bson:",omitempty"`
 	QueriedAt     time.Time `groups:"internal" bson:",omitempty"`

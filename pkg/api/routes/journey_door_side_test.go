@@ -62,6 +62,125 @@ func TestCalculateTrainDoorSideIgnoresSameNumberedUndergroundPlatform(t *testing
 	}
 }
 
+func TestCalculateTrainDoorSidePrefersTrackMatchingPlatformLine(t *testing.T) {
+	osmStop := &ctdf.OSMStop{
+		TransportTypes: []ctdf.TransportType{ctdf.TransportTypeMetro},
+		Features: []ctdf.OSMStopFeature{
+			{
+				Type:        ctdf.OSMStopFeatureTypePlatform,
+				Element:     ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 101},
+				Ref:         "5",
+				PrimaryName: "Northbound",
+				Tags:        map[string]string{"railway": "platform", "subway": "yes", "note": "Bakerloo Line"},
+				Geometry:    []ctdf.Location{testLocation(-0.00002, -0.001), testLocation(-0.00002, 0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 201},
+				Tags:     map[string]string{"railway": "subway", "line": "Circle;District"},
+				Geometry: []ctdf.Location{testLocation(0, -0.001), testLocation(0, 0.001)},
+			},
+			{
+				Type:     ctdf.OSMStopFeatureTypeTrack,
+				Element:  ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 202},
+				Tags:     map[string]string{"railway": "subway", "line": "Bakerloo"},
+				Geometry: []ctdf.Location{testLocation(-0.00007, -0.001), testLocation(-0.00007, 0.001)},
+			},
+		},
+	}
+	stop := testLocation(0, 0)
+	south := testLocation(0, -0.01)
+	north := testLocation(0, 0.01)
+
+	result := calculateTrainDoorSide(osmStop, "5 - Northbound", stop, &south, &north)
+	if result.side != trainDoorSideRight {
+		t.Fatalf("expected Bakerloo platform to be right of its track, got %s (%s)", result.side, result.reason)
+	}
+	if result.trackElement == nil || result.trackElement.ID != 202 {
+		t.Fatalf("expected Bakerloo track 202, got %#v", result.trackElement)
+	}
+}
+
+func TestRealtimePlatformDirectionSuffixMatchesOSMRef(t *testing.T) {
+	features := []ctdf.OSMStopFeature{
+		{
+			Type:    ctdf.OSMStopFeatureTypePlatform,
+			Element: ctdf.OSMElementRef{Type: ctdf.OSMElementTypeWay, ID: 1465716690},
+			Ref:     "1",
+			Tags:    map[string]string{"railway": "platform", "subway": "yes", "ref": "1"},
+		},
+	}
+
+	matches := matchingPlatformFeatureIndexes(features, "1 - Northbound", []ctdf.TransportType{ctdf.TransportTypeMetro})
+	if len(matches) != 1 || matches[0] != 0 {
+		t.Fatalf("expected realtime platform 1 to match OSM platform ref 1, got %v", matches)
+	}
+}
+
+func TestCompetingTracksCanAgreeOnDoorSide(t *testing.T) {
+	direction := projectedPoint{x: 0, y: 10}
+	matches := []trackMatch{
+		{
+			trackPoint:    projectedPoint{x: 0, y: 0},
+			platformPoint: projectedPoint{x: 2, y: 0},
+			segmentStart:  projectedPoint{x: 0, y: -5},
+			segmentEnd:    projectedPoint{x: 0, y: 5},
+		},
+		{
+			trackPoint:    projectedPoint{x: -1, y: 0},
+			platformPoint: projectedPoint{x: 2, y: 0},
+			segmentStart:  projectedPoint{x: -1, y: -5},
+			segmentEnd:    projectedPoint{x: -1, y: 5},
+		},
+	}
+
+	if !trackMatchesAgreeOnDoorSide(matches, direction) {
+		t.Fatal("expected parallel tracks on the same platform side to agree")
+	}
+	matches[1].trackPoint = projectedPoint{x: 3, y: 0}
+	matches[1].segmentStart.x = 3
+	matches[1].segmentEnd.x = 3
+	if trackMatchesAgreeOnDoorSide(matches, direction) {
+		t.Fatal("expected tracks on opposite platform sides to remain ambiguous")
+	}
+}
+
+func TestConnectedTrackWaysAreNotCompetingTracks(t *testing.T) {
+	best := trackMatch{
+		trackFeatureIndex:    1,
+		platformFeatureIndex: 10,
+		distance:             4,
+		segmentStart:         projectedPoint{x: 0, y: 0},
+		segmentEnd:           projectedPoint{x: 10, y: 0},
+		trackStart:           projectedPoint{x: 0, y: 0},
+		trackEnd:             projectedPoint{x: 10, y: 0},
+	}
+	continuation := trackMatch{
+		trackFeatureIndex:    2,
+		platformFeatureIndex: 10,
+		distance:             4.2,
+		segmentStart:         projectedPoint{x: 10, y: 0},
+		segmentEnd:           projectedPoint{x: 20, y: 0},
+		trackStart:           projectedPoint{x: 10, y: 0},
+		trackEnd:             projectedPoint{x: 20, y: 0},
+	}
+
+	competing := competingTrackMatches([]trackMatch{best, continuation}, best)
+	if len(competing) != 1 {
+		t.Fatalf("expected connected OSM ways to represent one track, got %d candidates", len(competing))
+	}
+
+	parallel := continuation
+	parallel.segmentStart = projectedPoint{x: 0, y: 5}
+	parallel.segmentEnd = projectedPoint{x: 10, y: 5}
+	parallel.trackStart = projectedPoint{x: 0, y: 5}
+	parallel.trackEnd = projectedPoint{x: 10, y: 5}
+	competing = competingTrackMatches([]trackMatch{best, parallel}, best)
+	if len(competing) != 2 {
+		t.Fatalf("expected an unconnected parallel way to remain competing, got %d candidates", len(competing))
+	}
+}
+
 func TestCalculateTrainDoorSideReturnsUnknownForAmbiguousIslandPlatform(t *testing.T) {
 	osmStop := &ctdf.OSMStop{Features: []ctdf.OSMStopFeature{
 		{

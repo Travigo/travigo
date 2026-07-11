@@ -25,6 +25,7 @@ import (
 
 const (
 	osmStopCollectionName    = "osm_stops"
+	osmStopQueryVersion      = 3
 	defaultOverpassTimeout   = 90 * time.Second
 	defaultRailSearchRadius  = 700
 	defaultBusSearchRadius   = 150
@@ -150,6 +151,7 @@ func (s Source) OSMStopQuery(q query.OSMStop) (*ctdf.OSMStop, error) {
 			DistanceMetres: osmStopDistanceToSelection(q.Stop, stopArea, station),
 		},
 		Query: ctdf.OSMStopQuery{
+			Version:       osmStopQueryVersion,
 			OverpassQuery: plan.overpassQuery,
 			Endpoint:      endpoint,
 			QueriedAt:     now,
@@ -189,29 +191,40 @@ func findCachedOSMStop(collection *mongo.Collection, stop *ctdf.Stop) (*ctdf.OSM
 	if err != nil {
 		return nil, err
 	}
+	if !osmStopCacheIsCurrent(&osmStop) {
+		return nil, mongo.ErrNoDocuments
+	}
 
 	return &osmStop, nil
 }
 
+func osmStopCacheIsCurrent(osmStop *ctdf.OSMStop) bool {
+	return osmStop != nil && osmStop.Query.Version == osmStopQueryVersion
+}
+
 func buildOSMStopQueryPlan(stop *ctdf.Stop, radiusMetres int) (osmStopQueryPlan, error) {
-	crs := firstIdentifierValue(stop, "gb-crs-")
-	tiploc := firstIdentifierValue(stop, "gb-tiploc-")
-	atco := firstIdentifierValue(stop, "gb-atco-")
-	gtfsStopID := firstIdentifierValue(stop, "gtfs-stop-")
+	crsValues := identifierValues(stop, "gb-crs-")
+	tiplocValues := identifierValues(stop, "gb-tiploc-")
+	atcoValues := identifierValues(stop, "gb-atco-")
+	gtfsStopIDValues := identifierValues(stop, "gtfs-stop-")
+	crs := firstValue(crsValues)
+	tiploc := firstValue(tiplocValues)
+	atco := firstValue(atcoValues)
+	gtfsStopID := firstValue(gtfsStopIDValues)
 
 	if crs != "" || tiploc != "" || atco != "" || gtfsStopID != "" {
-		queryParts := make([]string, 0, 12)
-		if crs != "" {
-			queryParts = append(queryParts, osmNWRTagLookup("ref:crs", crs)...)
+		queryParts := make([]string, 0, 3*(len(crsValues)+len(tiplocValues)+len(atcoValues)+len(gtfsStopIDValues)))
+		for _, value := range crsValues {
+			queryParts = append(queryParts, osmNWRTagLookup("ref:crs", value)...)
 		}
-		if tiploc != "" {
-			queryParts = append(queryParts, osmNWRTagLookup("ref:tiploc", tiploc)...)
+		for _, value := range tiplocValues {
+			queryParts = append(queryParts, osmNWRTagLookup("ref:tiploc", value)...)
 		}
-		if atco != "" {
-			queryParts = append(queryParts, osmNWRTagLookup("naptan:AtcoCode", atco)...)
+		for _, value := range atcoValues {
+			queryParts = append(queryParts, osmNWRTagLookup("naptan:AtcoCode", value)...)
 		}
-		if gtfsStopID != "" {
-			queryParts = append(queryParts, osmNWRTagLookup("gtfs:stop_id", gtfsStopID)...)
+		for _, value := range gtfsStopIDValues {
+			queryParts = append(queryParts, osmNWRTagLookup("gtfs:stop_id", value)...)
 		}
 
 		method, matchedValue := bestIdentifierMatch(crs, tiploc, atco, gtfsStopID)
@@ -271,6 +284,7 @@ node(w.nested_ways)->.nested_way_nodes;
 
 node.member_nodes["public_transport"="stop_position"]->.stop_positions;
 node.station["public_transport"="stop_position"]->.matched_stop_positions;
+way.station["railway"="platform"]->.matched_platform_ways;
 (
   .stop_positions;
   .matched_stop_positions;
@@ -291,8 +305,13 @@ way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_sto
 (
   .platform_ways;
   .platform_ways_near_stops;
+  .matched_platform_ways;
 )->.all_platform_ways;
 node(w.all_platform_ways)->.platform_nodes;
+
+way(around.platform_nodes:15)
+  ["railway"~"^(rail|light_rail|subway|tram)$"]
+->.tracks_near_platforms;
 
 way(bn.platform_nodes)
   ["railway"="platform_edge"]
@@ -364,6 +383,7 @@ way(bn.platform_nodes)
   .nested_ways;
   .nested_relations;
   .tracks_at_stops;
+  .tracks_near_platforms;
   .roads_at_stops;
   .all_platform_ways;
   .platform_edges_from_platforms;
@@ -416,6 +436,10 @@ way(around.all_stop_positions:40)["railway"="platform"]->.platform_ways_near_sto
 )->.all_platform_ways;
 node(w.all_platform_ways)->.platform_nodes;
 
+way(around.platform_nodes:15)
+  ["railway"~"^(rail|light_rail|subway|tram)$"]
+->.tracks_near_platforms;
+
 way(bn.platform_nodes)
   ["railway"="platform_edge"]
 ->.platform_edges_from_platforms;
@@ -484,6 +508,7 @@ way(bn.platform_nodes)
   .nested_ways;
   .nested_relations;
   .tracks_at_stops;
+  .tracks_near_platforms;
   .roads_at_stops;
   .all_platform_ways;
   .platform_edges_from_platforms;
@@ -663,12 +688,34 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 		}
 	}
 
+	// NaPTAN and GTFS identifiers are often attached directly to platform ways
+	// that are missing from an otherwise valid stop_area relation.
+	stopIdentifiersByTag := buildStopIdentifiersByTag(stop)
+	for _, element := range elements {
+		if !elementMatchesStopIdentifiers(element, stopIdentifiersByTag) {
+			continue
+		}
+		included[overpassElementKey(element)] = true
+		if isStopPosition(element) && element.Type == string(ctdf.OSMElementTypeNode) {
+			stopPositionNodeIDs[element.ID] = true
+		}
+		if isPlatform(element) {
+			for _, nodeID := range element.Nodes {
+				platformNodeIDs[nodeID] = true
+			}
+		}
+	}
+
 	for _, element := range elements {
 		if included[overpassElementKey(element)] {
 			continue
 		}
 
-		if isTrack(element) || isRoad(element) {
+		if isTrack(element) {
+			included[overpassElementKey(element)] = true
+		}
+
+		if isRoad(element) {
 			for _, nodeID := range element.Nodes {
 				if stopPositionNodeIDs[nodeID] {
 					included[overpassElementKey(element)] = true
@@ -703,6 +750,37 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 	}
 
 	return selected, stopArea, station
+}
+
+func buildStopIdentifiersByTag(stop *ctdf.Stop) map[string]map[string]struct{} {
+	prefixesByTag := map[string]string{
+		"ref:crs":         "gb-crs-",
+		"ref:tiploc":      "gb-tiploc-",
+		"naptan:AtcoCode": "gb-atco-",
+		"gtfs:stop_id":    "gtfs-stop-",
+	}
+	identifiersByTag := make(map[string]map[string]struct{}, len(prefixesByTag))
+	for tag, prefix := range prefixesByTag {
+		identifiers := identifierValues(stop, prefix)
+		if len(identifiers) == 0 {
+			continue
+		}
+		values := make(map[string]struct{}, len(identifiers))
+		for _, identifier := range identifiers {
+			values[identifier] = struct{}{}
+		}
+		identifiersByTag[tag] = values
+	}
+	return identifiersByTag
+}
+
+func elementMatchesStopIdentifiers(element overpassElement, identifiersByTag map[string]map[string]struct{}) bool {
+	for tag, identifiers := range identifiersByTag {
+		if _, matches := identifiers[element.Tags[tag]]; matches {
+			return true
+		}
+	}
+	return false
 }
 
 func selectBestStopArea(elements []overpassElement, stop *ctdf.Stop) *overpassElement {
@@ -1499,13 +1577,20 @@ func mapOverpassElementsByKey(elements []overpassElement) map[string]overpassEle
 	return byKey
 }
 
-func firstIdentifierValue(stop *ctdf.Stop, prefix string) string {
+func identifierValues(stop *ctdf.Stop, prefix string) []string {
+	values := make([]string, 0, len(stop.GetAllStopIDs()))
 	for _, id := range stop.GetAllStopIDs() {
 		if strings.HasPrefix(id, prefix) {
-			return strings.TrimPrefix(id, prefix)
+			values = append(values, strings.TrimPrefix(id, prefix))
 		}
 	}
+	return values
+}
 
+func firstValue(values []string) string {
+	if len(values) > 0 {
+		return values[0]
+	}
 	return ""
 }
 

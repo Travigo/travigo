@@ -38,6 +38,15 @@ func TestQueryOverpassTriesNextEndpointAfterFailure(t *testing.T) {
 	}
 }
 
+func TestOSMStopCacheVersion(t *testing.T) {
+	if osmStopCacheIsCurrent(&ctdf.OSMStop{}) {
+		t.Fatal("expected an unversioned OSM stop cache entry to be stale")
+	}
+	if !osmStopCacheIsCurrent(&ctdf.OSMStop{Query: ctdf.OSMStopQuery{Version: osmStopQueryVersion}}) {
+		t.Fatal("expected current OSM stop query version to be reusable")
+	}
+}
+
 func TestOverpassEndpointsIncludeSwissOnlyForSwissLocations(t *testing.T) {
 	ukEndpoints := overpassEndpointsForLocation(&ctdf.Location{Coordinates: []float64{-0.263, 51.953}})
 	if slicesContain(ukEndpoints, "https://overpass.osm.ch/api/interpreter") {
@@ -73,6 +82,84 @@ func TestExactOverpassQueryExpandsDirectlyMatchedStopPositions(t *testing.T) {
 			t.Fatalf("expected exact Overpass query to contain %q", expected)
 		}
 	}
+}
+
+func TestOSMStopQueryPlanIncludesParentAndPlatformIdentifiers(t *testing.T) {
+	stop := &ctdf.Stop{
+		PrimaryIdentifier: "gb-atco-9400ZZLUWLO",
+		OtherIdentifiers: []string{
+			"gb-atco-9400ZZLUWLO",
+			"gb-atco-9400ZZLUWLO1",
+			"gb-atco-9400ZZLUWLO2",
+		},
+		Platforms: []*ctdf.StopPlatform{
+			{PrimaryIdentifier: "gb-atco-9400ZZLUWLO3"},
+		},
+	}
+
+	plan, err := buildOSMStopQueryPlan(stop, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, atcoCode := range []string{"9400ZZLUWLO", "9400ZZLUWLO1", "9400ZZLUWLO2", "9400ZZLUWLO3"} {
+		expected := `["naptan:AtcoCode"="` + atcoCode + `"]`
+		if !strings.Contains(plan.overpassQuery, expected) {
+			t.Fatalf("expected Overpass query to contain %s", expected)
+		}
+	}
+	for _, expected := range []string{
+		`way.station["railway"="platform"]->.matched_platform_ways;`,
+		`.matched_platform_ways;`,
+		`way(around.platform_nodes:15)`,
+		`.tracks_near_platforms;`,
+	} {
+		if !strings.Contains(plan.overpassQuery, expected) {
+			t.Fatalf("expected platform expansion query to contain %q", expected)
+		}
+	}
+}
+
+func TestSelectOSMStopElementsKeepsIdentifierMatchedPlatformOutsideStopArea(t *testing.T) {
+	stop := &ctdf.Stop{
+		PrimaryIdentifier: "gb-atco-9400ZZLUPCC",
+		OtherIdentifiers:  []string{"gb-atco-9400ZZLUPCC1"},
+		TransportTypes:    []ctdf.TransportType{ctdf.TransportTypeMetro},
+	}
+	elements := []overpassElement{
+		{
+			Type: string(ctdf.OSMElementTypeRelation),
+			ID:   7216557,
+			Tags: map[string]string{
+				"type":             "public_transport",
+				"public_transport": "stop_area",
+			},
+			Members: []overpassMember{{Type: string(ctdf.OSMElementTypeNode), Ref: 10, Role: "station"}},
+		},
+		{
+			Type: string(ctdf.OSMElementTypeNode),
+			ID:   10,
+			Tags: map[string]string{"railway": "station", "subway": "yes"},
+		},
+		{
+			Type:  string(ctdf.OSMElementTypeWay),
+			ID:    1465716690,
+			Nodes: []int64{100, 101},
+			Tags: map[string]string{
+				"railway":          "platform",
+				"public_transport": "platform",
+				"ref":              "1",
+				"naptan:AtcoCode":  "9400ZZLUPCC1",
+			},
+		},
+	}
+
+	selected, _, _ := selectOSMStopElements(elements, stop)
+	for _, element := range selected {
+		if element.ID == 1465716690 {
+			return
+		}
+	}
+	t.Fatal("expected directly identifier-matched platform to survive stop-area selection")
 }
 
 func TestCoordinateOverpassQueryExpandsTracksAndPlatformsFromStopPositions(t *testing.T) {

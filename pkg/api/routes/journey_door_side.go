@@ -244,6 +244,8 @@ type trackMatch struct {
 	platformPoint        projectedPoint
 	segmentStart         projectedPoint
 	segmentEnd           projectedPoint
+	trackStart           projectedPoint
+	trackEnd             projectedPoint
 }
 
 func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation ctdf.Location, previousLocation *ctdf.Location, nextLocation *ctdf.Location) doorSideCalculation {
@@ -278,6 +280,7 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		unknown.reason = "No OSM rail track geometry is available at the stop"
 		return unknown
 	}
+	trackIndexes = preferPlatformLineTracks(osmStop.Features, platformIndexes, trackIndexes)
 
 	referenceLatitude := stopLocation.Coordinates[1]
 	direction, ok := journeyDirection(stopLocation, previousLocation, nextLocation, referenceLatitude)
@@ -323,9 +326,16 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 		unknown.reason = "The nearest OSM track is too far from the matched platform"
 		return unknown
 	}
-	if !trackWasIdentifiedByStopPosition && platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge && hasCompetingTrack(matches, best) {
-		unknown.reason = "The platform is similarly close to tracks on both sides"
-		return unknown
+	competingTracksAgree := false
+	if !trackWasIdentifiedByStopPosition && platformFeature.Type != ctdf.OSMStopFeatureTypePlatformEdge {
+		competingMatches := competingTrackMatches(matches, best)
+		if len(competingMatches) > 1 {
+			if !trackMatchesAgreeOnDoorSide(competingMatches, direction) {
+				unknown.reason = "The platform is similarly close to tracks on both sides"
+				return unknown
+			}
+			competingTracksAgree = true
+		}
 	}
 
 	trackVector := projectedPoint{x: best.segmentEnd.x - best.segmentStart.x, y: best.segmentEnd.y - best.segmentStart.y}
@@ -363,6 +373,10 @@ func calculateTrainDoorSide(osmStop *ctdf.OSMStop, platform string, stopLocation
 	}
 	if platformFeature.Type == ctdf.OSMStopFeatureTypePlatformEdge {
 		result.confidence = math.Min(0.98, result.confidence+0.05)
+	}
+	if competingTracksAgree {
+		result.confidence = math.Min(result.confidence, 0.78)
+		result.reason = "Multiple nearby OSM tracks imply the same platform side for this journey direction"
 	}
 	return result
 }
@@ -427,6 +441,63 @@ func featureMatchesTransport(feature ctdf.OSMStopFeature, transportTypes []ctdf.
 		}
 	}
 	return false
+}
+
+func preferPlatformLineTracks(features []ctdf.OSMStopFeature, platformIndexes []int, trackIndexes []int) []int {
+	platformLines := map[string]struct{}{}
+	for _, index := range platformIndexes {
+		for line := range featureLineTokens(features[index], true) {
+			platformLines[line] = struct{}{}
+		}
+	}
+	if len(platformLines) == 0 {
+		return trackIndexes
+	}
+
+	matchingTracks := make([]int, 0, len(trackIndexes))
+	for _, index := range trackIndexes {
+		for line := range featureLineTokens(features[index], false) {
+			if _, matches := platformLines[line]; matches {
+				matchingTracks = append(matchingTracks, index)
+				break
+			}
+		}
+	}
+	if len(matchingTracks) > 0 {
+		return matchingTracks
+	}
+	return trackIndexes
+}
+
+func featureLineTokens(feature ctdf.OSMStopFeature, includeNote bool) map[string]struct{} {
+	values := []string{feature.Tags["line"], feature.Tags["route_ref"]}
+	if includeNote {
+		values = append(values, feature.Tags["note"])
+	}
+	if feature.Tags["line"] == "" {
+		values = append(values, feature.PrimaryName, feature.Tags["name"])
+	}
+
+	tokens := map[string]struct{}{}
+	for _, value := range values {
+		for _, part := range strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+			return r == ';' || r == ',' || r == '/' || r == '|'
+		}) {
+			part = strings.TrimSpace(part)
+			part = strings.TrimSuffix(part, " lines")
+			part = strings.TrimSuffix(part, " line")
+			part = strings.Map(func(r rune) rune {
+				if unicode.IsLetter(r) || unicode.IsDigit(r) {
+					return r
+				}
+				return -1
+			}, part)
+			if part != "" {
+				tokens[part] = struct{}{}
+			}
+		}
+	}
+	return tokens
 }
 
 func trackIndexForPlatformStopPosition(features []ctdf.OSMStopFeature, platform string, transportTypes []ctdf.TransportType, trackIndexes []int, referenceLatitude float64) (int, bool) {
@@ -565,7 +636,11 @@ func closestTrackMatch(platformPoints []projectedPoint, trackPoints []projectedP
 	if len(platformPoints) == 0 || len(trackPoints) < 2 {
 		return trackMatch{}, false
 	}
-	best := trackMatch{distance: math.Inf(1)}
+	best := trackMatch{
+		distance:   math.Inf(1),
+		trackStart: trackPoints[0],
+		trackEnd:   trackPoints[len(trackPoints)-1],
+	}
 	for _, platformPoint := range platformPoints {
 		for index := 0; index < len(trackPoints)-1; index++ {
 			trackPoint := closestPointOnSegment(platformPoint, trackPoints[index], trackPoints[index+1])
@@ -582,14 +657,79 @@ func closestTrackMatch(platformPoints []projectedPoint, trackPoints []projectedP
 	return best, !math.IsInf(best.distance, 1)
 }
 
-func hasCompetingTrack(matches []trackMatch, best trackMatch) bool {
+func competingTrackMatches(matches []trackMatch, best trackMatch) []trackMatch {
+	competing := []trackMatch{best}
 	for _, match := range matches[1:] {
 		if match.platformFeatureIndex != best.platformFeatureIndex || match.trackFeatureIndex == best.trackFeatureIndex {
 			continue
 		}
-		return match.distance-best.distance < 1.5 || match.distance < best.distance*1.2
+		if trackMatchesAreConnected(best, match) {
+			continue
+		}
+		if match.distance-best.distance < 1.5 || match.distance < best.distance*1.2 {
+			competing = append(competing, match)
+		}
+	}
+	return competing
+}
+
+func trackMatchesAreConnected(a trackMatch, b trackMatch) bool {
+	aEndpoints := []projectedPoint{a.trackStart, a.trackEnd}
+	bEndpoints := []projectedPoint{b.trackStart, b.trackEnd}
+	for _, aEndpoint := range aEndpoints {
+		for _, bEndpoint := range bEndpoints {
+			if pointDistance(aEndpoint, bEndpoint) <= 2 {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+func trackMatchesAgreeOnDoorSide(matches []trackMatch, direction projectedPoint) bool {
+	var expectedSide trainDoorSide
+	for _, match := range matches {
+		side, ok := trackMatchDoorSide(match, direction)
+		if !ok {
+			return false
+		}
+		if expectedSide == "" {
+			expectedSide = side
+			continue
+		}
+		if side != expectedSide {
+			return false
+		}
+	}
+	return expectedSide != ""
+}
+
+func trackMatchDoorSide(match trackMatch, direction projectedPoint) (trainDoorSide, bool) {
+	trackVector := projectedPoint{x: match.segmentEnd.x - match.segmentStart.x, y: match.segmentEnd.y - match.segmentStart.y}
+	if dot(trackVector, direction) < 0 {
+		trackVector.x = -trackVector.x
+		trackVector.y = -trackVector.y
+	}
+	if vectorLength(trackVector) == 0 || vectorLength(direction) == 0 {
+		return trainDoorSideUnknown, false
+	}
+	alignment := math.Abs(dot(trackVector, direction) / (vectorLength(trackVector) * vectorLength(direction)))
+	if math.IsNaN(alignment) || alignment < 0.15 {
+		return trainDoorSideUnknown, false
+	}
+
+	platformVector := projectedPoint{x: match.platformPoint.x - match.trackPoint.x, y: match.platformPoint.y - match.trackPoint.y}
+	if vectorLength(platformVector) < 0.25 {
+		return trainDoorSideUnknown, false
+	}
+	crossProduct := trackVector.x*platformVector.y - trackVector.y*platformVector.x
+	if math.Abs(crossProduct) < 0.01 {
+		return trainDoorSideUnknown, false
+	}
+	if crossProduct > 0 {
+		return trainDoorSideLeft, true
+	}
+	return trainDoorSideRight, true
 }
 
 func closestPointOnSegment(point projectedPoint, start projectedPoint, end projectedPoint) projectedPoint {
