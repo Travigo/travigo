@@ -59,6 +59,12 @@ spec:
                   name: {{ $.Values.jp_odpt.apiKeySecret }}
                   key: api_key
                   optional: false
+            - name: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.ch_opentransportdata.apiKeySecret }}
+                  key: api_key
+                  optional: false
             - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:
@@ -67,14 +73,6 @@ spec:
                   optional: false
             - name: TRAVIGO_MONGODB_DATABASE
               value: {{ $.Values.database.database }}
-            # - name: TRAVIGO_REALTIME_MONGODB_CONNECTION
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: {{ $.Values.database.realtime.connectionStringSecret }}
-            #       key: connectionString.standard
-            #       optional: false
-            # - name: TRAVIGO_REALTIME_MONGODB_DATABASE
-            #   value: {{ $.Values.database.realtime.database }}
             - name: TRAVIGO_REDIS_ADDRESS
               value: {{ $.Values.redis.address }}
             - name: TRAVIGO_REDIS_PASSWORD

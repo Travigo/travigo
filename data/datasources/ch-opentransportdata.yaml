@@ -1,0 +1,33 @@
+identifier: ch-opentransportdata
+region: ch
+provider:
+  name: OpenTransportData
+  website: "https://opentransportdata.swiss"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  # TODO need a way to get the latest
+  source: "https://data.opentransportdata.swiss/dataset/3d2c18f9-9ef1-463f-a249-5c67604efd74/resource/1cc4e454-3343-44ca-abcd-011f5e76d635/download/gtfs_fp2026_20260708.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+- identifier: gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api.opentransportdata.swiss/la/gtfs-rt"
+  linkeddataset: ch-opentransportdata-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+  sourceauthentication:
+    authHeader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
+- identifier: gtfs-realtime-sa
+  format: gtfs-realtime
+  source: "https://api.opentransportdata.swiss/la/gtfs-sa"
+  linkeddataset: ch-opentransportdata-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+  sourceauthentication:
+    authHeader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY

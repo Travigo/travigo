@@ -33,9 +33,10 @@ type DataSet struct {
 }
 
 type SourceAuthentication struct {
-	Query  map[string]string
-	Header map[string]string
-	Basic  struct {
+	Query      map[string]string
+	Header     map[string]string
+	AuthHeader string
+	Basic      struct {
 		Username string
 		Password string
 	}

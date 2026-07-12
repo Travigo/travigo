@@ -30,6 +30,9 @@ se_trafiklab:
 jp_odpt:
   apiKeySecret: travigo-odtp-japan-gtfs
 
+ch_opentransportdata:
+  apiKeySecret: travigo-ch-opentransportdata
+
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials
