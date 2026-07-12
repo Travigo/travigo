@@ -3,4 +3,15 @@ region: gb
 provider:
   name: Transport for London
   website: "https://tfl.gov.uk/"
-datasets: []
+datasets:
+- identifier: tfl-api
+  format: tfl-json
+  source: "https://api.tfl.gov.uk"
+  supportedobjects:
+    realtimejourneys: true
+    servicealerts: true
+  sourceauthentication:
+    query:
+      api_key: TRAVIGO_TFL_API_KEY
+  linkeddataset: gb-dft-bods-gtfs-schedule-*
+  importdestination: specific-runner

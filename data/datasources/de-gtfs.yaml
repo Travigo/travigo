@@ -8,8 +8,15 @@ datasets:
   format: gtfs-schedule
   source: "https://download.gtfs.de/germany/free/latest.zip"
   datasetsize: large
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
 - identifier: gtfs-realtime
   format: gtfs-realtime
   source: "https://realtime.gtfs.de/realtime-free.pb"
   linkeddataset: de-gtfs-gtfs-schedule
   importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+    servicealerts: true

@@ -7,6 +7,8 @@ datasets:
 - identifier: naptan
   format: gb-naptan
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
+  supportedobjects:
+    stops: true
 - identifier: bods-gtfs-schedule-east-anglia
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/"
@@ -193,6 +195,8 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule-*
   unpackbundle: zip
   importdestination: realtime-queue
@@ -203,6 +207,8 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule-*
   unpackbundle: zip
   importdestination: realtime-queue
@@ -213,6 +219,8 @@ datasets:
   sourceauthentication:
     query:
       api_key: TRAVIGO_BODS_API_KEY
+  supportedobjects:
+    servicealerts: true
   linkeddataset: gb-dft-bods-gtfs-schedule-*
   unpackbundle: zip
   importdestination: realtime-queue

@@ -93,6 +93,10 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		return nil, errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
 
+	if dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
+		return nil, errors.New("Custom runner required for this dataset, cannot import")
+	}
+
 	if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
 		if dataset.Queue == nil {
 			realtimeQueue, err := redis_client.QueueConnection.OpenQueue("realtime-queue")

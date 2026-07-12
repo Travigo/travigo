@@ -9,9 +9,29 @@ datasets:
   source: "https://opendata.nationalrail.co.uk/api/staticfeeds/4.0/tocs"
   sourceauthentication:
     custom: "gb-nationalrail-login"
+  supportedobjects:
+    services: true
+    operators: true
 - identifier: timetable
   format: gb-cif
   source: "https://opendata.nationalrail.co.uk/api/staticfeeds/3.0/timetable"
   datasetsize: medium
   sourceauthentication:
     custom: "gb-nationalrail-login"
+  supportedobjects:
+    journeys: true
+- identifier: darwin
+  format: xml-darwin
+  source: "https://opendata.nationalrail.co.uk/"
+  supportedobjects:
+    realtimejourneys: true
+    servicealerts: true
+  linkeddataset: gb-nationalrail-timetable
+  importdestination: specific-runner
+- identifier: linx-consist
+  format: xml-linx-S506
+  source: "https://raildata.org.uk/"
+  supportedobjects:
+    realtimejourneys: true
+  linkeddataset: gb-nationalrail-timetable
+  importdestination: specific-runner

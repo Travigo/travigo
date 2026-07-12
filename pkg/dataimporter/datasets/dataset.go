@@ -74,6 +74,7 @@ const (
 type ImportDestination string
 
 const (
-	ImportDestinationDatabase      ImportDestination = "database"
-	ImportDestinationRealtimeQueue                   = "realtime-queue"
+	ImportDestinationDatabase       ImportDestination = "database"
+	ImportDestinationRealtimeQueue  ImportDestination = "realtime-queue"
+	ImportDestinationSpecificRunner ImportDestination = "specific-runner"
 )

@@ -12,3 +12,13 @@ datasets:
       username: TRAVIGO_NETWORKRAIL_USERNAME
       password: TRAVIGO_NETWORKRAIL_PASSWORD
   unpackbundle: gz
+  supportedobjects:
+    stops: true
+- identifier: nrod-train-tracker
+  format: json-nrod
+  source: "https://publicdatafeeds.networkrail.co.uk/"
+  supportedobjects:
+    realtimejourneys: true
+    servicealerts: true
+  linkeddataset: gb-nationalrail-timetable
+  importdestination: specific-runner

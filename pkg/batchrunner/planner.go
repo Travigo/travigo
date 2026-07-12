@@ -36,7 +36,7 @@ func BuildPlan() Plan {
 	}
 
 	for _, dataset := range manager.GetRegisteredDataSets() {
-		if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
+		if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue || dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
 			continue
 		}
 

@@ -8,6 +8,10 @@ datasets:
   format: gtfs-schedule
   source: "https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip"
   datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
 - identifier: gtfs-realtime
   format: gtfs-realtime
   source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr"
@@ -16,3 +20,6 @@ datasets:
       x-api-key: TRAVIGO_IE_NATIONALTRANSPORT_API_KEY
   linkeddataset: ie-tfi-gtfs-schedule
   importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+    servicealerts: true

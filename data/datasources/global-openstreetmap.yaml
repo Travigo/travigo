@@ -3,4 +3,10 @@ region: global
 provider:
   name: OpenStreetMap
   website: "http://openstreetmap.org/"
-datasets: []
+datasets:
+- identifier: osm-data
+  format: geojson
+  source: "https://openstreetmap.org"
+  supportedobjects:
+    stopsdetailed: true
+  importdestination: specific-runner
