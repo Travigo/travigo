@@ -7,8 +7,9 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   # TODO need a way to get the latest
-  source: "https://data.opentransportdata.swiss/dataset/3d2c18f9-9ef1-463f-a249-5c67604efd74/resource/1cc4e454-3343-44ca-abcd-011f5e76d635/download/gtfs_fp2026_20260708.zip"
-  datasetsize: medium
+  # source: "https://data.opentransportdata.swiss/dataset/3d2c18f9-9ef1-463f-a249-5c67604efd74/resource/1cc4e454-3343-44ca-abcd-011f5e76d635/download/gtfs_fp2026_20260708.zip"
+  source: "/Users/aaronclaydon/Downloads/gtfs_fp2026_20260708.zip"
+  datasetsize: large
   supportedobjects:
     stops: true
     services: true

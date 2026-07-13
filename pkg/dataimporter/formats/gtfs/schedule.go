@@ -2,6 +2,7 @@ package gtfs
 
 import (
 	"archive/zip"
+	"bufio"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -193,7 +194,18 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 
 	file, _ := os.Open(g.fileMap[fileName])
 	defer file.Close()
-	decoder := csv.NewDecoder(file)
+
+	// Check for UTF-8 BOM that messes up headers
+	reader := bufio.NewReader(file)
+
+	if bytes, _ := reader.Peek(3); len(bytes) == 3 &&
+		bytes[0] == 0xEF &&
+		bytes[1] == 0xBB &&
+		bytes[2] == 0xBF {
+		_, _ = reader.Discard(3)
+	}
+
+	decoder := csv.NewDecoder(reader)
 
 	line, err := decoder.ReadLine()
 	if err != nil {
