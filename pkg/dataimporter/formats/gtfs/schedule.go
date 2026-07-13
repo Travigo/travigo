@@ -276,7 +276,7 @@ func materializeShapeTrack(points []compactShapePoint) []ctdf.Location {
 func (g *Schedule) loadShapeTracks() (map[string][]compactShapePoint, error) {
 	shapeTracks := map[string][]compactShapePoint{}
 	if _, exists := g.fileMap["shapes.txt"]; !exists {
-		log.Debug().Msg("GTFS feed does not contain shapes.txt")
+		log.Warn().Msg("GTFS feed does not contain shapes.txt")
 		return shapeTracks, nil
 	}
 
@@ -647,10 +647,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journeysQueue.Process()
 	}
 
-	// PERF(low-risk): hoist dataset-wide constants out of the per-stop hot loop.
-	// These depend only on dataset.Identifier (constant for the whole import), so
-	// computing them once avoids repeated strings.Contains / fmt.Sprintf prefix work
-	// for every single stop time across every trip.
 	useGBAtcoStopRef := strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-")
 	datasetStopPrefix := fmt.Sprintf("%s-stop-", dataset.Identifier)
 
@@ -663,10 +659,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 		journey := buildJourney(trip)
 
-		// PERF(low-risk): pre-size the Path slice. The loop below appends exactly
-		// len(stopTimes)-1 items (one per adjacent stop pair). Allocating the full
-		// capacity up front avoids repeated slice growth/reallocation as the path is
-		// built. Length stays 0 here so appended ordering and output are unchanged.
 		if len(stopTimes) > 1 {
 			journey.Path = make([]*ctdf.JourneyPathItem, 0, len(stopTimes)-1)
 		}
@@ -692,10 +684,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			var destinationStopRef string
 
 			// TODO no hardocded nonsense!!
-			// PERF(low-risk): use the hoisted bool/prefix instead of recomputing
-			// strings.Contains and the "-stop-" prefix per stop. Behaviour identical:
-			// gb-atco branch is unchanged; the else branch builds the same string via
-			// the precomputed datasetStopPrefix.
 			if useGBAtcoStopRef {
 				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
 				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
@@ -711,12 +699,8 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				DestinationArrivalTime: destinationArrivalTime,
 				OriginDepartureTime:    originDeparturelTime,
 				DestinationDisplay:     stopTime.StopHeadsign,
-				// PERF(low-risk): pre-size activity slices (max 2 entries each:
-				// setdown + pickup) so the typical append of 1-2 items doesn't
-				// trigger a grow-from-nil reallocation. Starts empty (len 0) so
-				// JSON/BSON output is identical to the previous []T{} literal.
-				OriginActivity:      make([]ctdf.JourneyPathItemActivity, 0, 2),
-				DestinationActivity: make([]ctdf.JourneyPathItemActivity, 0, 2),
+				OriginActivity:         make([]ctdf.JourneyPathItemActivity, 0, 2),
+				DestinationActivity:    make([]ctdf.JourneyPathItemActivity, 0, 2),
 			}
 
 			if previousStopTime.DropOffType == 0 {

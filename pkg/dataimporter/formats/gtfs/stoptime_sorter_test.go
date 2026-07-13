@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSortedStopTimeGroupsSortsAndGroupsUnorderedFile(t *testing.T) {
@@ -78,6 +80,64 @@ func TestSortedStopTimeGroupsMergesTripsAcrossChunks(t *testing.T) {
 
 	assertIntsEqual(t, gotSequences["trip-a"], []int{1, 2})
 	assertIntsEqual(t, gotSequences["trip-b"], []int{1, 2})
+}
+
+func TestSortedStopTimeGroupsStripsUTF8BOMFromHeader(t *testing.T) {
+	stopTimesPath := filepath.Join(t.TempDir(), "stop_times.txt")
+	err := os.WriteFile(stopTimesPath, []byte("\ufefftrip_id,arrival_time,departure_time,stop_id,stop_sequence,pickup_type,drop_off_type\ntrip-a,08:00:00,08:00:30,stop-1,1,0,0\ntrip-a,08:05:00,08:05:30,stop-2,2,0,0\ntrip-b,09:00:00,09:00:30,stop-3,1,0,0\ntrip-b,09:05:00,09:05:30,stop-4,2,0,0\n"), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := newSortedStopTimeGroups(stopTimesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer groups.Close()
+
+	var gotTripIDs []string
+	err = groups.Process(func(tripID string, stopTimes []StopTime) error {
+		gotTripIDs = append(gotTripIDs, tripID)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertStringsEqual(t, gotTripIDs, []string{"trip-a", "trip-b"})
+}
+
+func TestSortedStopTimeGroupsContinuesAfterProcessorError(t *testing.T) {
+	stopTimesPath := filepath.Join(t.TempDir(), "stop_times.txt")
+	err := os.WriteFile(stopTimesPath, []byte(`trip_id,arrival_time,departure_time,stop_id,stop_headsign,stop_sequence,pickup_type,drop_off_type
+trip-a,08:00:00,08:00:30,stop-1,,1,0,0
+trip-a,08:05:00,08:05:30,stop-2,,2,0,0
+trip-b,09:00:00,09:00:30,stop-3,,1,0,0
+trip-b,09:05:00,09:05:30,stop-4,,2,0,0
+`), 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := newSortedStopTimeGroups(stopTimesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer groups.Close()
+
+	var seenTripIDs []string
+	err = groups.Process(func(tripID string, stopTimes []StopTime) error {
+		seenTripIDs = append(seenTripIDs, tripID)
+		if tripID == "trip-a" {
+			return assert.AnError
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertStringsEqual(t, seenTripIDs, []string{"trip-a", "trip-b"})
 }
 
 func assertStringsEqual(t *testing.T, got []string, want []string) {

@@ -1,6 +1,7 @@
 package gtfs
 
 import (
+	"bufio"
 	"container/heap"
 	stdcsv "encoding/csv"
 	"fmt"
@@ -80,7 +81,9 @@ func (groups *sortedStopTimeGroups) Process(process func(string, []StopTime) err
 		}
 		if stopTime.TripID != currentTripID {
 			if err := process(currentTripID, currentTripStopTimes); err != nil {
-				return err
+				log.Debug().Err(err).Str("trip", currentTripID).Msg("Failed to process trip stop times")
+			} else {
+				currentTripStopTimes = nil
 			}
 
 			currentTripID = stopTime.TripID
@@ -112,7 +115,16 @@ func writeSortedStopTimeChunks(sourcePath string) ([]string, error) {
 	}
 	defer file.Close()
 
-	decoder := gtfscsv.NewDecoder(file)
+	reader := bufio.NewReader(file)
+
+	if bytes, _ := reader.Peek(3); len(bytes) == 3 &&
+		bytes[0] == 0xEF &&
+		bytes[1] == 0xBB &&
+		bytes[2] == 0xBF {
+		_, _ = reader.Discard(3)
+	}
+
+	decoder := gtfscsv.NewDecoder(reader)
 
 	line, err := decoder.ReadLine()
 	if err != nil {
