@@ -3,6 +3,8 @@ image:
   - events
   - run
 
+replicaCount: 3
+
 ingress:
   enabled: true
   hosts:
