@@ -9,6 +9,7 @@ datasets:
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
   supportedobjects:
     stops: true
+    stopgroups: true
 - identifier: bods-gtfs-schedule-east-anglia
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/"
