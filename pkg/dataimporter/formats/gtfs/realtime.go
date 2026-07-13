@@ -47,8 +47,8 @@ func (r *Realtime) ParseFile(reader io.Reader) error {
 }
 
 func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
-	if !dataset.SupportedObjects.RealtimeJourneys {
-		return errors.New("This format requires realtimejourneys to be enabled")
+	if !(dataset.SupportedObjects.RealtimeJourneys || dataset.SupportedObjects.ServiceAlerts) {
+		return errors.New("This format requires realtime journeys or service alerts to be enabled")
 	}
 
 	locationEventType := vehicletracker.VehicleUpdateEventTypeTrip
