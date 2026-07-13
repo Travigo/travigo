@@ -12,6 +12,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: gtfs-realtime
   format: gtfs-realtime
   source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr"

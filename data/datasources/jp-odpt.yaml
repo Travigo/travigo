@@ -15,6 +15,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-toei-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
@@ -23,6 +24,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-tokyo-metro
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip"
@@ -31,6 +33,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-yokohama-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/odpt/YokohamaMunicipal/Train.zip?date=20241227"
@@ -39,6 +42,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-yokohama-bus
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Bus-GTFS.zip"
@@ -47,6 +51,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-twr-train
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TWR/data/TWR-Train-GTFS.zip"
@@ -55,6 +60,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: schedule-tama-monorail
   format: gtfs-schedule
   source: "https://api.odpt.org/api/v4/files/TamaMonorail/data/TamaMonorail-Train-GTFS.zip"
@@ -63,6 +69,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 
 - identifier: realtime-twr-train-alert
   format: gtfs-realtime

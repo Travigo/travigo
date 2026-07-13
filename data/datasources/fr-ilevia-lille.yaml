@@ -12,6 +12,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: gtfs-realtime
   format: gtfs-realtime
   source: "https://proxy.transport.data.gouv.fr/resource/ilevia-lille-gtfs-rt"

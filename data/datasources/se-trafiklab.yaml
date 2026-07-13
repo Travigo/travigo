@@ -18,6 +18,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: gtfs-realtime-sl-trip
   format: gtfs-realtime
   source: "https://opendata.samtrafiken.se/gtfs-rt-sweden/sl/TripUpdatesSweden.pb"

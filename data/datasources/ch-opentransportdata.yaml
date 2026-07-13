@@ -13,6 +13,7 @@ datasets:
     stops: true
     services: true
     journeys: true
+    operators: true
 - identifier: gtfs-realtime
   format: gtfs-realtime
   source: "https://api.opentransportdata.swiss/la/gtfs-rt"
