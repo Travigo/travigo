@@ -9,3 +9,4 @@ datasets:
   source: "https://www.travelinedata.org.uk/noc/api/1.0/nocrecords.xml"
   supportedobjects:
     operators: true
+    operatorgroups: true
