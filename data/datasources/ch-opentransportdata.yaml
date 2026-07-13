@@ -22,7 +22,7 @@ datasets:
   supportedobjects:
     realtimejourneys: true
   sourceauthentication:
-    authHeader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
+    authheader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
 - identifier: gtfs-realtime-sa
   format: gtfs-realtime
   source: "https://api.opentransportdata.swiss/la/gtfs-sa"
@@ -31,4 +31,4 @@ datasets:
   supportedobjects:
     servicealerts: true
   sourceauthentication:
-    authHeader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
+    authheader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY

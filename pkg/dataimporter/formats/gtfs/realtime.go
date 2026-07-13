@@ -58,12 +58,14 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	body, err := io.ReadAll(r.reader)
 	if err != nil {
+		log.Error().Str("body", string(body)).Msg("Failed to read realtime feed")
 		return err
 	}
 
 	feed := gtfs.FeedMessage{}
 	err = proto.Unmarshal(body, &feed)
 	if err != nil {
+		log.Error().Str("body", string(body)).Msg("Failed to unmarshal realtime feed")
 		return err
 	}
 
