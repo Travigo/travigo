@@ -65,6 +65,12 @@ spec:
                   name: {{ $.Values.ch_opentransportdata.apiKeySecret }}
                   key: api_key
                   optional: false
+            - name: TRAVIGO_CH_OPENTRANSPORTDATA_SA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.ch_opentransportdata.saApiKeySecret }}
+                  key: api_key
+                  optional: false
             - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:

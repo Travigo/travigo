@@ -32,6 +32,7 @@ jp_odpt:
 
 ch_opentransportdata:
   apiKeySecret: travigo-ch-opentransportdata
+  saApiKeySecret: travigo-ch-opentransportdata-sa
 
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials

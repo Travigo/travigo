@@ -31,4 +31,4 @@ datasets:
   supportedobjects:
     servicealerts: true
   sourceauthentication:
-    authheader: TRAVIGO_CH_OPENTRANSPORTDATA_API_KEY
+    authheader: TRAVIGO_CH_OPENTRANSPORTDATA_SA_API_KEY
