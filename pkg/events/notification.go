@@ -2,12 +2,14 @@ package events
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
@@ -17,8 +19,21 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 
 	switch e.Type {
 	case ctdf.EventTypeServiceAlertCreated:
-		eventNotificationData.Title = eventBody["AlertType"].(string)
-		eventNotificationData.Message = eventBody["Text"].(string)
+		matchedIdentifiers := eventBody["MatchedIdentifiers"].([]interface{})
+		matchedIdentifiersStrings := make([]string, len(matchedIdentifiers))
+		for i, identifier := range matchedIdentifiers {
+			identifierString := identifier.(string)
+			identifierStringSplit := strings.Split(identifierString, ":")
+			if identifierStringSplit[0] == "DAYINSTANCEOF" {
+				identifierString = strings.Join(identifierStringSplit[2:], ":")
+			}
+			matchedIdentifiersStrings[i] = identifierString
+		}
+
+		alertScope := strings.Join(matchedIdentifiersStrings, ", ") // TODO needs to work out actual name
+
+		eventNotificationData.Title = strings.Join(util.CamelCaseSplit(eventBody["AlertType"].(string)), " ")
+		eventNotificationData.Message = fmt.Sprintf("%s\n%s", alertScope, eventBody["Text"].(string))
 
 		title := eventBody["Title"].(string)
 		if title != "" {
