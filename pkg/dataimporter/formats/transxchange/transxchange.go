@@ -64,7 +64,7 @@ func (doc *TransXChange) Validate() error {
 	return nil
 }
 
-func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	datasource.OriginalFormat = "transxchange"
 
 	var transportType ctdf.TransportType
@@ -120,7 +120,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	}
 	existingServicesByID, err := preloadTransXChangeServices(context.Background(), servicesCollection, doc, operatorLocalMapping)
 	if err != nil {
-		return err
+		return datasets.DataImportReport{}, err
 	}
 
 	// There should be so few services (probably just 1) services defined per document that there is no point of batch processing them
@@ -300,7 +300,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	}
 	existingJourneysByID, err := preloadTransXChangeJourneys(context.Background(), journeysCollection, doc.VehicleJourneys, servicesReferences, operatorLocalMapping)
 	if err != nil {
-		return err
+		return datasets.DataImportReport{}, err
 	}
 
 	var journeyOperationInsert uint64
@@ -723,7 +723,10 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 	log.Info().Msgf("Successfully imported into MongoDB")
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedJourneys: int(journeyOperationInsert + journeyOperationUpdate),
+		ImportedServices: int(serviceOperationInsert + serviceOperationUpdate),
+	}, nil
 }
 
 func preloadTransXChangeServices(ctx context.Context, collection *mongo.Collection, doc *TransXChange, operatorLocalMapping map[string]string) (map[string]*ctdf.Service, error) {

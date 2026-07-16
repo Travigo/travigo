@@ -117,6 +117,7 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 
 func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool) error {
 	datasetVersionCollection := database.GetCollection("dataset_versions")
+	datasetImportReportCollection := database.GetCollection("dataset_import_reports")
 
 	var existingDatasetVersion *ctdf.DatasetVersion
 	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
@@ -209,6 +210,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		return errors.New(fmt.Sprintf("Cannot handle bundle format %s", dataset.UnpackBundle))
 	}
 
+	importReports := make([]datasets.DataImportReport, len(sourceFileReaders))
 	for i, sourceFileReader := range sourceFileReaders {
 		format, err := createDatasetFormat(dataset)
 		if err != nil {
@@ -222,10 +224,11 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		}
 
 		log.Debug().Int("index", i).Msg("Opening zipped file")
-		err = format.Import(*dataset, datasource)
+		importReport, err := format.Import(*dataset, datasource)
 		if err != nil {
 			return err
 		}
+		importReports[i] = importReport
 	}
 
 	if !skipCleanup {
@@ -261,6 +264,24 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 
 		opts := options.Update().SetUpsert(true)
 		_, err = datasetVersionCollection.UpdateOne(context.Background(), bson.M{"dataset": datasetVersion.Dataset}, bson.M{"$set": datasetVersion}, opts)
+
+		// Aggregate the import report
+		importReport := datasets.DataImportReport{
+			DatasetIdentifier: dataset.Identifier,
+			CreationDateTime:  time.Now(),
+			RunTime:           0, // TODO
+		}
+
+		for _, report := range importReports {
+			importReport.ImportedStops += report.ImportedStops
+			importReport.ImportedStopGroups += report.ImportedStopGroups
+			importReport.ImportedServices += report.ImportedServices
+			importReport.ImportedJourneys += report.ImportedJourneys
+			importReport.ImportedOperators += report.ImportedOperators
+			importReport.ImportedOperationGroups += report.ImportedOperationGroups
+		}
+
+		_, err = datasetImportReportCollection.InsertOne(context.Background(), importReport)
 	}
 
 	return nil

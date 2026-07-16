@@ -29,11 +29,6 @@ type SiriVMVehicleIdentificationEvent struct {
 	ResponseTime    time.Time
 }
 
-type queueEmptyElasticEvent struct {
-	Timestamp time.Time
-	Duration  int
-}
-
 func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) bool {
 	datasource.OriginalFormat = "siri-vm"
 
@@ -178,9 +173,9 @@ func (s *SiriVM) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.RealtimeJourneys {
-		return errors.New("This format requires realtimejourneys to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires realtimejourneys to be enabled")
 	}
 
 	var retrievedRecords int64
@@ -195,7 +190,7 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return err
+			return datasets.DataImportReport{}, err
 		}
 
 		switch ty := tok.(type) {
@@ -229,7 +224,7 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 	// Wait for queue to empty
 	checkQueueSize()
 
-	return nil
+	return datasets.DataImportReport{}, nil
 }
 
 func checkQueueSize() {

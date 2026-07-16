@@ -78,9 +78,9 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 	return operators, services
 }
 
-func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.Operators || !dataset.SupportedObjects.Services {
-		return errors.New("This format requires operators & services to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires operators & services to be enabled")
 	}
 
 	operators, services := t.convertToCTDF()
@@ -208,7 +208,10 @@ func (t *TrainOperatingCompanyList) Import(dataset datasets.DataSet, datasource 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", servicesOperationInsert)
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedServices:  int(servicesOperationInsert),
+		ImportedOperators: int(operatorOperationInsert),
+	}, nil
 }
 
 func generateRailStopNameOverrides() map[string]string {

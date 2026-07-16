@@ -208,9 +208,9 @@ func (t *TravelineData) convertToCTDF() ([]*ctdf.Operator, []*ctdf.OperatorGroup
 	return operators, operatorGroups
 }
 
-func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.Operators || !dataset.SupportedObjects.OperatorGroups {
-		return errors.New("This format requires operators & operatorgroups to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires operators & operatorgroups to be enabled")
 	}
 
 	log.Info().Msg("Converting to CTDF")
@@ -340,5 +340,8 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 
 	log.Info().Msgf("Successfully imported into MongoDB")
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedStops:      int(operatorOperationInsert),
+		ImportedStopGroups: int(operatorGroupOperationInsert),
+	}, nil
 }

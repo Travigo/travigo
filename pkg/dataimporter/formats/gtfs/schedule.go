@@ -307,7 +307,7 @@ func (g *Schedule) loadShapeTracks() (map[string][]compactShapePoint, error) {
 	return shapeTracks, nil
 }
 
-func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	//// Translations ////
@@ -414,14 +414,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			g.frequencies[f.TripID] = append(g.frequencies[f.TripID], ctdf.JourneyFrequency{StartTime: start, EndTime: end, HeadwaySeconds: f.HeadwaySeconds, ExactTimes: parseExactTimes(f.ExactTimes)})
 			return nil, ""
 		}); err != nil {
-			return err
+			return datasets.DataImportReport{}, err
 		}
 	}
 
 	//// Shapes ////
 	shapeTracks, err := g.loadShapeTracks()
 	if err != nil {
-		return err
+		return datasets.DataImportReport{}, err
 	}
 	trackStore := newJourneyTrackStore(dataset, datasource)
 	for shapeID, track := range shapeTracks {
@@ -452,7 +452,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 			return transfer, identifier
 		}); err != nil {
-			return err
+			return datasets.DataImportReport{}, err
 		}
 	}
 
@@ -637,7 +637,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	//// Stop Times ////
 	stopTimeGroups, err := newSortedStopTimeGroups(g.fileMap["stop_times.txt"])
 	if err != nil {
-		return err
+		return datasets.DataImportReport{}, err
 	}
 	defer stopTimeGroups.Close()
 
@@ -817,7 +817,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 		return nil
 	}); err != nil {
-		return err
+		return datasets.DataImportReport{}, err
 	}
 	gtfsTrips = nil
 
@@ -837,7 +837,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	log.Info().Msg("Finished Journeys")
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedOperators: len(g.Agencies),
+		ImportedStops:     len(g.stopLocations),
+		ImportedServices:  len(g.ctdfServices),
+		ImportedJourneys:  0, // TODO
+	}, nil
 }
 
 func (gtfs *Schedule) GetTranslation(table string, field string, language string, originalValue string) string {

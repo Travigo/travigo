@@ -33,9 +33,9 @@ func (s *SiriSX) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.ServiceAlerts {
-		return errors.New("This format requires servicealerts to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires servicealerts to be enabled")
 	}
 
 	var retrievedRecords int64
@@ -50,7 +50,7 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 			break
 		} else if err != nil {
 			log.Fatal().Msgf("Error decoding token: %s", err)
-			return err
+			return datasets.DataImportReport{}, err
 		}
 
 		switch ty := tok.(type) {
@@ -75,7 +75,7 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 
 	log.Info().Int64("retrieved", retrievedRecords).Int64("submitted", submittedRecords).Msgf("Parsed latest Siri-SX response")
 
-	return nil
+	return datasets.DataImportReport{}, nil
 }
 
 func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) bool {

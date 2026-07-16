@@ -10,7 +10,7 @@ import (
 
 type Format interface {
 	ParseFile(io.Reader) error
-	Import(datasets.DataSet, *ctdf.DataSourceReference) error
+	Import(datasets.DataSet, *ctdf.DataSourceReference) (datasets.DataImportReport, error)
 }
 
 type RealtimeQueueFormat interface {

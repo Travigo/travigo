@@ -46,9 +46,9 @@ func (r *Realtime) ParseFile(reader io.Reader) error {
 	return nil
 }
 
-func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !(dataset.SupportedObjects.RealtimeJourneys || dataset.SupportedObjects.ServiceAlerts) {
-		return errors.New("This format requires realtime journeys or service alerts to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires realtime journeys or service alerts to be enabled")
 	}
 
 	locationEventType := vehicletracker.VehicleUpdateEventTypeTrip
@@ -59,14 +59,14 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	body, err := io.ReadAll(r.reader)
 	if err != nil {
 		log.Error().Str("body", string(body)).Msg("Failed to read realtime feed")
-		return err
+		return datasets.DataImportReport{}, err
 	}
 
 	feed := gtfs.FeedMessage{}
 	err = proto.Unmarshal(body, &feed)
 	if err != nil {
 		log.Error().Str("body", string(body)).Msg("Failed to unmarshal realtime feed")
-		return err
+		return datasets.DataImportReport{}, err
 	}
 
 	withTripID := 0
@@ -335,7 +335,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	checkQueueSize()
 
-	return nil
+	return datasets.DataImportReport{}, nil
 }
 
 func checkQueueSize() {

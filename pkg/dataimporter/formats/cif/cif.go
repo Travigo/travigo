@@ -186,9 +186,9 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 	return journeysArray
 }
 
-func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.Journeys || !dataset.SupportedObjects.Services {
-		return errors.New("This format requires services & journeys to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires services & journeys to be enabled")
 	}
 	log.Info().Msg("Converting to CTDF")
 
@@ -243,7 +243,9 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operationInsert)
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedJourneys: int(operationInsert),
+	}, nil
 }
 
 func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {

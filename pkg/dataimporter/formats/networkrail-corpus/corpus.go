@@ -30,9 +30,9 @@ type TiplocData struct {
 	NLCDESC16  string
 }
 
-func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.Stops {
-		return errors.New("This format requires stops to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires stops to be enabled")
 	}
 
 	now := time.Now()
@@ -90,5 +90,7 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		}
 	}
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedStops: len(updateOperations),
+	}, nil
 }

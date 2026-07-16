@@ -58,9 +58,9 @@ func (naptanDoc *NaPTAN) Validate() error {
 	return nil
 }
 
-func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) error {
+func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
 	if !dataset.SupportedObjects.Stops || !dataset.SupportedObjects.StopGroups {
-		return errors.New("This format requires stops & stopgroups to be enabled")
+		return datasets.DataImportReport{}, errors.New("This format requires stops & stopgroups to be enabled")
 	}
 
 	stopsCollection := database.GetCollection("stops_raw")
@@ -266,5 +266,8 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	log.Info().Msgf(" - %d inserts", stationStopOperationInsert)
 	log.Info().Msgf("Successfully imported into MongoDB")
 
-	return nil
+	return datasets.DataImportReport{
+		ImportedStops:      int(stopOperationInsert),
+		ImportedStopGroups: int(stopGroupsOperationInsert) + stationStopOperationInsert,
+	}, nil
 }
