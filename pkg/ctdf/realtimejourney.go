@@ -34,7 +34,10 @@ type RealtimeJourney struct {
 	DepartedStop    *Stop  `groups:"basic" bson:"-"`
 
 	NextStopRef string `groups:"basic"`
-	NextStop    *Stop  `groups:"basic" bson:"-"`
+	// NextStopIndex identifies the next call in Journey.Path's ordered stop list.
+	// NextStopRef alone is ambiguous when a journey revisits a stop.
+	NextStopIndex int   `groups:"basic"`
+	NextStop      *Stop `groups:"basic" bson:"-"`
 
 	Stops  map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
 	Offset time.Duration                    `groups:"internal"`

@@ -56,6 +56,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	var offset time.Duration
 	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem // TODO maybe not here?
+	closestDistanceJourneyPathIndex := -1
 
 	// Calculate everything based on location if we aren't provided with updates
 	if len(vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates) == 0 && vehicleUpdateEvent.VehicleLocationUpdate.Location.Type == "Point" {
@@ -63,7 +64,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		if !matched || position.PathIndex < 0 || position.PathIndex >= len(realtimeJourney.Journey.Path) {
 			return errors.New("unable to match vehicle location to journey track")
 		}
-		closestDistanceJourneyPathIndex := position.PathIndex
+		closestDistanceJourneyPathIndex = position.PathIndex
 		closestDistanceJourneyPath = realtimeJourney.Journey.Path[position.PathIndex]
 		closestDistanceJourneyPathPercentComplete := position.LegProgress
 		if position.UsedGlobalTrack {
@@ -204,6 +205,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 
 			if refTime.Before(now) && now.Sub(refTime) < closestPathTime {
 				closestDistanceJourneyPath = path
+				closestDistanceJourneyPathIndex = pathIndex
 
 				closestPathTime = now.Sub(refTime)
 			}
@@ -232,6 +234,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	realtimeJourney.ModificationDateTime = currentTime
 	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
 	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
+	realtimeJourney.NextStopIndex = closestDistanceJourneyPathIndex + 1
 	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
 	realtimeJourney.Reliability = realtimeJourneyReliability
 	realtimeJourney.VehicleRef = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier

@@ -27,6 +27,7 @@ type storedRealtimeJourney struct {
 	VehicleBearing             float64                             `json:"vb,omitempty"`
 	DepartedStopRef            string                              `json:"dep,omitempty"`
 	NextStopRef                string                              `json:"next,omitempty"`
+	NextStopIndex              int                                 `json:"nexti,omitempty"`
 	Stops                      map[string]*storedRealtimeStop      `json:"st,omitempty"`
 	Offset                     time.Duration                       `json:"off,omitempty"`
 	Reliability                ctdf.RealtimeJourneyReliabilityType `json:"rel,omitempty"`
@@ -114,6 +115,7 @@ func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *store
 		VehicleBearing:             realtimeJourney.VehicleBearing,
 		DepartedStopRef:            realtimeJourney.DepartedStopRef,
 		NextStopRef:                realtimeJourney.NextStopRef,
+		NextStopIndex:              realtimeJourney.NextStopIndex,
 		Stops:                      storedRealtimeStopsFromCTDF(realtimeJourney.Stops),
 		Offset:                     realtimeJourney.Offset,
 		Reliability:                realtimeJourney.Reliability,
@@ -261,6 +263,7 @@ func (stored *storedRealtimeJourney) toCTDF(ctx context.Context, hydrateJourney 
 		VehicleBearing:             stored.VehicleBearing,
 		DepartedStopRef:            stored.DepartedStopRef,
 		NextStopRef:                stored.NextStopRef,
+		NextStopIndex:              stored.NextStopIndex,
 		Stops:                      stored.realtimeStops(),
 		Offset:                     stored.Offset,
 		Reliability:                stored.Reliability,

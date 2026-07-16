@@ -22,3 +22,13 @@ func TestStoredRealtimeStopsPreserveRepeatedOccurrences(t *testing.T) {
 		t.Fatal("expected second call occurrence to survive storage round trip")
 	}
 }
+
+func TestStoredRealtimeJourneyPreservesNextStopIndex(t *testing.T) {
+	journey := &ctdf.RealtimeJourney{NextStopRef: "waterloo", NextStopIndex: 3}
+	stored := storedRealtimeJourneyFromCTDF(journey)
+	result := stored.toCTDF(nil, false)
+
+	if result.NextStopRef != "waterloo" || result.NextStopIndex != 3 {
+		t.Fatalf("unexpected next stop after round trip: %#v", result)
+	}
+}

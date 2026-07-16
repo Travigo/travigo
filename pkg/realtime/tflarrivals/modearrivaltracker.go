@@ -433,6 +433,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 				realtimeJourney.DepartedStop = referenceItem.OriginStop
 
 				realtimeJourney.NextStopRef = referenceItem.DestinationStopRef
+				if i == 0 {
+					realtimeJourney.NextStopIndex = 1
+				} else {
+					realtimeJourney.NextStopIndex = i
+				}
 				realtimeJourney.NextStop = referenceItem.DestinationStop
 			}
 		}

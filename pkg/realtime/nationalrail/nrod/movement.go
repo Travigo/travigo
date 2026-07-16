@@ -81,6 +81,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				}
 				realtimeJourney.DepartedStopRef = path.OriginStopRef
 				realtimeJourney.NextStopRef = path.DestinationStopRef
+				realtimeJourney.NextStopIndex = pathIndex + 1
 				realtimeJourney.DepartedStop = path.OriginStop
 				realtimeJourney.NextStop = path.DestinationStop
 
