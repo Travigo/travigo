@@ -34,8 +34,8 @@ nationalRail:
 runner:
   resources:
     requests:
-      cpu: 200m
-      memory: 150Mi
+      cpu: 400m
+      memory: 250Mi
     limit:
       memory: 4Gi
 

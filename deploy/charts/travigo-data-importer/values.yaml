@@ -69,7 +69,7 @@ batchRunner:
   persistence:
     enabled: true
     existingClaim: ""
-    size: 10Gi
+    size: 4Gi
     accessModes:
       - ReadWriteOnce
     storageClassName: ""

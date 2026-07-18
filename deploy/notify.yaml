@@ -18,3 +18,8 @@ env:
         name: travigo-notify-firebase-service-account
         key: credentials
         optional: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi

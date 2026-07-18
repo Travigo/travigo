@@ -143,6 +143,29 @@ func newKubernetesClient(namespace string) (*kubernetesClient, error) {
 }
 
 func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName string, runID string, task *Task) error {
+	podSpec := map[string]any{
+		"restartPolicy":      "Never",
+		"serviceAccountName": config.JobServiceAccountName,
+		"containers": []map[string]any{
+			{
+				"name":            "main",
+				"image":           config.JobImage,
+				"imagePullPolicy": config.JobImagePullPolicy,
+				"args":            task.Args,
+				"env":             childJobEnv(config),
+			},
+		},
+	}
+	if task.Size != "small" {
+		podSpec["nodeSelector"] = map[string]string{"workload": "batch-import"}
+		podSpec["tolerations"] = []map[string]string{{
+			"key":      "workload",
+			"operator": "Equal",
+			"value":    "batch-import",
+			"effect":   "NoSchedule",
+		}}
+	}
+
 	body := map[string]any{
 		"apiVersion": "batch/v1",
 		"kind":       "Job",
@@ -157,19 +180,7 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 				"metadata": map[string]any{
 					"labels": jobLabels(runID, task.ID),
 				},
-				"spec": map[string]any{
-					"restartPolicy":      "Never",
-					"serviceAccountName": config.JobServiceAccountName,
-					"containers": []map[string]any{
-						{
-							"name":            "main",
-							"image":           config.JobImage,
-							"imagePullPolicy": config.JobImagePullPolicy,
-							"args":            task.Args,
-							"env":             childJobEnv(config),
-						},
-					},
-				},
+				"spec": podSpec,
 			},
 		},
 	}
