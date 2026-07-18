@@ -20,6 +20,9 @@ spec:
         app.kubernetes.io/component: batch-runner
     spec:
       serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" . }}
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: batch-runner
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
