@@ -187,8 +187,8 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 }
 
 func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) (datasets.DataImportReport, error) {
-	if !dataset.SupportedObjects.Journeys || !dataset.SupportedObjects.Services {
-		return datasets.DataImportReport{}, errors.New("This format requires services & journeys to be enabled")
+	if !dataset.SupportedObjects.Journeys {
+		return datasets.DataImportReport{}, errors.New("This format requires journeys to be enabled")
 	}
 	log.Info().Msg("Converting to CTDF")
 

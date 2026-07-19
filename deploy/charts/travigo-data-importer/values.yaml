@@ -58,6 +58,15 @@ batchRunner:
   enabled: true
   replicaCount: 1
   storagePath: /batch-runs
+  # The batch-runner owns an EBS-backed work directory, so keep it on the
+  # single-AZ storage node pool with the rest of the stateful workloads.
+  nodeSelector:
+    workload: storage
+  tolerations:
+    - key: workload
+      operator: Equal
+      value: storage
+      effect: NoSchedule
   maxActiveTasks: 1
   continueOnFailure: true
   forceImport: false

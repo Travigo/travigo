@@ -20,6 +20,14 @@ spec:
         app.kubernetes.io/component: batch-runner
     spec:
       serviceAccountName: {{ include "travigo-data-importer.serviceAccountName" . }}
+      {{- with .Values.batchRunner.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.batchRunner.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch
