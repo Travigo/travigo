@@ -47,6 +47,12 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 		jobName = jobNameForTask(runID, task.ID)
 	}
 	task.JobName = jobName
+	if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
+		return 1, err
+	}
+	defer func() {
+		_ = e.client.deletePodDisruptionBudget(context.Background(), jobName)
+	}()
 
 	var podName string
 	var err error
@@ -178,7 +184,8 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 			"ttlSecondsAfterFinished": config.JobTTLSeconds,
 			"template": map[string]any{
 				"metadata": map[string]any{
-					"labels": jobLabels(runID, task.ID),
+					"labels":      jobLabels(runID, task.ID),
+					"annotations": map[string]string{"cluster-autoscaler.kubernetes.io/safe-to-evict": "false"},
 				},
 				"spec": podSpec,
 			},
@@ -190,6 +197,30 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 	}
 
 	return c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs", c.namespace), body, nil)
+}
+
+func (c *kubernetesClient) ensurePodDisruptionBudget(ctx context.Context, jobName string) error {
+	body := map[string]any{
+		"apiVersion": "policy/v1",
+		"kind":       "PodDisruptionBudget",
+		"metadata": map[string]any{
+			"name": jobName,
+			"labels": map[string]string{
+				"app.kubernetes.io/name": "travigo-batch-runner",
+			},
+		},
+		"spec": map[string]any{
+			"minAvailable": 1,
+			"selector": map[string]any{
+				"matchLabels": map[string]string{"job-name": jobName},
+			},
+		},
+	}
+	err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/apis/policy/v1/namespaces/%s/poddisruptionbudgets", c.namespace), body, nil)
+	if isKubernetesStatus(err, http.StatusConflict) {
+		return nil
+	}
+	return err
 }
 
 func (c *kubernetesClient) getJob(ctx context.Context, jobName string) (*kubernetesJob, error) {
@@ -348,6 +379,11 @@ func (c *kubernetesClient) copyPodLogs(ctx context.Context, podName string, logP
 
 func (c *kubernetesClient) deleteJob(ctx context.Context, name string) error {
 	path := fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s?propagationPolicy=Background", c.namespace, name)
+	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
+}
+
+func (c *kubernetesClient) deletePodDisruptionBudget(ctx context.Context, name string) error {
+	path := fmt.Sprintf("/apis/policy/v1/namespaces/%s/poddisruptionbudgets/%s", c.namespace, name)
 	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
 }
 

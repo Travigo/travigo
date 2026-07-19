@@ -102,5 +102,38 @@ func createJobPodSpec(t *testing.T, task *Task) map[string]any {
 		t.Fatal(err)
 	}
 
-	return job["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)
+	template := job["spec"].(map[string]any)["template"].(map[string]any)
+	annotations := template["metadata"].(map[string]any)["annotations"].(map[string]any)
+	if annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"] != "false" {
+		t.Fatalf("safe-to-evict annotation = %#v, want false", annotations["cluster-autoscaler.kubernetes.io/safe-to-evict"])
+	}
+	return template["spec"].(map[string]any)
+}
+
+func TestEnsurePodDisruptionBudgetProtectsOneJobPod(t *testing.T) {
+	var budget map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/apis/policy/v1/namespaces/default/poddisruptionbudgets" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&budget); err != nil {
+			t.Fatal(err)
+		}
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	client := &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()}
+	if err := client.ensurePodDisruptionBudget(context.Background(), "test-job"); err != nil {
+		t.Fatal(err)
+	}
+
+	spec := budget["spec"].(map[string]any)
+	if spec["minAvailable"] != float64(1) {
+		t.Fatalf("minAvailable = %#v, want 1", spec["minAvailable"])
+	}
+	labels := spec["selector"].(map[string]any)["matchLabels"].(map[string]any)
+	if labels["job-name"] != "test-job" {
+		t.Fatalf("PDB selector = %#v, want job-name=test-job", labels)
+	}
 }
