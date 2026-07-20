@@ -16,6 +16,20 @@ func createIndexes() {
 	createOperatorsIndexes()
 	createJourneysIndexes()
 	createSavedObjectsIndexes()
+	createDatasetImportReportIndexes()
+}
+
+func createDatasetImportReportIndexes() {
+	collection := GetCollection("dataset_import_reports")
+	_, err := collection.Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "datasetidentifier", Value: 1},
+			{Key: "creationdatetime", Value: -1},
+		},
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating Dataset Import Report Index")
+	}
 }
 
 func createStopTransferIndexes() {
