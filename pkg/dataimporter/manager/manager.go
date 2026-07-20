@@ -28,10 +28,10 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
+	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func GetDatasource(identifier string) (datasets.DataSource, error) {
@@ -262,8 +262,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			LastModified: time.Now(),
 		}
 
-		opts := options.Update().SetUpsert(true)
-		_, err = datasetVersionCollection.UpdateOne(context.Background(), bson.M{"dataset": datasetVersion.Dataset}, bson.M{"$set": datasetVersion}, opts)
+		err = datasetversion.Upsert(context.Background(), datasetVersion)
 
 		// Aggregate the import report
 		importReport := datasets.DataImportReport{

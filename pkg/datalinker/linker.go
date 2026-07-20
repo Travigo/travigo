@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -19,7 +20,7 @@ import (
 
 type OldLinker interface {
 	GetBaseCollectionName() string
-	Run()
+	Run() error
 }
 
 type Linker[T ctdf.LinkableRecord] struct {
@@ -37,7 +38,7 @@ func (l Linker[T]) GetBaseCollectionName() string {
 	return fmt.Sprintf("%ss", l.objectName)
 }
 
-func (l Linker[T]) Run() {
+func (l Linker[T]) Run() error {
 	liveCollectionName := l.GetBaseCollectionName()
 	rawCollectionName := fmt.Sprintf("%s_raw", liveCollectionName)
 	stagingCollectionName := fmt.Sprintf("%s_staging", liveCollectionName)
@@ -172,6 +173,11 @@ func (l Linker[T]) Run() {
 	copyCollection(stagingCollectionName, liveCollectionName)
 
 	compactLinkedCollections(context.Background(), rawCollectionName, liveCollectionName)
+
+	return datasetversion.Upsert(context.Background(), ctdf.DatasetVersion{
+		Dataset:      datasetversion.LinkerDataset(l.objectName),
+		LastModified: time.Now(),
+	})
 }
 
 type identifierMergeGroup struct {

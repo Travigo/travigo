@@ -73,6 +73,10 @@ func Connect(required bool) error {
 }
 
 func IndexRequest(indexName string, document io.ReadSeeker) {
+	IndexRequestWithID(indexName, "", document)
+}
+
+func IndexRequestWithID(indexName string, documentID string, document io.ReadSeeker) {
 	if Client == nil {
 		return
 	}
@@ -80,9 +84,10 @@ func IndexRequest(indexName string, document io.ReadSeeker) {
 	bulkIndexer.Add(
 		context.Background(),
 		esutil.BulkIndexerItem{
-			Index:  indexName,
-			Action: "index",
-			Body:   document,
+			Index:      indexName,
+			DocumentID: documentID,
+			Action:     "index",
+			Body:       document,
 			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 				if err != nil {
 					log.Error().Err(err).Str("indexName", indexName).Msg("Failed to index document")

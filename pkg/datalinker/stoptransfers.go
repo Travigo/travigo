@@ -12,6 +12,9 @@ import (
 	"github.com/sourcegraph/conc/pool"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/dataimporter/manager"
+	"github.com/travigo/travigo/pkg/datasetversion"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -45,6 +48,7 @@ type transferStop struct {
 	CosLatitude       float64
 	Associations      []*ctdf.Association
 	Platforms         []*ctdf.StopPlatform
+	DatasetID         string
 }
 
 type transferKey struct {
@@ -110,8 +114,17 @@ func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 }
 
 func BuildStopTransfers(config StopTransferBuildConfig) error {
-	config = config.withDefaults()
 	ctx := context.Background()
+	changedDatasets, err := datasetversion.ChangedDatasets(ctx, datasetversion.StopTransfersDataset, stopProvidingDatasetIDs())
+	if err != nil {
+		return err
+	}
+	if len(changedDatasets) == 0 {
+		log.Info().Msg("Stop transfer datasets are unchanged; skipping build")
+		return nil
+	}
+
+	config = config.withDefaults()
 	start := time.Now()
 
 	phaseStart := time.Now()
@@ -121,22 +134,23 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 	}
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: load stops")
 
+	changedStopIDs := changedStopIdentifiers(stops, changedDatasets)
 	transfers := make(map[transferKey]transferCandidate)
 
 	phaseStart = time.Now()
-	buildSameStopGroupTransfers(stops, transfers, config)
+	buildSameStopGroupTransfers(stops, transfers, config, changedStopIDs)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: same stop groups")
 
 	phaseStart = time.Now()
-	buildPlatformAliasTransfers(stops, transfers, config)
+	buildPlatformAliasTransfers(stops, transfers, config, changedStopIDs)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: platform aliases")
 
 	phaseStart = time.Now()
-	buildNearbyWalkTransfers(stops, transfers, config)
+	buildNearbyWalkTransfers(stops, transfers, config, changedStopIDs)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: nearby walk scan")
 
 	phaseStart = time.Now()
-	if err := writeStopTransfers(ctx, transfers, config); err != nil {
+	if err := writeStopTransfers(ctx, transfers, config, changedStopIDs); err != nil {
 		return err
 	}
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: write transfers")
@@ -152,7 +166,37 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 		Dur("duration", time.Since(start)).
 		Msg("Built Stop Transfers")
 
-	return nil
+	return datasetversion.Upsert(ctx, ctdf.DatasetVersion{
+		Dataset:      datasetversion.StopTransfersDataset,
+		LastModified: time.Now(),
+	})
+}
+
+func stopProvidingDatasetIDs() []string {
+	var datasetIDs []string
+	for _, dataset := range manager.GetRegisteredDataSets() {
+		if dataset.SupportedObjects.Stops &&
+			dataset.ImportDestination != datasets.ImportDestinationRealtimeQueue &&
+			dataset.ImportDestination != datasets.ImportDestinationSpecificRunner {
+			datasetIDs = append(datasetIDs, dataset.Identifier)
+		}
+	}
+	return datasetIDs
+}
+
+func changedStopIdentifiers(stops []*transferStop, changedDatasets []string) map[string]struct{} {
+	changedDatasetSet := make(map[string]struct{}, len(changedDatasets))
+	for _, datasetID := range changedDatasets {
+		changedDatasetSet[datasetID] = struct{}{}
+	}
+
+	changedStops := make(map[string]struct{})
+	for _, stop := range stops {
+		if _, changed := changedDatasetSet[stop.DatasetID]; changed {
+			changedStops[stop.PrimaryIdentifier] = struct{}{}
+		}
+	}
+	return changedStops
 }
 
 func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
@@ -175,6 +219,7 @@ func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
 		bson.E{Key: "location", Value: 1},
 		bson.E{Key: "associations", Value: 1},
 		bson.E{Key: "platforms", Value: 1},
+		bson.E{Key: "datasource.datasetid", Value: 1},
 	})
 
 	cursor, err := stopsCollection.Find(ctx, query, opts)
@@ -195,6 +240,10 @@ func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
 
 		latitude := stop.Location.Coordinates[1]
 		longitude := stop.Location.Coordinates[0]
+		datasetID := ""
+		if stop.DataSource != nil {
+			datasetID = stop.DataSource.DatasetID
+		}
 		stops = append(stops, &transferStop{
 			PrimaryIdentifier: stop.PrimaryIdentifier,
 			Index:             len(stops),
@@ -204,6 +253,7 @@ func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
 			CosLatitude:       math.Cos(latitude * math.Pi / 180),
 			Associations:      stop.Associations,
 			Platforms:         stop.Platforms,
+			DatasetID:         datasetID,
 		})
 	}
 
@@ -216,7 +266,29 @@ func loadTransferStops(ctx context.Context) ([]*transferStop, error) {
 	return stops, nil
 }
 
-func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) {
+func shouldGenerateTransfersFor(stop *transferStop, changedStopIDs []map[string]struct{}) bool {
+	if len(changedStopIDs) == 0 {
+		return true
+	}
+	_, changed := changedStopIDs[0][stop.PrimaryIdentifier]
+	return changed
+}
+
+func transferOrigins(stops []*transferStop, changedStopIDs []map[string]struct{}) []*transferStop {
+	if len(changedStopIDs) == 0 {
+		return stops
+	}
+
+	origins := make([]*transferStop, 0, len(changedStopIDs[0]))
+	for _, stop := range stops {
+		if shouldGenerateTransfersFor(stop, changedStopIDs) {
+			origins = append(origins, stop)
+		}
+	}
+	return origins
+}
+
+func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs ...map[string]struct{}) {
 	stopGroups := make(map[string][]*transferStop)
 	for _, stop := range stops {
 		for _, association := range stop.Associations {
@@ -241,14 +313,23 @@ func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKe
 			for j := i + 1; j < len(groupStops); j++ {
 				fromStop := groupStops[i]
 				toStop := groupStops[j]
+				fromChanged := shouldGenerateTransfersFor(fromStop, changedStopIDs)
+				toChanged := shouldGenerateTransfersFor(toStop, changedStopIDs)
+				if !fromChanged && !toChanged {
+					continue
+				}
 
 				distance := roundedStopDistanceMetres(fromStop, toStop)
 				if distance > maxDistanceMetres {
 					continue
 				}
 
-				addTransfer(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
-				addTransfer(transfers, toStop.PrimaryIdentifier, fromStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
+				if fromChanged {
+					addTransfer(transfers, fromStop.PrimaryIdentifier, toStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
+				}
+				if toChanged {
+					addTransfer(transfers, toStop.PrimaryIdentifier, fromStop.PrimaryIdentifier, ctdf.StopTransferTypeSameStopGroup, distance, maxDistanceMetres, config)
+				}
 			}
 		}
 	}
@@ -259,7 +340,7 @@ func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKe
 		Msg("Built same stop-group transfer candidates")
 }
 
-func buildPlatformAliasTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) {
+func buildPlatformAliasTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs ...map[string]struct{}) {
 	stopsByPrimaryIdentifier := make(map[string]*transferStop, len(stops))
 	for _, stop := range stops {
 		stopsByPrimaryIdentifier[stop.PrimaryIdentifier] = stop
@@ -275,18 +356,28 @@ func buildPlatformAliasTransfers(stops []*transferStop, transfers map[transferKe
 			if platformStop == nil || !validTransferLocation(platformStop.Location) {
 				continue
 			}
+			parentChanged := shouldGenerateTransfersFor(parentStop, changedStopIDs)
+			platformChanged := shouldGenerateTransfersFor(platformStop, changedStopIDs)
+			if !parentChanged && !platformChanged {
+				continue
+			}
 
 			distance := roundedStopDistanceMetres(parentStop, platformStop)
-			addTransfer(transfers, parentStop.PrimaryIdentifier, platformStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
-			addTransfer(transfers, platformStop.PrimaryIdentifier, parentStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
+			if parentChanged {
+				addTransfer(transfers, parentStop.PrimaryIdentifier, platformStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
+			}
+			if platformChanged {
+				addTransfer(transfers, platformStop.PrimaryIdentifier, parentStop.PrimaryIdentifier, ctdf.StopTransferTypePlatformAlias, distance, config.MaxDistanceMetres, config)
+			}
 		}
 	}
 
 	log.Info().Int("transfers", len(transfers)).Msg("Built platform alias transfer candidates")
 }
 
-func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) {
-	if len(stops) == 0 {
+func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs ...map[string]struct{}) {
+	origins := transferOrigins(stops, changedStopIDs)
+	if len(stops) == 0 || len(origins) == 0 {
 		return
 	}
 
@@ -314,19 +405,19 @@ func buildNearbyWalkTransfers(stops []*transferStop, transfers map[transferKey]t
 	if workerCount < 1 {
 		workerCount = 1
 	}
-	if workerCount > len(stops) {
-		workerCount = len(stops)
+	if workerCount > len(origins) {
+		workerCount = len(origins)
 	}
-	chunkSize := (len(stops) + workerCount - 1) / workerCount
+	chunkSize := (len(origins) + workerCount - 1) / workerCount
 
 	discoveryPool := pool.NewWithResults[nearbyDiscoveryResult]().WithMaxGoroutines(workerCount)
 
-	for start := 0; start < len(stops); start += chunkSize {
+	for start := 0; start < len(origins); start += chunkSize {
 		end := start + chunkSize
-		if end > len(stops) {
-			end = len(stops)
+		if end > len(origins) {
+			end = len(origins)
 		}
-		chunk := stops[start:end]
+		chunk := origins[start:end]
 
 		discoveryPool.Go(func() nearbyDiscoveryResult {
 			result := nearbyDiscoveryResult{
@@ -461,7 +552,7 @@ func nearbyCandidateLess(a nearbyTransferCandidate, b nearbyTransferCandidate, s
 	return a.distanceMetres < b.distanceMetres
 }
 
-func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig) error {
+func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs map[string]struct{}) error {
 	stopTransfersCollection := database.GetCollection("stop_transfers")
 
 	keys := make([]transferKey, 0, len(transfers))
@@ -489,6 +580,11 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	}
 
 	for _, key := range keys {
+		if _, changed := changedStopIDs[key.from]; !changed {
+			if _, changed = changedStopIDs[key.to]; !changed {
+				continue
+			}
+		}
 		candidate := transfers[key]
 		identifier := fmt.Sprintf("generated-"+ctdf.StopTransferIDFormat, candidate.key.from, candidate.key.to)
 		transfer := ctdf.StopTransfer{
@@ -530,14 +626,27 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	// Upserting first and deleting stale afterwards keeps the collection fully
 	// populated throughout the rebuild, so concurrent readers (the journey
 	// planner) never see an empty transfers set.
-	deleted, err := stopTransfersCollection.DeleteMany(ctx, bson.M{
-		"datasource.originalformat": "travigo-stop-transfer-generator",
-		"modificationdatetime":      bson.M{"$lt": now},
-	})
-	if err != nil {
-		return err
+	var deletedCount int64
+	if len(changedStopIDs) > 0 {
+		staleQuery := bson.M{
+			"datasource.originalformat": "travigo-stop-transfer-generator",
+			"modificationdatetime":      bson.M{"$lt": now},
+		}
+		stopIDs := make([]string, 0, len(changedStopIDs))
+		for stopID := range changedStopIDs {
+			stopIDs = append(stopIDs, stopID)
+		}
+		staleQuery["$or"] = bson.A{
+			bson.M{"fromstopref": bson.M{"$in": stopIDs}},
+			bson.M{"tostopref": bson.M{"$in": stopIDs}},
+		}
+		deleted, err := stopTransfersCollection.DeleteMany(ctx, staleQuery)
+		if err != nil {
+			return err
+		}
+		deletedCount = deleted.DeletedCount
 	}
-	log.Info().Int64("deleted", deleted.DeletedCount).Msg("Deleted stale Stop Transfers")
+	log.Info().Int64("deleted", deletedCount).Msg("Deleted stale Stop Transfers")
 
 	return nil
 }

@@ -114,7 +114,9 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
-						linker.Run()
+						if err := linker.Run(); err != nil {
+							return err
+						}
 						if !c.Bool("skip-stop-linker-oplog-maintenance") {
 							runStopLinkerOplogMaintenance(StopLinkerMongoMaintenanceConfig{
 								OplogClearSizeMB: c.Int("oplog-clear-size-mb"),
@@ -161,7 +163,9 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
-						linker.Run()
+						if err := linker.Run(); err != nil {
+							return err
+						}
 					default:
 						return errors.New("Unknown type")
 					}

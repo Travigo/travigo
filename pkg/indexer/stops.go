@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/dataimporter/manager"
+	"github.com/travigo/travigo/pkg/datasetversion"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -24,13 +28,87 @@ import (
 	"github.com/travigo/travigo/pkg/elastic_client"
 )
 
-func IndexStops() {
-	indexName := fmt.Sprintf("travigo-stops-%d", time.Now().Unix())
+func IndexStops() error {
+	ctx := context.Background()
+	lastIndexerVersion := ctdf.DatasetVersion{}
+	indexerVersionErr := database.GetCollection("dataset_versions").FindOne(ctx, bson.M{
+		"dataset": datasetversion.StopsIndexerDataset,
+	}).Decode(&lastIndexerVersion)
+	firstRun := indexerVersionErr != nil
 
-	createStopIndex(indexName)
-	indexStopsFromMongo(indexName)
+	for _, dataset := range manager.GetRegisteredDataSets() {
+		if !dataset.SupportedObjects.Stops ||
+			dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue ||
+			dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
+			continue
+		}
 
-	deleteOldIndexes("travigo-stops-*", indexName)
+		sourceVersion := ctdf.DatasetVersion{}
+		if err := database.GetCollection("dataset_versions").FindOne(ctx, bson.M{
+			"dataset": dataset.Identifier,
+		}).Decode(&sourceVersion); err != nil {
+			continue
+		}
+
+		indexName := stopDatasetIndexName(dataset.Identifier)
+		if !firstRun && !sourceVersion.LastModified.After(lastIndexerVersion.LastModified) && indexExists(indexName) {
+			continue
+		}
+
+		deleteIndex(indexName)
+		createStopIndex(indexName)
+		indexStopsFromMongo(indexName, dataset.Identifier)
+	}
+
+	return nil
+}
+
+func stopDatasetIndexName(dataset string) string {
+	return fmt.Sprintf("travigo-stops-%s", dataset)
+}
+
+func indexExists(indexName string) bool {
+	resp, err := elastic_client.Client.Indices.Exists([]string{indexName})
+	if err != nil {
+		log.Error().Err(err).Str("index", indexName).Msg("Failed to check stop index")
+		return false
+	}
+	return resp.StatusCode == 200
+}
+
+func deleteIndex(indexName string) {
+	deleteReq := esapi.IndicesDeleteRequest{Index: []string{indexName}}
+	resp, err := deleteReq.Do(context.Background(), elastic_client.Client)
+	if err != nil || (resp != nil && resp.StatusCode != 404 && resp.IsError()) {
+		log.Error().Err(err).Str("index", indexName).Msg("Failed to delete stop index")
+	}
+}
+
+func deleteLegacyStopIndexes() {
+	resp, err := elastic_client.Client.Cat.Indices(
+		elastic_client.Client.Cat.Indices.WithIndex("travigo-stops-*"),
+		elastic_client.Client.Cat.Indices.WithFormat("json"),
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to list legacy stop indexes")
+		return
+	}
+	defer resp.Body.Close()
+
+	var indexes []struct {
+		Index string `json:"index"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&indexes); err != nil {
+		log.Error().Err(err).Msg("Failed to decode stop indexes")
+		return
+	}
+
+	legacyPattern := regexp.MustCompile(`^travigo-stops-[0-9]+$`)
+	for _, index := range indexes {
+		if legacyPattern.MatchString(index.Index) {
+			deleteIndex(index.Index)
+		}
+	}
 }
 
 func createStopIndex(indexName string) {
@@ -135,11 +213,11 @@ type basicService struct {
 
 const railDepartureBoardWarmConcurrency = 4
 
-func indexStopsFromMongo(indexName string) {
+func indexStopsFromMongo(indexName string, datasetID string) {
 	now := time.Now()
 	stopsCollection := database.GetCollection("stops")
 
-	cursor, err := stopsCollection.Find(context.Background(), bson.M{})
+	cursor, err := stopsCollection.Find(context.Background(), bson.M{"datasource.datasetid": datasetID})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch stops for indexing")
 		return
@@ -229,7 +307,7 @@ func indexStopsFromMongo(indexName string) {
 			"Services":          basicServices,
 		})
 
-		elastic_client.IndexRequest(indexName, bytes.NewReader(jsonStop))
+		elastic_client.IndexRequestWithID(indexName, stop.PrimaryIdentifier, bytes.NewReader(jsonStop))
 		indexedStops++
 		if stopHasTransportType(stop, ctdf.TransportTypeRail) {
 			railIndexedStops++
