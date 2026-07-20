@@ -643,6 +643,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	log.Info().Msg("Importing Finished Journeys")
 	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, journeyBatchSize)
+	importedJourneys := 0
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
@@ -801,6 +802,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			updateModel.SetUpsert(true)
 
 			journeysQueue.Add(updateModel)
+			importedJourneys++
 		}
 
 		delete(gtfsTrips, tripID)
@@ -841,7 +843,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		ImportedOperators: len(g.Agencies),
 		ImportedStops:     len(g.stopLocations),
 		ImportedServices:  len(g.ctdfServices),
-		ImportedJourneys:  0, // TODO
+		ImportedJourneys:  importedJourneys,
 	}, nil
 }
 

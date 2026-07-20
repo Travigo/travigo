@@ -116,6 +116,7 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 }
 
 func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool) error {
+	importStartedAt := time.Now()
 	datasetVersionCollection := database.GetCollection("dataset_versions")
 	datasetImportReportCollection := database.GetCollection("dataset_import_reports")
 
@@ -268,10 +269,12 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		importReport := datasets.DataImportReport{
 			DatasetIdentifier: dataset.Identifier,
 			CreationDateTime:  time.Now(),
-			RunTime:           0, // TODO
+			RunTime:           time.Since(importStartedAt),
 		}
 
 		for _, report := range importReports {
+			report = filterImportReport(report, dataset.SupportedObjects)
+
 			importReport.ImportedStops += report.ImportedStops
 			importReport.ImportedStopGroups += report.ImportedStopGroups
 			importReport.ImportedServices += report.ImportedServices
@@ -284,6 +287,29 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	return nil
+}
+
+func filterImportReport(report datasets.DataImportReport, supported datasets.SupportedObjects) datasets.DataImportReport {
+	if !supported.Stops {
+		report.ImportedStops = 0
+	}
+	if !supported.StopGroups {
+		report.ImportedStopGroups = 0
+	}
+	if !supported.Services {
+		report.ImportedServices = 0
+	}
+	if !supported.Journeys {
+		report.ImportedJourneys = 0
+	}
+	if !supported.Operators {
+		report.ImportedOperators = 0
+	}
+	if !supported.OperatorGroups {
+		report.ImportedOperationGroups = 0
+	}
+
+	return report
 }
 
 func isValidUrl(toTest string) bool {
