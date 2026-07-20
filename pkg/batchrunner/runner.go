@@ -257,13 +257,25 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 		run.Tasks[index].JobName = jobNameForTask(run.ID, run.Tasks[index].ID)
 	}
 	run.Tasks[index].Status = TaskStatusRunning
+	if !recovering {
+		run.Tasks[index].PodStatus = PodStatusPending
+	}
 	run.Tasks[index].StartedAt = &now
 	run.Tasks[index].Error = ""
 	task := run.Tasks[index]
 	_ = r.store.SaveRun(run)
 	runMu.Unlock()
 
-	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath, recovering)
+	updatePodStatus := func(status PodStatus) {
+		runMu.Lock()
+		defer runMu.Unlock()
+		if run.Tasks[index].PodStatus == status {
+			return
+		}
+		run.Tasks[index].PodStatus = status
+		_ = r.store.SaveRun(run)
+	}
+	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath, recovering, updatePodStatus)
 
 	finished := time.Now().UTC()
 	runMu.Lock()
@@ -272,12 +284,15 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	run.Tasks[index].ExitCode = &exitCode
 	if ctx.Err() != nil {
 		run.Tasks[index].Status = TaskStatusCancelled
+		run.Tasks[index].PodStatus = PodStatusTerminating
 		run.Tasks[index].Error = "run cancelled"
 	} else if err != nil {
 		run.Tasks[index].Status = TaskStatusFailed
+		run.Tasks[index].PodStatus = PodStatusFailed
 		run.Tasks[index].Error = err.Error()
 	} else {
 		run.Tasks[index].Status = TaskStatusSucceeded
+		run.Tasks[index].PodStatus = PodStatusSucceeded
 	}
 	_ = r.store.SaveRun(run)
 	runMu.Unlock()

@@ -52,8 +52,25 @@ func TestFindRunningJobPodRequiresRunningPod(t *testing.T) {
 		baseURL:   server.URL,
 		http:      server.Client(),
 	}
-	if _, err := client.findRunningJobPod(context.Background(), "existing-job"); err == nil {
+	if _, err := client.findRunningJobPod(context.Background(), "existing-job", nil); err == nil {
 		t.Fatal("expected non-running pod to prevent recovery")
+	}
+}
+
+func TestFindJobPodReportsTerminatingStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"terminating-pod","deletionTimestamp":"2026-07-20T12:00:00Z"},"status":{"phase":"Running"}}]}`))
+	}))
+	defer server.Close()
+
+	client := &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()}
+	podName, status, err := client.findJobPod(context.Background(), "existing-job")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if podName != "terminating-pod" || status != PodStatusTerminating {
+		t.Fatalf("pod = %q, status = %q; want terminating-pod, terminating", podName, status)
 	}
 }
 

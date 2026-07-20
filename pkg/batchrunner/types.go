@@ -23,6 +23,16 @@ const (
 	TaskStatusCancelled TaskStatus = "cancelled"
 )
 
+type PodStatus string
+
+const (
+	PodStatusPending     PodStatus = "pending"
+	PodStatusRunning     PodStatus = "running"
+	PodStatusTerminating PodStatus = "terminating"
+	PodStatusSucceeded   PodStatus = "succeeded"
+	PodStatusFailed      PodStatus = "failed"
+)
+
 type RunStatus string
 
 const (
@@ -74,6 +84,7 @@ type Task struct {
 	DatasetID  string     `json:"datasetId,omitempty"`
 	Args       []string   `json:"args"`
 	Status     TaskStatus `json:"status"`
+	PodStatus  PodStatus  `json:"podStatus,omitempty"`
 	JobName    string     `json:"jobName,omitempty"`
 	LogPath    string     `json:"logPath,omitempty"`
 	StartedAt  *time.Time `json:"startedAt,omitempty"`

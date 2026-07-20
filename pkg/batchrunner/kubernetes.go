@@ -20,7 +20,7 @@ import (
 )
 
 type TaskExecutor interface {
-	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool) (int, error)
+	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePodStatus func(PodStatus)) (int, error)
 	DeleteJob(ctx context.Context, name string) error
 }
 
@@ -41,7 +41,7 @@ func NewKubernetesExecutor(config Config) (*KubernetesExecutor, error) {
 	}, nil
 }
 
-func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool) (int, error) {
+func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePodStatus func(PodStatus)) (int, error) {
 	jobName := task.JobName
 	if jobName == "" {
 		jobName = jobNameForTask(runID, task.ID)
@@ -57,12 +57,12 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 	var podName string
 	var err error
 	if recovering {
-		podName, err = e.client.findRunningJobPod(ctx, jobName)
+		podName, err = e.client.findRunningJobPod(ctx, jobName, updatePodStatus)
 	} else {
 		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
 			return 1, err
 		}
-		podName, err = e.client.waitForJobPod(ctx, jobName)
+		podName, err = e.client.waitForJobPod(ctx, jobName, updatePodStatus)
 	}
 	if err != nil {
 		return 1, err
@@ -74,21 +74,24 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 		e.client.streamPodLogs(ctx, podName, logPath)
 	}()
 
-	exitCode, waitErr := e.client.waitForJobCompletion(ctx, jobName)
+	exitCode, waitErr := e.client.waitForJobCompletion(ctx, jobName, updatePodStatus)
 	select {
 	case <-logDone:
 	case <-time.After(10 * time.Second):
 	}
 
 	if ctx.Err() != nil {
+		reportPodStatus(updatePodStatus, PodStatusTerminating)
 		_ = e.DeleteJob(context.Background(), jobName)
 		return 1, ctx.Err()
 	}
 
 	if waitErr != nil {
+		reportPodStatus(updatePodStatus, PodStatusFailed)
 		return exitCode, waitErr
 	}
 
+	reportPodStatus(updatePodStatus, PodStatusSucceeded)
 	return exitCode, nil
 }
 
@@ -235,15 +238,16 @@ func (c *kubernetesClient) getJob(ctx context.Context, jobName string) (*kuberne
 	return &job, nil
 }
 
-func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string) (string, error) {
+func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (string, error) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
-		podName, err := c.findJobPod(ctx, jobName)
+		podName, status, err := c.findJobPod(ctx, jobName)
 		if err != nil {
 			return "", err
 		}
+		reportPodStatus(updatePodStatus, status)
 		if podName != "" {
 			return podName, nil
 		}
@@ -256,11 +260,17 @@ func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string) (s
 	}
 }
 
-func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName string) (int, error) {
+func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (int, error) {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for {
+		_, status, err := c.findJobPod(ctx, jobName)
+		if err != nil {
+			return 1, err
+		}
+		reportPodStatus(updatePodStatus, status)
+
 		var job kubernetesJob
 		if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", c.namespace, jobName), nil, &job); err != nil {
 			return 1, err
@@ -289,24 +299,26 @@ func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName str
 	}
 }
 
-func (c *kubernetesClient) findJobPod(ctx context.Context, jobName string) (string, error) {
+func (c *kubernetesClient) findJobPod(ctx context.Context, jobName string) (string, PodStatus, error) {
 	pods, err := c.listJobPods(ctx, jobName)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(pods.Items) == 0 {
-		return "", nil
+		return "", PodStatusPending, nil
 	}
 
-	return pods.Items[0].Metadata.Name, nil
+	pod := pods.Items[0]
+	return pod.Metadata.Name, pod.status(), nil
 }
 
-func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string) (string, error) {
+func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (string, error) {
 	pods, err := c.listJobPods(ctx, jobName)
 	if err != nil {
 		return "", err
 	}
 	for _, pod := range pods.Items {
+		reportPodStatus(updatePodStatus, pod.status())
 		if pod.Status.Phase == "Running" {
 			return pod.Metadata.Name, nil
 		}
@@ -315,6 +327,12 @@ func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string
 		return "", fmt.Errorf("cannot resume job %s: no running pod exists", jobName)
 	}
 	return "", fmt.Errorf("cannot resume job %s: pod is not running", jobName)
+}
+
+func reportPodStatus(updatePodStatus func(PodStatus), status PodStatus) {
+	if updatePodStatus != nil && status != "" {
+		updatePodStatus(status)
+	}
 }
 
 func (c *kubernetesClient) listJobPods(ctx context.Context, jobName string) (*kubernetesPodList, error) {
@@ -549,12 +567,25 @@ type kubernetesJob struct {
 }
 
 type kubernetesPodList struct {
-	Items []struct {
-		Metadata struct {
-			Name string `json:"name"`
-		} `json:"metadata"`
-		Status struct {
-			Phase string `json:"phase"`
-		} `json:"status"`
-	} `json:"items"`
+	Items []kubernetesPod `json:"items"`
+}
+
+type kubernetesPod struct {
+	Metadata struct {
+		Name              string `json:"name"`
+		DeletionTimestamp string `json:"deletionTimestamp"`
+	} `json:"metadata"`
+	Status struct {
+		Phase string `json:"phase"`
+	} `json:"status"`
+}
+
+func (p kubernetesPod) status() PodStatus {
+	if p.Metadata.DeletionTimestamp != "" {
+		return PodStatusTerminating
+	}
+	if p.Status.Phase == "" {
+		return PodStatusPending
+	}
+	return PodStatus(strings.ToLower(p.Status.Phase))
 }

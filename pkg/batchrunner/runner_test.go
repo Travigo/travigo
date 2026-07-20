@@ -11,9 +11,10 @@ type recordingExecutor struct {
 	recovering chan bool
 }
 
-func (e *recordingExecutor) RunTask(_ context.Context, _ string, task *Task, _ string, recovering bool) (int, error) {
+func (e *recordingExecutor) RunTask(_ context.Context, _ string, task *Task, _ string, recovering bool, updatePodStatus func(PodStatus)) (int, error) {
 	e.tasks <- *task
 	e.recovering <- recovering
+	updatePodStatus(PodStatusRunning)
 	return 0, nil
 }
 
@@ -71,6 +72,9 @@ func TestResumeRunsReconnectsPersistedRunningTask(t *testing.T) {
 		if resumed.Status == RunStatusSucceeded && resumed.Tasks[0].Status == TaskStatusSucceeded {
 			if !resumed.StartedAt.Equal(started) {
 				t.Fatalf("recovered run start time = %v, want %v", resumed.StartedAt, started)
+			}
+			if resumed.Tasks[0].PodStatus != PodStatusSucceeded {
+				t.Fatalf("recovered task pod status = %q, want succeeded", resumed.Tasks[0].PodStatus)
 			}
 			return
 		}
