@@ -58,7 +58,7 @@ securityContext: {}
 
 resources:
   requests:
-    cpu: 200m
+    cpu: 50m
     memory: 256Mi
 
 # Additional volumes on the output Deployment definition.
