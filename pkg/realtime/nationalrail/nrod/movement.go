@@ -117,6 +117,9 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		}
 
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Arrived at %s", locationStop.PrimaryName))
+		if locationStop.Location != nil {
+			realtimeJourney.VehicleLocation = *locationStop.Location
+		}
 
 		// If we've arrived at the end, then it's not actively tracked anymore
 		if locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
