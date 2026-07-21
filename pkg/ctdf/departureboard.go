@@ -55,6 +55,29 @@ type DepartureBoardRealtimeLookup struct {
 	FindByJourneyRefs   func(journeyRefs []string) *RealtimeJourney
 }
 
+type blockJourneyReference struct {
+	PrimaryIdentifier string
+	DepartureTime     time.Time
+}
+
+// precedingBlockJourneyRefs returns the block journeys that run before target,
+// newest first. A realtime journey for one of these is the vehicle that can
+// carry delay into target; a later journey must not influence it.
+func precedingBlockJourneyRefs(blockJourneys []blockJourneyReference, target *Journey) []string {
+	if target == nil {
+		return nil
+	}
+	refs := make([]string, 0, len(blockJourneys))
+	for index := len(blockJourneys) - 1; index >= 0; index-- {
+		blockJourney := blockJourneys[index]
+		if blockJourney.PrimaryIdentifier == "" || !blockJourney.DepartureTime.Before(target.DepartureTime) {
+			continue
+		}
+		refs = append(refs, blockJourney.PrimaryIdentifier)
+	}
+	return refs
+}
+
 // IsBoardJourneyCancelled applies cancellation signals that are independent of
 // whether a realtime stop update exists for the requested board stop.
 func IsBoardJourneyCancelled(journey *Journey, realtimeJourney *RealtimeJourney, cancelledJourneyIDs map[string]struct{}) bool {
@@ -199,8 +222,8 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	// blockNumber) so that qualifying journeys sharing a block don't each issue
 	// duplicate Mongo/realtime lookups during this generation.
 	var (
-		blockJourneysCache sync.Map // blockKey -> []string
-		blockRealtimeCache sync.Map // blockKey -> *RealtimeJourney (may be nil)
+		blockJourneysCache sync.Map // blockKey -> []blockJourneyReference, ordered by departure
+		blockRealtimeCache sync.Map // blockKey + target journey -> *RealtimeJourney (may be nil)
 	)
 
 	p := pool.NewWithResults[*DepartureBoard]()
@@ -337,12 +360,15 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					replacementBusCount.Add(1)
 				}
 
-				// This block does a Find (block journeys by serviceref + BlockNumber)
+				// This block finds the preceding journeys in the same scheduled vehicle
+				// block. GTFS blocks can continue across routes, so serviceRef must not
+				// scope this lookup; datasource.datasetid prevents block ID collisions
+				// between independently supplied schedules.
 				// plus a realtime lookup per qualifying journey. Qualification
 				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
 				// stopTime and departureBoardRecordType which are only known after the
 				// path loop above, so it can't be fully hoisted into a pre-pass. As a cheaper
-				// mitigation, both lookups are memoised per (serviceRef, BlockNumber) via
+				// mitigation, both lookups are memoised per (dataset, BlockNumber) via
 				// blockJourneysCache/blockRealtimeCache so journeys sharing a block reuse the
 				// result instead of each issuing duplicate Mongo/realtime round trips.
 				// A fuller batch (first pass to collect qualifiers, then one Find with $in over
@@ -357,38 +383,57 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					estimateCandidateCount.Add(1)
 
 					blockNumber := journey.OtherIdentifiers["BlockNumber"]
-					blockKey := journey.ServiceRef + "\x00" + blockNumber
+					datasetID := ""
+					if journey.DataSource != nil {
+						datasetID = journey.DataSource.DatasetID
+					}
+					blockKey := datasetID + "\x00" + blockNumber
 
-					var blockJourneys []string
+					var blockJourneys []blockJourneyReference
 					if cached, ok := blockJourneysCache.Load(blockKey); ok {
-						blockJourneys = cached.([]string)
+						blockJourneys = cached.([]blockJourneyReference)
 					} else {
 						opts := options.Find().SetProjection(bson.D{
 							bson.E{Key: "primaryidentifier", Value: 1},
-						})
-						cursor, _ := journeysCollection.Find(context.Background(), bson.M{"serviceref": journey.ServiceRef, "otheridentifiers.BlockNumber": blockNumber}, opts)
+							bson.E{Key: "departuretime", Value: 1},
+						}).SetSort(bson.D{{Key: "departuretime", Value: 1}})
+						query := bson.M{"otheridentifiers.BlockNumber": blockNumber}
+						if datasetID != "" {
+							query["datasource.datasetid"] = datasetID
+						} else {
+							// Legacy cached journeys may predate datasource cache support.
+							query["serviceref"] = journey.ServiceRef
+						}
+						cursor, err := journeysCollection.Find(context.Background(), query, opts)
+						if err != nil {
+							log.Error().Err(err).Msg("Failed to query vehicle block journeys")
+						} else {
+							defer cursor.Close(context.Background())
 
-						for cursor.Next(context.Background()) {
-							var blockJourney Journey
-							err := cursor.Decode(&blockJourney)
-							if err != nil {
-								log.Error().Err(err).Msg("Failed to decode Journey")
+							for cursor.Next(context.Background()) {
+								var blockJourney blockJourneyReference
+								err := cursor.Decode(&blockJourney)
+								if err != nil {
+									log.Error().Err(err).Msg("Failed to decode Journey")
+								}
+
+								blockJourneys = append(blockJourneys, blockJourney)
 							}
-
-							blockJourneys = append(blockJourneys, blockJourney.PrimaryIdentifier)
 						}
 
 						blockJourneysCache.Store(blockKey, blockJourneys)
 					}
-					estimateBlockJourneyCount.Add(int64(len(blockJourneys)))
+					precedingJourneyRefs := precedingBlockJourneyRefs(blockJourneys, journey)
+					estimateBlockJourneyCount.Add(int64(len(precedingJourneyRefs)))
 
 					var blockRealtimeJourney *RealtimeJourney
-					if realtimeLookup.FindByJourneyRefs != nil && len(blockJourneys) > 0 {
-						if cached, ok := blockRealtimeCache.Load(blockKey); ok {
+					if realtimeLookup.FindByJourneyRefs != nil && len(precedingJourneyRefs) > 0 {
+						realtimeKey := blockKey + "\x00" + journey.PrimaryIdentifier
+						if cached, ok := blockRealtimeCache.Load(realtimeKey); ok {
 							blockRealtimeJourney = cached.(*RealtimeJourney)
 						} else {
-							blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(blockJourneys)
-							blockRealtimeCache.Store(blockKey, blockRealtimeJourney)
+							blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(precedingJourneyRefs)
+							blockRealtimeCache.Store(realtimeKey, blockRealtimeJourney)
 						}
 					}
 

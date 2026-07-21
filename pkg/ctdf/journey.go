@@ -19,13 +19,13 @@ const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
 	PrimaryIdentifier string            `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
-	OtherIdentifiers  map[string]string `groups:"basic" json:",omitempty" bson:",omitempty"`
+	OtherIdentifiers  map[string]string `groups:"basic,departureboard-cache" json:",omitempty" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 	Expiry               time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed,departureboard-cache" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
 	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`

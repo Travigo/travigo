@@ -105,6 +105,22 @@ func TestDeduplicateBoardEntriesPrefersFirstRecord(t *testing.T) {
 	}
 }
 
+func TestPrecedingBlockJourneyRefsUsesOnlyEarlierRunsNewestFirst(t *testing.T) {
+	base := time.Date(2026, 7, 21, 8, 0, 0, 0, time.UTC)
+	blockJourneys := []blockJourneyReference{
+		{PrimaryIdentifier: "route-a-early", DepartureTime: base},
+		{PrimaryIdentifier: "route-b-current", DepartureTime: base.Add(time.Hour)},
+		{PrimaryIdentifier: "route-c-target", DepartureTime: base.Add(2 * time.Hour)},
+		{PrimaryIdentifier: "route-d-later", DepartureTime: base.Add(3 * time.Hour)},
+	}
+	target := &Journey{PrimaryIdentifier: "route-c-target", DepartureTime: base.Add(2 * time.Hour)}
+
+	refs := precedingBlockJourneyRefs(blockJourneys, target)
+	if len(refs) != 2 || refs[0] != "route-b-current" || refs[1] != "route-a-early" {
+		t.Fatalf("preceding block refs = %v, want [route-b-current route-a-early]", refs)
+	}
+}
+
 func TestRealtimeJourneySuppressesBoardOnlyOnReplacementDates(t *testing.T) {
 	realtimeJourney := &RealtimeJourney{
 		SuppressFromDepartures:     true,
