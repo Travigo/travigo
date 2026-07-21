@@ -70,3 +70,31 @@ func TestIdentificationMappingReturnsMissAndSuppressesFailures(t *testing.T) {
 		t.Fatalf("expected suppressed mapping, got id=%q found=%t", journeyID, found)
 	}
 }
+
+func TestGTFSJourneyOwnershipIsJourneySpecificAndExpiresAfterEightHours(t *testing.T) {
+	setupIdentificationTestRedis(t)
+	ctx := context.Background()
+	consumer := &BatchConsumer{}
+	event := &VehicleUpdateEvent{VehicleLocationUpdate: &VehicleLocationUpdate{
+		VehicleIdentifier: "vehicle-1",
+		Timeframe:         "2026-07-21",
+	}}
+	information := map[string]string{"LinkedDataset": "gb-dft-bods-gtfs-schedule-*"}
+
+	storeGTFSJourneyOwnership(ctx, event, information, "journey-a")
+
+	if !consumer.gtfsOwnsJourney(event, information, "journey-a") {
+		t.Fatal("expected GTFS to own the same journey")
+	}
+	if consumer.gtfsOwnsJourney(event, information, "journey-b") {
+		t.Fatal("GTFS ownership must not suppress a different journey after vehicle turn-over")
+	}
+
+	ttl, err := redis_client.Client.TTL(ctx, gtfsJourneyOwnershipKey(information["LinkedDataset"], "vehicle-1", "2026-07-21")).Result()
+	if err != nil {
+		t.Fatalf("get ownership TTL: %v", err)
+	}
+	if ttl > gtfsJourneyOwnershipTTL || ttl < gtfsJourneyOwnershipTTL-time.Minute {
+		t.Fatalf("expected approximately %s TTL, got %s", gtfsJourneyOwnershipTTL, ttl)
+	}
+}

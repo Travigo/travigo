@@ -27,6 +27,7 @@ var identificationCache *cache.Cache[string]
 const numConsumers = 5
 const batchSize = 200
 const identificationCacheTTL = 90 * time.Minute
+const gtfsJourneyOwnershipTTL = 8 * time.Hour
 
 var touchIdentificationMapping = redis.NewScript(`
 local journey_id = redis.call("HGET", KEYS[1], "journey_id")
@@ -250,6 +251,10 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		log.Warn().Err(err).Str("local_id", vehicleUpdateEvent.LocalID).Msg("Failed to read realtime identification mapping")
 	}
 	if mappingFound {
+		if sourceType == "siri-vm" && journeyID != "" && consumer.gtfsOwnsJourney(vehicleUpdateEvent, identifyingInformation, journeyID) {
+			consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs_same_journey")
+			return ""
+		}
 		consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, journeyID != "" && journeyID != "N/A", "cached")
 		return journeyID
 	}
@@ -260,14 +265,6 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 		// TODO use an interface here to reduce duplication
 		if sourceType == "siri-vm" {
-			// Save a cache value of N/A to stop us from constantly rechecking for journeys handled somewhere else
-			successVehicleID, _ := identificationCache.Get(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier))
-			if vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" && successVehicleID != "" {
-				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
-				consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs")
-				return ""
-			}
-
 			// perform the actual sirivm
 			journeyIdentifier := identifiers.SiriVM{
 				IdentifyingInformation: identifyingInformation,
@@ -352,12 +349,17 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			return ""
 		}
 		journeyID = journey
+		if sourceType == "siri-vm" && consumer.gtfsOwnsJourney(vehicleUpdateEvent, identifyingInformation, journeyID) {
+			// Deliberately do not cache this as N/A: the vehicle may turn onto a
+			// different journey while the GTFS ownership marker remains valid.
+			consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs_same_journey")
+			return ""
+		}
 
 		storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, journeyID, vehicleUpdateEvent.RecordedAt)
 
-		// Set cross dataset ID
-		if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
-			identificationCache.Set(context.Background(), fmt.Sprintf("successvehicleid/%s/%s", identifyingInformation["LinkedDataset"], vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier), sourceType)
+		if sourceType == "GTFS-RT" {
+			storeGTFSJourneyOwnership(context.Background(), vehicleUpdateEvent, identifyingInformation, journeyID)
 		}
 
 		// Record the successful identification event
@@ -378,6 +380,41 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 	}
 
 	return journeyID
+}
+
+func gtfsJourneyOwnershipKey(linkedDataset, vehicleID, timeframe string) string {
+	return fmt.Sprintf("realtime-gtfs-journey:%s:%s:%s", linkedDataset, vehicleID, timeframe)
+}
+
+func storeGTFSJourneyOwnership(ctx context.Context, event *VehicleUpdateEvent, information map[string]string, journeyID string) {
+	if event == nil || event.VehicleLocationUpdate == nil || journeyID == "" {
+		return
+	}
+	vehicleID := event.VehicleLocationUpdate.VehicleIdentifier
+	if vehicleID == "" {
+		return
+	}
+	key := gtfsJourneyOwnershipKey(information["LinkedDataset"], vehicleID, event.VehicleLocationUpdate.Timeframe)
+	if err := redis_client.Client.Set(ctx, key, journeyID, gtfsJourneyOwnershipTTL).Err(); err != nil {
+		log.Warn().Err(err).Str("vehicle_id", vehicleID).Str("journey_id", journeyID).Msg("Failed to store GTFS journey ownership")
+	}
+}
+
+func (consumer *BatchConsumer) gtfsOwnsJourney(event *VehicleUpdateEvent, information map[string]string, journeyID string) bool {
+	if event == nil || event.VehicleLocationUpdate == nil || journeyID == "" {
+		return false
+	}
+	vehicleID := event.VehicleLocationUpdate.VehicleIdentifier
+	if vehicleID == "" {
+		return false
+	}
+	key := gtfsJourneyOwnershipKey(information["LinkedDataset"], vehicleID, event.VehicleLocationUpdate.Timeframe)
+	gtfsJourneyID, err := redis_client.Client.Get(context.Background(), key).Result()
+	if err != nil && err != redis.Nil {
+		log.Warn().Err(err).Str("vehicle_id", vehicleID).Msg("Failed to read GTFS journey ownership")
+		return false
+	}
+	return gtfsJourneyID == journeyID
 }
 
 func realtimeIdentificationMappingKey(localID string) string {
