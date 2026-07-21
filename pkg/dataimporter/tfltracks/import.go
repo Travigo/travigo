@@ -76,6 +76,12 @@ type routeTask struct {
 	direction string
 }
 
+type routeImportFailure struct {
+	task        routeTask
+	err         error
+	preserveErr error
+}
+
 type stopResolver struct {
 	mu    sync.RWMutex
 	cache map[string]*ctdf.Stop
@@ -123,7 +129,7 @@ func ImportRoutes(ctx context.Context, options Options, source *ctdf.DataSourceR
 		log.Info().Str("mode", modeID).Int("lines", len(lines)).Msg("Importing TfL route tracks")
 
 		tasks := make(chan routeTask)
-		errCh := make(chan error, len(lines)*2)
+		errCh := make(chan routeImportFailure, len(lines)*2)
 		var workers sync.WaitGroup
 		for range options.MaxConcurrency {
 			workers.Add(1)
@@ -132,7 +138,10 @@ func ImportRoutes(ctx context.Context, options Options, source *ctdf.DataSourceR
 				for task := range tasks {
 					count, err := importRouteSequence(ctx, client, resolver, task, source)
 					if err != nil {
-						errCh <- err
+						errCh <- routeImportFailure{
+							task: task, err: err,
+							preserveErr: preserveExistingRouteTracks(ctx, task, source),
+						}
 					} else {
 						importedTracks.Add(int64(count))
 					}
@@ -148,15 +157,51 @@ func ImportRoutes(ctx context.Context, options Options, source *ctdf.DataSourceR
 		workers.Wait()
 		close(errCh)
 
-		for routeErr := range errCh {
-			importErrors = append(importErrors, routeErr)
-			log.Error().Err(routeErr).Str("mode", modeID).Msg("Failed importing TfL route sequence")
+		for failure := range errCh {
+			if failure.preserveErr != nil {
+				importErrors = append(importErrors, fmt.Errorf("%w; preserve previous tracks: %v", failure.err, failure.preserveErr))
+				log.Error().Err(failure.err).Str("mode", modeID).Str("line", failure.task.line.ID).Str("direction", failure.task.direction).Msg("Failed importing TfL route sequence and preserving previous tracks")
+				continue
+			}
+			log.Warn().Err(failure.err).Str("mode", modeID).Str("line", failure.task.line.ID).Str("direction", failure.task.direction).Msg("Skipped TfL route sequence; retained previous tracks when available")
 		}
 	}
 	if err := errors.Join(importErrors...); err != nil {
 		return int(importedTracks.Load()), err
 	}
 	return int(importedTracks.Load()), nil
+}
+
+func preserveExistingRouteTracks(ctx context.Context, task routeTask, source *ctdf.DataSourceReference) error {
+	filter := bson.M{
+		"datasource.datasetid": source.DatasetID,
+		"attributes.mode":      task.mode.ID,
+		"attributes.line":      task.line.ID,
+		"direction":            task.direction,
+	}
+	cursor, err := database.GetCollection(journeytracks.RouteCollectionName).Find(ctx, filter)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+	trackRefs := []string{}
+	for cursor.Next(ctx) {
+		var leg journeytracks.RouteLeg
+		if err := cursor.Decode(&leg); err != nil {
+			return err
+		}
+		trackRefs = append(trackRefs, leg.TrackRef)
+	}
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+	if _, err := database.GetCollection(journeytracks.RouteCollectionName).UpdateMany(ctx, filter, bson.M{"$set": bson.M{"datasource.timestamp": source.Timestamp}}); err != nil {
+		return err
+	}
+	if len(trackRefs) > 0 {
+		_, err = database.GetCollection("journey_tracks").UpdateMany(ctx, bson.M{"primaryidentifier": bson.M{"$in": trackRefs}}, bson.M{"$set": bson.M{"datasource.timestamp": source.Timestamp}})
+	}
+	return err
 }
 
 func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *stopResolver, task routeTask, source *ctdf.DataSourceReference) (int, error) {
@@ -172,20 +217,34 @@ func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *s
 		}
 		decodedTracks = append(decodedTracks, track)
 	}
+	stationLocations := tflStationLocations(sequence.Stations)
 
 	imported := 0
 	for routeIndex, route := range sequence.OrderedLineRoutes {
-		stops, err := resolver.resolveAll(ctx, route.NaptanIDs)
-		if err != nil {
-			return imported, fmt.Errorf("%s %s %s route %d: %w", task.mode.ID, task.line.ID, task.direction, routeIndex, err)
-		}
-		locations := make([]ctdf.Location, len(stops))
-		routeStopRefs := make([]string, len(stops))
-		routeStopIdentifiers := make([][]string, len(stops))
-		for index, stop := range stops {
-			locations[index] = *stop.Location
-			routeStopRefs[index] = stop.PrimaryIdentifier
-			routeStopIdentifiers[index] = append(stop.GetAllStopIDs(), fmt.Sprintf(ctdf.GBStopIDFormat, route.NaptanIDs[index]))
+		locations := make([]ctdf.Location, len(route.NaptanIDs))
+		routeStopRefs := make([]string, len(route.NaptanIDs))
+		routeStopIdentifiers := make([][]string, len(route.NaptanIDs))
+		for index, naptanID := range route.NaptanIDs {
+			formattedID := fmt.Sprintf(ctdf.GBStopIDFormat, naptanID)
+			stop, err := resolver.resolve(ctx, naptanID)
+			if err != nil {
+				return imported, fmt.Errorf("%s %s %s route %d stop %s: %w", task.mode.ID, task.line.ID, task.direction, routeIndex, naptanID, err)
+			}
+			identifiers := []string{formattedID}
+			routeStopRefs[index] = formattedID
+			if stop != nil {
+				identifiers = append(identifiers, stop.GetAllStopIDs()...)
+				routeStopRefs[index] = stop.PrimaryIdentifier
+			}
+			location, found := stationLocations[naptanID]
+			if !found && stop != nil && stop.Location != nil && len(stop.Location.Coordinates) >= 2 {
+				location, found = *stop.Location, true
+			}
+			if !found {
+				return imported, fmt.Errorf("%s %s %s route %d stop %s has no TfL or CTDF location", task.mode.ID, task.line.ID, task.direction, routeIndex, naptanID)
+			}
+			locations[index] = location
+			routeStopIdentifiers[index] = identifiers
 		}
 		legTracks, _, err := tflapi.SplitBestTrack(locations, decodedTracks)
 		if err != nil {
@@ -209,7 +268,7 @@ func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *s
 				ServiceNameKeys: lineKeys(task.line), TransportType: task.mode.TransportType,
 				Direction: task.direction, RouteName: route.Name,
 				ExternalStopRefs: route.NaptanIDs, RouteStopRefs: routeStopRefs, RouteStopIdentifiers: routeStopIdentifiers, LegIndex: legIndex,
-				OriginStopRefs: stops[legIndex].GetAllStopIDs(), DestinationStopRefs: stops[legIndex+1].GetAllStopIDs(),
+				OriginStopRefs: routeStopIdentifiers[legIndex], DestinationStopRefs: routeStopIdentifiers[legIndex+1],
 				TrackRef: trackID, DataSource: source,
 				Attributes: map[string]string{"mode": task.mode.ID, "line": task.line.ID, "line_name": task.line.Name},
 			}
@@ -232,6 +291,17 @@ func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *s
 	return imported, nil
 }
 
+func tflStationLocations(stations []tflapi.Station) map[string]ctdf.Location {
+	locations := make(map[string]ctdf.Location, len(stations))
+	for _, station := range stations {
+		if station.Latitude < -90 || station.Latitude > 90 || station.Longitude < -180 || station.Longitude > 180 {
+			continue
+		}
+		locations[station.ID] = ctdf.Location{Type: "Point", Coordinates: []float64{station.Longitude, station.Latitude}}
+	}
+	return locations
+}
+
 func routeIdentifier(modeID, lineID, direction string, naptanIDs []string) string {
 	hash := sha256.Sum256([]byte(strings.Join(naptanIDs, "\x00")))
 	return fmt.Sprintf("%s:%s:%s:%x", modeID, lineID, direction, hash[:8])
@@ -244,21 +314,6 @@ func lineKeys(line tflapi.Line) []string {
 		keys = keys[:1]
 	}
 	return keys
-}
-
-func (resolver *stopResolver) resolveAll(ctx context.Context, naptanIDs []string) ([]*ctdf.Stop, error) {
-	stops := make([]*ctdf.Stop, len(naptanIDs))
-	for index, naptanID := range naptanIDs {
-		stop, err := resolver.resolve(ctx, naptanID)
-		if err != nil {
-			return nil, err
-		}
-		if stop.Location == nil || len(stop.Location.Coordinates) < 2 {
-			return nil, fmt.Errorf("TfL stop %s has no location", naptanID)
-		}
-		stops[index] = stop
-	}
-	return stops, nil
 }
 
 func (resolver *stopResolver) resolve(ctx context.Context, naptanID string) (*ctdf.Stop, error) {
@@ -279,13 +334,13 @@ func (resolver *stopResolver) resolve(ctx context.Context, naptanID string) (*ct
 			return nil, err
 		}
 		if group != nil {
-			if err := database.GetCollection("stops").FindOne(ctx, bson.M{"associations.associatedidentifier": group.PrimaryIdentifier}).Decode(&stop); err != nil {
+			if err := database.GetCollection("stops").FindOne(ctx, bson.M{"associations.associatedidentifier": group.PrimaryIdentifier}).Decode(&stop); err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 				return nil, err
 			}
 		}
 	}
 	if stop == nil {
-		return nil, fmt.Errorf("could not resolve TfL stop %s", naptanID)
+		return nil, nil
 	}
 	resolver.mu.Lock()
 	resolver.cache[naptanID] = stop

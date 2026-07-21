@@ -25,11 +25,18 @@ type Line struct {
 type RouteSequence struct {
 	LineStrings       []string           `json:"lineStrings"`
 	OrderedLineRoutes []OrderedLineRoute `json:"orderedLineRoutes"`
+	Stations          []Station          `json:"stations"`
 }
 
 type OrderedLineRoute struct {
 	Name      string   `json:"name"`
 	NaptanIDs []string `json:"naptanIds"`
+}
+
+type Station struct {
+	ID        string  `json:"id"`
+	Latitude  float64 `json:"lat"`
+	Longitude float64 `json:"lon"`
 }
 
 func (client *Client) Lines(ctx context.Context, modeID string) ([]Line, error) {

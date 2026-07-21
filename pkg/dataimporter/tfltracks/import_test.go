@@ -24,3 +24,11 @@ func TestLineKeysIncludeIDAndDisplayName(t *testing.T) {
 		t.Fatalf("line key count = %d, want %d", got, want)
 	}
 }
+
+func TestTfLStationLocationsUseLongitudeLatitudeOrder(t *testing.T) {
+	locations := tflStationLocations([]tflapi.Station{{ID: "490000283N", Latitude: 51.377481, Longitude: -0.239506}})
+	location := locations["490000283N"]
+	if location.Coordinates[0] != -0.239506 || location.Coordinates[1] != 51.377481 {
+		t.Fatalf("coordinates = %v, want longitude then latitude", location.Coordinates)
+	}
+}
