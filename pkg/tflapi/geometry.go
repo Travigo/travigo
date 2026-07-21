@@ -47,16 +47,44 @@ func DecodeLineString(encoded string) ([]ctdf.Location, error) {
 }
 
 func SplitTrack(stopLocations []ctdf.Location, track []ctdf.Location) ([][]ctdf.Location, error) {
-	if len(stopLocations) < 2 || len(track) < 2 {
-		return nil, errors.New("route requires at least two stops and two track points")
-	}
-	snaps, err := orderedSnaps(stopLocations, track)
-	if err != nil {
-		track = reverseTrack(track)
-		snaps, err = orderedSnaps(stopLocations, track)
-		if err != nil {
-			return nil, err
+	legs, _, err := splitTrack(stopLocations, track)
+	return legs, err
+}
+
+// SplitBestTrack selects the line string that best follows the supplied stop
+// sequence. TfL does not guarantee that lineStrings and orderedLineRoutes use
+// corresponding array indexes.
+func SplitBestTrack(stopLocations []ctdf.Location, tracks [][]ctdf.Location) ([][]ctdf.Location, int, error) {
+	bestIndex := -1
+	bestScore := math.Inf(1)
+	var bestLegs [][]ctdf.Location
+	for index, track := range tracks {
+		legs, score, err := splitTrack(stopLocations, track)
+		if err == nil && score < bestScore {
+			bestIndex = index
+			bestScore = score
+			bestLegs = legs
 		}
+	}
+	if bestIndex < 0 {
+		return nil, -1, fmt.Errorf("none of %d line strings follows the route's %d stops within %dm", len(tracks), len(stopLocations), MaxStopDistanceMetres)
+	}
+	return bestLegs, bestIndex, nil
+}
+
+func splitTrack(stopLocations []ctdf.Location, track []ctdf.Location) ([][]ctdf.Location, float64, error) {
+	if len(stopLocations) < 2 || len(track) < 2 {
+		return nil, 0, errors.New("route requires at least two stops and two track points")
+	}
+	snaps, forwardErr := orderedSnaps(stopLocations, track)
+	reversedTrack := reverseTrack(track)
+	reversedSnaps, reverseErr := orderedSnaps(stopLocations, reversedTrack)
+	if forwardErr != nil && reverseErr != nil {
+		return nil, 0, forwardErr
+	}
+	if reverseErr == nil && (forwardErr != nil || snapScore(reversedSnaps) < snapScore(snaps)) {
+		track = reversedTrack
+		snaps = reversedSnaps
 	}
 	legs := make([][]ctdf.Location, len(stopLocations)-1)
 	for index := range legs {
@@ -64,10 +92,18 @@ func SplitTrack(stopLocations []ctdf.Location, track []ctdf.Location) ([][]ctdf.
 		end := offsetSnap(snaps[index+1], track, TrackCutLeewayMetres)
 		legs[index] = sliceTrack(start, end, track)
 		if len(legs[index]) < 2 {
-			return nil, fmt.Errorf("route leg %d has no usable geometry", index)
+			return nil, 0, fmt.Errorf("route leg %d has no usable geometry", index)
 		}
 	}
-	return legs, nil
+	return legs, snapScore(snaps), nil
+}
+
+func snapScore(snaps []trackSnap) float64 {
+	score := 0.0
+	for _, snap := range snaps {
+		score += snap.distance
+	}
+	return score
 }
 
 func orderedSnaps(stops []ctdf.Location, track []ctdf.Location) ([]trackSnap, error) {

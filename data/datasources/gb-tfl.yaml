@@ -21,4 +21,4 @@ datasets:
   supportedobjects:
     journeytracks: true
   customconfig:
-    modes: tube,dlr,tram,river-bus,cable-car,overground,elizabeth-line,national-rail,bus
+    modes: tube,dlr,tram,river-bus,cable-car,bus

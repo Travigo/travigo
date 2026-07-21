@@ -43,6 +43,23 @@ func TestSplitTrackSupportsRepeatedTerminal(t *testing.T) {
 	}
 }
 
+func TestSplitBestTrackDoesNotAssumeTfLRouteArrayOrder(t *testing.T) {
+	wrongTrack := []ctdf.Location{testPoint(0, 51.5), testPoint(0.01, 51.5)}
+	matchingTrack := []ctdf.Location{testPoint(1, 52.5), testPoint(1.01, 52.5), testPoint(1.02, 52.5)}
+	stops := []ctdf.Location{testPoint(1, 52.5), testPoint(1.01, 52.5), testPoint(1.02, 52.5)}
+
+	legs, trackIndex, err := SplitBestTrack(stops, [][]ctdf.Location{wrongTrack, matchingTrack})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trackIndex != 1 {
+		t.Fatalf("selected track index = %d, want 1", trackIndex)
+	}
+	if len(legs) != 2 {
+		t.Fatalf("leg count = %d, want 2", len(legs))
+	}
+}
+
 func testPoint(longitude, latitude float64) ctdf.Location {
 	return ctdf.Location{Type: "Point", Coordinates: []float64{longitude, latitude}}
 }

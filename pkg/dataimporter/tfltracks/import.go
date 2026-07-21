@@ -164,16 +164,17 @@ func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *s
 	if err != nil {
 		return 0, fmt.Errorf("%s %s %s: %w", task.mode.ID, task.line.ID, task.direction, err)
 	}
-	if len(sequence.OrderedLineRoutes) != len(sequence.LineStrings) {
-		return 0, fmt.Errorf("%s %s %s: %d routes but %d line strings", task.mode.ID, task.line.ID, task.direction, len(sequence.OrderedLineRoutes), len(sequence.LineStrings))
+	decodedTracks := make([][]ctdf.Location, 0, len(sequence.LineStrings))
+	for lineStringIndex, encodedTrack := range sequence.LineStrings {
+		track, err := tflapi.DecodeLineString(encodedTrack)
+		if err != nil {
+			return 0, fmt.Errorf("%s %s %s line string %d: %w", task.mode.ID, task.line.ID, task.direction, lineStringIndex, err)
+		}
+		decodedTracks = append(decodedTracks, track)
 	}
 
 	imported := 0
 	for routeIndex, route := range sequence.OrderedLineRoutes {
-		track, err := tflapi.DecodeLineString(sequence.LineStrings[routeIndex])
-		if err != nil {
-			return imported, fmt.Errorf("%s %s %s route %d: %w", task.mode.ID, task.line.ID, task.direction, routeIndex, err)
-		}
 		stops, err := resolver.resolveAll(ctx, route.NaptanIDs)
 		if err != nil {
 			return imported, fmt.Errorf("%s %s %s route %d: %w", task.mode.ID, task.line.ID, task.direction, routeIndex, err)
@@ -186,7 +187,7 @@ func importRouteSequence(ctx context.Context, client *tflapi.Client, resolver *s
 			routeStopRefs[index] = stop.PrimaryIdentifier
 			routeStopIdentifiers[index] = append(stop.GetAllStopIDs(), fmt.Sprintf(ctdf.GBStopIDFormat, route.NaptanIDs[index]))
 		}
-		legTracks, err := tflapi.SplitTrack(locations, track)
+		legTracks, _, err := tflapi.SplitBestTrack(locations, decodedTracks)
 		if err != nil {
 			return imported, fmt.Errorf("%s %s %s route %d: %w", task.mode.ID, task.line.ID, task.direction, routeIndex, err)
 		}
