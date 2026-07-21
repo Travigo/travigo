@@ -73,8 +73,10 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	}
 
 	if m.EventType == "DEPARTURE" {
+		matchedJourneyStop := false
 		for pathIndex, path := range realtimeJourney.Journey.Path {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
+				matchedJourneyStop = true
 				journeyStop := realtimeJourney.RealtimeStop(path.OriginStopRef, pathIndex)
 				if journeyStop != nil && !journeyStop.DepartureTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 					continue
@@ -96,13 +98,19 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			}
 		}
 
-		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Departed %s", locationStop.PrimaryName))
+		description := fmt.Sprintf("Passed %s", locationStop.PrimaryName)
+		if matchedJourneyStop {
+			description = fmt.Sprintf("Departed %s", locationStop.PrimaryName)
+		}
+		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
 	} else if m.EventType == "ARRIVAL" {
+		matchedJourneyStop := false
 		for pathIndex, path := range realtimeJourney.Journey.Path {
 			journeyStopIndex := pathIndex + 1
 			if path.DestinationStopRef != locationStop.PrimaryIdentifier && !util.ContainsString(locationStop.OtherIdentifiers, path.DestinationStopRef) {
 				continue
 			}
+			matchedJourneyStop = true
 			journeyStop := realtimeJourney.RealtimeStop(path.DestinationStopRef, journeyStopIndex)
 			if journeyStop != nil && !journeyStop.ArrivalTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 				continue
@@ -116,7 +124,11 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			break
 		}
 
-		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, fmt.Sprintf("Arrived at %s", locationStop.PrimaryName))
+		description := fmt.Sprintf("Passing %s", locationStop.PrimaryName)
+		if matchedJourneyStop {
+			description = fmt.Sprintf("Arrived at %s", locationStop.PrimaryName)
+		}
+		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
 		if locationStop.Location != nil {
 			realtimeJourney.VehicleLocation = *locationStop.Location
 		}
