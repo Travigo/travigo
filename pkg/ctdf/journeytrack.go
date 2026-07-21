@@ -54,11 +54,11 @@ func (j *Journey) GetTracks() JourneyTrackHydrationStats {
 		return stats
 	}
 	defer cursor.Close(context.Background())
-	tracks := map[string][]Location{}
+	tracks := map[string]JourneyTrack{}
 	for cursor.Next(context.Background()) {
 		var track JourneyTrack
 		if cursor.Decode(&track) == nil {
-			tracks[track.PrimaryIdentifier] = track.Track
+			tracks[track.PrimaryIdentifier] = track
 		}
 	}
 	if err := cursor.Err(); err != nil {
@@ -68,16 +68,29 @@ func (j *Journey) GetTracks() JourneyTrackHydrationStats {
 	}
 	stats.Hydrated = len(tracks)
 	stats.Missing = stats.References - stats.Hydrated
-	if j.TrackRef != "" {
-		j.Track = tracks[j.TrackRef]
-	}
-	for _, path := range j.Path {
-		if path != nil && path.TrackRef != "" {
-			path.Track = tracks[path.TrackRef]
-		}
-	}
+	applyJourneyTracks(j, tracks)
 	if stats.Missing > 0 {
 		log.Warn().Str("journey", j.PrimaryIdentifier).Int("track_references", stats.References).Int("hydrated_tracks", stats.Hydrated).Int("missing_tracks", stats.Missing).Msg("Journey track references are missing")
 	}
 	return stats
+}
+
+func applyJourneyTracks(j *Journey, tracks map[string]JourneyTrack) {
+	if j == nil {
+		return
+	}
+	if j.TrackRef != "" {
+		if track, ok := tracks[j.TrackRef]; ok {
+			j.Track = track.Track
+			j.TrackDataSource = track.DataSource
+		}
+	}
+	for _, path := range j.Path {
+		if path != nil && path.TrackRef != "" {
+			if track, ok := tracks[path.TrackRef]; ok {
+				path.Track = track.Track
+				path.TrackDataSource = track.DataSource
+			}
+		}
+	}
 }

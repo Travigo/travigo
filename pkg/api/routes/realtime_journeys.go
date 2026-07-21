@@ -134,6 +134,9 @@ func getRealtimeJourney(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		if realtimeJourney.Journey != nil {
+			realtimeJourney.Journey.GetTracks()
+		}
 		return c.JSON(realtimeJourney)
 	}
 }

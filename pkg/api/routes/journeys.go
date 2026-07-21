@@ -41,6 +41,9 @@ func getJourney(c *fiber.Ctx) error {
 			log.Error().Err(realtimeErr).Str("journey", journey.PrimaryIdentifier).Msg("Failed to query realtime journey")
 		}
 		journey.RealtimeJourney = realtimeJourney
+		if realtimeJourney != nil && realtimeJourney.Journey != nil {
+			realtimeJourney.Journey.GetTracks()
+		}
 
 		var journeyReduced interface{}
 

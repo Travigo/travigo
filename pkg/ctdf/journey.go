@@ -40,9 +40,10 @@ type Journey struct {
 	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 	DepartureTimezone    string    `groups:"basic,departureboard-cache" bson:",omitempty"`
 
-	Track     []Location         `groups:"detailed" bson:",omitempty"`
-	TrackRef  string             `groups:"internal" bson:",omitempty"`
-	Frequency []JourneyFrequency `groups:"detailed" bson:",omitempty"`
+	Track           []Location           `groups:"detailed" bson:",omitempty"`
+	TrackRef        string               `groups:"internal" bson:",omitempty"`
+	TrackDataSource *DataSourceReference `groups:"detailed" bson:"-"`
+	Frequency       []JourneyFrequency   `groups:"detailed" bson:",omitempty"`
 
 	DestinationDisplay  string   `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 	ReplacesJourneyRefs []string `groups:"basic,departureboard-cache" bson:",omitempty"`
@@ -199,8 +200,9 @@ type JourneyPathItem struct {
 	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 	DestinationActivity []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
 
-	Track    []Location `groups:"basic"`
-	TrackRef string     `groups:"internal" bson:",omitempty"`
+	Track           []Location           `groups:"basic"`
+	TrackRef        string               `groups:"internal" bson:",omitempty"`
+	TrackDataSource *DataSourceReference `groups:"basic" bson:"-"`
 
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
 }
