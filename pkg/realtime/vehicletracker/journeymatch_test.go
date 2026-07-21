@@ -52,6 +52,55 @@ func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 	}
 }
 
+func TestEstimateFutureStopsAbsorbsDelayDuringScheduledDwell(t *testing.T) {
+	base := time.Date(2026, time.July, 21, 10, 0, 0, 0, time.UTC)
+	paths := []*ctdf.JourneyPathItem{
+		{DestinationStopRef: "timed-stop", DestinationArrivalTime: base.Add(5 * time.Minute)},
+		{
+			OriginStopRef:          "timed-stop",
+			OriginDepartureTime:    base.Add(7 * time.Minute),
+			DestinationStopRef:     "downstream-stop",
+			DestinationArrivalTime: base.Add(12 * time.Minute),
+		},
+		{OriginStopRef: "downstream-stop", OriginDepartureTime: base.Add(12 * time.Minute), DestinationStopRef: "terminus", DestinationArrivalTime: base.Add(18 * time.Minute)},
+	}
+
+	tests := []struct {
+		name                  string
+		offset                time.Duration
+		wantTimedArrival      time.Time
+		wantTimedDeparture    time.Time
+		wantDownstreamArrival time.Time
+	}{
+		{
+			name:                  "delay is fully absorbed",
+			offset:                time.Minute,
+			wantTimedArrival:      base.Add(6 * time.Minute),
+			wantTimedDeparture:    base.Add(7 * time.Minute),
+			wantDownstreamArrival: base.Add(12 * time.Minute),
+		},
+		{
+			name:                  "remaining delay is carried forward",
+			offset:                3 * time.Minute,
+			wantTimedArrival:      base.Add(8 * time.Minute),
+			wantTimedDeparture:    base.Add(8 * time.Minute),
+			wantDownstreamArrival: base.Add(13 * time.Minute),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stops := estimateFutureStops(paths, 0, test.offset)
+			if !stops[0].ArrivalTime.Equal(test.wantTimedArrival) || !stops[0].DepartureTime.Equal(test.wantTimedDeparture) {
+				t.Fatalf("timed stop = arrival %s, departure %s; want arrival %s, departure %s", stops[0].ArrivalTime, stops[0].DepartureTime, test.wantTimedArrival, test.wantTimedDeparture)
+			}
+			if !stops[1].ArrivalTime.Equal(test.wantDownstreamArrival) {
+				t.Fatalf("downstream arrival = %s, want %s", stops[1].ArrivalTime, test.wantDownstreamArrival)
+			}
+		})
+	}
+}
+
 func TestJourneyStopOccurrenceIndexHandlesRepeatedStop(t *testing.T) {
 	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
 		{OriginStopRef: "waterloo", DestinationStopRef: "vauxhall"},

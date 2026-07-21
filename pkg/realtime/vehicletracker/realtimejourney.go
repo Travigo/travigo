@@ -108,35 +108,13 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			offset = time.Duration(0)
 		}
 
-		// Calculate all the estimated stop arrival & departure times
-		for i := closestDistanceJourneyPathIndex; i < len(realtimeJourney.Journey.Path); i++ {
+		// Calculate all the estimated stop arrival & departure times. A vehicle
+		// cannot leave a timed stop before its scheduled departure, so its delay
+		// can be absorbed by scheduled dwell time before calculating later calls.
+		for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, closestDistanceJourneyPathIndex, offset) {
 			// Don't update the database if theres no actual change
 			if (offset.Seconds() == realtimeJourney.Offset.Seconds()) && !newRealtimeJourney {
 				break
-			}
-
-			path := realtimeJourney.Journey.Path[i]
-
-			arrivalTime := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
-			var departureTime time.Time
-
-			if i < len(realtimeJourney.Journey.Path)-1 {
-				nextPath := realtimeJourney.Journey.Path[i+1]
-
-				if arrivalTime.Before(nextPath.OriginDepartureTime) {
-					departureTime = nextPath.OriginDepartureTime
-				} else {
-					departureTime = arrivalTime
-				}
-			}
-
-			stopUpdate := &ctdf.RealtimeJourneyStops{
-				StopRef:          path.DestinationStopRef,
-				JourneyStopIndex: i + 1,
-				TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
-
-				ArrivalTime:   arrivalTime,
-				DepartureTime: departureTime,
 			}
 			journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
 		}
@@ -282,6 +260,36 @@ func serviceTimeOnDate(serviceDate time.Time, serviceTime time.Time, location *t
 	serviceDayStart := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 0, 0, 0, 0, location)
 	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
 	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
+}
+
+func estimateFutureStops(paths []*ctdf.JourneyPathItem, startIndex int, offset time.Duration) []*ctdf.RealtimeJourneyStops {
+	stops := make([]*ctdf.RealtimeJourneyStops, 0, len(paths)-startIndex)
+	projectedOffset := offset
+
+	for i := startIndex; i < len(paths); i++ {
+		path := paths[i]
+		arrivalTime := path.DestinationArrivalTime.Add(projectedOffset).Round(time.Minute)
+		departureTime := time.Time{}
+
+		if i < len(paths)-1 {
+			scheduledDepartureTime := paths[i+1].OriginDepartureTime
+			departureTime = scheduledDepartureTime
+			if arrivalTime.After(departureTime) {
+				departureTime = arrivalTime
+			}
+			projectedOffset = departureTime.Sub(scheduledDepartureTime)
+		}
+
+		stops = append(stops, &ctdf.RealtimeJourneyStops{
+			StopRef:          path.DestinationStopRef,
+			JourneyStopIndex: i + 1,
+			TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+			ArrivalTime:      arrivalTime,
+			DepartureTime:    departureTime,
+		})
+	}
+
+	return stops
 }
 
 func absDuration(value time.Duration) time.Duration {
