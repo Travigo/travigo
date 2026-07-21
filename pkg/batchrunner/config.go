@@ -19,6 +19,7 @@ type Config struct {
 	AllowConcurrentRuns      bool
 
 	BodsAPIKeySecret                string
+	TfLAPIKeySecret                 string
 	IENationalTransportAPIKeySecret string
 	NationalRailCredentialsSecret   string
 	NetworkRailCredentialsSecret    string
@@ -47,6 +48,7 @@ func ConfigFromEnv() Config {
 		AllowConcurrentRuns:      os.Getenv("TRAVIGO_BATCH_ALLOW_CONCURRENT_RUNS") == "true",
 
 		BodsAPIKeySecret:                envOrDefault("TRAVIGO_BATCH_BODS_API_KEY_SECRET", "travigo-bods-api"),
+		TfLAPIKeySecret:                 envOrDefault("TRAVIGO_BATCH_TFL_API_KEY_SECRET", "travigo-tfl-api-key"),
 		IENationalTransportAPIKeySecret: envOrDefault("TRAVIGO_BATCH_IE_NATIONALTRANSPORT_API_KEY_SECRET", "travigo-ie-nationaltransport-api"),
 		NationalRailCredentialsSecret:   envOrDefault("TRAVIGO_BATCH_NATIONALRAIL_CREDENTIALS_SECRET", "travigo-nationalrail-credentials"),
 		NetworkRailCredentialsSecret:    envOrDefault("TRAVIGO_BATCH_NETWORKRAIL_CREDENTIALS_SECRET", "travigo-networkrail-credentials"),

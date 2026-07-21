@@ -9,9 +9,11 @@ import (
 )
 
 const postProcessingGroup = "post-processing"
+const enrichmentGroup = "enrichment"
 
-var datasetSizes = []string{"small", "medium", "large"}
-var planGroupOrder = []string{"small", "medium", "large", postProcessingGroup}
+var datasetSizes = []string{"small", "medium", "large", enrichmentGroup}
+var initialDatasetSizes = []string{"small", "medium", "large"}
+var planGroupOrder = []string{"small", "medium", "large", postProcessingGroup, enrichmentGroup}
 
 type fixedTaskDefinition struct {
 	id   string

@@ -1,6 +1,7 @@
 package tflarrivals
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/journeytracks"
 )
 
 type TfLMode struct {
@@ -22,6 +24,41 @@ type TfLMode struct {
 
 	ArrivalRefreshRate    time.Duration
 	DisruptionRefreshRate time.Duration
+}
+
+func (m *TfLMode) LoadImportedRouteTracks() error {
+	for _, line := range m.Lines {
+		line.OrderedLineRoutes = nil
+	}
+
+	routes, err := journeytracks.Load(context.Background(), journeytracks.Filter{
+		DatasetID:  "gb-tfl-route-tracks",
+		Attributes: map[string]string{"mode": m.ModeID},
+	})
+	if err != nil {
+		return err
+	}
+	for _, importedRoute := range routes {
+		metadata := importedRoute.Metadata
+		lineID := metadata.Attributes["line"]
+		if m.Lines[lineID] == nil {
+			continue
+		}
+		route := OrderedLineRoute{Name: metadata.RouteName, NaptanIDs: metadata.ExternalStopRefs, Direction: metadata.Direction}
+		route.LegTracks = make([][]ctdf.Location, len(metadata.ExternalStopRefs)-1)
+		route.LegTrackRefs = make([]string, len(metadata.ExternalStopRefs)-1)
+		for legIndex, journeyTrack := range importedRoute.Legs {
+			if legIndex >= 0 && legIndex < len(route.LegTracks) {
+				route.LegTracks[legIndex] = journeyTrack.Track
+				route.LegTrackRefs[legIndex] = journeyTrack.PrimaryIdentifier
+			}
+		}
+		m.Lines[lineID].OrderedLineRoutes = append(m.Lines[lineID].OrderedLineRoutes, route)
+	}
+	for _, line := range m.Lines {
+		line.StopOccurrenceLimits = tflRouteStopOccurrenceLimits(line.OrderedLineRoutes)
+	}
+	return nil
 }
 
 func (m *TfLMode) GetLines() {
@@ -49,6 +86,7 @@ func (m *TfLMode) GetLines() {
 
 	for _, line := range modeLines {
 		tflLine := &TfLLine{
+			ModeID:        m.ModeID,
 			LineID:        line.ID,
 			LineName:      line.Name,
 			TransportType: m.TransportType,

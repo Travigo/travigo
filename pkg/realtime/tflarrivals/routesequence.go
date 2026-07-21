@@ -1,11 +1,12 @@
 package tflarrivals
 
-type RouteSequenceResponse struct {
-	LineStrings       []string           `json:"lineStrings"`
-	OrderedLineRoutes []OrderedLineRoute `json:"orderedLineRoutes"`
-}
+import "github.com/travigo/travigo/pkg/ctdf"
 
 type OrderedLineRoute struct {
-	Name      string   `json:"name"`
-	NaptanIDs []string `json:"naptanIds"`
+	Name      string
+	NaptanIDs []string
+
+	Direction    string
+	LegTracks    [][]ctdf.Location
+	LegTrackRefs []string
 }

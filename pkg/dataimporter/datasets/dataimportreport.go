@@ -12,6 +12,7 @@ type DataImportReport struct {
 	ImportedStopGroups      int
 	ImportedServices        int
 	ImportedJourneys        int
+	ImportedJourneyTracks   int
 	ImportedOperators       int
 	ImportedOperationGroups int
 }

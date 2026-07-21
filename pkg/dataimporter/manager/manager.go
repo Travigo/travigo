@@ -28,7 +28,9 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
+	"github.com/travigo/travigo/pkg/dataimporter/tfltracks"
 	"github.com/travigo/travigo/pkg/datasetversion"
+	"github.com/travigo/travigo/pkg/journeytracks"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -89,6 +91,8 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		format = &cif.CommonInterfaceFormat{}
 	case datasets.DataSetFormatTransXChange:
 		format = &transxchange.TransXChange{}
+	case datasets.DataSetFormatTfLRouteTracks:
+		format = &tfltracks.Format{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}
@@ -135,6 +139,32 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		ProviderID:     dataset.DataSourceRef,
 		DatasetID:      dataset.Identifier,
 		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
+	}
+
+	format, err := createDatasetFormat(dataset)
+	if err != nil {
+		return err
+	}
+	if apiFormat, ok := format.(formats.APIFormat); ok {
+		importReport, err := apiFormat.ImportAPI(*dataset, datasource)
+		if err != nil {
+			return err
+		}
+		if dataset.SupportedObjects.JourneyTracks {
+			if err := applyJourneyTracks(datasource, !skipCleanup); err != nil {
+				return err
+			}
+		}
+		importReport = filterImportReport(importReport, dataset.SupportedObjects)
+		importReport.DatasetIdentifier = dataset.Identifier
+		importReport.CreationDateTime = time.Now()
+		importReport.RunTime = time.Since(importStartedAt)
+		if _, err := datasetImportReportCollection.InsertOne(context.Background(), importReport); err != nil {
+			return err
+		}
+		return datasetversion.Upsert(context.Background(), ctdf.DatasetVersion{
+			Dataset: dataset.Identifier, LastModified: time.Now(),
+		})
 	}
 
 	source := dataset.Source
@@ -232,6 +262,11 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		importReports[i] = importReport
 	}
 
+	if dataset.SupportedObjects.JourneyTracks {
+		if err := applyJourneyTracks(datasource, !skipCleanup); err != nil {
+			return err
+		}
+	}
 	if !skipCleanup {
 		if dataset.SupportedObjects.Stops {
 			cleanupOldRecords("stops_raw", datasource)
@@ -279,6 +314,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			importReport.ImportedStopGroups += report.ImportedStopGroups
 			importReport.ImportedServices += report.ImportedServices
 			importReport.ImportedJourneys += report.ImportedJourneys
+			importReport.ImportedJourneyTracks += report.ImportedJourneyTracks
 			importReport.ImportedOperators += report.ImportedOperators
 			importReport.ImportedOperationGroups += report.ImportedOperationGroups
 		}
@@ -286,6 +322,17 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		_, err = datasetImportReportCollection.InsertOne(context.Background(), importReport)
 	}
 
+	return nil
+}
+
+func applyJourneyTracks(datasource *ctdf.DataSourceReference, cleanup bool) error {
+	if err := journeytracks.ApplyDataset(context.Background(), datasource.DatasetID, datasource.Timestamp); err != nil {
+		return err
+	}
+	if cleanup {
+		cleanupOldRecords(journeytracks.RouteCollectionName, datasource)
+		cleanupOldRecords("journey_tracks", datasource)
+	}
 	return nil
 }
 
@@ -301,6 +348,9 @@ func filterImportReport(report datasets.DataImportReport, supported datasets.Sup
 	}
 	if !supported.Journeys {
 		report.ImportedJourneys = 0
+	}
+	if !supported.JourneyTracks {
+		report.ImportedJourneyTracks = 0
 	}
 	if !supported.Operators {
 		report.ImportedOperators = 0

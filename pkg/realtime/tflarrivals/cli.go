@@ -142,7 +142,7 @@ func RegisterCLI() *cli.Command {
 
 						RuntimeJourneyFilterProvider: loadTFLTrackerRuntimeJourneyFilter,
 					}
-					trackerManager.Run(false)
+					trackerManager.Run(true)
 
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "tfl-bus-queue",

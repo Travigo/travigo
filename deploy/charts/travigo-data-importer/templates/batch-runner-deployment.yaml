@@ -63,6 +63,8 @@ spec:
               value: {{ .Values.batchRunner.allowConcurrentRuns | quote }}
             - name: TRAVIGO_BATCH_BODS_API_KEY_SECRET
               value: {{ .Values.bods.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_TFL_API_KEY_SECRET
+              value: {{ .Values.tfl.apiKeySecret | quote }}
             - name: TRAVIGO_BATCH_IE_NATIONALTRANSPORT_API_KEY_SECRET
               value: {{ .Values.ie_nationaltransport.apiKeySecret | quote }}
             - name: TRAVIGO_BATCH_NATIONALRAIL_CREDENTIALS_SECRET

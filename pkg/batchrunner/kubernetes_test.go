@@ -100,6 +100,22 @@ func TestCreateJobSchedulesNonSmallTasksOnBatchImportNodes(t *testing.T) {
 	}
 }
 
+func TestChildJobReceivesTfLAPIKeySecret(t *testing.T) {
+	environment := childJobEnv(Config{TfLAPIKeySecret: "custom-tfl-secret"})
+	for _, variable := range environment {
+		if variable["name"] != "TRAVIGO_TFL_API_KEY" {
+			continue
+		}
+		valueFrom := variable["valueFrom"].(map[string]any)
+		secretRef := valueFrom["secretKeyRef"].(map[string]any)
+		if secretRef["name"] != "custom-tfl-secret" || secretRef["key"] != "api_key" {
+			t.Fatalf("TfL secret ref = %#v", secretRef)
+		}
+		return
+	}
+	t.Fatal("TRAVIGO_TFL_API_KEY was not added to child job environment")
+}
+
 func createJobPodSpec(t *testing.T, task *Task) map[string]any {
 	t.Helper()
 	var job map[string]any

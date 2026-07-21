@@ -232,6 +232,18 @@ func createJourneysIndexes() {
 	if err != nil {
 		log.Error().Err(err).Msg("Creating journey track indexes")
 	}
+	journeyTrackRoutesCollection := GetCollection("journey_track_routes")
+	_, err = journeyTrackRoutesCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
+		{Keys: bson.D{{Key: "routekey", Value: 1}, {Key: "legindex", Value: 1}}},
+		{Keys: bson.D{{Key: "servicerefs", Value: 1}}},
+		{Keys: bson.D{{Key: "servicenamekeys", Value: 1}, {Key: "transporttype", Value: 1}}},
+		{Keys: bson.D{{Key: "datasource.datasetid", Value: 1}, {Key: "datasource.timestamp", Value: 1}}},
+		{Keys: bson.D{{Key: "datasource.datasetid", Value: 1}, {Key: "attributes.mode", Value: 1}}},
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating journey track route indexes")
+	}
 
 	// Services
 	servicesCollection := GetCollection("services")

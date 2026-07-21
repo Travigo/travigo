@@ -20,6 +20,9 @@ elasticsearch:
 bods:
   apiKeySecret: travigo-bods-api
 
+tfl:
+  apiKeySecret: travigo-tfl-api-key
+
 ie_nationaltransport:
   apiKeySecret: travigo-ie-nationaltransport-api
 

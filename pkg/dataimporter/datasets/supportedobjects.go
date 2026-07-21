@@ -8,6 +8,7 @@ type SupportedObjects struct {
 	StopsDetailed  bool
 	Services       bool
 	Journeys       bool
+	JourneyTracks  bool
 
 	RealtimeJourneys bool
 	ServiceAlerts    bool

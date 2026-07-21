@@ -331,9 +331,10 @@ func (r *Runner) markTaskCancelled(run *Run, runMu *sync.Mutex, index int, messa
 func buildStages(tasks []Task) [][]int {
 	stages := [][]int{}
 	sizeIndexes := map[string][]int{
-		"small":  {},
-		"medium": {},
-		"large":  {},
+		"small":         {},
+		"medium":        {},
+		"large":         {},
+		enrichmentGroup: {},
 	}
 	for i, task := range tasks {
 		if task.Kind == TaskKindDataset {
@@ -344,12 +345,15 @@ func buildStages(tasks []Task) [][]int {
 	}
 
 	ordered := [][]int{}
-	for _, size := range datasetSizes {
+	for _, size := range initialDatasetSizes {
 		if len(sizeIndexes[size]) > 0 {
 			ordered = append(ordered, sizeIndexes[size])
 		}
 	}
 	ordered = append(ordered, stages...)
+	if len(sizeIndexes[enrichmentGroup]) > 0 {
+		ordered = append(ordered, sizeIndexes[enrichmentGroup])
+	}
 	return ordered
 }
 

@@ -107,6 +107,7 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 				OriginDepartureTime:    time.Date(2026, 7, 9, 12, 0, 30, 0, time.UTC),
 				OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
 				DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
+				TrackRef:               "realtime-tfl-route-track:test",
 			}},
 		},
 	}
@@ -138,6 +139,9 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 	}
 	if got, want := pathItem.OriginActivity, []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}; len(got) != 1 || got[0] != want[0] {
 		t.Errorf("origin activity = %v, want %v", got, want)
+	}
+	if got, want := pathItem.TrackRef, "realtime-tfl-route-track:test"; got != want {
+		t.Errorf("track reference = %q, want %q", got, want)
 	}
 }
 

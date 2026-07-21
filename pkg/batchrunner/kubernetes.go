@@ -518,6 +518,7 @@ func childJobEnv(config Config) []map[string]any {
 	return []map[string]any{
 		valueEnv("TRAVIGO_LOG_FORMAT", "JSON"),
 		secretEnv("TRAVIGO_BODS_API_KEY", config.BodsAPIKeySecret, "api_key", false),
+		secretEnv("TRAVIGO_TFL_API_KEY", config.TfLAPIKeySecret, "api_key", false),
 		secretEnv("TRAVIGO_IE_NATIONALTRANSPORT_API_KEY", config.IENationalTransportAPIKeySecret, "api_key", false),
 		secretEnv("TRAVIGO_NATIONALRAIL_USERNAME", config.NationalRailCredentialsSecret, "username", true),
 		secretEnv("TRAVIGO_NATIONALRAIL_PASSWORD", config.NationalRailCredentialsSecret, "password", true),

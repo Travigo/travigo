@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -46,8 +47,13 @@ func (l *ModeArrivalTracker) Run(getRoutes bool) {
 	// }
 
 	if getRoutes {
+		if err := l.Mode.LoadImportedRouteTracks(); err != nil {
+			log.Error().Err(err).
+				Str("id", l.Mode.ModeID).
+				Str("type", string(l.Mode.TransportType)).
+				Msg("Failed to load imported TfL route tracks")
+		}
 		for _, line := range l.Mode.Lines {
-			line.GetTfLRouteSequences()
 			if len(line.OrderedLineRoutes) == 0 {
 				log.Error().
 					Str("id", line.LineID).
@@ -326,6 +332,9 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// Identify the route the vehicle is on
 	var potentialOrderLineRouteMatches []OrderedLineRoute
 	for _, route := range line.OrderedLineRoutes {
+		if route.Direction != "" && predictions[0].Direction != "" && !strings.EqualFold(route.Direction, predictions[0].Direction) {
+			continue
+		}
 		routeOrderedNaptanIDs := route.NaptanIDs
 
 		// Reduce the route naptan ids so that it only contains the same stops in the predictions
@@ -367,28 +376,37 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// Work out the route the vehicle is on
 	var vehicleJourneyPath []*ctdf.JourneyPathItem
 	if len(potentialOrderLineRouteMatches) == 1 {
-		for i := 1; i < len(potentialOrderLineRouteMatches[0].NaptanIDs); i++ {
-			originTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i-1]
+		matchedRoute := potentialOrderLineRouteMatches[0]
+		for i := 1; i < len(matchedRoute.NaptanIDs); i++ {
+			originTfLID := matchedRoute.NaptanIDs[i-1]
 			originStop := getStopFromTfLStop(originTfLID)
 			if originStop == nil {
 				log.Error().Str("naptanid", originTfLID).Msg("Could not find stop for tfl stop")
 				continue
 			}
 
-			destinationTfLID := potentialOrderLineRouteMatches[0].NaptanIDs[i]
+			destinationTfLID := matchedRoute.NaptanIDs[i]
 			destinationStop := getStopFromTfLStop(destinationTfLID)
 			if destinationStop == nil {
 				log.Error().Str("naptanid", destinationTfLID).Msg("Could not find stop for tfl stop")
 				continue
 			}
 
-			vehicleJourneyPath = append(vehicleJourneyPath, &ctdf.JourneyPathItem{
+			pathItem := &ctdf.JourneyPathItem{
 				OriginStop:    originStop,
 				OriginStopRef: originStop.PrimaryIdentifier,
 
 				DestinationStop:    destinationStop,
 				DestinationStopRef: destinationStop.PrimaryIdentifier,
-			})
+			}
+			legIndex := i - 1
+			if legIndex < len(matchedRoute.LegTracks) {
+				pathItem.Track = matchedRoute.LegTracks[legIndex]
+			}
+			if legIndex < len(matchedRoute.LegTrackRefs) {
+				pathItem.TrackRef = matchedRoute.LegTrackRefs[legIndex]
+			}
+			vehicleJourneyPath = append(vehicleJourneyPath, pathItem)
 		}
 	} else {
 		log.Debug().

@@ -66,6 +66,7 @@ type storedJourneyPathItem struct {
 	DestinationDisplay     string                         `json:"dd,omitempty"`
 	OriginActivity         []ctdf.JourneyPathItemActivity `json:"ox,omitempty"`
 	DestinationActivity    []ctdf.JourneyPathItemActivity `json:"dx,omitempty"`
+	TrackRef               string                         `json:"tr,omitempty"`
 }
 
 type storedService struct {
@@ -183,6 +184,7 @@ func storedJourneyPathFromCTDF(path []*ctdf.JourneyPathItem) []storedJourneyPath
 			DestinationDisplay:     item.DestinationDisplay,
 			OriginActivity:         item.OriginActivity,
 			DestinationActivity:    item.DestinationActivity,
+			TrackRef:               item.TrackRef,
 		})
 	}
 
@@ -330,6 +332,7 @@ func (stored *storedJourney) path() []*ctdf.JourneyPathItem {
 			DestinationDisplay:     item.DestinationDisplay,
 			OriginActivity:         item.OriginActivity,
 			DestinationActivity:    item.DestinationActivity,
+			TrackRef:               item.TrackRef,
 		})
 	}
 

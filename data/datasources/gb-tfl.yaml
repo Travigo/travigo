@@ -15,3 +15,10 @@ datasets:
       api_key: TRAVIGO_TFL_API_KEY
   linkeddataset: gb-dft-bods-gtfs-schedule-*
   importdestination: specific-runner
+- identifier: route-tracks
+  format: gb-tfl-route-tracks
+  datasetsize: enrichment
+  supportedobjects:
+    journeytracks: true
+  customconfig:
+    modes: tube,dlr,tram,river-bus,cable-car,overground,elizabeth-line,national-rail,bus

@@ -56,6 +56,7 @@ const (
 	DataSetFormatSiriSX                          = "eu-siri-sx"
 	DataSetFormatGTFSSchedule                    = "gtfs-schedule"
 	DataSetFormatGTFSRealtime                    = "gtfs-realtime"
+	DataSetFormatTfLRouteTracks                  = "gb-tfl-route-tracks"
 )
 
 type Provider struct {

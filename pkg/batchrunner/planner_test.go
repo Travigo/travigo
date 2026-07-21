@@ -1,6 +1,9 @@
 package batchrunner
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestBuildRunTasksDatasetSelection(t *testing.T) {
 	plan := Plan{
@@ -44,14 +47,15 @@ func TestBuildStages(t *testing.T) {
 		{ID: "large-a", Kind: TaskKindDataset, Size: "large"},
 		{ID: "medium-a", Kind: TaskKindDataset, Size: "medium"},
 		{ID: "link-stops", Kind: TaskKindLinkStops},
+		{ID: "enrich-a", Kind: TaskKindDataset, Size: enrichmentGroup},
 	}
 
 	stages := buildStages(tasks)
-	if len(stages) != 4 {
-		t.Fatalf("expected 4 stages, got %d", len(stages))
+	if len(stages) != 5 {
+		t.Fatalf("expected 5 stages, got %d", len(stages))
 	}
 
-	expected := [][]int{{0}, {2}, {1}, {3}}
+	expected := [][]int{{0}, {2}, {1}, {3}, {4}}
 	for i := range expected {
 		if len(stages[i]) != len(expected[i]) {
 			t.Fatalf("stage %d length mismatch", i)
@@ -61,6 +65,29 @@ func TestBuildStages(t *testing.T) {
 				t.Fatalf("stage %d index %d: expected %d, got %d", i, j, expected[i][j], stages[i][j])
 			}
 		}
+	}
+}
+
+func TestBuildPlanIncludesTfLRouteTracks(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir("../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(workingDirectory)
+
+	plan := BuildPlan()
+	found := false
+	for _, task := range plan.Groups[enrichmentGroup] {
+		if task.Identifier == "gb-tfl-route-tracks" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("TfL route tracks dataset was not included in the normal enrichment batch stage")
 	}
 }
 
