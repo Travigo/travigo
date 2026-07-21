@@ -2,6 +2,7 @@ package transxchange
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math"
@@ -99,6 +100,55 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	routeSectionReferences := map[string]*RouteSection{}
 	for _, routeSection := range doc.RouteSections {
 		routeSectionReferences[routeSection.ID] = routeSection
+	}
+
+	// TransXChange route links are shared by many journeys. Store their geometry
+	// once and let journey path items reference it, matching the GTFS track model.
+	journeyTrackRefs := map[string]string{}
+	journeyTrackModels := []mongo.WriteModel{}
+	journeyTrackSeen := map[string]bool{}
+	flushJourneyTracks := func() error {
+		if len(journeyTrackModels) == 0 {
+			return nil
+		}
+		_, err := database.GetCollection("journey_tracks").BulkWrite(context.Background(), journeyTrackModels)
+		journeyTrackModels = journeyTrackModels[:0]
+		return err
+	}
+	for _, routeSection := range doc.RouteSections {
+		for index := range routeSection.RouteLinks {
+			routeLink := &routeSection.RouteLinks[index]
+			if journeyTrackSeen[routeLink.ID] {
+				continue
+			}
+			journeyTrackSeen[routeLink.ID] = true
+			track := transXChangeRouteLinkTrack(routeLink)
+			if len(track) < 2 {
+				continue
+			}
+			trackRef := transXChangeTrackIdentifier(dataset.Identifier, routeLink.ID)
+			journeyTrackRefs[routeLink.ID] = trackRef
+			now := time.Now()
+			journeyTrack := &ctdf.JourneyTrack{
+				PrimaryIdentifier:    trackRef,
+				Track:                track,
+				DataSource:           datasource,
+				CreationDateTime:     now,
+				ModificationDateTime: now,
+			}
+			journeyTrackModels = append(journeyTrackModels, mongo.NewUpdateOneModel().
+				SetFilter(bson.M{"primaryidentifier": trackRef}).
+				SetUpdate(bson.M{"$set": journeyTrack}).
+				SetUpsert(true))
+			if len(journeyTrackModels) == 500 {
+				if err := flushJourneyTracks(); err != nil {
+					return datasets.DataImportReport{}, fmt.Errorf("store TransXChange journey tracks: %w", err)
+				}
+			}
+		}
+	}
+	if err := flushJourneyTracks(); err != nil {
+		return datasets.DataImportReport{}, fmt.Errorf("store TransXChange journey tracks: %w", err)
 	}
 
 	// Get CTDF services from TransXChange Services & Lines
@@ -620,41 +670,6 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}
 					}
 
-					// Convert the track
-					var track []ctdf.Location
-					for _, point := range routeLink.Track {
-						// Have a wide range of different places the location can be defined
-						longitude := point.Longitude
-						latitude := point.Latitude
-
-						if longitude == 0 && point.Translation.Longitude != 0 {
-							longitude = point.Translation.Longitude
-						}
-
-						if latitude == 0 && point.Translation.Latitude != 0 {
-							latitude = point.Translation.Latitude
-						}
-
-						if longitude == 0 && latitude == 0 && point.Easting != "" && point.Northing != "" {
-							gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Easting, point.Northing))
-							if err == nil {
-								latitude, longitude = gridRef.ToLatLon()
-							}
-						}
-
-						if longitude == 0 && latitude == 0 && point.Translation.Easting != "" && point.Translation.Northing != "" {
-							gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Translation.Easting, point.Translation.Northing))
-							if err == nil {
-								latitude, longitude = gridRef.ToLatLon()
-							}
-						}
-
-						track = append(track, ctdf.Location{
-							Type:        "Point",
-							Coordinates: []float64{longitude, latitude},
-						})
-					}
-
 					pathItem := ctdf.JourneyPathItem{
 						OriginStopRef:      fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.From.StopPointRef),
 						DestinationStopRef: fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.To.StopPointRef),
@@ -671,7 +686,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						OriginActivity:      originActivity,
 						DestinationActivity: destinationActivity,
 
-						Track: track,
+						TrackRef: journeyTrackRefs[routeLink.ID],
 					}
 
 					ctdfJourney.Path = append(ctdfJourney.Path, &pathItem)
@@ -727,6 +742,39 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 		ImportedJourneys: int(journeyOperationInsert + journeyOperationUpdate),
 		ImportedServices: int(serviceOperationInsert + serviceOperationUpdate),
 	}, nil
+}
+
+func transXChangeTrackIdentifier(datasetID string, routeLinkID string) string {
+	hash := sha256.Sum256([]byte(routeLinkID))
+	return fmt.Sprintf("%s-journey-track-%x", datasetID, hash)
+}
+
+func transXChangeRouteLinkTrack(routeLink *RouteLink) []ctdf.Location {
+	track := make([]ctdf.Location, 0, len(routeLink.Track))
+	for _, point := range routeLink.Track {
+		// TransXChange permits WGS84 coordinates, translated coordinates, or
+		// British National Grid coordinates for the same mapping point.
+		longitude := point.Longitude
+		latitude := point.Latitude
+		if longitude == 0 && point.Translation.Longitude != 0 {
+			longitude = point.Translation.Longitude
+		}
+		if latitude == 0 && point.Translation.Latitude != 0 {
+			latitude = point.Translation.Latitude
+		}
+		if longitude == 0 && latitude == 0 && point.Easting != "" && point.Northing != "" {
+			if gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Easting, point.Northing)); err == nil {
+				latitude, longitude = gridRef.ToLatLon()
+			}
+		}
+		if longitude == 0 && latitude == 0 && point.Translation.Easting != "" && point.Translation.Northing != "" {
+			if gridRef, err := osgridref.ParseOsGridRef(fmt.Sprintf("%s,%s", point.Translation.Easting, point.Translation.Northing)); err == nil {
+				latitude, longitude = gridRef.ToLatLon()
+			}
+		}
+		track = append(track, ctdf.Location{Type: "Point", Coordinates: []float64{longitude, latitude}})
+	}
+	return track
 }
 
 func preloadTransXChangeServices(ctx context.Context, collection *mongo.Collection, doc *TransXChange, operatorLocalMapping map[string]string) (map[string]*ctdf.Service, error) {
