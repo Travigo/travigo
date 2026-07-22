@@ -96,7 +96,7 @@ func (stop *Stop) GetAllStopIDs() []string {
 }
 
 func (stop *Stop) UpdateNameFromServiceOverrides(service *Service) {
-	if service == nil {
+	if stop == nil || service == nil {
 		return
 	}
 

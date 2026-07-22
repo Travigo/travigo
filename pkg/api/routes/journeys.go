@@ -56,10 +56,7 @@ func getJourney(c *fiber.Ctx) error {
 				}, journey.RealtimeJourney)
 			}
 		} else {
-			// for _, pathItem := range journey.Path {
-			// 	pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
-			// 	pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
-			// }
+			applyJourneyServiceStopNameOverrides(journey)
 
 			transforms.Transform(journey.Service, 1)
 			transforms.Transform(journey.DetailedRailInformation, 1)
@@ -77,5 +74,20 @@ func getJourney(c *fiber.Ctx) error {
 		}
 
 		return c.JSON(journeyReduced)
+	}
+}
+
+func applyJourneyServiceStopNameOverrides(journey *ctdf.Journey) {
+	if journey == nil {
+		return
+	}
+
+	for _, pathItem := range journey.Path {
+		if pathItem == nil {
+			continue
+		}
+
+		pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
+		pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
 	}
 }
