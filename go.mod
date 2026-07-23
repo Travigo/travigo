@@ -38,6 +38,7 @@ require (
 	github.com/auth0/go-jwt-middleware/v2 v2.3.1
 	github.com/gocarina/gocsv v0.0.0-20240520201108-78e41c74b4b1
 	github.com/neo4j/neo4j-go-driver/v5 v5.28.4
+	github.com/qedus/osmpbf v1.2.0
 	github.com/travigo/go-csv v1.0.2
 )
 

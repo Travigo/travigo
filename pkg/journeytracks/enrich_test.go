@@ -30,3 +30,28 @@ func TestApplyBestRouteAssignsTrackReferencesToScheduledJourneyLegs(t *testing.T
 		t.Fatalf("timetable track was overwritten: %q", journey.Path[1].TrackRef)
 	}
 }
+
+func TestIndexRoutesByEndpointsIncludesSubsequencesAndAliases(t *testing.T) {
+	route := Route{Metadata: RouteLeg{
+		RouteKey: "route",
+		RouteStopIdentifiers: [][]string{
+			{"a", "alias-a"},
+			{"b"},
+			{"c", "alias-c"},
+		},
+	}}
+	index := indexRoutesByEndpoints([]Route{route})
+
+	for _, key := range []string{
+		routeEndpointKey("a", "c"),
+		routeEndpointKey("alias-a", "alias-c"),
+		routeEndpointKey("b", "c"),
+	} {
+		if len(index[key]) != 1 || index[key][0].Metadata.RouteKey != "route" {
+			t.Fatalf("route missing from endpoint index for %q", key)
+		}
+	}
+	if len(index[routeEndpointKey("c", "a")]) != 0 {
+		t.Fatal("route was indexed in the wrong direction")
+	}
+}

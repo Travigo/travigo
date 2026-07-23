@@ -10,3 +10,12 @@ datasets:
   supportedobjects:
     stopsdetailed: true
   importdestination: specific-runner
+- identifier: gb-national-rail-tracks
+  format: gb-osm-rail-tracks
+  source: "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf"
+  datasetsize: enrichment
+  supportedobjects:
+    journeytracks: true
+  linkeddataset: gb-nationalrail-timetable
+  customconfig:
+    maximumsnapdistancemetres: "2500"

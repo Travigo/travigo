@@ -28,6 +28,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/siri_vm"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/transxchange"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/travelinenoc"
+	"github.com/travigo/travigo/pkg/dataimporter/osmrailtracks"
 	"github.com/travigo/travigo/pkg/dataimporter/tfltracks"
 	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/journeytracks"
@@ -93,6 +94,8 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		format = &transxchange.TransXChange{}
 	case datasets.DataSetFormatTfLRouteTracks:
 		format = &tfltracks.Format{}
+	case datasets.DataSetFormatOSMRailTracks:
+		format = &osmrailtracks.Format{}
 	default:
 		return nil, errors.New(fmt.Sprintf("Unrecognised format %s", dataset.Format))
 	}

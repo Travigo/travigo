@@ -57,6 +57,7 @@ const (
 	DataSetFormatGTFSSchedule                    = "gtfs-schedule"
 	DataSetFormatGTFSRealtime                    = "gtfs-realtime"
 	DataSetFormatTfLRouteTracks                  = "gb-tfl-route-tracks"
+	DataSetFormatOSMRailTracks                   = "gb-osm-rail-tracks"
 )
 
 type Provider struct {

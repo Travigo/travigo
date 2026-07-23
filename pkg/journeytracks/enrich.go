@@ -168,6 +168,7 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}) 
 }
 
 func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route) error {
+	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
 	cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
 	if err != nil {
 		return err
@@ -179,7 +180,12 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		if err := cursor.Decode(&journey); err != nil {
 			return err
 		}
-		changed, err := ApplyBestRoute(ctx, &journey, candidates)
+		journeyStops := JourneyStops(journey.Path)
+		if len(journeyStops) < 2 {
+			continue
+		}
+		journeyCandidates := candidatesByEndpoints[routeEndpointKey(journeyStops[0], journeyStops[len(journeyStops)-1])]
+		changed, err := ApplyBestRoute(ctx, &journey, journeyCandidates)
 		if err != nil {
 			return err
 		}
@@ -194,6 +200,36 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		_, err = database.GetCollection("journeys").BulkWrite(ctx, models)
 	}
 	return err
+}
+
+func indexRoutesByEndpoints(routes []Route) map[string][]Route {
+	index := map[string][]Route{}
+	seen := map[string]map[string]struct{}{}
+	for _, route := range routes {
+		stops := route.Metadata.RouteStopIdentifiers
+		for originIndex := 0; originIndex+1 < len(stops); originIndex++ {
+			for destinationIndex := originIndex + 1; destinationIndex < len(stops); destinationIndex++ {
+				for _, originRef := range stops[originIndex] {
+					for _, destinationRef := range stops[destinationIndex] {
+						key := routeEndpointKey(originRef, destinationRef)
+						if seen[key] == nil {
+							seen[key] = map[string]struct{}{}
+						}
+						if _, exists := seen[key][route.Metadata.RouteKey]; exists {
+							continue
+						}
+						seen[key][route.Metadata.RouteKey] = struct{}{}
+						index[key] = append(index[key], route)
+					}
+				}
+			}
+		}
+	}
+	return index
+}
+
+func routeEndpointKey(originStopRef, destinationStopRef string) string {
+	return originStopRef + "\x00" + destinationStopRef
 }
 
 func journeyPathUpdate(journey *ctdf.Journey) mongo.WriteModel {

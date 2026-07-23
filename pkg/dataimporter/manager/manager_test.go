@@ -53,3 +53,28 @@ func TestTfLRouteTracksIsARegisteredBatchDataset(t *testing.T) {
 		t.Fatalf("dataset is not configured as a journey-track enrichment import: %+v", dataset)
 	}
 }
+
+func TestOSMRailTracksIsARegisteredBatchDataset(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir("../../.."); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(workingDirectory)
+
+	dataset, err := GetDataset("global-openstreetmap-gb-national-rail-tracks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dataset.Format != datasets.DataSetFormatOSMRailTracks {
+		t.Fatalf("format = %q", dataset.Format)
+	}
+	if dataset.DatasetSize != "enrichment" || !dataset.SupportedObjects.JourneyTracks {
+		t.Fatalf("dataset is not configured as a journey-track enrichment import: %+v", dataset)
+	}
+	if dataset.LinkedDataset != "gb-nationalrail-timetable" {
+		t.Fatalf("linked dataset = %q", dataset.LinkedDataset)
+	}
+}
