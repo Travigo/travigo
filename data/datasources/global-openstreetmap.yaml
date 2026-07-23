@@ -14,6 +14,7 @@ datasets:
   format: gb-osm-rail-tracks
   source: "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf"
   datasetsize: enrichment
+  refreshinterval: 168h
   supportedobjects:
     journeytracks: true
   linkeddataset: gb-nationalrail-timetable

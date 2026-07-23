@@ -130,6 +130,15 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	var existingDatasetVersion *ctdf.DatasetVersion
 	datasetVersionCollection.FindOne(context.Background(), bson.M{"dataset": dataset.Identifier}).Decode(&existingDatasetVersion)
 
+	if shouldSkipFreshDataset(dataset, existingDatasetVersion, forceImport, importStartedAt) {
+		log.Info().
+			Str("dataset", dataset.Identifier).
+			Time("last_modified", existingDatasetVersion.LastModified).
+			Dur("refresh_interval", dataset.RefreshInterval).
+			Msg("Dataset version is still fresh, skipping import")
+		return nil
+	}
+
 	var existingEtag string
 	if existingDatasetVersion != nil && !forceImport {
 		log.Info().Interface("version", existingDatasetVersion).Msg("Existing dataset version found")
@@ -326,6 +335,13 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	return nil
+}
+
+func shouldSkipFreshDataset(dataset *datasets.DataSet, version *ctdf.DatasetVersion, forceImport bool, now time.Time) bool {
+	if forceImport || version == nil || dataset.RefreshInterval <= 0 || version.LastModified.IsZero() {
+		return false
+	}
+	return version.LastModified.Add(dataset.RefreshInterval).After(now)
 }
 
 func applyJourneyTracks(datasource *ctdf.DataSourceReference, cleanup bool) error {

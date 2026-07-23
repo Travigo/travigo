@@ -18,6 +18,7 @@ datasets:
 - identifier: route-tracks
   format: gb-tfl-route-tracks
   datasetsize: enrichment
+  refreshinterval: 168h
   supportedobjects:
     journeytracks: true
   customconfig:
