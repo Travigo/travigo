@@ -1,6 +1,7 @@
 package batchrunner
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha1"
@@ -17,6 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type TaskExecutor interface {
@@ -68,17 +71,25 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 		return 1, err
 	}
 
-	logDone := make(chan struct{})
+	logContext, cancelLog := context.WithCancel(ctx)
+	defer cancelLog()
+	jobDone := make(chan struct{})
+	logDone := make(chan error, 1)
 	go func() {
-		defer close(logDone)
-		e.client.streamPodLogs(ctx, podName, logPath)
+		logDone <- e.client.streamPodLogs(logContext, podName, logPath, jobDone)
 	}()
 
 	exitCode, waitErr := e.client.waitForJobCompletion(ctx, jobName, updatePodStatus)
+	close(jobDone)
 	select {
-	case <-logDone:
+	case logErr := <-logDone:
+		if logErr != nil {
+			log.Warn().Err(logErr).Str("job", jobName).Str("pod", podName).Msg("Pod log stream ended with an error")
+		}
 	case <-time.After(10 * time.Second):
+		log.Warn().Str("job", jobName).Str("pod", podName).Msg("Timed out waiting for pod log stream to finish")
 	}
+	cancelLog()
 
 	if ctx.Err() != nil {
 		reportPodStatus(updatePodStatus, PodStatusTerminating)
@@ -120,6 +131,8 @@ type kubernetesClient struct {
 	baseURL   string
 	token     string
 	http      *http.Client
+
+	logRetryInterval time.Duration
 }
 
 func newKubernetesClient(namespace string) (*kubernetesClient, error) {
@@ -248,7 +261,10 @@ func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string, up
 			return "", err
 		}
 		reportPodStatus(updatePodStatus, status)
-		if podName != "" {
+		// A Pod object exists while it is still unscheduled or its container is
+		// waiting to start. Starting a follow request at that point can produce
+		// a successful but empty response and lose the live stream.
+		if podReadyForLogs(podName, status) {
 			return podName, nil
 		}
 
@@ -258,6 +274,10 @@ func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string, up
 		case <-ticker.C:
 		}
 	}
+}
+
+func podReadyForLogs(podName string, status PodStatus) bool {
+	return podName != "" && status != PodStatusPending
 }
 
 func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (int, error) {
@@ -348,51 +368,99 @@ func (c *kubernetesClient) listJobPods(ctx context.Context, jobName string) (*ku
 	return &pods, nil
 }
 
-func (c *kubernetesClient) streamPodLogs(ctx context.Context, podName string, logPath string) {
+func (c *kubernetesClient) streamPodLogs(ctx context.Context, podName string, logPath string, jobDone <-chan struct{}) error {
+	var lastTimestamp time.Time
 	for {
-		err := c.copyPodLogs(ctx, podName, logPath, true)
-		if err == nil || ctx.Err() != nil {
-			return
+		nextTimestamp, err := c.copyPodLogs(ctx, podName, logPath, true, lastTimestamp)
+		if nextTimestamp.After(lastTimestamp) {
+			lastTimestamp = nextTimestamp
 		}
-		time.Sleep(2 * time.Second)
+		if ctx.Err() != nil {
+			return nil
+		}
+		select {
+		case <-jobDone:
+			_, finalErr := c.copyPodLogs(ctx, podName, logPath, false, lastTimestamp)
+			return finalErr
+		default:
+		}
+		if err != nil {
+			log.Warn().Err(err).Str("pod", podName).Msg("Retrying pod log stream")
+		}
+
+		retryInterval := c.logRetryInterval
+		if retryInterval <= 0 {
+			retryInterval = 2 * time.Second
+		}
+		timer := time.NewTimer(retryInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil
+		case <-jobDone:
+			timer.Stop()
+			_, finalErr := c.copyPodLogs(ctx, podName, logPath, false, lastTimestamp)
+			return finalErr
+		case <-timer.C:
+		}
 	}
 }
 
-func (c *kubernetesClient) copyPodLogs(ctx context.Context, podName string, logPath string, follow bool) error {
+func (c *kubernetesClient) copyPodLogs(ctx context.Context, podName string, logPath string, follow bool, since time.Time) (time.Time, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		return err
+		return since, err
 	}
 
 	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		return err
+		return since, err
 	}
 	defer file.Close()
 
 	query := url.Values{}
 	query.Set("container", "main")
+	query.Set("timestamps", "true")
 	if follow {
 		query.Set("follow", "true")
+	}
+	if !since.IsZero() {
+		query.Set("sinceTime", since.Add(time.Nanosecond).Format(time.RFC3339Nano))
 	}
 
 	req, err := c.newRequest(ctx, http.MethodGet, fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/log?%s", c.namespace, podName, query.Encode()), nil)
 	if err != nil {
-		return err
+		return since, err
 	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return since, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("kubernetes logs request failed: %s: %s", resp.Status, string(data))
+		return since, fmt.Errorf("kubernetes logs request failed: %s: %s", resp.Status, string(data))
 	}
 
-	_, err = io.Copy(file, resp.Body)
-	return err
+	scanner := bufio.NewScanner(resp.Body)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	lastTimestamp := since
+	for scanner.Scan() {
+		timestampText, message, found := strings.Cut(scanner.Text(), " ")
+		if !found {
+			continue
+		}
+		timestamp, err := time.Parse(time.RFC3339Nano, timestampText)
+		if err != nil || !timestamp.After(lastTimestamp) {
+			continue
+		}
+		if _, err := file.WriteString(message + "\n"); err != nil {
+			return lastTimestamp, err
+		}
+		lastTimestamp = timestamp
+	}
+	return lastTimestamp, scanner.Err()
 }
 
 func (c *kubernetesClient) deleteJob(ctx context.Context, name string) error {

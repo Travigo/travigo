@@ -5,7 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestEnsureJobReusesExistingJob(t *testing.T) {
@@ -71,6 +76,74 @@ func TestFindJobPodReportsTerminatingStatus(t *testing.T) {
 	}
 	if podName != "terminating-pod" || status != PodStatusTerminating {
 		t.Fatalf("pod = %q, status = %q; want terminating-pod, terminating", podName, status)
+	}
+}
+
+func TestPodReadyForLogsWaitsForRunningContainer(t *testing.T) {
+	if podReadyForLogs("pending-pod", PodStatusPending) {
+		t.Fatal("pending pod was considered ready for logs")
+	}
+	if !podReadyForLogs("running-pod", PodStatusRunning) {
+		t.Fatal("running pod was not considered ready for logs")
+	}
+}
+
+func TestStreamPodLogsReconnectsAfterEmptyResponseWithoutDuplicates(t *testing.T) {
+	var requests int
+	var closeDone sync.Once
+	jobDone := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.URL.Path != "/api/v1/namespaces/default/pods/test-pod/log" {
+			t.Fatalf("request path = %s", r.URL.Path)
+		}
+		if r.URL.Query().Get("timestamps") != "true" {
+			t.Fatal("log request did not enable Kubernetes timestamps")
+		}
+		switch requests {
+		case 1:
+			// This is the production race: Kubernetes can successfully close
+			// an empty follow request while the container is starting.
+		case 2:
+			_, _ = w.Write([]byte(
+				"2026-07-23T21:02:26.000000001Z one\n" +
+					"2026-07-23T21:02:26.000000002Z two\n",
+			))
+			closeDone.Do(func() { close(jobDone) })
+		default:
+			if r.URL.Query().Get("follow") != "" {
+				t.Fatal("final log catch-up request must not follow")
+			}
+			if !strings.Contains(r.URL.Query().Get("sinceTime"), "2026-07-23T21:02:26.000000003Z") {
+				t.Fatalf("sinceTime = %q", r.URL.Query().Get("sinceTime"))
+			}
+			_, _ = w.Write([]byte(
+				"2026-07-23T21:02:26.000000002Z two\n" +
+					"2026-07-23T21:02:26.000000003Z three\n",
+			))
+		}
+	}))
+	defer server.Close()
+
+	logPath := filepath.Join(t.TempDir(), "task.log")
+	client := &kubernetesClient{
+		namespace:        "default",
+		baseURL:          server.URL,
+		http:             server.Client(),
+		logRetryInterval: time.Millisecond,
+	}
+	if err := client.streamPodLogs(context.Background(), "test-pod", logPath, jobDone); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), "one\ntwo\nthree\n"; got != want {
+		t.Fatalf("log = %q, want %q", got, want)
+	}
+	if requests != 3 {
+		t.Fatalf("requests = %d, want 3", requests)
 	}
 }
 
