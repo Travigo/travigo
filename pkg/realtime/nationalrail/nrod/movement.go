@@ -74,10 +74,12 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	if m.EventType == "DEPARTURE" {
 		matchedJourneyStop := false
+
 		for pathIndex, path := range realtimeJourney.Journey.Path {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
 				matchedJourneyStop = true
 				journeyStop := realtimeJourney.RealtimeStop(path.OriginStopRef, pathIndex)
+
 				if journeyStop != nil && !journeyStop.DepartureTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 					continue
 				}
@@ -119,7 +121,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.DestinationStopRef, JourneyStopIndex: journeyStopIndex}
 			}
 			journeyStop.ArrivalTime = now
-			journeyStop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
+
 			realtimeJourney.SetRealtimeStop(journeyStop)
 			break
 		}
