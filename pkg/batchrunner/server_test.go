@@ -31,6 +31,7 @@ func TestServerIsAPIOnlyWithoutDuplicateAPIPrefix(t *testing.T) {
 }
 
 func TestServerRequiresAdminPermission(t *testing.T) {
+	t.Setenv("TRAVIGO_BATCH_RUNNER_AUTH_TOKEN", "")
 	handler := NewServer(nil, nil).handlerWithTokenValidator(func(_ context.Context, token string) ([]string, error) {
 		switch token {
 		case "admin":
@@ -62,6 +63,21 @@ func TestServerRequiresAdminPermission(t *testing.T) {
 				t.Fatalf("expected %d, got %d", test.status, response.Code)
 			}
 		})
+	}
+}
+
+func TestServerAcceptsInternalBatchRunnerToken(t *testing.T) {
+	t.Setenv("TRAVIGO_BATCH_RUNNER_AUTH_TOKEN", "internal-token")
+	handler := NewServer(nil, nil).handlerWithTokenValidator(func(_ context.Context, _ string) ([]string, error) {
+		return nil, errors.New("JWT validation should not run")
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/not-found", nil)
+	request.Header.Set("Authorization", "Bearer internal-token")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected internal token to be accepted, got %d", response.Code)
 	}
 }
 

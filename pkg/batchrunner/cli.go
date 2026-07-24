@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -93,7 +94,16 @@ func triggerRun(baseURL string, options RunOptions) error {
 		return err
 	}
 
-	resp, err := http.Post(strings.TrimRight(baseURL, "/")+"/runs", "application/json", bytes.NewReader(data))
+	request, err := http.NewRequest(http.MethodPost, strings.TrimRight(baseURL, "/")+"/runs", bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if token := os.Getenv("TRAVIGO_BATCH_RUNNER_AUTH_TOKEN"); token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return err
 	}

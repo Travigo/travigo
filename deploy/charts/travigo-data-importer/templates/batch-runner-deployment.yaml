@@ -47,6 +47,11 @@ spec:
               value: {{ .Values.auth.domain | quote }}
             - name: AUTH0_AUDIENCE
               value: {{ .Values.auth.audience | quote }}
+            - name: TRAVIGO_BATCH_RUNNER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner-auth
+                  key: token
             - name: TRAVIGO_BATCH_ADDRESS
               value: ":8080"
             - name: TRAVIGO_BATCH_STORAGE_PATH

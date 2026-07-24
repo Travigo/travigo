@@ -39,4 +39,9 @@ spec:
               env:
                 - name: TRAVIGO_LOG_FORMAT
                   value: JSON
+                - name: TRAVIGO_BATCH_RUNNER_AUTH_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "travigo-data-importer.fullname" . }}-batch-runner-auth
+                      key: token
 {{- end }}

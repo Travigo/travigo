@@ -2,6 +2,7 @@ package batchrunner
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"net/url"
 	"os"
@@ -52,7 +53,13 @@ func requireAdmin(next http.Handler, validate tokenValidator) http.Handler {
 			return
 		}
 
-		permissions, err := validate(r.Context(), strings.TrimPrefix(authHeader, "Bearer "))
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		if internalToken := os.Getenv("TRAVIGO_BATCH_RUNNER_AUTH_TOKEN"); internalToken != "" && subtle.ConstantTimeCompare([]byte(token), []byte(internalToken)) == 1 {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		permissions, err := validate(r.Context(), token)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, "Invalid auth token")
 			return
