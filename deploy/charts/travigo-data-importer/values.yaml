@@ -41,6 +41,10 @@ nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials
 
+auth:
+  domain: travigo.uk.auth0.com
+  audience: https://api.travigo.app
+
 image:
   repository: ghcr.io/travigo/travigo
   pullPolicy: Always

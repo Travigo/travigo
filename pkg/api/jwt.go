@@ -16,7 +16,8 @@ import (
 
 // CustomClaims contains custom data we want from the token.
 type CustomClaims struct {
-	Scope string `json:"scope"`
+	Scope       string   `json:"scope"`
+	Permissions []string `json:"permissions"`
 }
 
 // Validate does nothing for this example, but we need
@@ -67,15 +68,19 @@ func EnsureValidToken() fiber.Handler {
 
 		if jwtErr == nil || env["TRAVIGO_SINGLE_USER_MODE"] != "" {
 			var userID string
+			var permissions []string
 
 			if env["TRAVIGO_SINGLE_USER_MODE"] != "" {
 				userID = env["TRAVIGO_SINGLE_USER_MODE"]
+				permissions = []string{"admin:all"}
 			} else {
 				claims := claimsI.(*validator.ValidatedClaims)
 				userID = claims.RegisteredClaims.Subject
+				permissions = claims.CustomClaims.(*CustomClaims).Permissions
 			}
 
 			c.Locals("account_userid", userID)
+			c.Locals("account_permissions", permissions)
 
 			return c.Next()
 		} else {

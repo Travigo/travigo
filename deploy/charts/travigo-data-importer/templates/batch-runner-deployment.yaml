@@ -43,6 +43,10 @@ spec:
           env:
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
+            - name: AUTH0_DOMAIN
+              value: {{ .Values.auth.domain | quote }}
+            - name: AUTH0_AUDIENCE
+              value: {{ .Values.auth.audience | quote }}
             - name: TRAVIGO_BATCH_ADDRESS
               value: ":8080"
             - name: TRAVIGO_BATCH_STORAGE_PATH

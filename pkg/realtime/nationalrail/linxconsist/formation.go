@@ -61,16 +61,16 @@ func BuildRailTrains(message PassengerTrainConsistMessage) []ctdf.RailTrain {
 		}
 
 		train := ctdf.RailTrain{
-			ID:                  allocation.ResourceGroup.ResourceGroupID,
-			Position:            allocation.ResourceGroupPosition,
-			AllocationSequence:  allocation.AllocationSequenceNumber,
-			ValidFrom:           allocation.AllocationOriginDateTime,
-			ValidUntil:          allocation.AllocationDestinationDateTime,
-			Reversed:            strings.EqualFold(allocation.Reversed, "Y"),
-			FleetID:             allocation.ResourceGroup.FleetID,
-			ResourceGroupType:   allocation.ResourceGroup.TypeOfResource,
-			ResourceGroupStatus: allocation.ResourceGroup.ResourceGroupStatus,
-			Carriages:           make([]ctdf.RailCarriage, 0, len(vehicles)),
+			ID:                 allocation.ResourceGroup.ResourceGroupID,
+			Position:           allocation.ResourceGroupPosition,
+			AllocationSequence: allocation.AllocationSequenceNumber,
+			ValidFrom:          allocation.AllocationOriginDateTime,
+			ValidUntil:         allocation.AllocationDestinationDateTime,
+			Reversed:           strings.EqualFold(allocation.Reversed, "Y"),
+			FleetID:            allocation.ResourceGroup.FleetID,
+			// ResourceGroupType:   allocation.ResourceGroup.TypeOfResource,
+			// ResourceGroupStatus: allocation.ResourceGroup.ResourceGroupStatus,
+			Carriages: make([]ctdf.RailCarriage, 0, len(vehicles)),
 		}
 
 		for position, vehicle := range vehicles {
@@ -86,12 +86,12 @@ func BuildRailTrains(message PassengerTrainConsistMessage) []ctdf.RailTrain {
 				SpecificType: vehicle.SpecificType,
 				Livery:       vehicle.Livery,
 				// Decor:                  vehicle.Decor,
-				SpecialCharacteristics: vehicle.SpecialCharacteristics,
-				VehicleStatus:          vehicle.VehicleStatus,
-				RegisteredStatus:       vehicle.RegisteredStatus,
-				LengthMM:               lengthInMM(vehicle.Length),
-				WeightKG:               vehicle.Weight,
-				SeatCount:              vehicle.NumberOfSeats,
+				// SpecialCharacteristics: vehicle.SpecialCharacteristics,
+				// VehicleStatus:          vehicle.VehicleStatus,
+				// RegisteredStatus: vehicle.RegisteredStatus,
+				LengthMM: lengthInMM(vehicle.Length),
+				// WeightKG:  vehicle.Weight,
+				SeatCount: vehicle.NumberOfSeats,
 				// MaximumSpeedMPH:        vehicle.MaximumSpeed,
 				Occupancy: -1,
 			}

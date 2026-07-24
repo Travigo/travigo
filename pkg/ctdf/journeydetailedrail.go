@@ -31,9 +31,7 @@ type RailTrain struct {
 	VehicleTypeName string `groups:"detailed"`
 	PowerType       string `groups:"detailed"`
 
-	FleetID             string `groups:"detailed"`
-	ResourceGroupType   string `groups:"detailed"`
-	ResourceGroupStatus string `groups:"detailed"`
+	FleetID string `groups:"detailed"`
 
 	TrainLength int            `groups:"detailed"`
 	Carriages   []RailCarriage `groups:"detailed"`
@@ -77,17 +75,13 @@ type RailCarriage struct {
 	SeatingClasses []JourneyDetailedRailSeating `groups:"basic"`
 	Toilets        []RailCarriageToilet         `groups:"basic"`
 
-	CarriageID             string `groups:"detailed"`
-	VehicleID              string `groups:"detailed"`
-	VehiclePosition        int    `groups:"detailed"`
-	SpecificType           string `groups:"detailed"`
-	Livery                 string `groups:"detailed"`
-	SpecialCharacteristics string `groups:"detailed"`
-	VehicleStatus          string `groups:"detailed"`
-	RegisteredStatus       string `groups:"detailed"`
-	LengthMM               int    `groups:"detailed"`
-	WeightKG               int    `groups:"detailed"`
-	SeatCount              int    `groups:"detailed"`
+	CarriageID      string `groups:"detailed"`
+	VehicleID       string `groups:"detailed"`
+	VehiclePosition int    `groups:"detailed"`
+	SpecificType    string `groups:"detailed"`
+	Livery          string `groups:"detailed"`
+	LengthMM        int    `groups:"detailed"`
+	SeatCount       int    `groups:"detailed"`
 
 	Occupancy int `groups:"basic"`
 }

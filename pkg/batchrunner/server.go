@@ -3,6 +3,7 @@ package batchrunner
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,6 +23,18 @@ func NewServer(store *Store, runner *Runner) *Server {
 }
 
 func (s *Server) Handler() http.Handler {
+	validate, err := newTokenValidator()
+	if err != nil {
+		log.Fatalf("Failed to set up the jwt validator: %v", err)
+	}
+	return requireAdmin(s.routes(), validate)
+}
+
+func (s *Server) handlerWithTokenValidator(validate tokenValidator) http.Handler {
+	return requireAdmin(s.routes(), validate)
+}
+
+func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/plan", s.handlePlan)
 	mux.HandleFunc("/runs", s.handleRuns)
