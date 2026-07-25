@@ -119,14 +119,15 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				continue
 			}
 
+			wholeJourneyCancelled := ctdf.IsBoardJourneyCancelled(realtimeJourney.Journey, &realtimeJourney, cancelledJourneyIDs)
 			departure := &ctdf.DepartureBoard{
-				DestinationDisplay: ctdf.BoardDestinationDisplay(realtimeJourney.Journey, realtimeJourney.Journey.DestinationDisplay, q.Type),
+				DestinationDisplay: ctdf.BoardDestinationDisplayWithRealtime(realtimeJourney.Journey, &realtimeJourney, realtimeJourney.Journey.DestinationDisplay, q.Type, wholeJourneyCancelled),
 				Type:               ctdf.DepartureBoardRecordTypeRealtimeTracked,
 				Time:               scheduledTime,
 
 				Journey: realtimeJourney.Journey,
 			}
-			if ctdf.IsBoardJourneyCancelled(realtimeJourney.Journey, &realtimeJourney, cancelledJourneyIDs) {
+			if wholeJourneyCancelled {
 				departure.Type = ctdf.DepartureBoardRecordTypeCancelled
 			}
 			realtimeJourney.Journey.GetService()

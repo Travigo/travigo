@@ -77,6 +77,102 @@ func TestBoardDestinationDisplayUsesJourneyOriginForArrivals(t *testing.T) {
 	}
 }
 
+func TestBoardDestinationDisplayWithRealtimeUsesLastNonCancelledStop(t *testing.T) {
+	journey := &Journey{
+		DestinationDisplay: "Terminal",
+		Path: []*JourneyPathItem{
+			{
+				OriginStopRef:      "origin",
+				OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
+				DestinationStopRef: "middle",
+				DestinationStop:    &Stop{PrimaryIdentifier: "middle", PrimaryName: "Middle"},
+			},
+			{
+				OriginStopRef:      "middle",
+				DestinationStopRef: "penultimate",
+				DestinationStop:    &Stop{PrimaryIdentifier: "penultimate", PrimaryName: "Penultimate"},
+			},
+			{
+				OriginStopRef:      "penultimate",
+				DestinationStopRef: "terminal",
+				DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
+			},
+		},
+	}
+	realtimeJourney := &RealtimeJourney{Journey: journey}
+	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 3, Cancelled: true})
+
+	if got := BoardDestinationDisplayWithRealtime(journey, realtimeJourney, journey.DestinationDisplay, BoardTypeDeparture, false); got != "Penultimate" {
+		t.Fatalf("destination display = %q, want Penultimate", got)
+	}
+}
+
+func TestBoardDestinationDisplayWithRealtimeSkipsConsecutiveCancelledStops(t *testing.T) {
+	journey := &Journey{
+		DestinationDisplay: "Terminal",
+		Path: []*JourneyPathItem{
+			{
+				OriginStopRef:      "origin",
+				OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
+				DestinationStopRef: "middle",
+				DestinationStop:    &Stop{PrimaryIdentifier: "middle", PrimaryName: "Middle"},
+			},
+			{
+				OriginStopRef:      "middle",
+				DestinationStopRef: "penultimate",
+				DestinationStop:    &Stop{PrimaryIdentifier: "penultimate", PrimaryName: "Penultimate"},
+			},
+			{
+				OriginStopRef:      "penultimate",
+				DestinationStopRef: "terminal",
+				DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
+			},
+		},
+	}
+	realtimeJourney := &RealtimeJourney{Journey: journey}
+	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "penultimate", JourneyStopIndex: 2, Cancelled: true})
+	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 3, Cancelled: true})
+
+	if got := BoardDestinationDisplayWithRealtime(journey, realtimeJourney, journey.DestinationDisplay, BoardTypeDeparture, false); got != "Middle" {
+		t.Fatalf("destination display = %q, want Middle", got)
+	}
+}
+
+func TestBoardDestinationDisplayWithRealtimeKeepsWholeJourneyCancellationDestination(t *testing.T) {
+	journey := &Journey{
+		DestinationDisplay: "Terminal",
+		Path: []*JourneyPathItem{{
+			OriginStopRef:      "origin",
+			OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
+			DestinationStopRef: "terminal",
+			DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
+		}},
+	}
+	realtimeJourney := &RealtimeJourney{Journey: journey}
+	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 1, Cancelled: true})
+
+	if got := BoardDestinationDisplayWithRealtime(journey, realtimeJourney, journey.DestinationDisplay, BoardTypeDeparture, true); got != "Terminal" {
+		t.Fatalf("destination display = %q, want Terminal", got)
+	}
+}
+
+func TestBoardDestinationDisplayWithRealtimeKeepsUncancelledTerminalDestination(t *testing.T) {
+	journey := &Journey{
+		DestinationDisplay: "Terminal",
+		Path: []*JourneyPathItem{{
+			OriginStopRef:      "origin",
+			OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
+			DestinationStopRef: "terminal",
+			DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
+		}},
+	}
+	realtimeJourney := &RealtimeJourney{Journey: journey}
+
+	if got := BoardDestinationDisplayWithRealtime(journey, realtimeJourney, journey.DestinationDisplay, BoardTypeDeparture, false); got != "Terminal" {
+		t.Fatalf("destination display = %q, want Terminal", got)
+	}
+}
+
 func TestIsBoardJourneyCancelled(t *testing.T) {
 	journey := &Journey{PrimaryIdentifier: "journey-1"}
 

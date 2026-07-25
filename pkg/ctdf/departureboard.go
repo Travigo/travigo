@@ -177,6 +177,74 @@ func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardT
 	return firstPathItem.OriginStopRef
 }
 
+// BoardDestinationDisplayWithRealtime shortens a departure's destination when
+// realtime marks the scheduled terminal call as cancelled. Whole-journey
+// cancellations retain the scheduled destination.
+func BoardDestinationDisplayWithRealtime(journey *Journey, realtimeJourney *RealtimeJourney, fallback string, boardType BoardType, wholeJourneyCancelled bool) string {
+	display := BoardDestinationDisplay(journey, fallback, boardType)
+	if boardType.IsArrival() || wholeJourneyCancelled || journey == nil || realtimeJourney == nil || len(journey.Path) == 0 {
+		return display
+	}
+
+	terminalIndex := len(journey.Path)
+	terminalPathItem := journey.Path[terminalIndex-1]
+	if terminalPathItem == nil {
+		return display
+	}
+	terminalStop := realtimeJourney.RealtimeStop(terminalPathItem.DestinationStopRef, terminalIndex)
+	if terminalStop == nil || !terminalStop.Cancelled {
+		return display
+	}
+
+	for journeyStopIndex := terminalIndex - 1; journeyStopIndex >= 0; journeyStopIndex-- {
+		var stopRef string
+		var pathItem *JourneyPathItem
+		if journeyStopIndex == 0 {
+			pathItem = journey.Path[0]
+			if pathItem == nil {
+				continue
+			}
+			stopRef = pathItem.OriginStopRef
+		} else {
+			pathItem = journey.Path[journeyStopIndex-1]
+			if pathItem == nil {
+				continue
+			}
+			stopRef = pathItem.DestinationStopRef
+		}
+
+		realtimeStop := realtimeJourney.RealtimeStop(stopRef, journeyStopIndex)
+		if realtimeStop != nil && realtimeStop.Cancelled {
+			continue
+		}
+
+		var stop *Stop
+		if journeyStopIndex == 0 {
+			pathItem.GetOriginStop()
+			stop = pathItem.OriginStop
+		} else {
+			pathItem.GetDestinationStop()
+			stop = pathItem.DestinationStop
+		}
+		if stop == nil {
+			return display
+		}
+		if journey.Service != nil {
+			for _, identifier := range stop.GetAllStopIDs() {
+				if override := journey.Service.StopNameOverrides[identifier]; override != "" {
+					return override
+				}
+			}
+		}
+		if stop.PrimaryName != "" {
+			return stop.PrimaryName
+		}
+		return display
+	}
+
+	return display
+}
+
 // GenerateDepartureBoardFromJourneys is retained for callers that explicitly
 // need a departure board. New code should use GenerateBoardFromJourneys.
 func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup) []*DepartureBoard {
@@ -333,7 +401,8 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							}
 						}
 
-						if IsBoardJourneyCancelled(journey, journey.RealtimeJourney, realtimeLookup.CancelledJourneyIDs) {
+						wholeJourneyCancelled := IsBoardJourneyCancelled(journey, journey.RealtimeJourney, realtimeLookup.CancelledJourneyIDs)
+						if wholeJourneyCancelled {
 							departureBoardRecordType = DepartureBoardRecordTypeCancelled
 						}
 						if departureBoardRecordType == DepartureBoardRecordTypeCancelled {
@@ -344,7 +413,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
 						)
 
-						destinationDisplay = BoardDestinationDisplay(journey, path.DestinationDisplay, boardType)
+						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)
 						break
 					}
 				}
