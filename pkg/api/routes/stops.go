@@ -653,7 +653,7 @@ func departureBoardReferenceIdentifiers(refs map[string]struct{}) []string {
 
 func searchStops(c *fiber.Ctx) error {
 	searchTerm := c.Query("name")
-	transportType := c.Query("transporttype")
+	transportTypes := stopSearchTransportTypes(c)
 	isLLM := strings.ToLower(c.Query("isllm"))
 
 	if searchTerm == "" {
@@ -689,16 +689,10 @@ func searchStops(c *fiber.Ctx) error {
 		},
 	}
 
-	if transportType != "" {
+	if len(transportTypes) > 0 {
 		queryFilters = append(queryFilters, map[string]interface{}{
-			"bool": map[string]interface{}{
-				"should": []interface{}{
-					map[string]interface{}{
-						"match": map[string]interface{}{
-							"TransportTypes": transportType,
-						},
-					},
-				},
+			"terms": map[string]interface{}{
+				"TransportTypes.keyword": transportTypes,
 			},
 		})
 	}
@@ -765,4 +759,29 @@ func searchStops(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"stops": stopsReduced,
 	})
+}
+
+func stopSearchTransportTypes(c *fiber.Ctx) []string {
+	values := make([][]byte, 0)
+	values = append(values, c.Context().QueryArgs().PeekMulti("transporttype")...)
+	values = append(values, c.Context().QueryArgs().PeekMulti("transport_type")...)
+
+	transportTypes := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		for _, transportType := range strings.Split(string(value), ",") {
+			transportType = strings.TrimSpace(transportType)
+			if transportType == "" {
+				continue
+			}
+			if _, exists := seen[transportType]; exists {
+				continue
+			}
+
+			seen[transportType] = struct{}{}
+			transportTypes = append(transportTypes, transportType)
+		}
+	}
+
+	return transportTypes
 }
