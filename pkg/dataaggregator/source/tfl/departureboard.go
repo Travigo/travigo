@@ -2,6 +2,7 @@ package tfl
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 	_ "time/tzdata"
@@ -68,14 +69,14 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	var departureBoard []*ctdf.DepartureBoard
 
 	now = time.Now()
-	latestDepartureTime := now
+	directionWatermarks := map[boardDirectionKey]time.Time{}
 
 	stopTimezone, err := time.LoadLocation(q.Stop.Timezone)
 	if err != nil || stopTimezone == nil {
 		stopTimezone = time.UTC
 	}
 
-	allStopIDS := append(q.Stop.OtherIdentifiers, q.Stop.PrimaryIdentifier)
+	allStopIDS := q.Stop.GetAllStopIDs()
 	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneys(context.Background(), allStopIDS, now.Add(-30*time.Second))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
@@ -145,8 +146,10 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			transforms.Transform(departure.Journey.Operator, 2)
 			departureBoard = append(departureBoard, departure)
 
-			if scheduledTime.After(latestDepartureTime) {
-				latestDepartureTime = scheduledTime
+			if direction, ok := departureBoardDirection(departure, allStopIDS, q.Type); ok {
+				if watermark := directionWatermarks[direction]; scheduledTime.After(watermark) {
+					directionWatermarks[direction] = scheduledTime
+				}
 			}
 		}
 	}
@@ -154,21 +157,110 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	log.Debug().Str("Length", time.Now().Sub(generateDeparteBoardStart).String()).Msg("Generate TfL departure board from realtime journeys")
 	departureBoard = ctdf.DeduplicateBoardEntries(departureBoard)
 
-	// If the realtime data doesnt provide enough to cover our request then fill in with the local departure board
-	remainingCount := q.Count - len(departureBoard)
+	// Load scheduled journeys from the requested time for every direction. Each
+	// direction is then advanced only as far as its own realtime predictions,
+	// so a later prediction in one direction cannot hide an earlier scheduled
+	// journey in another.
+	localSource := getBackfillSource()
+	localDepartures, err := localSource.Lookup(q)
 
-	if remainingCount > 0 {
-		localSource := getBackfillSource()
-
-		q.StartDateTime = latestDepartureTime
-		q.Count = remainingCount
-
-		localDepartures, err := localSource.Lookup(q)
-
-		if err == nil {
-			departureBoard = append(departureBoard, localDepartures.([]*ctdf.DepartureBoard)...)
-		}
+	if err == nil {
+		scheduledBackfill := filterScheduledBoardByDirection(
+			localDepartures.([]*ctdf.DepartureBoard),
+			allStopIDS,
+			q.Type,
+			directionWatermarks,
+		)
+		departureBoard = append(departureBoard, scheduledBackfill...)
 	}
 
 	return ctdf.DeduplicateBoardEntries(departureBoard), nil
+}
+
+type boardDirectionKey struct {
+	serviceRef      string
+	adjacentStopRef string
+}
+
+func departureBoardDirection(entry *ctdf.DepartureBoard, stopIDs []string, boardType ctdf.BoardType) (boardDirectionKey, bool) {
+	if entry == nil || entry.Journey == nil {
+		return boardDirectionKey{}, false
+	}
+
+	serviceRef := entry.Journey.ServiceRef
+	if serviceRef == "" && entry.Journey.Service != nil {
+		serviceRef = entry.Journey.Service.PrimaryIdentifier
+	}
+	if serviceRef == "" {
+		return boardDirectionKey{}, false
+	}
+
+	var adjacentStopRef string
+	closestTimeDifference := time.Duration(math.MaxInt64)
+	for pathIndex, pathItem := range entry.Journey.Path {
+		if pathItem == nil {
+			continue
+		}
+
+		var stopRef string
+		var candidateAdjacentStopRef string
+		var candidateTime time.Time
+		if boardType.IsArrival() {
+			stopRef = pathItem.DestinationStopRef
+			candidateAdjacentStopRef = pathItem.OriginStopRef
+			candidateTime = pathItem.DestinationArrivalTime
+			if candidateTime.IsZero() && pathIndex+1 < len(entry.Journey.Path) {
+				nextPathItem := entry.Journey.Path[pathIndex+1]
+				if nextPathItem != nil && nextPathItem.OriginStopRef == stopRef {
+					candidateTime = nextPathItem.OriginArrivalTime
+				}
+			}
+		} else {
+			stopRef = pathItem.OriginStopRef
+			candidateAdjacentStopRef = pathItem.DestinationStopRef
+			candidateTime = pathItem.OriginDepartureTime
+			if candidateTime.IsZero() {
+				candidateTime = pathItem.OriginArrivalTime
+			}
+		}
+		if !util.ContainsString(stopIDs, stopRef) || candidateAdjacentStopRef == "" {
+			continue
+		}
+
+		timeDifference := time.Duration(math.MaxInt64)
+		if !candidateTime.IsZero() {
+			timeDifference = entry.Time.Sub(candidateTime).Abs()
+		}
+		if adjacentStopRef == "" || timeDifference < closestTimeDifference {
+			adjacentStopRef = candidateAdjacentStopRef
+			closestTimeDifference = timeDifference
+		}
+	}
+	if adjacentStopRef == "" {
+		return boardDirectionKey{}, false
+	}
+
+	return boardDirectionKey{
+		serviceRef:      serviceRef,
+		adjacentStopRef: adjacentStopRef,
+	}, true
+}
+
+func filterScheduledBoardByDirection(
+	entries []*ctdf.DepartureBoard,
+	stopIDs []string,
+	boardType ctdf.BoardType,
+	directionWatermarks map[boardDirectionKey]time.Time,
+) []*ctdf.DepartureBoard {
+	filtered := make([]*ctdf.DepartureBoard, 0, len(entries))
+	for _, entry := range entries {
+		direction, ok := departureBoardDirection(entry, stopIDs, boardType)
+		if ok {
+			if watermark, found := directionWatermarks[direction]; found && entry.Time.Before(watermark) {
+				continue
+			}
+		}
+		filtered = append(filtered, entry)
+	}
+	return filtered
 }
