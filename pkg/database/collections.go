@@ -17,6 +17,26 @@ func createIndexes() {
 	createJourneysIndexes()
 	createSavedObjectsIndexes()
 	createDatasetImportReportIndexes()
+	createUserNotificationSubscriptionsIndexes()
+}
+
+func createUserNotificationSubscriptionsIndexes() {
+	collection := GetCollection("user_notification_subscriptions")
+	_, err := collection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "userid", Value: 1}},
+		},
+		{
+			Keys:    bson.D{{Key: "primaryidentifier", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{Key: "eventtype", Value: 1}},
+		},
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating User Notification Subscriptions Index")
+	}
 }
 
 func createDatasetImportReportIndexes() {
