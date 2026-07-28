@@ -209,7 +209,9 @@ func validateNotificationSubscriptionRequest(request notificationSubscriptionReq
 	}
 	if len(request.Values.ServiceAlertTypes) == 0 &&
 		request.Values.StopRef == "" &&
-		request.Values.ServiceRef == "" {
+		request.Values.ServiceRef == "" &&
+		request.Values.JourneyRef == "" &&
+		len(request.Values.StopRefs) == 0 {
 		return "No notification values set"
 	}
 

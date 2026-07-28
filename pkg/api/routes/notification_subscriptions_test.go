@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -56,11 +57,32 @@ func TestValidateNotificationSubscriptionRequestRejectsUnknownEventType(t *testi
 	}
 }
 
+func TestNotificationSubscriptionRequestDecodesWebUIValues(t *testing.T) {
+	var request notificationSubscriptionRequest
+	err := json.Unmarshal([]byte(`{
+		"eventType": "RealtimeJourneyPlatformChanged",
+		"values": {
+			"JourneyRef": "journey-1",
+			"StopRefs": ["stop-1", "stop-2"]
+		}
+	}`), &request)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if request.Values.JourneyRef != "journey-1" {
+		t.Fatalf("JourneyRef = %q, want journey-1", request.Values.JourneyRef)
+	}
+	if len(request.Values.StopRefs) != 2 || request.Values.StopRefs[0] != "stop-1" || request.Values.StopRefs[1] != "stop-2" {
+		t.Fatalf("StopRefs = %#v, want [stop-1 stop-2]", request.Values.StopRefs)
+	}
+}
+
 func validJourneyNotificationSubscriptionRequest() notificationSubscriptionRequest {
 	return notificationSubscriptionRequest{
-		EventType: ctdf.EventTypeServiceAlertCreated,
+		EventType: ctdf.EventTypeRealtimeJourneyCancelled,
 		Values: ctdf.UserNotificationSubscriptionValues{
-			ServiceRef: "service-1",
+			JourneyRef: "journey-1",
 		},
 	}
 }

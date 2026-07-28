@@ -2,8 +2,11 @@ package ctdf
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/expr-lang/expr"
 )
 
 func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
@@ -13,6 +16,9 @@ func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
 		EventType:         EventTypeServiceAlertCreated,
 		Values: UserNotificationSubscriptionValues{
 			StopRef:           "stop-1",
+			ServiceRef:        "service-1",
+			JourneyRef:        "journey-1",
+			StopRefs:          []string{"stop-1", "stop-2"},
 			ServiceAlertTypes: []string{"Delays"},
 		},
 	}
@@ -29,10 +35,184 @@ func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
 	if strings.Contains(body, `"events"`) {
 		t.Fatalf("json.Marshal() = %s, must not contain events array", body)
 	}
-	if !strings.Contains(body, `"values":{"serviceAlertTypes":["Delays"],"stopRef":"stop-1","serviceRef":""}`) {
-		t.Fatalf("json.Marshal() = %s, want typed values", body)
+	if !strings.Contains(body, `"values":{"ServiceAlertTypes":["Delays"],"StopRef":"stop-1","ServiceRef":"service-1","JourneyRef":"journey-1","StopRefs":["stop-1","stop-2"]}`) {
+		t.Fatalf("json.Marshal() = %s, want all WebUI values", body)
 	}
 	if strings.Contains(body, `"userID"`) || strings.Contains(body, `"UserID"`) {
 		t.Fatalf("json.Marshal() = %s, must not expose user ID", body)
+	}
+}
+
+func TestUserNotificationSubscriptionCompileServiceAlerts(t *testing.T) {
+	tests := []struct {
+		name              string
+		values            UserNotificationSubscriptionValues
+		matchedIdentifier string
+	}{
+		{
+			name: "stop",
+			values: UserNotificationSubscriptionValues{
+				StopRef: "stop-1",
+			},
+			matchedIdentifier: "stop-1",
+		},
+		{
+			name: "service",
+			values: UserNotificationSubscriptionValues{
+				ServiceRef: "service-1",
+			},
+			matchedIdentifier: "service-1",
+		},
+		{
+			name: "journey",
+			values: UserNotificationSubscriptionValues{
+				JourneyRef: `journey-"1"`,
+			},
+			matchedIdentifier: `DAYINSTANCEOF:20260728:journey-"1"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			test.values.ServiceAlertTypes = []string{
+				string(ServiceAlertTypeWarning),
+				`type-"requiring-escaping"`,
+			}
+			subscription := UserNotificationSubscription{
+				EventType: EventTypeServiceAlertCreated,
+				Values:    test.values,
+			}
+
+			assertSubscriptionMatchesEvent(t, &subscription, Event{
+				Type: EventTypeServiceAlertCreated,
+				Body: ServiceAlert{
+					AlertType:          ServiceAlertTypeWarning,
+					MatchedIdentifiers: []string{test.matchedIdentifier},
+				},
+			}, true)
+
+			assertSubscriptionMatchesEvent(t, &subscription, Event{
+				Type: EventTypeServiceAlertCreated,
+				Body: ServiceAlert{
+					AlertType:          ServiceAlertTypeDelays,
+					MatchedIdentifiers: []string{test.matchedIdentifier},
+				},
+			}, false)
+
+			assertSubscriptionMatchesEvent(t, &subscription, Event{
+				Type: EventTypeServiceAlertCreated,
+				Body: ServiceAlert{
+					AlertType:          ServiceAlertTypeWarning,
+					MatchedIdentifiers: []string{"another-reference"},
+				},
+			}, false)
+		})
+	}
+}
+
+func TestUserNotificationSubscriptionCompileRealtimeJourneyEvents(t *testing.T) {
+	directBody := func(journeyRef string) interface{} {
+		return RealtimeJourney{
+			Journey: &Journey{PrimaryIdentifier: journeyRef},
+		}
+	}
+	nestedBody := func(journeyRef string) interface{} {
+		return map[string]interface{}{
+			"RealtimeJourney": RealtimeJourney{
+				Journey: &Journey{PrimaryIdentifier: journeyRef},
+			},
+		}
+	}
+
+	tests := []struct {
+		eventType EventType
+		body      func(string) interface{}
+	}{
+		{EventTypeRealtimeJourneyCreated, directBody},
+		{EventTypeRealtimeJourneyActivelyTracked, directBody},
+		{EventTypeRealtimeJourneyCancelled, directBody},
+		{EventTypeRealtimeJourneyOverlayCreated, directBody},
+		{EventTypeRealtimeJourneyLocationTextChanged, nestedBody},
+		{EventTypeRealtimeJourneyNextStopChanged, nestedBody},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.eventType), func(t *testing.T) {
+			subscription := UserNotificationSubscription{
+				EventType: test.eventType,
+				Values: UserNotificationSubscriptionValues{
+					JourneyRef: `journey-"1"`,
+				},
+			}
+
+			assertSubscriptionMatchesEvent(t, &subscription, Event{
+				Type: test.eventType,
+				Body: test.body(`journey-"1"`),
+			}, true)
+			assertSubscriptionMatchesEvent(t, &subscription, Event{
+				Type: test.eventType,
+				Body: test.body("another-journey"),
+			}, false)
+		})
+	}
+}
+
+func TestUserNotificationSubscriptionCompileRealtimeJourneyPlatformEvents(t *testing.T) {
+	for _, eventType := range []EventType{
+		EventTypeRealtimeJourneyPlatformSet,
+		EventTypeRealtimeJourneyPlatformChanged,
+	} {
+		t.Run(string(eventType), func(t *testing.T) {
+			subscription := UserNotificationSubscription{
+				EventType: eventType,
+				Values: UserNotificationSubscriptionValues{
+					JourneyRef: `journey-"1"`,
+					StopRefs:   []string{"stop-1", `stop-"2"`},
+				},
+			}
+
+			event := func(journeyRef string, stopRef string) Event {
+				return Event{
+					Type: eventType,
+					Body: map[string]interface{}{
+						"RealtimeJourney": RealtimeJourney{
+							Journey: &Journey{PrimaryIdentifier: journeyRef},
+						},
+						"Stop": stopRef,
+					},
+				}
+			}
+
+			assertSubscriptionMatchesEvent(t, &subscription, event(`journey-"1"`, `stop-"2"`), true)
+			assertSubscriptionMatchesEvent(t, &subscription, event("another-journey", `stop-"2"`), false)
+			assertSubscriptionMatchesEvent(t, &subscription, event(`journey-"1"`, "another-stop"), false)
+		})
+	}
+}
+
+func assertSubscriptionMatchesEvent(t *testing.T, subscription *UserNotificationSubscription, event Event, want bool) {
+	t.Helper()
+
+	if err := subscription.Compile(); err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	var consumedEvent Event
+	if err := json.Unmarshal(eventData, &consumedEvent); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	output, err := expr.Run(subscription.Program, consumedEvent)
+	if err != nil {
+		t.Fatalf("expr.Run() error = %v", err)
+	}
+
+	if output != want {
+		t.Fatalf("expression result = %v, want %v for event %s with body %s", output, want, event.Type, fmt.Sprintf("%#v", consumedEvent.Body))
 	}
 }

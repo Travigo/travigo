@@ -25,6 +25,9 @@ func TestCompileEventSubscriptionsGroupsByEventType(t *testing.T) {
 		{
 			UserID:    "user-3",
 			EventType: ctdf.EventTypeRealtimeJourneyCreated,
+			Values: ctdf.UserNotificationSubscriptionValues{
+				JourneyRef: "journey-1",
+			},
 		},
 	}
 
