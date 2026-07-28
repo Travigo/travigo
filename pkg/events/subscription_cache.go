@@ -5,33 +5,26 @@ import (
 	"sync"
 	"time"
 
-	"github.com/expr-lang/expr"
-	"github.com/expr-lang/expr/vm"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-const eventSubscriptionRefreshInterval = time.Minute
+const eventSubscriptionRefreshInterval = 5 * time.Minute
 
-type compiledEventSubscription struct {
-	ctdf.UserEventSubscription
-	Program *vm.Program
-}
-
-type eventSubscriptionCache struct {
+type notificationSubscriptionCache struct {
 	mu          sync.RWMutex
-	byEventType map[ctdf.EventType][]compiledEventSubscription
+	byEventType map[ctdf.EventType][]ctdf.UserNotificationSubscription
 }
 
-func newEventSubscriptionCache() *eventSubscriptionCache {
-	return &eventSubscriptionCache{
-		byEventType: map[ctdf.EventType][]compiledEventSubscription{},
+func newEventSubscriptionCache() *notificationSubscriptionCache {
+	return &notificationSubscriptionCache{
+		byEventType: map[ctdf.EventType][]ctdf.UserNotificationSubscription{},
 	}
 }
 
-func (c *eventSubscriptionCache) StartBackgroundReload(interval time.Duration) {
+func (c *notificationSubscriptionCache) StartBackgroundReload(interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -44,19 +37,19 @@ func (c *eventSubscriptionCache) StartBackgroundReload(interval time.Duration) {
 	}()
 }
 
-func (c *eventSubscriptionCache) Reload(ctx context.Context) error {
-	userEventSubscriptionCollection := database.GetCollection("user_event_subscription")
-	cursor, err := userEventSubscriptionCollection.Find(ctx, bson.M{})
+func (c *notificationSubscriptionCache) Reload(ctx context.Context) error {
+	userNotificationSubscriptionCollection := database.GetCollection("user_notification_subscriptions")
+	cursor, err := userNotificationSubscriptionCollection.Find(ctx, bson.M{})
 	if err != nil {
 		return err
 	}
 	defer cursor.Close(ctx)
 
-	subscriptions := []ctdf.UserEventSubscription{}
+	subscriptions := []ctdf.UserNotificationSubscription{}
 	for cursor.Next(ctx) {
-		var subscription ctdf.UserEventSubscription
+		var subscription ctdf.UserNotificationSubscription
 		if err := cursor.Decode(&subscription); err != nil {
-			log.Error().Err(err).Msg("Failed to decode UserEventSubscription")
+			log.Error().Err(err).Msg("Failed to decode UserNotificationSubscription")
 			continue
 		}
 
@@ -80,7 +73,7 @@ func (c *eventSubscriptionCache) Reload(ctx context.Context) error {
 	return nil
 }
 
-func (c *eventSubscriptionCache) ForEventType(eventType ctdf.EventType) []compiledEventSubscription {
+func (c *notificationSubscriptionCache) ForEventType(eventType ctdf.EventType) []ctdf.UserNotificationSubscription {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -89,17 +82,17 @@ func (c *eventSubscriptionCache) ForEventType(eventType ctdf.EventType) []compil
 		return nil
 	}
 
-	copiedSubscriptions := make([]compiledEventSubscription, len(subscriptions))
+	copiedSubscriptions := make([]ctdf.UserNotificationSubscription, len(subscriptions))
 	copy(copiedSubscriptions, subscriptions)
 
 	return copiedSubscriptions
 }
 
-func compileEventSubscriptions(subscriptions []ctdf.UserEventSubscription) map[ctdf.EventType][]compiledEventSubscription {
-	compiledSubscriptions := map[ctdf.EventType][]compiledEventSubscription{}
+func compileEventSubscriptions(subscriptions []ctdf.UserNotificationSubscription) map[ctdf.EventType][]ctdf.UserNotificationSubscription {
+	compiledSubscriptions := map[ctdf.EventType][]ctdf.UserNotificationSubscription{}
 
 	for _, subscription := range subscriptions {
-		program, err := expr.Compile(subscription.Expression, expr.AsBool(), expr.AllowUndefinedVariables())
+		err := subscription.Compile()
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -109,16 +102,13 @@ func compileEventSubscriptions(subscriptions []ctdf.UserEventSubscription) map[c
 			continue
 		}
 
-		compiledSubscriptions[subscription.EventType] = append(compiledSubscriptions[subscription.EventType], compiledEventSubscription{
-			UserEventSubscription: subscription,
-			Program:               program,
-		})
+		compiledSubscriptions[subscription.EventType] = append(compiledSubscriptions[subscription.EventType], subscription)
 	}
 
 	return compiledSubscriptions
 }
 
-func countCompiledEventSubscriptions(subscriptions map[ctdf.EventType][]compiledEventSubscription) int {
+func countCompiledEventSubscriptions(subscriptions map[ctdf.EventType][]ctdf.UserNotificationSubscription) int {
 	count := 0
 	for _, eventSubscriptions := range subscriptions {
 		count += len(eventSubscriptions)

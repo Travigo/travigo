@@ -10,9 +10,10 @@ func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
 	subscription := UserNotificationSubscription{
 		PrimaryIdentifier: "subscription-1",
 		UserID:            "user-1",
-		EventType:         EventTypeRealtimeJourneyCancelled,
-		Values: map[string]interface{}{
-			"JourneyRef": "journey-1",
+		EventType:         EventTypeServiceAlertCreated,
+		Values: UserNotificationSubscriptionValues{
+			StopRef:           "stop-1",
+			ServiceAlertTypes: []string{"Delays"},
 		},
 	}
 
@@ -22,14 +23,14 @@ func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
 	}
 
 	body := string(data)
-	if !strings.Contains(body, `"eventType":"RealtimeJourneyCancelled"`) {
+	if !strings.Contains(body, `"eventType":"ServiceAlertCreated"`) {
 		t.Fatalf("json.Marshal() = %s, want singular eventType", body)
 	}
 	if strings.Contains(body, `"events"`) {
 		t.Fatalf("json.Marshal() = %s, must not contain events array", body)
 	}
-	if !strings.Contains(body, `"values":{"JourneyRef":"journey-1"}`) {
-		t.Fatalf("json.Marshal() = %s, want generic values", body)
+	if !strings.Contains(body, `"values":{"serviceAlertTypes":["Delays"],"stopRef":"stop-1","serviceRef":""}`) {
+		t.Fatalf("json.Marshal() = %s, want typed values", body)
 	}
 	if strings.Contains(body, `"userID"`) || strings.Contains(body, `"UserID"`) {
 		t.Fatalf("json.Marshal() = %s, must not expose user ID", body)

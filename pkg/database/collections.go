@@ -424,20 +424,6 @@ func createJourneysIndexes() {
 		log.Error().Err(err).Msg("Creating Index")
 	}
 
-	// UserEventNotificationExpression
-	userEventSubscriptionCollection := GetCollection("user_event_subscription")
-	_, err = userEventSubscriptionCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{
-			Keys: bson.D{{Key: "userid", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "eventtype", Value: 1}},
-		},
-	}, options.CreateIndexes())
-	if err != nil {
-		log.Error().Err(err).Msg("Creating Index")
-	}
-
 	// UserPushNotificationTarget
 	tflTrackerCollection := GetCollection("tfl_tracker")
 	_, err = tflTrackerCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{

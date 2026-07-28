@@ -15,7 +15,7 @@ import (
 
 type EventsBatchConsumer struct {
 	NotifyQueue   rmq.Queue
-	Subscriptions *eventSubscriptionCache
+	Subscriptions *notificationSubscriptionCache
 }
 
 func NewEventsBatchConsumer() *EventsBatchConsumer {
@@ -47,9 +47,9 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 			continue
 		}
 
-		log.Info().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
+		log.Debug().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
 
-		var subscriptions []compiledEventSubscription
+		var subscriptions []ctdf.UserNotificationSubscription
 		if c.Subscriptions != nil {
 			subscriptions = c.Subscriptions.ForEventType(event.Type)
 		}
@@ -66,7 +66,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 
 				notification := ctdf.Notification{
 					TargetUser: userEventSubscription.UserID,
-					Type:       userEventSubscription.NotificationType,
+					Type:       ctdf.NotificationTypePush, // TODO currently only supported method
 					Title:      notificationData.Title,
 					Message:    notificationData.Message,
 				}
@@ -74,7 +74,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 				notificationBytes, _ := json.Marshal(notification)
 				c.NotifyQueue.PublishBytes(notificationBytes)
 
-				log.Info().Str("user", userEventSubscription.UserID).Msg("Sending notification")
+				log.Info().Str("user", userEventSubscription.UserID).Interface("notification", notification).Msg("Sending notification")
 			}
 		}
 	}

@@ -16,8 +16,8 @@ import (
 const defaultUserNotificationSubscriptionLimit int64 = 10
 
 type notificationSubscriptionRequest struct {
-	EventType ctdf.EventType         `json:"eventType"`
-	Values    map[string]interface{} `json:"values"`
+	EventType ctdf.EventType                          `json:"eventType"`
+	Values    ctdf.UserNotificationSubscriptionValues `json:"values"`
 }
 
 type notificationSubscriptionQuota struct {
@@ -207,7 +207,9 @@ func validateNotificationSubscriptionRequest(request notificationSubscriptionReq
 	if !request.EventType.Valid() {
 		return "Invalid notification event type"
 	}
-	if len(request.Values) == 0 {
+	if len(request.Values.ServiceAlertTypes) == 0 &&
+		request.Values.StopRef == "" &&
+		request.Values.ServiceRef == "" {
 		return "No notification values set"
 	}
 

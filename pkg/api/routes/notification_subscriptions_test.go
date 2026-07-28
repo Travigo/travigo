@@ -31,9 +31,9 @@ func TestBuildNotificationSubscriptionQuotaDoesNotReturnNegativeRemaining(t *tes
 func TestValidateNotificationSubscriptionRequest(t *testing.T) {
 	validRequest := notificationSubscriptionRequest{
 		EventType: ctdf.EventTypeServiceAlertCreated,
-		Values: map[string]interface{}{
-			"StopRef":           "stop-1",
-			"ServiceAlertTypes": []interface{}{"Delays"},
+		Values: ctdf.UserNotificationSubscriptionValues{
+			StopRef:           "stop-1",
+			ServiceAlertTypes: []string{"Delays"},
 		},
 	}
 
@@ -41,7 +41,7 @@ func TestValidateNotificationSubscriptionRequest(t *testing.T) {
 		t.Fatalf("validateNotificationSubscriptionRequest() = %q, want no error", got)
 	}
 
-	validRequest.Values = nil
+	validRequest.Values = ctdf.UserNotificationSubscriptionValues{}
 	if got := validateNotificationSubscriptionRequest(validRequest); got != "No notification values set" {
 		t.Fatalf("validateNotificationSubscriptionRequest() = %q, want missing values error", got)
 	}
@@ -58,9 +58,9 @@ func TestValidateNotificationSubscriptionRequestRejectsUnknownEventType(t *testi
 
 func validJourneyNotificationSubscriptionRequest() notificationSubscriptionRequest {
 	return notificationSubscriptionRequest{
-		EventType: ctdf.EventTypeRealtimeJourneyCancelled,
-		Values: map[string]interface{}{
-			"JourneyRef": "journey-1",
+		EventType: ctdf.EventTypeServiceAlertCreated,
+		Values: ctdf.UserNotificationSubscriptionValues{
+			ServiceRef: "service-1",
 		},
 	}
 }
