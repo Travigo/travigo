@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -126,5 +128,27 @@ func TestShouldSkipFreshDataset(t *testing.T) {
 				t.Fatalf("shouldSkipFreshDataset() = %t, want %t", got, test.want)
 			}
 		})
+	}
+}
+
+func TestTempDownloadFileReturnsTLSFailure(t *testing.T) {
+	server := httptest.NewTLSServer(nil)
+	defer server.Close()
+
+	_, _, _, err := tempDownloadFile(&datasets.DataSet{Source: server.URL}, "")
+	if err == nil {
+		t.Fatal("tempDownloadFile() error = nil, want TLS error")
+	}
+}
+
+func TestTempDownloadFileReturnsHTTPFailure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(503)
+	}))
+	defer server.Close()
+
+	_, _, _, err := tempDownloadFile(&datasets.DataSet{Source: server.URL}, "")
+	if err == nil {
+		t.Fatal("tempDownloadFile() error = nil, want HTTP error")
 	}
 }

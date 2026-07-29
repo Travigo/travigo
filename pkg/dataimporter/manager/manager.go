@@ -185,7 +185,11 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	if isValidUrl(dataset.Source) {
 		var tempFile *os.File
 		var hasChanged bool
-		hasChanged, tempFile, etag = tempDownloadFile(dataset, existingEtag)
+		var err error
+		hasChanged, tempFile, etag, err = tempDownloadFile(dataset, existingEtag)
+		if err != nil {
+			return err
+		}
 
 		if !hasChanged {
 			log.Info().Str("dataset", dataset.Identifier).Msg("File ETag is not new, skipping processing")
@@ -395,8 +399,11 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, string) {
-	req, _ := http.NewRequest("GET", dataset.Source, nil)
+func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, string, error) {
+	req, err := http.NewRequest("GET", dataset.Source, nil)
+	if err != nil {
+		return false, nil, "", fmt.Errorf("create download request: %w", err)
+	}
 	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
 
 	if etag != "" {
@@ -409,7 +416,7 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		// Query paramaters
 		for queryKey, queryValue := range dataset.SourceAuthentication.Query {
 			if env[queryValue] == "" {
-				log.Fatal().Msgf("%s must be set", queryValue)
+				return false, nil, "", fmt.Errorf("%s must be set", queryValue)
 			}
 
 			q := req.URL.Query()
@@ -419,10 +426,10 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		// Basic auth
 		if dataset.SourceAuthentication.Basic.Username != "" && dataset.SourceAuthentication.Basic.Password != "" {
 			if env[dataset.SourceAuthentication.Basic.Username] == "" {
-				log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Username)
+				return false, nil, "", fmt.Errorf("%s must be set", dataset.SourceAuthentication.Basic.Username)
 			}
 			if env[dataset.SourceAuthentication.Basic.Password] == "" {
-				log.Fatal().Msgf("%s must be set", dataset.SourceAuthentication.Basic.Password)
+				return false, nil, "", fmt.Errorf("%s must be set", dataset.SourceAuthentication.Basic.Password)
 			}
 
 			req.SetBasicAuth(env[dataset.SourceAuthentication.Basic.Username], env[dataset.SourceAuthentication.Basic.Password])
@@ -430,7 +437,7 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		// Headers
 		for headerKey, headerValue := range dataset.SourceAuthentication.Header {
 			if env[headerValue] == "" {
-				log.Fatal().Msgf("%s must be set", headerValue)
+				return false, nil, "", fmt.Errorf("%s must be set", headerValue)
 			}
 
 			req.Header.Set(headerKey, env[headerValue])
@@ -450,24 +457,31 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Fatal().Err(err).Msg("Download file")
+		return false, nil, "", fmt.Errorf("download file: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotModified {
-		return false, nil, ""
+		return false, nil, "", nil
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return false, nil, "", fmt.Errorf("download file: unexpected HTTP status %s", resp.Status)
 	}
 
 	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create temporary file")
+		return false, nil, "", fmt.Errorf("create temporary file: %w", err)
 	}
 
 	log.Debug().Str("path", tmpFile.Name()).Msg("Data file downloaded")
 
-	io.Copy(tmpFile, resp.Body)
+	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return false, nil, "", fmt.Errorf("save downloaded file: %w", err)
+	}
 
-	return true, tmpFile, resp.Header.Get("Etag")
+	return true, tmpFile, resp.Header.Get("Etag"), nil
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {
