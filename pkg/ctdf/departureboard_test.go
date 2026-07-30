@@ -63,6 +63,17 @@ func TestBoardRealtimeStopTime(t *testing.T) {
 	}
 }
 
+func TestServiceTimeOnDatePreservesServiceDayOverflow(t *testing.T) {
+	serviceTime := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC).Add(25*time.Hour + 30*time.Minute)
+	date := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+
+	got := serviceTimeOnDate(date, serviceTime)
+	want := time.Date(2026, 7, 31, 1, 30, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("service time on date = %v, want %v", got, want)
+	}
+}
+
 func TestBoardDestinationDisplayUsesJourneyOriginForArrivals(t *testing.T) {
 	journey := &Journey{Path: []*JourneyPathItem{
 		{OriginStop: &Stop{PrimaryName: "First Stop"}},

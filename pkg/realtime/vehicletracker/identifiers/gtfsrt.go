@@ -117,6 +117,29 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		journeysQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
 	}
 
+	// Frequency-expanded journeys retain the source trip_id but expose their
+	// concrete GTFS frequency start time as an additional identifier. Prefer it
+	// when GTFS-RT supplies TripDescriptor.start_time; fall back to the legacy
+	// trip_id-only lookup for ordinary trips and older feeds.
+	if tripStartTime := r.IdentifyingInformation["TripStartTime"]; tripStartTime != "" {
+		frequencyQuery := make(bson.M, len(journeysQuery)+1)
+		for key, value := range journeysQuery {
+			frequencyQuery[key] = value
+		}
+		frequencyQuery["otheridentifiers.GTFS-TripStartTime"] = tripStartTime
+
+		potentialJourneys, err := findPrimaryIdentifiers(journeysCollection, frequencyQuery, 2)
+		if err != nil {
+			return "", err
+		}
+		if len(potentialJourneys) == 1 {
+			return potentialJourneys[0], nil
+		}
+		if len(potentialJourneys) > 1 {
+			return "", errors.New("Could not find referenced trip")
+		}
+	}
+
 	potentialJourneys, err := findPrimaryIdentifiers(journeysCollection, journeysQuery, 2)
 	if err != nil {
 		return "", err

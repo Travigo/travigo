@@ -40,13 +40,11 @@ type Journey struct {
 	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
 	DepartureTimezone    string    `groups:"basic,departureboard-cache" bson:",omitempty"`
 
-	Track           []Location           `groups:"detailed" bson:",omitempty"`
-	TrackRef        string               `groups:"internal" bson:",omitempty"`
-	TrackDataSource *DataSourceReference `groups:"detailed" bson:"-"`
-	Frequency       []JourneyFrequency   `groups:"detailed" bson:",omitempty"`
-
-	DestinationDisplay  string   `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
-	ReplacesJourneyRefs []string `groups:"basic,departureboard-cache" bson:",omitempty"`
+	Track               []Location           `groups:"detailed" bson:",omitempty"`
+	TrackRef            string               `groups:"internal" bson:",omitempty"`
+	TrackDataSource     *DataSourceReference `groups:"detailed" bson:"-"`
+	DestinationDisplay  string               `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	ReplacesJourneyRefs []string             `groups:"basic,departureboard-cache" bson:",omitempty"`
 
 	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 
@@ -205,13 +203,6 @@ type JourneyPathItem struct {
 	TrackDataSource *DataSourceReference `groups:"basic" bson:"-"`
 
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
-}
-
-type JourneyFrequency struct {
-	StartTime      time.Time `groups:"detailed" bson:",omitempty"`
-	EndTime        time.Time `groups:"detailed" bson:",omitempty"`
-	HeadwaySeconds int       `groups:"detailed" bson:",omitempty"`
-	ExactTimes     int8      `groups:"detailed" bson:",omitempty"`
 }
 
 func (jpi *JourneyPathItem) GetReferences() {

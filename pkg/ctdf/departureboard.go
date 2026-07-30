@@ -158,6 +158,14 @@ func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time
 	return stop.DepartureTime
 }
 
+// serviceTimeOnDate converts a GTFS service-day time into a real date without
+// discarding the service-day overflow represented by times such as 25:30:00.
+func serviceTimeOnDate(dateTime time.Time, serviceTime time.Time) time.Time {
+	serviceDayStart := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, dateTime.Location())
+	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
+	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
+}
+
 // BoardDestinationDisplay returns the service destination for departures and
 // the journey origin for arrivals.
 func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardType) string {
@@ -324,10 +332,9 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 				for _, path := range journey.Path {
 					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
 						journeyTime := boardPathTime(path, boardType)
-						journeyDepMins := (journeyTime.Hour() * 60) + journeyTime.Minute()
-						startMins := (dateTime.Hour() * 60) + dateTime.Minute()
+						scheduledBoardTime := serviceTimeOnDate(dateTime, journeyTime)
 
-						if (startMins - journeyDepMins) > 240 {
+						if dateTime.Sub(scheduledBoardTime) > 4*time.Hour {
 							tooOldSkippedCount.Add(1)
 							return nil
 						}
@@ -409,9 +416,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							cancelledCount.Add(1)
 						}
 
-						stopTime = time.Date(
-							dateTime.Year(), dateTime.Month(), dateTime.Day(), refTime.Hour(), refTime.Minute(), refTime.Second(), refTime.Nanosecond(), dateTime.Location(),
-						)
+						stopTime = serviceTimeOnDate(dateTime, refTime)
 
 						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)
 						break

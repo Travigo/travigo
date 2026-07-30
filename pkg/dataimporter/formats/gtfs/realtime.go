@@ -135,13 +135,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			var identifyingInformation []map[string]string
 
 			for _, informedEntity := range entity.Alert.InformedEntity {
-				tripID := informedEntity.GetTrip().GetTripId()
+				trip := informedEntity.GetTrip()
+				tripID := trip.GetTripId()
 				routeID := informedEntity.GetRouteId()
 				stopID := informedEntity.GetStopId()
 				agencyID := informedEntity.GetAgencyId()
 
 				identifyingInformation = append(identifyingInformation, map[string]string{
 					"TripID":        tripID,
+					"TripStartTime": trip.GetStartTime(),
 					"RouteID":       routeID,
 					"StopID":        stopID,
 					"AgencyID":      agencyID,
@@ -193,6 +195,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 		if tripID != "" {
 			withTripID += 1
+			tripStartTime := trip.GetStartTime()
 
 			var timeFrameDateTime time.Time
 
@@ -207,15 +210,21 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
+			localID := fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID)
+			if tripStartTime != "" {
+				localID += "-" + tripStartTime
+			}
+
 			locationEvent := vehicletracker.VehicleUpdateEvent{
 				MessageType: locationEventType,
-				LocalID:     fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID),
+				LocalID:     localID,
 				SourceType:  "GTFS-RT",
 				VehicleLocationUpdate: &vehicletracker.VehicleLocationUpdate{
 					Timeframe: timeframe,
 
 					IdentifyingInformation: map[string]string{
 						"TripID":        tripID,
+						"TripStartTime": tripStartTime,
 						"RouteID":       trip.GetRouteId(),
 						"LinkedDataset": dataset.LinkedDataset,
 					},

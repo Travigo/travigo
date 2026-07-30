@@ -33,11 +33,20 @@ type Schedule struct {
 	ctdfServices  map[string]*ctdf.Service
 	routeMap      map[string]Route
 	stopLocations map[string]ctdf.Location
-	frequencies   map[string][]ctdf.JourneyFrequency
+	frequencies   map[string][]frequencyWindow
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
 	translationIndex map[string]string
+}
+
+type frequencyWindow struct {
+	StartTime      time.Time
+	EndTime        time.Time
+	HeadwaySeconds int
+	// ExactTimes is validated while importing. Both exact and frequency-based
+	// windows are materialized into concrete static journey iterations here.
+	ExactTimes int8
 }
 
 type journeyTrackStore struct {
@@ -402,7 +411,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	})
 
 	//// Frequencies ////
-	g.frequencies = map[string][]ctdf.JourneyFrequency{}
+	g.frequencies = map[string][]frequencyWindow{}
 	if _, exists := g.fileMap["frequencies.txt"]; exists {
 		if err := importObject[Frequency](g, "frequencies.txt", "frequencies", false, func(f Frequency) (any, string) {
 			start, startErr := parseGTFSTime(f.StartTime)
@@ -411,7 +420,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				log.Warn().Str("trip", f.TripID).Msg("Skipping GTFS frequency with invalid time")
 				return nil, ""
 			}
-			g.frequencies[f.TripID] = append(g.frequencies[f.TripID], ctdf.JourneyFrequency{StartTime: start, EndTime: end, HeadwaySeconds: f.HeadwaySeconds, ExactTimes: parseExactTimes(f.ExactTimes)})
+			if !start.Before(end) || f.HeadwaySeconds <= 0 {
+				log.Warn().Str("trip", f.TripID).Msg("Skipping GTFS frequency with invalid window or headway")
+				return nil, ""
+			}
+			exactTimes, exactTimesErr := parseExactTimes(f.ExactTimes)
+			if exactTimesErr != nil {
+				log.Warn().Str("trip", f.TripID).Err(exactTimesErr).Msg("Skipping GTFS frequency with invalid exact_times")
+				return nil, ""
+			}
+			g.frequencies[f.TripID] = append(g.frequencies[f.TripID], frequencyWindow{StartTime: start, EndTime: end, HeadwaySeconds: f.HeadwaySeconds, ExactTimes: exactTimes})
 			return nil, ""
 		}); err != nil {
 			return datasets.DataImportReport{}, err
@@ -590,7 +608,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ShortName:            t.Name,
 			WheelchairAccessible: t.WheelchairAccessible,
 			BikesAllowed:         t.BikesAllowed,
-			Frequency:            g.frequencies[t.ID],
 			DestinationDisplay:   g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
 			DepartureTimezone:    agenciesMap[g.routeMap[t.RouteID].AgencyID].Timezone,
 			Availability:         availability,
@@ -784,25 +801,30 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		// 	journey.OperatorRef = "gb-noc-TFLO"
 		// }
 
-		// Insert
 		if dataset.SupportedObjects.Journeys {
-			// Geometry is persisted exclusively in journey_tracks. Keep the
-			// in-memory fallback available for this import, but never write the
-			// legacy embedded fields back to MongoDB.
-			journey.Track = nil
-			for _, path := range journey.Path {
-				if path != nil {
-					path.Track = nil
-				}
-			}
-			bsonRep, _ := bson.Marshal(bson.M{"$set": journey})
-			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier})
-			updateModel.SetUpdate(bsonRep)
-			updateModel.SetUpsert(true)
+			// Insert one concrete journey for each frequency iteration. Frequency
+			// trips are represented by their expanded journeys in CTDF; the base
+			// template is never persisted.
+			for _, expandedJourney := range expandJourneyForFrequencies(journey, g.frequencies[tripID]) {
 
-			journeysQueue.Add(updateModel)
-			importedJourneys++
+				// Geometry is persisted exclusively in journey_tracks. Keep the
+				// in-memory fallback available for this import, but never write the
+				// legacy embedded fields back to MongoDB.
+				expandedJourney.Track = nil
+				for _, path := range expandedJourney.Path {
+					if path != nil {
+						path.Track = nil
+					}
+				}
+				bsonRep, _ := bson.Marshal(bson.M{"$set": expandedJourney})
+				updateModel := mongo.NewUpdateOneModel()
+				updateModel.SetFilter(bson.M{"primaryidentifier": expandedJourney.PrimaryIdentifier})
+				updateModel.SetUpdate(bsonRep)
+				updateModel.SetUpsert(true)
+
+				journeysQueue.Add(updateModel)
+				importedJourneys++
+			}
 		}
 
 		delete(gtfsTrips, tripID)
@@ -914,12 +936,109 @@ func parseGTFSTime(timestamp string) (time.Time, error) {
 	return time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC).Add(time.Duration(hour)*time.Hour + time.Duration(minute)*time.Minute + time.Duration(second)*time.Second), nil
 }
 
-func parseExactTimes(value string) int8 {
-	parsed, err := strconv.ParseInt(value, 10, 8)
-	if err != nil {
-		return 0
+func parseExactTimes(value string) (int8, error) {
+	switch strings.TrimSpace(value) {
+	case "", "0":
+		return 0, nil
+	case "1":
+		return 1, nil
+	default:
+		return 0, fmt.Errorf("invalid exact_times value %q", value)
 	}
-	return int8(parsed)
+}
+
+func expandJourneyForFrequencies(journey *ctdf.Journey, windows []frequencyWindow) []*ctdf.Journey {
+	if journey == nil {
+		return nil
+	}
+	if len(windows) == 0 {
+		return []*ctdf.Journey{journey}
+	}
+
+	orderedWindows := append([]frequencyWindow(nil), windows...)
+	sort.SliceStable(orderedWindows, func(i, j int) bool {
+		return orderedWindows[i].StartTime.Before(orderedWindows[j].StartTime)
+	})
+
+	templateDepartureTime := journey.DepartureTime
+	if templateDepartureTime.IsZero() && len(journey.Path) > 0 && journey.Path[0] != nil {
+		templateDepartureTime = journey.Path[0].OriginDepartureTime
+	}
+
+	expanded := make([]*ctdf.Journey, 0)
+	var previousWindowEnd time.Time
+	for _, window := range orderedWindows {
+		if window.HeadwaySeconds <= 0 || !window.StartTime.Before(window.EndTime) {
+			continue
+		}
+		// GTFS frequency windows for a trip must not overlap. Keep the first
+		// ordered window if malformed input violates that rule; a window may
+		// legitimately begin exactly when the previous one ends.
+		if !previousWindowEnd.IsZero() && window.StartTime.Before(previousWindowEnd) {
+			continue
+		}
+		previousWindowEnd = window.EndTime
+
+		for occurrenceStart := window.StartTime; occurrenceStart.Before(window.EndTime); occurrenceStart = occurrenceStart.Add(time.Duration(window.HeadwaySeconds) * time.Second) {
+			occurrence := cloneJourneyWithTimeShift(journey, occurrenceStart.Sub(templateDepartureTime))
+			occurrence.PrimaryIdentifier = fmt.Sprintf("%s-frequency-%d", journey.PrimaryIdentifier, gtfsTimeSeconds(occurrenceStart))
+			if occurrence.OtherIdentifiers == nil {
+				occurrence.OtherIdentifiers = map[string]string{}
+			}
+			occurrence.OtherIdentifiers["GTFS-TripStartTime"] = formatGTFSTime(occurrenceStart)
+			expanded = append(expanded, occurrence)
+		}
+	}
+
+	return expanded
+}
+
+func cloneJourneyWithTimeShift(journey *ctdf.Journey, offset time.Duration) *ctdf.Journey {
+	clone := *journey
+
+	if journey.OtherIdentifiers != nil {
+		clone.OtherIdentifiers = make(map[string]string, len(journey.OtherIdentifiers))
+		for key, value := range journey.OtherIdentifiers {
+			clone.OtherIdentifiers[key] = value
+		}
+	}
+	if journey.Availability != nil {
+		availability := *journey.Availability
+		availability.Match = append([]ctdf.AvailabilityRule(nil), journey.Availability.Match...)
+		availability.MatchSecondary = append([]ctdf.AvailabilityRule(nil), journey.Availability.MatchSecondary...)
+		availability.Condition = append([]ctdf.AvailabilityRule(nil), journey.Availability.Condition...)
+		availability.Exclude = append([]ctdf.AvailabilityRule(nil), journey.Availability.Exclude...)
+		clone.Availability = &availability
+	}
+	if journey.Path != nil {
+		clone.Path = make([]*ctdf.JourneyPathItem, len(journey.Path))
+		for index, path := range journey.Path {
+			if path == nil {
+				continue
+			}
+			pathClone := *path
+			pathClone.OriginArrivalTime = path.OriginArrivalTime.Add(offset)
+			pathClone.OriginDepartureTime = path.OriginDepartureTime.Add(offset)
+			pathClone.DestinationArrivalTime = path.DestinationArrivalTime.Add(offset)
+			clone.Path[index] = &pathClone
+		}
+	}
+	if !journey.DepartureTime.IsZero() {
+		clone.DepartureTime = journey.DepartureTime.Add(offset)
+	} else if len(journey.Path) > 0 && journey.Path[0] != nil {
+		clone.DepartureTime = journey.Path[0].OriginDepartureTime.Add(offset)
+	}
+	return &clone
+}
+
+func gtfsTimeSeconds(value time.Time) int64 {
+	base := time.Date(0, time.January, 1, 0, 0, 0, 0, value.Location())
+	return int64(value.Sub(base) / time.Second)
+}
+
+func formatGTFSTime(value time.Time) string {
+	seconds := gtfsTimeSeconds(value)
+	return fmt.Sprintf("%02d:%02d:%02d", seconds/3600, (seconds%3600)/60, seconds%60)
 }
 
 func gtfsStopReference(datasetIdentifier string, stopID string) string {
