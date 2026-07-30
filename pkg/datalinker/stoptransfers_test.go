@@ -1,6 +1,7 @@
 package datalinker
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -64,6 +65,27 @@ func TestStopTransferWorkerCountUsesAtMostHalfCPUs(t *testing.T) {
 		if workers := stopTransferWorkerCount(cpuCount); workers != expectedWorkers {
 			t.Fatalf("expected %d workers for %d CPUs, got %d", expectedWorkers, cpuCount, workers)
 		}
+	}
+}
+
+func TestStaleStopTransferDeletesAreBatched(t *testing.T) {
+	changedStopIDs := make(map[string]struct{}, stopTransferStaleDeleteBatchSize+1)
+	for i := 0; i <= stopTransferStaleDeleteBatchSize; i++ {
+		changedStopIDs[fmt.Sprintf("stop-%05d", i)] = struct{}{}
+	}
+
+	batches := staleStopTransferDeleteBatches(changedStopIDs)
+	if len(batches) != 2 {
+		t.Fatalf("expected 2 stale-delete batches, got %d", len(batches))
+	}
+	if len(batches[0]) != stopTransferStaleDeleteBatchSize {
+		t.Fatalf("first batch contains %d stop IDs, want %d", len(batches[0]), stopTransferStaleDeleteBatchSize)
+	}
+	if len(batches[1]) != 1 {
+		t.Fatalf("second batch contains %d stop IDs, want 1", len(batches[1]))
+	}
+	if batches[0][0] != "stop-00000" || batches[1][0] != fmt.Sprintf("stop-%05d", stopTransferStaleDeleteBatchSize) {
+		t.Fatalf("stale-delete batches are not deterministic: first=%q last=%q", batches[0][0], batches[1][0])
 	}
 }
 

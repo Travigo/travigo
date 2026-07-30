@@ -26,6 +26,7 @@ const (
 	defaultStopTransferWalkSpeedMetresPerSecond = 1.3
 	defaultStopTransferBatchSize                = 10000
 	defaultStopTransferMaxNearbyTransfers       = 24
+	stopTransferStaleDeleteBatchSize            = 10000
 	metresPerDegree                             = 111320.0
 )
 
@@ -628,27 +629,40 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	// planner) never see an empty transfers set.
 	var deletedCount int64
 	if len(changedStopIDs) > 0 {
-		staleQuery := bson.M{
-			"datasource.originalformat": "travigo-stop-transfer-generator",
-			"modificationdatetime":      bson.M{"$lt": now},
+		for _, stopIDs := range staleStopTransferDeleteBatches(changedStopIDs) {
+			staleQuery := bson.M{
+				"datasource.originalformat": "travigo-stop-transfer-generator",
+				"modificationdatetime":      bson.M{"$lt": now},
+				"$or": bson.A{
+					bson.M{"fromstopref": bson.M{"$in": stopIDs}},
+					bson.M{"tostopref": bson.M{"$in": stopIDs}},
+				},
+			}
+			deleted, err := stopTransfersCollection.DeleteMany(ctx, staleQuery)
+			if err != nil {
+				return err
+			}
+			deletedCount += deleted.DeletedCount
 		}
-		stopIDs := make([]string, 0, len(changedStopIDs))
-		for stopID := range changedStopIDs {
-			stopIDs = append(stopIDs, stopID)
-		}
-		staleQuery["$or"] = bson.A{
-			bson.M{"fromstopref": bson.M{"$in": stopIDs}},
-			bson.M{"tostopref": bson.M{"$in": stopIDs}},
-		}
-		deleted, err := stopTransfersCollection.DeleteMany(ctx, staleQuery)
-		if err != nil {
-			return err
-		}
-		deletedCount = deleted.DeletedCount
 	}
 	log.Info().Int64("deleted", deletedCount).Msg("Deleted stale Stop Transfers")
 
 	return nil
+}
+
+func staleStopTransferDeleteBatches(changedStopIDs map[string]struct{}) [][]string {
+	stopIDs := make([]string, 0, len(changedStopIDs))
+	for stopID := range changedStopIDs {
+		stopIDs = append(stopIDs, stopID)
+	}
+	sort.Strings(stopIDs)
+
+	batches := make([][]string, 0, (len(stopIDs)+stopTransferStaleDeleteBatchSize-1)/stopTransferStaleDeleteBatchSize)
+	for start := 0; start < len(stopIDs); start += stopTransferStaleDeleteBatchSize {
+		end := minInt(start+stopTransferStaleDeleteBatchSize, len(stopIDs))
+		batches = append(batches, stopIDs[start:end])
+	}
+	return batches
 }
 
 func flushStopTransferBatch(ctx context.Context, collection *mongo.Collection, operations []mongo.WriteModel) error {

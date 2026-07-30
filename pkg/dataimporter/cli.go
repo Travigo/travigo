@@ -53,13 +53,13 @@ func RegisterCLI() *cli.Command {
 					},
 					&cli.IntFlag{
 						Name:  "max-cpus",
-						Usage: "Maximum number of CPU cores used by the importer",
-						Value: 1,
+						Usage: "Maximum number of CPU cores used by the importer (0 uses the runtime default)",
+						Value: 0,
 					},
 					&cli.IntFlag{
 						Name:  "memory-limit-mb",
 						Usage: "Soft Go heap limit in MiB (0 disables the limit)",
-						Value: 768,
+						Value: 0,
 					},
 				},
 				Action: func(c *cli.Context) error {
@@ -75,19 +75,22 @@ func RegisterCLI() *cli.Command {
 					skipCleanup := c.Bool("skip-cleanup")
 					memStats := c.Bool("mem-stats")
 					maxCPUs := c.Int("max-cpus")
-					if maxCPUs < 1 {
-						maxCPUs = 1
+					if maxCPUs > 0 {
+						previousMaxProcs := runtime.GOMAXPROCS(maxCPUs)
+						defer runtime.GOMAXPROCS(previousMaxProcs)
 					}
-					previousMaxProcs := runtime.GOMAXPROCS(maxCPUs)
-					defer runtime.GOMAXPROCS(previousMaxProcs)
 
 					memoryLimitBytes := int64(c.Int("memory-limit-mb")) * 1024 * 1024
-					if memoryLimitBytes <= 0 {
-						memoryLimitBytes = -1
+					if memoryLimitBytes > 0 {
+						previousMemoryLimit := debug.SetMemoryLimit(memoryLimitBytes)
+						defer debug.SetMemoryLimit(previousMemoryLimit)
 					}
-					previousMemoryLimit := debug.SetMemoryLimit(memoryLimitBytes)
-					defer debug.SetMemoryLimit(previousMemoryLimit)
-					log.Info().Int("max_cpus", maxCPUs).Int64("memory_limit_bytes", memoryLimitBytes).Msg("Configured importer resource limits")
+					resourceLog := log.Info().Int("max_cpus", maxCPUs).Int64("memory_limit_bytes", memoryLimitBytes)
+					if maxCPUs > 0 || memoryLimitBytes > 0 {
+						resourceLog.Msg("Configured importer resource limits")
+					} else {
+						resourceLog.Msg("Importer resource limits disabled")
+					}
 
 					repeatEvery := c.String("repeat-every")
 					repeat := repeatEvery != ""
