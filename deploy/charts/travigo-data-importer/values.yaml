@@ -79,7 +79,7 @@ batchRunner:
   forceImport: false
   allowConcurrentRuns: false
   job:
-    backoffLimit: 0
+    backoffLimit: 3
     ttlSecondsAfterFinished: 3600
     activeDeadlineSeconds: 0
   persistence:

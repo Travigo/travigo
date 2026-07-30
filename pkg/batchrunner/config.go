@@ -42,7 +42,7 @@ func ConfigFromEnv() Config {
 		JobImage:                 envOrDefault("TRAVIGO_BATCH_JOB_IMAGE", "ghcr.io/travigo/travigo:main"),
 		JobImagePullPolicy:       envOrDefault("TRAVIGO_BATCH_JOB_IMAGE_PULL_POLICY", "Always"),
 		JobServiceAccountName:    envOrDefault("TRAVIGO_BATCH_JOB_SERVICE_ACCOUNT", "default"),
-		JobBackoffLimit:          envIntOrDefault("TRAVIGO_BATCH_JOB_BACKOFF_LIMIT", 0),
+		JobBackoffLimit:          envIntOrDefault("TRAVIGO_BATCH_JOB_BACKOFF_LIMIT", 3),
 		JobTTLSeconds:            envIntOrDefault("TRAVIGO_BATCH_JOB_TTL_SECONDS", 3600),
 		JobActiveDeadlineSeconds: int64(envIntOrDefault("TRAVIGO_BATCH_JOB_ACTIVE_DEADLINE_SECONDS", 0)),
 		AllowConcurrentRuns:      os.Getenv("TRAVIGO_BATCH_ALLOW_CONCURRENT_RUNS") == "true",
