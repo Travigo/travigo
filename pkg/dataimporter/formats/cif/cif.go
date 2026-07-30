@@ -202,6 +202,7 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 	// Import journeys
 	log.Info().Msg("Importing CTDF Journeys into Mongo")
 	var operationInsert uint64
+	var preservedTrackRefs int
 
 	maxBatchSize := 200
 	numBatches := int(math.Ceil(float64(len(journeys)) / float64(maxBatchSize)))
@@ -215,6 +216,11 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 		}
 
 		batchSlice := journeys[lower:upper]
+		preserved, err := preserveExistingJourneyTrackRefs(context.Background(), journeysCollection, batchSlice)
+		if err != nil {
+			return datasets.DataImportReport{}, fmt.Errorf("preserve existing journey track references: %w", err)
+		}
+		preservedTrackRefs += preserved
 
 		var operations []mongo.WriteModel
 
@@ -242,10 +248,89 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", operationInsert)
+	log.Info().Int("track_refs", preservedTrackRefs).Msg("Preserved National Rail journey track references")
 
 	return datasets.DataImportReport{
 		ImportedJourneys: int(operationInsert),
 	}, nil
+}
+
+func preserveExistingJourneyTrackRefs(ctx context.Context, collection *mongo.Collection, replacements []*ctdf.Journey) (int, error) {
+	replacementsByID := make(map[string]*ctdf.Journey, len(replacements))
+	identifiers := make([]string, 0, len(replacements))
+	for _, journey := range replacements {
+		if journey == nil || journey.PrimaryIdentifier == "" {
+			continue
+		}
+		replacementsByID[journey.PrimaryIdentifier] = journey
+		identifiers = append(identifiers, journey.PrimaryIdentifier)
+	}
+	if len(identifiers) == 0 {
+		return 0, nil
+	}
+
+	cursor, err := collection.Find(ctx, bson.M{
+		"primaryidentifier": bson.M{"$in": identifiers},
+		"path.trackref":     bson.M{"$exists": true, "$ne": ""},
+	}, options.Find().SetProjection(bson.M{
+		"primaryidentifier":       1,
+		"path.originstopref":      1,
+		"path.destinationstopref": 1,
+		"path.trackref":           1,
+	}))
+	if err != nil {
+		return 0, err
+	}
+	defer cursor.Close(ctx)
+
+	preserved := 0
+	for cursor.Next(ctx) {
+		var existing ctdf.Journey
+		if err := cursor.Decode(&existing); err != nil {
+			return 0, err
+		}
+		replacement := replacementsByID[existing.PrimaryIdentifier]
+		if replacement == nil {
+			continue
+		}
+		preserved += preserveMatchingJourneyTrackRefs(&existing, replacement)
+	}
+	return preserved, cursor.Err()
+}
+
+func preserveMatchingJourneyTrackRefs(existing *ctdf.Journey, replacement *ctdf.Journey) int {
+	if existing == nil || replacement == nil {
+		return 0
+	}
+
+	type legKey struct {
+		origin      string
+		destination string
+	}
+	existingRefs := make(map[legKey][]string)
+	for _, path := range existing.Path {
+		if path == nil || path.TrackRef == "" {
+			continue
+		}
+		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef}
+		existingRefs[key] = append(existingRefs[key], path.TrackRef)
+	}
+
+	preserved := 0
+	for _, path := range replacement.Path {
+		if path == nil || path.TrackRef != "" {
+			continue
+		}
+		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef}
+		refs := existingRefs[key]
+		if len(refs) == 0 {
+			continue
+		}
+		path.TrackRef = refs[0]
+		existingRefs[key] = refs[1:]
+		preserved++
+	}
+	return preserved
 }
 
 func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trainDef *TrainDefinitionSet) *ctdf.Journey {
