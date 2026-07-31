@@ -49,7 +49,9 @@ func (l Linker[T]) Run() error {
 	dropCollection(stagingCollectionName)
 	defer dropCollection(stagingCollectionName)
 
-	copyCollection(rawCollectionName, stagingCollectionName)
+	if err := copyCollection(rawCollectionName, stagingCollectionName); err != nil {
+		return err
+	}
 
 	log.Info().Msg("Fetching aggregate records started")
 
@@ -170,7 +172,9 @@ func (l Linker[T]) Run() error {
 	stagingCollection.DeleteMany(context.Background(), bson.M{"primaryidentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
 
 	// Copy staging to live
-	copyCollection(stagingCollectionName, liveCollectionName)
+	if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
+		return err
+	}
 
 	compactLinkedCollections(context.Background(), rawCollectionName, liveCollectionName)
 

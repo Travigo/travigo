@@ -300,7 +300,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			cleanupOldRecords("services_raw", datasource)
 		}
 		if dataset.SupportedObjects.Journeys {
-			cleanupOldRecords("journeys", datasource)
+			cleanupOldRecords(database.JourneysRawCollectionName, datasource)
 			cleanupOldRecords("journey_tracks", datasource)
 		}
 	}

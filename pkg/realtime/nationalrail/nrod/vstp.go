@@ -146,7 +146,7 @@ func (v *VSTPMessage) processOverlay() {
 		log.Error().Err(err).Str("trainuid", v.VSTP.Schedule.TrainUID).Msg("Failed while reading permanent journeys for VSTP overlay")
 	}
 
-	if _, err := journeysCollection.UpdateOne(
+	if err := updateJourneyCollections(
 		context.Background(),
 		bson.M{"primaryidentifier": overlayJourney.PrimaryIdentifier},
 		bson.M{"$set": bson.M{"replacesjourneyrefs": replacedJourneyRefs}},
@@ -411,12 +411,28 @@ func (v *VSTPMessage) processCreate() {
 	if len(updateOperations) > 0 {
 		// TODO we also need to clear any stop journey caches
 
-		journeysCollection := database.GetCollection("journeys")
-		_, err := journeysCollection.BulkWrite(context.Background(), updateOperations, &options.BulkWriteOptions{})
-		if err != nil {
+		if err := bulkWriteJourneyCollections(context.Background(), updateOperations); err != nil {
 			log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 		}
 	}
+}
+
+func bulkWriteJourneyCollections(ctx context.Context, operations []mongo.WriteModel) error {
+	for _, collectionName := range []string{database.JourneysCollectionName, database.JourneysRawCollectionName} {
+		if _, err := database.GetCollection(collectionName).BulkWrite(ctx, operations, &options.BulkWriteOptions{}); err != nil {
+			return fmt.Errorf("write VSTP journeys to %s: %w", collectionName, err)
+		}
+	}
+	return nil
+}
+
+func updateJourneyCollections(ctx context.Context, filter, update interface{}) error {
+	for _, collectionName := range []string{database.JourneysCollectionName, database.JourneysRawCollectionName} {
+		if _, err := database.GetCollection(collectionName).UpdateOne(ctx, filter, update); err != nil {
+			return fmt.Errorf("update VSTP journey in %s: %w", collectionName, err)
+		}
+	}
+	return nil
 }
 
 func (v *VSTPMessage) processDelete() {

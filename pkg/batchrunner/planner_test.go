@@ -2,6 +2,7 @@ package batchrunner
 
 import (
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -25,8 +26,8 @@ func TestBuildRunTasksDatasetSelection(t *testing.T) {
 	}
 
 	allTasks := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
-	if len(allTasks) != 6 {
-		t.Fatalf("expected all plan tasks to produce 6 tasks, got %d", len(allTasks))
+	if len(allTasks) != 7 {
+		t.Fatalf("expected all plan tasks to produce 7 tasks, got %d", len(allTasks))
 	}
 
 	selectedTasks := BuildRunTasks(plan, RunOptions{TaskIDs: []string{"medium-a", "link-stops"}})
@@ -47,15 +48,16 @@ func TestBuildStages(t *testing.T) {
 		{ID: "large-a", Kind: TaskKindDataset, Size: "large"},
 		{ID: "medium-a", Kind: TaskKindDataset, Size: "medium"},
 		{ID: "link-stops", Kind: TaskKindLinkStops},
+		{ID: "link-journeys", Kind: TaskKindLinkJourneys},
 		{ID: "enrich-a", Kind: TaskKindDataset, Size: enrichmentGroup},
 	}
 
 	stages := buildStages(tasks)
-	if len(stages) != 5 {
-		t.Fatalf("expected 5 stages, got %d", len(stages))
+	if len(stages) != 6 {
+		t.Fatalf("expected 6 stages, got %d", len(stages))
 	}
 
-	expected := [][]int{{0}, {2}, {1}, {3}, {4}}
+	expected := [][]int{{0}, {2}, {1}, {3}, {4}, {5}}
 	for i := range expected {
 		if len(stages[i]) != len(expected[i]) {
 			t.Fatalf("stage %d length mismatch", i)
@@ -65,6 +67,23 @@ func TestBuildStages(t *testing.T) {
 				t.Fatalf("stage %d index %d: expected %d, got %d", i, j, expected[i][j], stages[i][j])
 			}
 		}
+	}
+}
+
+func TestJourneyPublisherTask(t *testing.T) {
+	tasks := BuildRunTasks(Plan{Groups: map[string][]PlanTask{
+		postProcessingGroup: buildPostProcessingPlanTasks(),
+	}}, RunOptions{TaskIDs: []string{"link-journeys"}})
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected one journey publisher task, got %d", len(tasks))
+	}
+	if tasks[0].Kind != TaskKindLinkJourneys {
+		t.Fatalf("expected journey linker kind, got %s", tasks[0].Kind)
+	}
+	expectedArgs := []string{"data-linker", "run", "--type", "journeys"}
+	if !slices.Equal(tasks[0].Args, expectedArgs) {
+		t.Fatalf("journey publisher args = %q, expected %q", tasks[0].Args, expectedArgs)
 	}
 }
 

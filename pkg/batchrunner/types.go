@@ -9,6 +9,7 @@ const (
 	TaskKindLinkStops     TaskKind = "link-stops"
 	TaskKindLinkTransfers TaskKind = "link-stop-transfers"
 	TaskKindLinkServices  TaskKind = "link-services"
+	TaskKindLinkJourneys  TaskKind = "link-journeys"
 	TaskKindIndexStops    TaskKind = "index-stops"
 )
 

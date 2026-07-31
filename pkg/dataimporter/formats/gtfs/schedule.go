@@ -15,6 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
@@ -625,7 +626,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return journey
 	}
 
-	importObject[Trip](g, "trips.txt", "journeys", false, func(t Trip) (any, string) {
+	importObject[Trip](g, "trips.txt", database.JourneysRawCollectionName, false, func(t Trip) (any, string) {
 		if g.ctdfServices[t.RouteID] == nil {
 			log.Debug().Str("trip", t.ID).Str("route", t.RouteID).Msg("Cannot find service for this trip")
 			return nil, ""
@@ -659,7 +660,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	defer stopTimeGroups.Close()
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue("journeys", 1*time.Second, 1*time.Minute, journeyBatchSize)
+	journeysQueue := NewDatabaseBatchProcessingQueue(database.JourneysRawCollectionName, 1*time.Second, 1*time.Minute, journeyBatchSize)
 	importedJourneys := 0
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()

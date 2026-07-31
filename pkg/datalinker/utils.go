@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
@@ -9,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func copyCollection(source string, destination string) {
+func copyCollection(source string, destination string) error {
 	log.Info().Str("src", source).Str("dst", destination).Msg("Copying collection")
 	sourceCollection := database.GetCollection(source)
 
@@ -18,7 +19,13 @@ func copyCollection(source string, destination string) {
 		bson.D{{Key: "$out", Value: destination}},
 	}
 
-	sourceCollection.Aggregate(context.Background(), aggregation)
+	cursor, err := sourceCollection.Aggregate(context.Background(), aggregation)
+	if err != nil {
+		return fmt.Errorf("copy collection %s to %s: %w", source, destination, err)
+	}
+	defer cursor.Close(context.Background())
+
+	return cursor.Err()
 }
 
 func dropCollection(collectionName string) {

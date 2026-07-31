@@ -26,6 +26,7 @@ var postProcessingTaskDefinitions = []fixedTaskDefinition{
 	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}},
 	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}},
 	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}},
+	{id: "link-journeys", name: "Publish journeys", kind: TaskKindLinkJourneys, args: []string{"data-linker", "run", "--type", "journeys"}},
 	{id: "index-stops", name: "Index stops", kind: TaskKindIndexStops, args: []string{"indexer", "stops"}},
 }
 

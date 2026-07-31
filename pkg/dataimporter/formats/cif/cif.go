@@ -196,8 +196,10 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 
 	log.Info().Msgf(" - %d Journeys", len(journeys))
 
-	// Journeys table
-	journeysCollection := database.GetCollection("journeys")
+	// Preserve enrichment from the live collection while writing the refreshed
+	// timetable into the lightly indexed raw collection.
+	liveJourneysCollection := database.GetCollection(database.JourneysCollectionName)
+	rawJourneysCollection := database.GetCollection(database.JourneysRawCollectionName)
 
 	// Import journeys
 	log.Info().Msg("Importing CTDF Journeys into Mongo")
@@ -216,7 +218,7 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 		}
 
 		batchSlice := journeys[lower:upper]
-		preserved, err := preserveExistingJourneyTrackRefs(context.Background(), journeysCollection, batchSlice)
+		preserved, err := preserveExistingJourneyTrackRefs(context.Background(), liveJourneysCollection, batchSlice)
 		if err != nil {
 			return datasets.DataImportReport{}, fmt.Errorf("preserve existing journey track references: %w", err)
 		}
@@ -239,7 +241,7 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 		}
 
 		if len(operations) > 0 {
-			_, err := journeysCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
+			_, err := rawJourneysCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 			if err != nil {
 				log.Fatal().Err(err).Msg("Failed to bulk write Journeys")
 			}

@@ -72,7 +72,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	transportType = ctdf.TransportTypeCoach
 
 	servicesCollection := database.GetCollection("services_raw")
-	journeysCollection := database.GetCollection("journeys")
+	journeysCollection := database.GetCollection(database.JourneysRawCollectionName)
 
 	// Map the local operator references to globally unique operator codes based on NOC
 	operatorLocalMapping := map[string]string{}

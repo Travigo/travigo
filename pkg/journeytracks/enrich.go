@@ -117,7 +117,7 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}) 
 		if len(models) == 0 {
 			return nil
 		}
-		_, err := database.GetCollection("journeys").BulkWrite(ctx, models)
+		err := bulkWriteJourneyPaths(ctx, models)
 		models = models[:0]
 		return err
 	}
@@ -197,9 +197,18 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		return err
 	}
 	if len(models) > 0 {
-		_, err = database.GetCollection("journeys").BulkWrite(ctx, models)
+		err = bulkWriteJourneyPaths(ctx, models)
 	}
 	return err
+}
+
+func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel) error {
+	for _, collectionName := range []string{database.JourneysCollectionName, database.JourneysRawCollectionName} {
+		if _, err := database.GetCollection(collectionName).BulkWrite(ctx, models); err != nil {
+			return fmt.Errorf("update journey paths in %s: %w", collectionName, err)
+		}
+	}
+	return nil
 }
 
 func indexRoutesByEndpoints(routes []Route) map[string][]Route {

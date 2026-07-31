@@ -166,6 +166,11 @@ func RegisterCLI() *cli.Command {
 						if err := linker.Run(); err != nil {
 							return err
 						}
+					case "journeys":
+						linker := NewPlainCopyLinker("journey")
+						if err := linker.Run(); err != nil {
+							return err
+						}
 					default:
 						return errors.New("Unknown type")
 					}

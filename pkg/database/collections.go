@@ -9,6 +9,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	JourneysCollectionName        = "journeys"
+	JourneysRawCollectionName     = "journeys_raw"
+	JourneysStagingCollectionName = "journeys_staging"
+)
+
 func createIndexes() {
 	createStopsIndexes()
 	createStopTransferIndexes()
@@ -247,8 +253,29 @@ func createOperatorsIndexes() {
 }
 
 func createJourneysIndexes() {
+	journeysRawCollection := GetCollection(JourneysRawCollectionName)
+	_, err := journeysRawCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
+		{Keys: bson.D{
+			{Key: "datasource.originalformat", Value: 1},
+			{Key: "datasource.datasetid", Value: 1},
+			{Key: "datasource.timestamp", Value: 1},
+		}},
+	})
+	if err != nil {
+		log.Error().Err(err).Str("collection", JourneysRawCollectionName).Msg("Creating journey import indexes")
+	}
+
+	journeysStagingCollection := GetCollection(JourneysStagingCollectionName)
+	_, err = journeysStagingCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
+	})
+	if err != nil {
+		log.Error().Err(err).Str("collection", JourneysStagingCollectionName).Msg("Creating journey import indexes")
+	}
+
 	journeyTracksCollection := GetCollection("journey_tracks")
-	_, err := journeyTracksCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}})
+	_, err = journeyTracksCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}})
 	if err != nil {
 		log.Error().Err(err).Msg("Creating journey track indexes")
 	}
@@ -293,7 +320,7 @@ func createJourneysIndexes() {
 	}
 
 	// Journeys
-	journeysCollection := GetCollection("journeys")
+	journeysCollection := GetCollection(JourneysCollectionName)
 
 	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
 	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
