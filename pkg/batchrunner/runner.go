@@ -3,6 +3,7 @@ package batchrunner
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 )
@@ -329,19 +330,15 @@ func (r *Runner) markTaskCancelled(run *Run, runMu *sync.Mutex, index int, messa
 }
 
 func buildStages(tasks []Task) [][]int {
-	stages := [][]int{}
 	sizeIndexes := map[string][]int{
-		"small":         {},
-		"medium":        {},
-		"large":         {},
-		enrichmentGroup: {},
+		"small":  {},
+		"medium": {},
+		"large":  {},
 	}
 	for i, task := range tasks {
-		if task.Kind == TaskKindDataset {
+		if task.Kind == TaskKindDataset && slices.Contains(initialDatasetSizes, task.Size) {
 			sizeIndexes[task.Size] = append(sizeIndexes[task.Size], i)
-			continue
 		}
-		stages = append(stages, []int{i})
 	}
 
 	ordered := [][]int{}
@@ -350,9 +347,25 @@ func buildStages(tasks []Task) [][]int {
 			ordered = append(ordered, sizeIndexes[size])
 		}
 	}
-	ordered = append(ordered, stages...)
-	if len(sizeIndexes[enrichmentGroup]) > 0 {
-		ordered = append(ordered, sizeIndexes[enrichmentGroup])
+	for index := 0; index < len(tasks); {
+		task := tasks[index]
+		if task.Kind == TaskKindDataset && slices.Contains(initialDatasetSizes, task.Size) {
+			index++
+			continue
+		}
+		if task.Kind != TaskKindDataset {
+			ordered = append(ordered, []int{index})
+			index++
+			continue
+		}
+
+		stageSize := task.Size
+		stage := []int{}
+		for index < len(tasks) && tasks[index].Kind == TaskKindDataset && tasks[index].Size == stageSize {
+			stage = append(stage, index)
+			index++
+		}
+		ordered = append(ordered, stage)
 	}
 	return ordered
 }

@@ -13,7 +13,7 @@ datasets:
 - identifier: gb-national-rail-tracks
   format: gb-osm-rail-tracks
   source: "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf"
-  datasetsize: enrichment
+  datasetsize: journey-enrichment
   refreshinterval: 168h
   supportedobjects:
     journeytracks: true

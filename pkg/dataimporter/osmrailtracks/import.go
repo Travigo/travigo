@@ -197,7 +197,7 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 }
 
 func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, error) {
-	cursor, err := database.GetCollection("journeys").Find(
+	cursor, err := database.GetCollection(database.JourneysRawCollectionName).Find(
 		ctx,
 		bson.M{"datasource.datasetid": datasetID},
 		options.Find().SetProjection(bson.M{"path.originstopref": 1, "path.destinationstopref": 1, "serviceref": 1}),

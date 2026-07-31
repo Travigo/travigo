@@ -163,7 +163,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			return err
 		}
 		if dataset.SupportedObjects.JourneyTracks {
-			if err := applyJourneyTracks(datasource, !skipCleanup); err != nil {
+			if err := applyJourneyTracks(dataset, datasource, !skipCleanup); err != nil {
 				return err
 			}
 		}
@@ -279,7 +279,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	if dataset.SupportedObjects.JourneyTracks {
-		if err := applyJourneyTracks(datasource, !skipCleanup); err != nil {
+		if err := applyJourneyTracks(dataset, datasource, !skipCleanup); err != nil {
 			return err
 		}
 	}
@@ -348,8 +348,14 @@ func shouldSkipFreshDataset(dataset *datasets.DataSet, version *ctdf.DatasetVers
 	return version.LastModified.Add(dataset.RefreshInterval).After(now)
 }
 
-func applyJourneyTracks(datasource *ctdf.DataSourceReference, cleanup bool) error {
-	if err := journeytracks.ApplyDataset(context.Background(), datasource.DatasetID, datasource.Timestamp); err != nil {
+func applyJourneyTracks(dataset *datasets.DataSet, datasource *ctdf.DataSourceReference, cleanup bool) error {
+	var err error
+	if dataset.Format == datasets.DataSetFormatOSMRailTracks {
+		err = journeytracks.ApplyDatasetToCollection(context.Background(), datasource.DatasetID, datasource.Timestamp, database.JourneysRawCollectionName)
+	} else {
+		err = journeytracks.ApplyDataset(context.Background(), datasource.DatasetID, datasource.Timestamp)
+	}
+	if err != nil {
 		return err
 	}
 	if cleanup {

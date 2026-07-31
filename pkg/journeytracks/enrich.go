@@ -18,6 +18,19 @@ import (
 // applies the dataset's current route tracks to matching scheduled journeys.
 // Existing geometry from any other dataset remains authoritative.
 func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error {
+	return applyDataset(ctx, datasetID, timestamp, database.JourneysCollectionName, []string{
+		database.JourneysCollectionName,
+		database.JourneysRawCollectionName,
+	})
+}
+
+// ApplyDatasetToCollection applies route tracks within one journey collection.
+// It is used by enrichment stages that run before that collection is published.
+func ApplyDatasetToCollection(ctx context.Context, datasetID string, timestamp string, collectionName string) error {
+	return applyDataset(ctx, datasetID, timestamp, collectionName, []string{collectionName})
+}
+
+func applyDataset(ctx context.Context, datasetID string, timestamp string, readCollectionName string, writeCollectionNames []string) error {
 	routes, err := Load(ctx, Filter{DatasetID: datasetID, Timestamp: timestamp})
 	if err != nil {
 		return err
@@ -26,7 +39,7 @@ func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error
 	if err != nil {
 		return err
 	}
-	if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs); err != nil {
+	if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, readCollectionName, writeCollectionNames); err != nil {
 		return err
 	}
 
@@ -60,7 +73,7 @@ func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error
 		if len(candidates) == 0 {
 			continue
 		}
-		if err := applyServiceJourneys(ctx, serviceRefs, candidates); err != nil {
+		if err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, writeCollectionNames); err != nil {
 			return err
 		}
 	}
@@ -103,7 +116,7 @@ func datasetTrackRefs(ctx context.Context, datasetID string) (map[string]struct{
 	return refs, cursor.Err()
 }
 
-func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}) error {
+func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, readCollectionName string, writeCollectionNames []string) error {
 	if len(owned) == 0 {
 		return nil
 	}
@@ -117,13 +130,13 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}) 
 		if len(models) == 0 {
 			return nil
 		}
-		err := bulkWriteJourneyPaths(ctx, models)
+		err := bulkWriteJourneyPaths(ctx, models, writeCollectionNames)
 		models = models[:0]
 		return err
 	}
 	for start := 0; start < len(refs); start += 5000 {
 		end := min(start+5000, len(refs))
-		cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{"path.trackref": bson.M{"$in": refs[start:end]}})
+		cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"path.trackref": bson.M{"$in": refs[start:end]}})
 		if err != nil {
 			return err
 		}
@@ -167,9 +180,9 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}) 
 	return flush()
 }
 
-func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route) error {
+func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, writeCollectionNames []string) error {
 	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
-	cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
+	cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
 	if err != nil {
 		return err
 	}
@@ -197,13 +210,13 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		return err
 	}
 	if len(models) > 0 {
-		err = bulkWriteJourneyPaths(ctx, models)
+		err = bulkWriteJourneyPaths(ctx, models, writeCollectionNames)
 	}
 	return err
 }
 
-func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel) error {
-	for _, collectionName := range []string{database.JourneysCollectionName, database.JourneysRawCollectionName} {
+func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, collectionNames []string) error {
+	for _, collectionName := range collectionNames {
 		if _, err := database.GetCollection(collectionName).BulkWrite(ctx, models); err != nil {
 			return fmt.Errorf("update journey paths in %s: %w", collectionName, err)
 		}

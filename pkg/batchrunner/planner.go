@@ -9,25 +9,28 @@ import (
 )
 
 const postProcessingGroup = "post-processing"
+const journeyEnrichmentGroup = "journey-enrichment"
+const journeyPublishingGroup = "journey-publishing"
 const enrichmentGroup = "enrichment"
 
-var datasetSizes = []string{"small", "medium", "large", enrichmentGroup}
+var datasetSizes = []string{"small", "medium", "large", journeyEnrichmentGroup, enrichmentGroup}
 var initialDatasetSizes = []string{"small", "medium", "large"}
-var planGroupOrder = []string{"small", "medium", "large", postProcessingGroup, enrichmentGroup}
+var planGroupOrder = []string{"small", "medium", "large", postProcessingGroup, journeyEnrichmentGroup, journeyPublishingGroup, enrichmentGroup}
 
 type fixedTaskDefinition struct {
-	id   string
-	name string
-	kind TaskKind
-	args []string
+	id    string
+	name  string
+	kind  TaskKind
+	args  []string
+	group string
 }
 
 var postProcessingTaskDefinitions = []fixedTaskDefinition{
-	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}},
-	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}},
-	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}},
-	{id: "link-journeys", name: "Publish journeys", kind: TaskKindLinkJourneys, args: []string{"data-linker", "run", "--type", "journeys"}},
-	{id: "index-stops", name: "Index stops", kind: TaskKindIndexStops, args: []string{"indexer", "stops"}},
+	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}, group: postProcessingGroup},
+	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}, group: postProcessingGroup},
+	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}, group: postProcessingGroup},
+	{id: "link-journeys", name: "Publish journeys", kind: TaskKindLinkJourneys, args: []string{"data-linker", "run", "--type", "journeys"}, group: journeyPublishingGroup},
+	{id: "index-stops", name: "Index stops", kind: TaskKindIndexStops, args: []string{"indexer", "stops"}, group: journeyPublishingGroup},
 }
 
 func BuildPlan() Plan {
@@ -66,7 +69,8 @@ func BuildPlan() Plan {
 			return plan.Groups[size][i].Identifier < plan.Groups[size][j].Identifier
 		})
 	}
-	plan.Groups[postProcessingGroup] = buildPostProcessingPlanTasks()
+	plan.Groups[postProcessingGroup] = buildPostProcessingPlanTasks(postProcessingGroup)
+	plan.Groups[journeyPublishingGroup] = buildPostProcessingPlanTasks(journeyPublishingGroup)
 
 	return plan
 }
@@ -91,9 +95,12 @@ func BuildRunTasks(plan Plan, options RunOptions) []Task {
 	return tasks
 }
 
-func buildPostProcessingPlanTasks() []PlanTask {
+func buildPostProcessingPlanTasks(group string) []PlanTask {
 	tasks := make([]PlanTask, 0, len(postProcessingTaskDefinitions))
 	for _, definition := range postProcessingTaskDefinitions {
+		if definition.group != group {
+			continue
+		}
 		tasks = append(tasks, PlanTask{
 			Identifier: definition.id,
 			Name:       definition.name,
@@ -136,7 +143,7 @@ func taskFromPlanTask(item PlanTask, options RunOptions) (Task, bool) {
 	for _, definition := range postProcessingTaskDefinitions {
 		if definition.id == item.Identifier {
 			task := fixedTask(definition.id, definition.name, definition.kind, definition.args)
-			task.Size = postProcessingGroup
+			task.Size = definition.group
 			return task, true
 		}
 	}

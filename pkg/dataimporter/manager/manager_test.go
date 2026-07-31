@@ -78,7 +78,7 @@ func TestOSMRailTracksIsARegisteredBatchDataset(t *testing.T) {
 	if dataset.Format != datasets.DataSetFormatOSMRailTracks {
 		t.Fatalf("format = %q", dataset.Format)
 	}
-	if dataset.DatasetSize != "enrichment" || !dataset.SupportedObjects.JourneyTracks {
+	if dataset.DatasetSize != "journey-enrichment" || !dataset.SupportedObjects.JourneyTracks {
 		t.Fatalf("dataset is not configured as a journey-track enrichment import: %+v", dataset)
 	}
 	if dataset.LinkedDataset != "gb-nationalrail-timetable" {
