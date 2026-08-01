@@ -266,14 +266,6 @@ func createJourneysIndexes() {
 		log.Error().Err(err).Str("collection", JourneysRawCollectionName).Msg("Creating journey import indexes")
 	}
 
-	journeysStagingCollection := GetCollection(JourneysStagingCollectionName)
-	_, err = journeysStagingCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{
-		Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
-	})
-	if err != nil {
-		log.Error().Err(err).Str("collection", JourneysStagingCollectionName).Msg("Creating journey import indexes")
-	}
-
 	journeyTracksCollection := GetCollection("journey_tracks")
 	_, err = journeyTracksCollection.Indexes().CreateOne(context.Background(), mongo.IndexModel{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}})
 	if err != nil {
