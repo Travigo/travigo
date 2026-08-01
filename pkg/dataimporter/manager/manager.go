@@ -449,7 +449,7 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 			req.Header.Set(headerKey, env[headerValue])
 		}
 		if dataset.SourceAuthentication.AuthHeader != "" {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", dataset.SourceAuthentication.AuthHeader))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", env[dataset.SourceAuthentication.AuthHeader]))
 		}
 		// Customs
 		switch dataset.SourceAuthentication.Custom {
