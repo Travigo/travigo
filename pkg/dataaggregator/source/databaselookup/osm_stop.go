@@ -25,7 +25,7 @@ import (
 
 const (
 	osmStopCollectionName    = "osm_stops"
-	osmStopQueryVersion      = 8
+	osmStopQueryVersion      = 9
 	defaultOverpassTimeout   = 90 * time.Second
 	defaultRailSearchRadius  = 700
 	defaultBusSearchRadius   = 150
@@ -393,7 +393,35 @@ way(bn.platform_nodes)
 
 (
   .station;
+  .member_nodes;
+  .member_ways;
+  .member_relations;
+  .nested_nodes;
+  .nested_ways;
+  .nested_relations;
+  .all_stop_positions;
+  .all_platform_ways;
+  .platform_edges_from_platforms;
+  .candidate_pois;
+  .candidate_parking;
+)->.candidate_membership_elements;
+
+(
+  relation(bn.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+  relation(bw.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+  relation(br.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+)->.candidate_stop_areas;
+
+(
+  .station;
   relation.stop_area;
+  .candidate_stop_areas;
   .member_nodes;
   .member_ways;
   .member_relations;
@@ -519,7 +547,34 @@ way(bn.platform_nodes)
 )->.candidate_parking;
 
 (
+  .member_nodes;
+  .member_ways;
+  .member_relations;
+  .nested_nodes;
+  .nested_ways;
+  .nested_relations;
+  .all_stop_positions;
+  .all_platform_ways;
+  .platform_edges_from_platforms;
+  .candidate_pois;
+  .candidate_parking;
+)->.candidate_membership_elements;
+
+(
+  relation(bn.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+  relation(bw.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+  relation(br.candidate_membership_elements)
+    ["type"="public_transport"]
+    ["public_transport"="stop_area"];
+)->.candidate_stop_areas;
+
+(
   relation.stop_area;
+  .candidate_stop_areas;
   .member_nodes;
   .member_ways;
   .member_relations;
@@ -656,9 +711,12 @@ func overpassQuote(value string) string {
 func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overpassElement, *overpassElement, *overpassElement) {
 	stopArea := selectBestStopArea(elements, stop)
 	station := selectBestStation(elements, stopArea)
+	byKey := mapOverpassElementsByKey(elements)
+	stopAreaMemberships := buildStopAreaMemberships(elements)
+	targetStopAreaKeys := buildTargetStopAreaKeys(elements, stopArea, stop, byKey)
 
 	if stopArea == nil {
-		return elements, nil, station
+		return filterElementsAssignedToOtherStopAreas(elements, stopAreaMemberships, targetStopAreaKeys), nil, station
 	}
 
 	included := map[string]bool{
@@ -670,7 +728,6 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 	stationPolygons := [][]overpassPoint{}
 	stationRetailAnchors := []overpassPoint{}
 
-	byKey := mapOverpassElementsByKey(elements)
 	for _, member := range stopArea.Members {
 		key := overpassElementRefKey(member.Type, member.Ref)
 		included[key] = true
@@ -735,6 +792,9 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 		if len(matchedStationAnchors) == 0 || !elementNearAnyPoint(element, matchedStationAnchors, 250) {
 			continue
 		}
+		if elementBelongsOnlyToOtherStopAreas(element, stopAreaMemberships, targetStopAreaKeys) {
+			continue
+		}
 		if isPlatform(element) {
 			included[overpassElementKey(element)] = true
 			for _, nodeID := range element.Nodes {
@@ -751,6 +811,9 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 
 	for _, element := range elements {
 		if included[overpassElementKey(element)] {
+			continue
+		}
+		if elementBelongsOnlyToOtherStopAreas(element, stopAreaMemberships, targetStopAreaKeys) {
 			continue
 		}
 
@@ -787,12 +850,92 @@ func selectOSMStopElements(elements []overpassElement, stop *ctdf.Stop) ([]overp
 
 	selected := make([]overpassElement, 0, len(included))
 	for _, element := range elements {
-		if included[overpassElementKey(element)] {
+		if included[overpassElementKey(element)] &&
+			!elementBelongsOnlyToOtherStopAreas(element, stopAreaMemberships, targetStopAreaKeys) {
 			selected = append(selected, element)
 		}
 	}
 
 	return selected, stopArea, station
+}
+
+func buildStopAreaMemberships(elements []overpassElement) map[string]map[string]struct{} {
+	memberships := map[string]map[string]struct{}{}
+	for _, element := range elements {
+		if !isStopArea(element) {
+			continue
+		}
+
+		stopAreaKey := overpassElementKey(element)
+		for _, member := range element.Members {
+			memberKey := overpassElementRefKey(member.Type, member.Ref)
+			if memberships[memberKey] == nil {
+				memberships[memberKey] = map[string]struct{}{}
+			}
+			memberships[memberKey][stopAreaKey] = struct{}{}
+		}
+	}
+	return memberships
+}
+
+func buildTargetStopAreaKeys(
+	elements []overpassElement,
+	selectedStopArea *overpassElement,
+	stop *ctdf.Stop,
+	byKey map[string]overpassElement,
+) map[string]struct{} {
+	targets := map[string]struct{}{}
+	if selectedStopArea != nil {
+		targets[overpassElementKey(*selectedStopArea)] = struct{}{}
+	}
+
+	identifiersByTag := buildStopIdentifiersByTag(stop)
+	for _, element := range elements {
+		if !isStopArea(element) {
+			continue
+		}
+		if stopAreaMatchesStopIdentifiers(element, byKey, identifiersByTag) {
+			targets[overpassElementKey(element)] = struct{}{}
+		}
+	}
+	return targets
+}
+
+func filterElementsAssignedToOtherStopAreas(
+	elements []overpassElement,
+	memberships map[string]map[string]struct{},
+	targetStopAreaKeys map[string]struct{},
+) []overpassElement {
+	selected := make([]overpassElement, 0, len(elements))
+	for _, element := range elements {
+		if isStopArea(element) {
+			if _, isTarget := targetStopAreaKeys[overpassElementKey(element)]; !isTarget {
+				continue
+			}
+		}
+		if elementBelongsOnlyToOtherStopAreas(element, memberships, targetStopAreaKeys) {
+			continue
+		}
+		selected = append(selected, element)
+	}
+	return selected
+}
+
+func elementBelongsOnlyToOtherStopAreas(
+	element overpassElement,
+	memberships map[string]map[string]struct{},
+	targetStopAreaKeys map[string]struct{},
+) bool {
+	stopAreaKeys := memberships[overpassElementKey(element)]
+	if len(stopAreaKeys) == 0 {
+		return false
+	}
+	for stopAreaKey := range stopAreaKeys {
+		if _, isTarget := targetStopAreaKeys[stopAreaKey]; isTarget {
+			return false
+		}
+	}
+	return true
 }
 
 func buildStopIdentifiersByTag(stop *ctdf.Stop) map[string]map[string]struct{} {
@@ -829,10 +972,16 @@ func elementMatchesStopIdentifiers(element overpassElement, identifiersByTag map
 func selectBestStopArea(elements []overpassElement, stop *ctdf.Stop) *overpassElement {
 	var best *overpassElement
 	bestScore := math.MaxFloat64
+	identifiersByTag := buildStopIdentifiersByTag(stop)
+	byKey := mapOverpassElementsByKey(elements)
 
 	for i := range elements {
 		element := &elements[i]
 		if !isStopArea(*element) {
+			continue
+		}
+		matchesIdentifiers := stopAreaMatchesStopIdentifiers(*element, byKey, identifiersByTag)
+		if len(identifiersByTag) > 0 && !matchesIdentifiers && !stopAreaMembersAreAvailable(*element, byKey) {
 			continue
 		}
 
@@ -846,6 +995,9 @@ func selectBestStopArea(elements []overpassElement, stop *ctdf.Stop) *overpassEl
 		if !stopAreaMatchesMode(*element, elements, stop.TransportTypes) {
 			score += 10000
 		}
+		if matchesIdentifiers {
+			score -= 100000
+		}
 
 		if score < bestScore {
 			best = element
@@ -854,6 +1006,35 @@ func selectBestStopArea(elements []overpassElement, stop *ctdf.Stop) *overpassEl
 	}
 
 	return best
+}
+
+func stopAreaMembersAreAvailable(stopArea overpassElement, byKey map[string]overpassElement) bool {
+	if len(stopArea.Members) == 0 {
+		return false
+	}
+	for _, member := range stopArea.Members {
+		if _, exists := byKey[overpassElementRefKey(member.Type, member.Ref)]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+func stopAreaMatchesStopIdentifiers(
+	stopArea overpassElement,
+	byKey map[string]overpassElement,
+	identifiersByTag map[string]map[string]struct{},
+) bool {
+	if elementMatchesStopIdentifiers(stopArea, identifiersByTag) {
+		return true
+	}
+	for _, member := range stopArea.Members {
+		memberElement, exists := byKey[overpassElementRefKey(member.Type, member.Ref)]
+		if exists && elementMatchesStopIdentifiers(memberElement, identifiersByTag) {
+			return true
+		}
+	}
+	return false
 }
 
 func selectBestStation(elements []overpassElement, stopArea *overpassElement) *overpassElement {
