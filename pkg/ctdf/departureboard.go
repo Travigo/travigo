@@ -18,6 +18,7 @@ type DepartureBoard struct {
 	Journey            *Journey                 `groups:"basic,departures-llm"`
 	DestinationDisplay string                   `groups:"basic,departures-llm"`
 	Type               DepartureBoardRecordType `groups:"basic,departures-llm"`
+	Delayed            bool                     `groups:"basic,departures-llm"`
 
 	Platform     string `groups:"basic,departures-llm"`
 	PlatformType string `groups:"basic,departures-llm"`
@@ -156,6 +157,10 @@ func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time
 		return stop.ArrivalTime
 	}
 	return stop.DepartureTime
+}
+
+func boardEntryIsDelayed(scheduledTime, realtimeTime time.Time, cancelled bool) bool {
+	return !cancelled && realtimeTime.After(scheduledTime)
 }
 
 // serviceTimeOnDate converts a GTFS service-day time into a real date without
@@ -315,9 +320,11 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	for _, journey := range journeys {
 		p.Go(func() *DepartureBoard {
 			var stopTime time.Time
+			var scheduledStopTime time.Time
 			var stopPlatform string
 			var stopPlatformType string
 			var destinationDisplay string
+			var delayed bool
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
 			if journey.Availability.MatchDate(dateTime) {
@@ -356,6 +363,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
 						stopMatchedCount.Add(1)
 						refTime := boardPathTime(path, boardType)
+						scheduledStopTime = serviceTimeOnDate(dateTime, refTime)
 						stopPlatform = boardPathPlatform(path, boardType)
 						stopPlatformType = "ESTIMATED"
 
@@ -417,6 +425,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						}
 
 						stopTime = serviceTimeOnDate(dateTime, refTime)
+						delayed = boardEntryIsDelayed(scheduledStopTime, stopTime, departureBoardRecordType == DepartureBoardRecordTypeCancelled)
 
 						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)
 						break
@@ -516,6 +525,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						// Ignore negative offsets as we assume bus will right itself when turning over
 						if blockRealtimeJourney.Offset.Minutes() > 0 {
 							stopTime = stopTime.Add(blockRealtimeJourney.Offset)
+							delayed = true
 						}
 						departureBoardRecordType = DepartureBoardRecordTypeEstimated
 						estimatedCount.Add(1)
@@ -527,6 +537,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					Time:               stopTime,
 					DestinationDisplay: destinationDisplay,
 					Type:               departureBoardRecordType,
+					Delayed:            delayed,
 					Platform:           stopPlatform,
 					PlatformType:       stopPlatformType,
 				}

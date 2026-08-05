@@ -63,6 +63,20 @@ func TestBoardRealtimeStopTime(t *testing.T) {
 	}
 }
 
+func TestBoardEntryIsDelayed(t *testing.T) {
+	scheduled := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
+
+	if !boardEntryIsDelayed(scheduled, scheduled.Add(4*time.Minute), false) {
+		t.Fatal("later realtime time should be delayed")
+	}
+	if boardEntryIsDelayed(scheduled, scheduled, false) {
+		t.Fatal("on-time realtime time should not be delayed")
+	}
+	if boardEntryIsDelayed(scheduled, scheduled.Add(2*time.Minute), true) {
+		t.Fatal("cancelled board entry should not be delayed")
+	}
+}
+
 func TestServiceTimeOnDatePreservesServiceDayOverflow(t *testing.T) {
 	serviceTime := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC).Add(25*time.Hour + 30*time.Minute)
 	date := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
