@@ -83,6 +83,117 @@ func TestLimitDepartureBoardSortsAndLimits(t *testing.T) {
 	}
 }
 
+func TestLoadDepartureBoardReusesFullGeneratedBoardForLaterArrival(t *testing.T) {
+	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
+	lookupCalls := 0
+	runtime := &plannerRuntime{
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+			lookupCalls++
+			board := make([]*ctdf.DepartureBoard, 10)
+			for index := range board {
+				board[index] = &ctdf.DepartureBoard{Time: start.Add(time.Duration(index) * time.Minute)}
+			}
+			return board, nil
+		},
+	}
+	stop := &ctdf.Stop{PrimaryIdentifier: "interchange"}
+
+	first, err := runtime.loadDepartureBoard(stop, start, 3)
+	if err != nil {
+		t.Fatalf("first board lookup failed: %s", err)
+	}
+	later, err := runtime.loadDepartureBoard(stop, start.Add(5*time.Minute), 3)
+	if err != nil {
+		t.Fatalf("later board lookup failed: %s", err)
+	}
+
+	if lookupCalls != 1 {
+		t.Fatalf("expected one underlying board lookup, got %d", lookupCalls)
+	}
+	if len(first) != 3 || !first[0].Time.Equal(start) || !first[2].Time.Equal(start.Add(2*time.Minute)) {
+		t.Fatalf("unexpected first board: %+v", first)
+	}
+	if len(later) != 3 || !later[0].Time.Equal(start.Add(5*time.Minute)) || !later[2].Time.Equal(start.Add(7*time.Minute)) {
+		t.Fatalf("expected cached board to advance to +5m..+7m, got %+v", later)
+	}
+}
+
+func TestExpandTransfersDefersDepartureBoardLookupUntilQueuedLabelIsExpanded(t *testing.T) {
+	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
+	fromStop := &ctdf.Stop{PrimaryIdentifier: "bus-stop"}
+	toStop := &ctdf.Stop{PrimaryIdentifier: "rail-station", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	departureBoardLookups := 0
+	runtime := &plannerRuntime{
+		stopCache: map[string]*ctdf.Stop{
+			toStop.PrimaryIdentifier: toStop,
+		},
+		transferCache: map[string][]*ctdf.StopTransfer{
+			fromStop.PrimaryIdentifier: {
+				{
+					FromStopRef:          fromStop.PrimaryIdentifier,
+					ToStopRef:            toStop.PrimaryIdentifier,
+					Type:                 ctdf.StopTransferTypeNearbyWalk,
+					TotalDurationSeconds: 120,
+				},
+			},
+		},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+			departureBoardLookups++
+			return nil, nil
+		},
+		bestArrivals: map[plannerStateKey][]time.Time{},
+		resultKeys:   map[string]bool{},
+		config: plannerConfig{
+			count:               1,
+			maxVehicleLegs:      2,
+			maxTransferDistance: 1000,
+			maxLabelsPerState:   1,
+		},
+		searchEndTime: start.Add(time.Hour),
+	}
+	pq := &plannerPriorityQueue{}
+
+	err := runtime.expandTransfers(pq, &plannerLabel{
+		stop:        fromStop,
+		arrivalTime: start,
+	}, &ctdf.Stop{PrimaryIdentifier: "destination"}, &ctdf.JourneyPlanResults{})
+	if err != nil {
+		t.Fatalf("transfer expansion failed: %s", err)
+	}
+
+	if departureBoardLookups != 0 {
+		t.Fatalf("expected transfer expansion to defer board lookup, got %d lookups", departureBoardLookups)
+	}
+	if pq.Len() != 1 || (*pq)[0].stop != toStop {
+		t.Fatalf("expected rail transfer label to be queued, got %+v", *pq)
+	}
+}
+
+func TestReplacedLabelIsNoLongerCurrent(t *testing.T) {
+	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
+	stop := &ctdf.Stop{PrimaryIdentifier: "interchange"}
+	runtime := &plannerRuntime{
+		bestArrivals:  map[plannerStateKey][]time.Time{},
+		config:        plannerConfig{maxLabelsPerState: 1},
+		searchEndTime: start.Add(time.Hour),
+	}
+	pq := &plannerPriorityQueue{}
+	later := &plannerLabel{stop: stop, arrivalTime: start.Add(10 * time.Minute)}
+	earlier := &plannerLabel{stop: stop, arrivalTime: start.Add(5 * time.Minute)}
+
+	if !runtime.pushLabel(pq, later) || !runtime.pushLabel(pq, earlier) {
+		t.Fatal("expected both labels to be accepted before the later one became stale")
+	}
+	if runtime.isCurrentLabel(later) {
+		t.Fatal("expected replaced later label to be stale")
+	}
+	if !runtime.isCurrentLabel(earlier) {
+		t.Fatal("expected earlier replacement label to remain current")
+	}
+}
+
 func TestRecordResultBuildsAndDeduplicatesPlan(t *testing.T) {
 	start := time.Date(2026, 7, 7, 19, 39, 0, 0, time.UTC)
 	arrival := start.Add(65 * time.Minute)
@@ -175,18 +286,6 @@ func TestRecordDirectDestinationFromDeparture(t *testing.T) {
 	}
 	if !routeItems[0].ArrivalTime.Equal(arrival) {
 		t.Fatalf("expected arrival %s, got %s", arrival, routeItems[0].ArrivalTime)
-	}
-}
-
-func TestShouldScanTransferDeparturesOnlyForRailLikeStops(t *testing.T) {
-	if !shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}) {
-		t.Fatal("expected rail stop to be scanned")
-	}
-	if !shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeMetro}}) {
-		t.Fatal("expected metro stop to be scanned")
-	}
-	if shouldScanTransferDepartures(&ctdf.Stop{TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}) {
-		t.Fatal("did not expect bus stop to be scanned")
 	}
 }
 

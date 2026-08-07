@@ -78,7 +78,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "150")
+	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "500")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{

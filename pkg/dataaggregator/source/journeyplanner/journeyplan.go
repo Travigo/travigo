@@ -26,7 +26,7 @@ const (
 	defaultJourneyPlanDepartureBoardCount       = 12
 	defaultJourneyPlanOriginDepartureBoardCount = 96
 	defaultJourneyPlanOriginLocationStopCount   = 12
-	defaultJourneyPlanMaxExpandedLabels         = 150
+	defaultJourneyPlanMaxExpandedLabels         = 500
 	defaultJourneyPlanMaxRouteItems             = 10
 	defaultJourneyPlanMaxConsecutiveTransfers   = 1
 	defaultJourneyPlanMaxSearchDuration         = 8 * time.Second
@@ -115,15 +115,16 @@ type cachedDepartureBoard struct {
 }
 
 type plannerRuntime struct {
-	stopCache           map[string]*ctdf.Stop
-	transferCache       map[string][]*ctdf.StopTransfer
-	departureBoardCache map[string]cachedDepartureBoard
-	bestArrivals        map[plannerStateKey][]time.Time
-	resultKeys          map[string]bool
-	config              plannerConfig
-	searchEndTime       time.Time
-	searchDeadline      time.Time
-	timedOut            bool
+	stopCache            map[string]*ctdf.Stop
+	transferCache        map[string][]*ctdf.StopTransfer
+	departureBoardCache  map[string]cachedDepartureBoard
+	departureBoardLookup func(query.DepartureBoard) ([]*ctdf.DepartureBoard, error)
+	bestArrivals         map[plannerStateKey][]time.Time
+	resultKeys           map[string]bool
+	config               plannerConfig
+	searchEndTime        time.Time
+	searchDeadline       time.Time
+	timedOut             bool
 }
 
 func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults, error) {
@@ -175,6 +176,9 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	searchStart := time.Now()
 	for pq.Len() > 0 && len(results.JourneyPlans) < config.count && expandedLabels < config.maxExpandedLabels && !runtime.searchExpired() {
 		current := heap.Pop(pq).(*plannerLabel)
+		if !runtime.isCurrentLabel(current) {
+			continue
+		}
 		expandedLabels++
 
 		if stopMatchesStop(current.stop, q.DestinationStop) && current.routeItems != nil {
@@ -214,13 +218,17 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	}
 
 	if runtime.timedOut {
+		results.SearchTruncated = true
+		results.SearchTruncatedReason = "time_budget"
 		log.Warn().
 			Int("results", len(results.JourneyPlans)).
 			Int("expanded_labels", expandedLabels).
 			Dur("duration", time.Since(searchStart)).
 			Dur("max_search_duration", config.maxSearchDuration).
 			Msg("Journey planner search stopped by time budget")
-	} else if expandedLabels >= config.maxExpandedLabels {
+	} else if expandedLabels >= config.maxExpandedLabels && pq.Len() > 0 && len(results.JourneyPlans) < config.count {
+		results.SearchTruncated = true
+		results.SearchTruncatedReason = "expanded_label_budget"
 		log.Warn().
 			Int("results", len(results.JourneyPlans)).
 			Int("expanded_labels", expandedLabels).
@@ -440,15 +448,6 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			continue
 		}
 
-		if nextLabel.vehicleLegs < runtime.config.maxVehicleLegs && shouldScanTransferDepartures(nextLabel.stop) {
-			if err := runtime.recordDirectDeparturesToDestination(nextLabel, destinationStop, results); err != nil {
-				return err
-			}
-			if len(results.JourneyPlans) >= runtime.config.count {
-				return nil
-			}
-		}
-
 		runtime.pushLabel(pq, nextLabel)
 	}
 
@@ -594,7 +593,8 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				continue
 			}
 
-			if nextLabel.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
+			labelAccepted := runtime.pushLabel(pq, nextLabel)
+			if labelAccepted && nextLabel.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
 				if err := runtime.expandTransfers(pq, nextLabel, destinationStop, results); err != nil {
 					return err
 				}
@@ -604,48 +604,6 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				}
 			}
 
-			runtime.pushLabel(pq, nextLabel)
-		}
-	}
-
-	return nil
-}
-
-func (runtime *plannerRuntime) recordDirectDeparturesToDestination(current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
-	if runtime.searchExpired() || current == nil || current.stop == nil || destinationStop == nil {
-		return nil
-	}
-
-	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime, runtime.config.departureBoardCount)
-	if err != nil {
-		return err
-	}
-
-	sort.Slice(departureBoard, func(i, j int) bool {
-		return departureBoard[i].Time.Before(departureBoard[j].Time)
-	})
-
-	for _, departure := range departureBoard {
-		if runtime.searchExpired() {
-			return nil
-		}
-		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
-			continue
-		}
-		if departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
-			continue
-		}
-		if departure.Time.Before(current.arrivalTime) || departure.Time.After(runtime.searchEndTime) {
-			continue
-		}
-
-		boardingIndex := boardingPathIndex(departure.Journey, current.stop)
-		if boardingIndex < 0 {
-			continue
-		}
-
-		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) && len(results.JourneyPlans) >= runtime.config.count {
-			return nil
 		}
 	}
 
@@ -699,11 +657,9 @@ func (runtime *plannerRuntime) recordDirectDestinationFromDeparture(current *pla
 	return recorded
 }
 
-// loadDepartureBoard returns a bounded departure board for a stop, memoising the
-// first board fetched for that stop on a calendar day. Journey planning uses the
-// first N departures from each stop as its expansion frontier; later visits to
-// the same stop filter that cached frontier forward rather than issuing another
-// expensive departure-board generation.
+// loadDepartureBoard returns a bounded departure board for a stop while caching
+// the full generated board for that calendar day. Later visits advance through
+// the cached board instead of regenerating the same stop for every arrival label.
 func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime time.Time, departureBoardCount int) ([]*ctdf.DepartureBoard, error) {
 	if stop == nil {
 		return nil, nil
@@ -720,11 +676,11 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 				}
 				filtered = append(filtered, departure)
 			}
-			return filtered, nil
+			return limitDepartureBoard(filtered, departureBoardCount), nil
 		}
 	}
 
-	board, err := dataaggregator.Lookup[[]*ctdf.DepartureBoard](query.DepartureBoard{
+	board, err := runtime.lookupDepartureBoard(query.DepartureBoard{
 		Stop:          stop,
 		Count:         departureBoardCount,
 		StartDateTime: startDateTime,
@@ -732,7 +688,10 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 	if err != nil {
 		return nil, err
 	}
-	board = limitDepartureBoard(board, departureBoardCount)
+	// The departure-board source already generated the whole day's board. Keep
+	// that full result in this search's cache so a later arrival at the same stop
+	// can advance past the first page without regenerating it.
+	board = limitDepartureBoard(board, 0)
 
 	runtime.departureBoardCache[stop.PrimaryIdentifier] = cachedDepartureBoard{
 		fetchTime: startDateTime,
@@ -740,7 +699,14 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 		board:     board,
 	}
 
-	return board, nil
+	return limitDepartureBoard(board, departureBoardCount), nil
+}
+
+func (runtime *plannerRuntime) lookupDepartureBoard(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+	if runtime.departureBoardLookup != nil {
+		return runtime.departureBoardLookup(q)
+	}
+	return dataaggregator.Lookup[[]*ctdf.DepartureBoard](q)
 }
 
 func (runtime *plannerRuntime) searchExpired() bool {
@@ -895,9 +861,9 @@ func (runtime *plannerRuntime) cacheStop(stop *ctdf.Stop) {
 	}
 }
 
-func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *plannerLabel) {
+func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *plannerLabel) bool {
 	if label == nil || label.stop == nil || label.arrivalTime.After(runtime.searchEndTime) {
-		return
+		return false
 	}
 
 	key := plannerStateKey{
@@ -909,7 +875,7 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 	arrivals := runtime.bestArrivals[key]
 	for _, arrival := range arrivals {
 		if arrival.Equal(label.arrivalTime) {
-			return
+			return false
 		}
 	}
 
@@ -918,7 +884,7 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 	if len(arrivals) >= runtime.config.maxLabelsPerState {
 		lastIndex := len(arrivals) - 1
 		if !label.arrivalTime.Before(arrivals[lastIndex]) {
-			return
+			return false
 		}
 
 		arrivals[lastIndex] = label.arrivalTime
@@ -932,6 +898,26 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 
 	runtime.bestArrivals[key] = arrivals
 	heap.Push(pq, label)
+	return true
+}
+
+func (runtime *plannerRuntime) isCurrentLabel(label *plannerLabel) bool {
+	if label == nil || label.stop == nil {
+		return false
+	}
+
+	key := plannerStateKey{
+		stopRef:              label.stop.PrimaryIdentifier,
+		vehicleLegs:          label.vehicleLegs,
+		consecutiveTransfers: label.consecutiveTransfers,
+	}
+	for _, arrival := range runtime.bestArrivals[key] {
+		if arrival.Equal(label.arrivalTime) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (runtime *plannerRuntime) recordResult(results *ctdf.JourneyPlanResults, label *plannerLabel) {
@@ -1071,21 +1057,6 @@ func stopMatchesRef(stop *ctdf.Stop, stopRef string) bool {
 
 	for _, stopID := range stop.GetAllStopIDs() {
 		if stopID == stopRef {
-			return true
-		}
-	}
-
-	return false
-}
-
-func shouldScanTransferDepartures(stop *ctdf.Stop) bool {
-	if stop == nil {
-		return false
-	}
-
-	for _, transportType := range stop.TransportTypes {
-		switch transportType {
-		case ctdf.TransportTypeRail, ctdf.TransportTypeMetro, ctdf.TransportTypeTram:
 			return true
 		}
 	}

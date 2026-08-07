@@ -14,6 +14,9 @@ type JourneyPlanResults struct {
 
 	OriginStop      Stop `groups:"basic,detailed"`
 	DestinationStop Stop `groups:"basic,detailed"`
+
+	SearchTruncated       bool   `groups:"basic,detailed"`
+	SearchTruncatedReason string `groups:"basic,detailed" json:",omitempty"`
 }
 
 type JourneyPlan struct {
