@@ -31,6 +31,8 @@ const (
 	defaultJourneyPlanMaxConsecutiveTransfers   = 1
 	defaultJourneyPlanMaxSearchDuration         = 8 * time.Second
 	defaultJourneyPlanWalkSpeedMetresPerSecond  = 1.3
+	defaultJourneyPlanDestinationApproachMetres = 15000
+	defaultJourneyPlanAccessVehicleLegs         = 1
 )
 
 type plannerConfig struct {
@@ -68,6 +70,7 @@ type plannerLabel struct {
 	arrivalTime          time.Time
 	vehicleLegs          int
 	consecutiveTransfers int
+	departuresExpanded   bool
 	transfersExpanded    bool
 	routeItems           *routeItemNode
 	index                int
@@ -190,7 +193,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if current.vehicleLegs < config.maxVehicleLegs {
+		if !current.departuresExpanded && current.vehicleLegs < config.maxVehicleLegs {
 			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
@@ -448,7 +451,28 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			continue
 		}
 
-		runtime.pushLabel(pq, nextLabel)
+		if !runtime.pushLabel(pq, nextLabel) || nextLabel.vehicleLegs >= runtime.config.maxVehicleLegs {
+			continue
+		}
+
+		if routeItemDepth(nextLabel.routeItems) < runtime.config.maxRouteItems && shouldScanDirectTransferDepartures(nextLabel.stop, destinationStop) {
+			if err := runtime.recordDirectDeparturesToDestination(nextLabel, destinationStop, results); err != nil {
+				return err
+			}
+			if len(results.JourneyPlans) >= runtime.config.count {
+				return nil
+			}
+		}
+
+		if runtime.shouldScanAccessInterchange(nextLabel, destinationStop) {
+			if err := runtime.expandDepartures(pq, nextLabel, destinationStop, results); err != nil {
+				return err
+			}
+			nextLabel.departuresExpanded = true
+			if len(results.JourneyPlans) >= runtime.config.count {
+				return nil
+			}
+		}
 	}
 
 	return nil
@@ -604,6 +628,40 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				}
 			}
 
+		}
+	}
+
+	return nil
+}
+
+func (runtime *plannerRuntime) recordDirectDeparturesToDestination(current *plannerLabel, destinationStop *ctdf.Stop, results *ctdf.JourneyPlanResults) error {
+	if runtime.searchExpired() || current == nil || current.stop == nil || destinationStop == nil {
+		return nil
+	}
+
+	departureBoard, err := runtime.loadDepartureBoard(current.stop, current.arrivalTime, runtime.config.departureBoardCount)
+	if err != nil {
+		return err
+	}
+
+	for _, departure := range departureBoard {
+		if runtime.searchExpired() {
+			return nil
+		}
+		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 || departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
+			continue
+		}
+		if departure.Time.Before(current.arrivalTime) || departure.Time.After(runtime.searchEndTime) {
+			continue
+		}
+
+		boardingIndex := boardingPathIndex(departure.Journey, current.stop)
+		if boardingIndex < 0 {
+			continue
+		}
+
+		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) && len(results.JourneyPlans) >= runtime.config.count {
+			return nil
 		}
 	}
 
@@ -1062,4 +1120,48 @@ func stopMatchesRef(stop *ctdf.Stop, stopRef string) bool {
 	}
 
 	return false
+}
+
+func (runtime *plannerRuntime) shouldScanAccessInterchange(label *plannerLabel, destinationStop *ctdf.Stop) bool {
+	if label == nil || label.stop == nil || destinationStop == nil {
+		return false
+	}
+	if label.stop.Location == nil || destinationStop.Location == nil {
+		return false
+	}
+	if label.vehicleLegs > defaultJourneyPlanAccessVehicleLegs || label.vehicleLegs+2 > runtime.config.maxVehicleLegs {
+		return false
+	}
+	if routeItemDepth(label.routeItems)+3 > runtime.config.maxRouteItems || !isHighCapacityStop(label.stop) {
+		return false
+	}
+
+	return !stopsWithinDistance(label.stop, destinationStop, defaultJourneyPlanDestinationApproachMetres)
+}
+
+func shouldScanDirectTransferDepartures(stop *ctdf.Stop, destinationStop *ctdf.Stop) bool {
+	return isHighCapacityStop(stop) && stopsWithinDistance(stop, destinationStop, defaultJourneyPlanDestinationApproachMetres)
+}
+
+func isHighCapacityStop(stop *ctdf.Stop) bool {
+	if stop == nil {
+		return false
+	}
+
+	for _, transportType := range stop.TransportTypes {
+		switch transportType {
+		case ctdf.TransportTypeRail, ctdf.TransportTypeMetro, ctdf.TransportTypeTram:
+			return true
+		}
+	}
+
+	return false
+}
+
+func stopsWithinDistance(stop *ctdf.Stop, destinationStop *ctdf.Stop, maxDistanceMetres int) bool {
+	if stop == nil || stop.Location == nil || destinationStop == nil || destinationStop.Location == nil || maxDistanceMetres < 0 {
+		return false
+	}
+
+	return stop.Location.Distance(destinationStop.Location) <= float64(maxDistanceMetres)
 }

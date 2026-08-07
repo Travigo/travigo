@@ -171,6 +171,180 @@ func TestExpandTransfersDefersDepartureBoardLookupUntilQueuedLabelIsExpanded(t *
 	}
 }
 
+func TestExpandTransfersFindsDirectAndConnectingRoutesViaAccessRailInterchange(t *testing.T) {
+	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
+	cambridgeLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0.137, 52.194}}
+	londonLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{-0.123, 51.531}}
+
+	busStop := &ctdf.Stop{PrimaryIdentifier: "bus-stop", Location: cambridgeLocation}
+	cambridge := &ctdf.Stop{
+		PrimaryIdentifier: "cambridge",
+		Location:          cambridgeLocation,
+		TransportTypes:    []ctdf.TransportType{ctdf.TransportTypeRail},
+	}
+	kingsCross := &ctdf.Stop{PrimaryIdentifier: "kings-cross", Location: londonLocation}
+	stPancras := &ctdf.Stop{
+		PrimaryIdentifier: "st-pancras",
+		Location:          &ctdf.Location{Type: "Point", Coordinates: []float64{-0.126, 51.530}},
+		TransportTypes:    []ctdf.TransportType{ctdf.TransportTypeRail},
+	}
+	blackfriars := &ctdf.Stop{
+		PrimaryIdentifier: "blackfriars",
+		Location:          &ctdf.Location{Type: "Point", Coordinates: []float64{-0.103, 51.512}},
+		TransportTypes:    []ctdf.TransportType{ctdf.TransportTypeRail},
+	}
+
+	boardLookups := []string{}
+	runtime := &plannerRuntime{
+		stopCache: map[string]*ctdf.Stop{
+			cambridge.PrimaryIdentifier:   cambridge,
+			kingsCross.PrimaryIdentifier:  kingsCross,
+			stPancras.PrimaryIdentifier:   stPancras,
+			blackfriars.PrimaryIdentifier: blackfriars,
+		},
+		transferCache: map[string][]*ctdf.StopTransfer{
+			busStop.PrimaryIdentifier: {
+				{
+					FromStopRef:          busStop.PrimaryIdentifier,
+					ToStopRef:            cambridge.PrimaryIdentifier,
+					Type:                 ctdf.StopTransferTypeNearbyWalk,
+					TotalDurationSeconds: 120,
+				},
+			},
+			kingsCross.PrimaryIdentifier: {
+				{
+					FromStopRef:          kingsCross.PrimaryIdentifier,
+					ToStopRef:            stPancras.PrimaryIdentifier,
+					Type:                 ctdf.StopTransferTypeNearbyWalk,
+					TotalDurationSeconds: 300,
+				},
+			},
+		},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+			boardLookups = append(boardLookups, q.Stop.PrimaryIdentifier)
+			switch q.Stop.PrimaryIdentifier {
+			case cambridge.PrimaryIdentifier:
+				return []*ctdf.DepartureBoard{
+					{
+						Time: start.Add(5 * time.Minute),
+						Journey: &ctdf.Journey{
+							PrimaryIdentifier: "cambridge-kings-cross",
+							Path: []*ctdf.JourneyPathItem{
+								{
+									OriginStopRef:          cambridge.PrimaryIdentifier,
+									DestinationStopRef:     kingsCross.PrimaryIdentifier,
+									OriginDepartureTime:    start.Add(5 * time.Minute),
+									DestinationArrivalTime: start.Add(65 * time.Minute),
+								},
+							},
+						},
+					},
+					{
+						Time: start.Add(10 * time.Minute),
+						Journey: &ctdf.Journey{
+							PrimaryIdentifier: "cambridge-brighton",
+							Path: []*ctdf.JourneyPathItem{
+								{
+									OriginStopRef:          cambridge.PrimaryIdentifier,
+									DestinationStopRef:     blackfriars.PrimaryIdentifier,
+									OriginDepartureTime:    start.Add(10 * time.Minute),
+									DestinationArrivalTime: start.Add(70 * time.Minute),
+								},
+								{
+									OriginStopRef:          blackfriars.PrimaryIdentifier,
+									DestinationStopRef:     "brighton",
+									OriginDepartureTime:    start.Add(72 * time.Minute),
+									DestinationArrivalTime: start.Add(130 * time.Minute),
+								},
+							},
+						},
+					},
+				}, nil
+			case stPancras.PrimaryIdentifier:
+				return []*ctdf.DepartureBoard{
+					{
+						Time: start.Add(75 * time.Minute),
+						Journey: &ctdf.Journey{
+							PrimaryIdentifier: "st-pancras-blackfriars",
+							Path: []*ctdf.JourneyPathItem{
+								{
+									OriginStopRef:          stPancras.PrimaryIdentifier,
+									DestinationStopRef:     blackfriars.PrimaryIdentifier,
+									OriginDepartureTime:    start.Add(75 * time.Minute),
+									DestinationArrivalTime: start.Add(85 * time.Minute),
+								},
+							},
+						},
+					},
+				}, nil
+			default:
+				return nil, nil
+			}
+		},
+		bestArrivals: map[plannerStateKey][]time.Time{},
+		resultKeys:   map[string]bool{},
+		config: plannerConfig{
+			count:                   5,
+			maxVehicleLegs:          4,
+			maxTransferDistance:     1000,
+			departureBoardCount:     12,
+			maxRouteItems:           10,
+			maxConsecutiveTransfers: 1,
+			maxLabelsPerState:       5,
+		},
+		searchEndTime: start.Add(6 * time.Hour),
+	}
+	pq := &plannerPriorityQueue{}
+	results := &ctdf.JourneyPlanResults{}
+	current := &plannerLabel{
+		stop:        busStop,
+		arrivalTime: start,
+		vehicleLegs: 1,
+		routeItems: appendRouteItem(nil, ctdf.JourneyPlanRouteItem{
+			Type:               ctdf.JourneyPlanRouteItemTypeJourney,
+			OriginStopRef:      "origin",
+			DestinationStopRef: busStop.PrimaryIdentifier,
+			StartTime:          start.Add(-30 * time.Minute),
+			ArrivalTime:        start,
+			Journey:            &ctdf.Journey{PrimaryIdentifier: "access-bus"},
+		}),
+	}
+
+	if err := runtime.expandTransfers(pq, current, blackfriars, results); err != nil {
+		t.Fatalf("transfer expansion failed: %s", err)
+	}
+
+	if len(results.JourneyPlans) != 2 {
+		t.Fatalf("expected direct Brighton and connecting journey plans, got %d", len(results.JourneyPlans))
+	}
+	if len(boardLookups) != 2 || boardLookups[0] != cambridge.PrimaryIdentifier || boardLookups[1] != stPancras.PrimaryIdentifier {
+		t.Fatalf("expected bounded Cambridge and St Pancras board lookups, got %v", boardLookups)
+	}
+	var directRouteItems []ctdf.JourneyPlanRouteItem
+	var connectingRouteItems []ctdf.JourneyPlanRouteItem
+	for _, plan := range results.JourneyPlans {
+		switch len(plan.RouteItems) {
+		case 3:
+			directRouteItems = plan.RouteItems
+		case 5:
+			connectingRouteItems = plan.RouteItems
+		}
+	}
+	if len(directRouteItems) != 3 || directRouteItems[2].Journey == nil || directRouteItems[2].Journey.PrimaryIdentifier != "cambridge-brighton" {
+		t.Fatalf("expected the Brighton service to provide the direct Blackfriars route, got %+v", directRouteItems)
+	}
+	if len(connectingRouteItems) != 5 {
+		t.Fatalf("expected access, transfer, rail, transfer, rail route items, got %+v", connectingRouteItems)
+	}
+	if connectingRouteItems[2].OriginStopRef != cambridge.PrimaryIdentifier || connectingRouteItems[2].DestinationStopRef != kingsCross.PrimaryIdentifier {
+		t.Fatalf("unexpected main rail leg %s -> %s", connectingRouteItems[2].OriginStopRef, connectingRouteItems[2].DestinationStopRef)
+	}
+	if connectingRouteItems[4].OriginStopRef != stPancras.PrimaryIdentifier || connectingRouteItems[4].DestinationStopRef != blackfriars.PrimaryIdentifier {
+		t.Fatalf("unexpected final rail leg %s -> %s", connectingRouteItems[4].OriginStopRef, connectingRouteItems[4].DestinationStopRef)
+	}
+}
+
 func TestReplacedLabelIsNoLongerCurrent(t *testing.T) {
 	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
 	stop := &ctdf.Stop{PrimaryIdentifier: "interchange"}

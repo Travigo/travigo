@@ -163,6 +163,40 @@ func boardEntryIsDelayed(scheduledTime, realtimeTime time.Time, cancelled bool) 
 	return !cancelled && realtimeTime.After(scheduledTime)
 }
 
+// boardRealtimeTimeOnDate resolves the two forms used by realtime producers:
+// date-less clock values (year 0/1) and absolute timestamps. Missing realtime
+// times fall back to the schedule rather than becoming a midnight departure.
+func boardRealtimeTimeOnDate(scheduledTime, realtimeTime time.Time) time.Time {
+	if realtimeTime.IsZero() {
+		return scheduledTime
+	}
+
+	if realtimeTime.Year() > 1 {
+		return realtimeTime.In(scheduledTime.Location())
+	}
+
+	candidate := time.Date(
+		scheduledTime.Year(), scheduledTime.Month(), scheduledTime.Day(),
+		realtimeTime.Hour(), realtimeTime.Minute(), realtimeTime.Second(), realtimeTime.Nanosecond(),
+		scheduledTime.Location(),
+	)
+	closest := candidate
+	for _, adjacent := range []time.Time{candidate.AddDate(0, 0, -1), candidate.AddDate(0, 0, 1)} {
+		if absoluteDuration(adjacent.Sub(scheduledTime)) < absoluteDuration(closest.Sub(scheduledTime)) {
+			closest = adjacent
+		}
+	}
+
+	return closest
+}
+
+func absoluteDuration(duration time.Duration) time.Duration {
+	if duration < 0 {
+		return -duration
+	}
+	return duration
+}
+
 // serviceTimeOnDate converts a GTFS service-day time into a real date without
 // discarding the service-day overflow represented by times such as 25:30:00.
 func serviceTimeOnDate(dateTime time.Time, serviceTime time.Time) time.Time {
@@ -321,6 +355,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		p.Go(func() *DepartureBoard {
 			var stopTime time.Time
 			var scheduledStopTime time.Time
+			var realtimeStopTime time.Time
 			var stopPlatform string
 			var stopPlatformType string
 			var destinationDisplay string
@@ -402,7 +437,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 								}
 
 								if journey.RealtimeJourney.ActivelyTracked {
-									refTime = boardRealtimeStopTime(realtimeJourneyStop, boardType)
+									realtimeStopTime = boardRealtimeStopTime(realtimeJourneyStop, boardType)
 								}
 
 								if realtimeJourneyStop.Platform != "" {
@@ -425,6 +460,9 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						}
 
 						stopTime = serviceTimeOnDate(dateTime, refTime)
+						if journey.RealtimeJourney != nil && journey.RealtimeJourney.ActivelyTracked {
+							stopTime = boardRealtimeTimeOnDate(stopTime, realtimeStopTime)
+						}
 						delayed = boardEntryIsDelayed(scheduledStopTime, stopTime, departureBoardRecordType == DepartureBoardRecordTypeCancelled)
 
 						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)

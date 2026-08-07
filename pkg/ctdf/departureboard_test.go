@@ -77,6 +77,36 @@ func TestBoardEntryIsDelayed(t *testing.T) {
 	}
 }
 
+func TestBoardRealtimeTimeOnDateFallsBackWhenTimeIsMissing(t *testing.T) {
+	scheduled := time.Date(2026, 8, 7, 23, 58, 0, 0, time.FixedZone("BST", 60*60))
+
+	if got := boardRealtimeTimeOnDate(scheduled, time.Time{}); !got.Equal(scheduled) {
+		t.Fatalf("missing realtime time = %v, want scheduled time %v", got, scheduled)
+	}
+}
+
+func TestBoardRealtimeTimeOnDatePlacesDatelessClockNearestSchedule(t *testing.T) {
+	location := time.FixedZone("BST", 60*60)
+	scheduled := time.Date(2026, 8, 7, 23, 58, 0, 0, location)
+	datelessMidnight := time.Date(0, time.January, 1, 0, 3, 0, 0, time.UTC)
+
+	got := boardRealtimeTimeOnDate(scheduled, datelessMidnight)
+	want := time.Date(2026, 8, 8, 0, 3, 0, 0, location)
+	if !got.Equal(want) {
+		t.Fatalf("dateless realtime time = %v, want %v", got, want)
+	}
+}
+
+func TestBoardRealtimeTimeOnDatePreservesAbsoluteTimestamp(t *testing.T) {
+	location := time.FixedZone("BST", 60*60)
+	scheduled := time.Date(2026, 8, 7, 22, 47, 0, 0, location)
+	absoluteRealtime := time.Date(2026, 8, 7, 22, 53, 0, 0, location)
+
+	if got := boardRealtimeTimeOnDate(scheduled, absoluteRealtime); !got.Equal(absoluteRealtime) {
+		t.Fatalf("absolute realtime time = %v, want %v", got, absoluteRealtime)
+	}
+}
+
 func TestServiceTimeOnDatePreservesServiceDayOverflow(t *testing.T) {
 	serviceTime := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC).Add(25*time.Hour + 30*time.Minute)
 	date := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
