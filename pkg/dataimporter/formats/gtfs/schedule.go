@@ -894,6 +894,7 @@ var routeTypeMapping = map[int]ctdf.TransportType{
 	// 1100: ctdf.TransportTypeAir,
 	1200: ctdf.TransportTypeFerry,
 	1400: ctdf.TransportTypeFunicular,
+	1501: ctdf.TransportTypeTaxiBus,
 }
 
 func convertTransportType(intType int) ctdf.TransportType {
@@ -915,6 +916,8 @@ func convertTransportType(intType int) ctdf.TransportType {
 		return ctdf.TransportTypeTram
 	} else if intType >= 1300 && intType <= 1307 {
 		return ctdf.TransportTypeCableCar
+	} else if intType >= 1500 && intType <= 1507 {
+		return ctdf.TransportTypeTaxi
 	} else {
 		return ctdf.TransportTypeUnknown
 	}

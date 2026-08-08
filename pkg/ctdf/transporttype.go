@@ -8,6 +8,7 @@ const (
 	TransportTypeCoach     TransportType = "Coach"
 	TransportTypeTram      TransportType = "Tram"
 	TransportTypeTaxi      TransportType = "Taxi"
+	TransportTypeTaxiBus   TransportType = "TaxiBus"
 	TransportTypeRail      TransportType = "Rail"
 	TransportTypeMetro     TransportType = "Metro"
 	TransportTypeFerry     TransportType = "Ferry"
