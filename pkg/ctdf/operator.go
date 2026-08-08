@@ -15,29 +15,29 @@ const OperatorNOCIDFormat = "gb-nocid-%s"
 const OperatorTOCFormat = "gb-toc-%s"
 
 type Operator struct {
-	PrimaryIdentifier string   `groups:"basic,departures-llm" bson:",omitempty"`
+	PrimaryIdentifier string   `groups:"basic,departures-llm,web-operator-list,web-operator-detail,web-operator-group,web-planner,web-notification" bson:",omitempty"`
 	OtherIdentifiers  []string `groups:"detailed" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed,web-operator-detail" bson:",omitempty"`
 
-	PrimaryName string   `groups:"basic,departures-llm" bson:",omitempty"`
-	OtherNames  []string `groups:"detailed" bson:",omitempty"`
+	PrimaryName string   `groups:"basic,departures-llm,web-operator-list,web-operator-detail,web-operator-group,web-planner,web-notification" bson:",omitempty"`
+	OtherNames  []string `groups:"detailed,web-operator-detail" bson:",omitempty"`
 
 	OperatorGroupRef string         `groups:"internal" bson:",omitempty"`
-	OperatorGroup    *OperatorGroup `groups:"detailed" bson:"-"`
+	OperatorGroup    *OperatorGroup `groups:"detailed,web-operator-detail" bson:"-"`
 
 	TransportType TransportType `groups:"detailed" bson:",omitempty"`
 
 	Licence string `groups:"internal" bson:",omitempty"`
 
-	Website     string            `groups:"detailed" bson:",omitempty"`
-	Email       string            `groups:"detailed" bson:",omitempty"`
+	Website     string            `groups:"detailed,web-operator-detail" bson:",omitempty"`
+	Email       string            `groups:"detailed,web-operator-detail" bson:",omitempty"`
 	Address     string            `groups:"detailed" bson:",omitempty"`
-	PhoneNumber string            `groups:"detailed" bson:",omitempty"`
-	SocialMedia map[string]string `groups:"detailed" bson:",omitempty"`
+	PhoneNumber string            `groups:"detailed,web-operator-detail" bson:",omitempty"`
+	SocialMedia map[string]string `groups:"detailed,web-operator-detail" bson:",omitempty"`
 
 	Regions []string `groups:"detailed" bson:",omitempty"`
 }

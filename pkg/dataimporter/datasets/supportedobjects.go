@@ -1,15 +1,15 @@
 package datasets
 
 type SupportedObjects struct {
-	Operators      bool
-	OperatorGroups bool
-	Stops          bool
-	StopGroups     bool
-	StopsDetailed  bool
-	Services       bool
-	Journeys       bool
-	JourneyTracks  bool
+	Operators      bool `groups:"web-datasource"`
+	OperatorGroups bool `groups:"web-datasource"`
+	Stops          bool `groups:"web-datasource"`
+	StopGroups     bool `groups:"web-datasource"`
+	StopsDetailed  bool `groups:"web-datasource"`
+	Services       bool `groups:"web-datasource"`
+	Journeys       bool `groups:"web-datasource"`
+	JourneyTracks  bool `groups:"web-datasource"`
 
-	RealtimeJourneys bool
-	ServiceAlerts    bool
+	RealtimeJourneys bool `groups:"web-datasource"`
+	ServiceAlerts    bool `groups:"web-datasource"`
 }

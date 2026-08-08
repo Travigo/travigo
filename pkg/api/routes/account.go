@@ -2,9 +2,11 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -53,6 +55,16 @@ func listNotificationTokens(c *fiber.Ctx) error {
 		})
 	}
 
+	if c.Query("view") == "web" {
+		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-notification-target"}}, userPushNotificationTargets)
+		if marshalErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+		}
+		return c.JSON(reduced)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(userPushNotificationTargets)
 }
 

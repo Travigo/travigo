@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -54,6 +55,16 @@ func getMatchingIdentifierServiceAlerts(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		if c.Query("view") == "web" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-alert-matching"}}, serviceAlertsFiltered)
+			if marshalErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+			}
+			return c.JSON(reduced)
+		}
+		if c.Query("view") != "" {
+			return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+		}
 		return c.JSON(serviceAlertsFiltered)
 	}
 }
@@ -102,6 +113,16 @@ func getStopServiceAlerts(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		if c.Query("view") == "web" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-alert"}}, serviceAlertsFiltered)
+			if marshalErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+			}
+			return c.JSON(reduced)
+		}
+		if c.Query("view") != "" {
+			return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+		}
 		return c.JSON(serviceAlertsFiltered)
 	}
 }

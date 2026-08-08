@@ -10,27 +10,27 @@ import (
 const GBStopIDFormat = "gb-atco-%s"
 
 type Stop struct {
-	PrimaryIdentifier string   `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	OtherIdentifiers  []string `groups:"basic,search" bson:",omitempty"`
+	PrimaryIdentifier string   `groups:"basic,search,search-llm,stop-llm,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-journey,web-planner,web-saved,web-notification" bson:",omitempty"`
+	OtherIdentifiers  []string `groups:"basic,search,web-journey" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSourceReference `groups:"detailed" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed,web-stop-detail,web-journey" bson:",omitempty"`
 
-	PrimaryName        string          `groups:"basic,search,search-llm,stop-llm" bson:",omitempty"`
-	Descriptor         string          `groups:"basic,search" bson:",omitempty"`
+	PrimaryName        string          `groups:"basic,search,search-llm,stop-llm,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-journey,web-planner,web-saved,web-notification" bson:",omitempty"`
+	Descriptor         string          `groups:"basic,search,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-planner,web-saved,web-notification" bson:",omitempty"`
 	Website            string          `groups:"detailed" bson:",omitempty"`
 	LocationType       string          `groups:"detailed" bson:",omitempty"`
 	PlatformCode       string          `groups:"basic" bson:",omitempty"` // The public platform/stand label.
 	WheelchairBoarding string          `groups:"detailed" bson:",omitempty"`
-	TransportTypes     []TransportType `groups:"detailed,search,search-llm,stop-llm" bson:",omitempty"`
+	TransportTypes     []TransportType `groups:"detailed,search,search-llm,stop-llm,web-stop-summary,web-stop-detail" bson:",omitempty"`
 
-	Timezone string `groups:"basic" bson:",omitempty"`
+	Timezone string `groups:"basic,web-stop-map,web-stop-summary,web-stop-detail,web-planner" bson:",omitempty"`
 
-	Location *Location `groups:"basic,stop-llm" bson:",omitempty"`
+	Location *Location `groups:"basic,stop-llm,web-stop-map,web-stop-summary,web-stop-detail,web-journey" bson:",omitempty"`
 
-	Services []*Service `bson:"-" groups:"basic,search,search-llm,stop-llm"`
+	Services []*Service `bson:"-" groups:"basic,search,search-llm,stop-llm,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-saved"`
 
 	Active bool `groups:"basic" bson:",omitempty"`
 

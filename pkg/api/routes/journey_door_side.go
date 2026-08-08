@@ -41,7 +41,7 @@ type journeyStopDoorSideResponse struct {
 	Visit           int                     `json:"visit"`
 	Platform        string                  `json:"platform,omitempty"`
 	PlatformSource  trainDoorPlatformSource `json:"platform_source"`
-	Side            trainDoorSide           `json:"side"`
+	Side            trainDoorSide           `json:"side" groups:"web-door-side"`
 	Confidence      float64                 `json:"confidence"`
 	Reason          string                  `json:"reason"`
 	PlatformElement *ctdf.OSMElementRef     `json:"platform_element,omitempty"`
@@ -111,18 +111,18 @@ func getJourneyStopDoorSide(c *fiber.Ctx) error {
 
 	if platform == "" {
 		response.Reason = "No realtime or scheduled platform is available"
-		return c.JSON(response)
+		return writeJourneyStopDoorSide(c, response)
 	}
 	if stop.Location == nil || !validLocation(*stop.Location) {
 		response.Reason = "The stop has no usable location"
-		return c.JSON(response)
+		return writeJourneyStopDoorSide(c, response)
 	}
 
 	previousLocation := lookupStopLocation(visit.previousStopRef)
 	nextLocation := lookupStopLocation(visit.nextStopRef)
 	if previousLocation == nil && nextLocation == nil {
 		response.Reason = "Neither the previous nor next stop has a usable location"
-		return c.JSON(response)
+		return writeJourneyStopDoorSide(c, response)
 	}
 
 	osmStop, err := dataaggregator.Lookup[*ctdf.OSMStop](query.OSMStop{Stop: stop})
@@ -137,7 +137,20 @@ func getJourneyStopDoorSide(c *fiber.Ctx) error {
 	response.PlatformElement = calculation.platformElement
 	response.TrackElement = calculation.trackElement
 
-	return c.JSON(response)
+	return writeJourneyStopDoorSide(c, response)
+}
+
+func writeJourneyStopDoorSide(c *fiber.Ctx, response journeyStopDoorSideResponse) error {
+	if c.Query("view") == "" {
+		return c.JSON(response)
+	}
+	reduced, err := marshalWithSheriffView(c, response, nil, sheriffViews{
+		"compact": {"web-door-side"},
+	})
+	if err != nil {
+		return sheriffViewError(c, err)
+	}
+	return c.JSON(reduced)
 }
 
 func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber int) (journeyStopVisit, error) {

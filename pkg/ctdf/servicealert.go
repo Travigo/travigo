@@ -3,20 +3,20 @@ package ctdf
 import "time"
 
 type ServiceAlert struct {
-	PrimaryIdentifier string            `groups:"basic"`
+	PrimaryIdentifier string            `groups:"basic,web-alert,web-alert-matching"`
 	OtherIdentifiers  map[string]string `groups:"basic"`
 
-	CreationDateTime     time.Time `groups:"detailed"`
+	CreationDateTime     time.Time `groups:"detailed,web-alert,web-alert-matching"`
 	ModificationDateTime time.Time `groups:"detailed"`
 
 	DataSource *DataSourceReference `groups:"internal"`
 
-	AlertType ServiceAlertType `groups:"basic"`
+	AlertType ServiceAlertType `groups:"basic,web-alert,web-alert-matching"`
 
-	Title string `groups:"basic"`
-	Text  string `groups:"basic"`
+	Title string `groups:"basic,web-alert,web-alert-matching"`
+	Text  string `groups:"basic,web-alert,web-alert-matching"`
 
-	MatchedIdentifiers []string `groups:"internal"`
+	MatchedIdentifiers []string `groups:"internal,web-alert-matching"`
 
 	ValidFrom  time.Time `groups:"internal"`
 	ValidUntil time.Time `groups:"internal"`

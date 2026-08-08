@@ -18,42 +18,43 @@ const XSDDateTimeFormat = "2006-01-02T15:04:05-07:00"
 const XSDDateTimeWithFractionalFormat = "2006-01-02T15:04:05.999999-07:00"
 
 type Journey struct {
-	PrimaryIdentifier string            `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	PrimaryIdentifier string            `groups:"basic,departures-llm,departureboard-cache,web-board,web-journey,web-planner,web-saved,web-notification" bson:",omitempty"`
 	OtherIdentifiers  map[string]string `groups:"basic,departureboard-cache" json:",omitempty" bson:",omitempty"`
 
 	CreationDateTime     time.Time `groups:"detailed" bson:",omitempty"`
 	ModificationDateTime time.Time `groups:"detailed" bson:",omitempty"`
 	Expiry               time.Time `groups:"detailed" bson:",omitempty"`
 
-	DataSource *DataSourceReference `groups:"detailed,departureboard-cache" bson:",omitempty"`
+	DataSource *DataSourceReference `groups:"detailed,departureboard-cache,web-journey" bson:",omitempty"`
 
 	ServiceRef string   `groups:"internal,departureboard-cache" bson:",omitempty"`
-	Service    *Service `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
+	Service    *Service `groups:"basic,departures-llm,web-board,web-journey,web-planner,web-saved,web-notification" json:",omitempty" bson:"-"`
 
 	OperatorRef string    `groups:"internal,departureboard-cache" bson:",omitempty"`
-	Operator    *Operator `groups:"basic,departures-llm" json:",omitempty" bson:"-"`
+	Operator    *Operator `groups:"basic,departures-llm,web-planner,web-notification" json:",omitempty" bson:"-"`
 
 	Direction            string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
 	ShortName            string    `groups:"detailed" json:",omitempty" bson:",omitempty"`
 	WheelchairAccessible int8      `groups:"detailed" bson:",omitempty"`
 	BikesAllowed         int8      `groups:"detailed" bson:",omitempty"`
-	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
-	DepartureTimezone    string    `groups:"basic,departureboard-cache" bson:",omitempty"`
+	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache,web-journey,web-planner,web-saved" bson:",omitempty"`
+	DepartureTimezone    string    `groups:"basic,departureboard-cache,web-journey,web-planner,web-saved" bson:",omitempty"`
 
-	Track               []Location           `groups:"detailed" bson:",omitempty"`
+	Track               []Location           `groups:"detailed,web-journey" bson:",omitempty"`
 	TrackRef            string               `groups:"internal" bson:",omitempty"`
-	TrackDataSource     *DataSourceReference `groups:"detailed" bson:"-"`
-	DestinationDisplay  string               `groups:"basic,departures-llm,departureboard-cache" bson:",omitempty"`
+	TrackDataSource     *DataSourceReference `groups:"detailed,web-journey" bson:"-"`
+	DestinationDisplay  string               `groups:"basic,departures-llm,departureboard-cache,web-journey,web-saved,web-notification" bson:",omitempty"`
+	OriginDisplay       string               `groups:"web-saved,web-notification" bson:"-" json:",omitempty"`
 	ReplacesJourneyRefs []string             `groups:"basic,departureboard-cache" bson:",omitempty"`
 
 	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 
-	Path []*JourneyPathItem `groups:"detailed,departureboard-cache" bson:",omitempty"`
+	Path []*JourneyPathItem `groups:"detailed,departureboard-cache,web-journey" bson:",omitempty"`
 
-	RealtimeJourney *RealtimeJourney `groups:"basic" bson:"-"`
+	RealtimeJourney *RealtimeJourney `groups:"basic,web-board,web-journey,web-planner" bson:"-"`
 
 	// Detailed journey information
-	DetailedRailInformation *JourneyDetailedRail `groups:"detailed" bson:",omitempty"`
+	DetailedRailInformation *JourneyDetailedRail `groups:"detailed,web-journey" bson:",omitempty"`
 }
 
 func (j *Journey) GetReferences() {
@@ -177,30 +178,30 @@ func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition b
 }
 
 type JourneyPathItem struct {
-	OriginStopRef      string `groups:"basic,departureboard-cache"`
-	DestinationStopRef string `groups:"basic,departureboard-cache"`
+	OriginStopRef      string `groups:"basic,departureboard-cache,web-journey"`
+	DestinationStopRef string `groups:"basic,departureboard-cache,web-journey"`
 
-	OriginStop      *Stop `groups:"basic"`
-	DestinationStop *Stop `groups:"basic"`
+	OriginStop      *Stop `groups:"basic,web-journey"`
+	DestinationStop *Stop `groups:"basic,web-journey"`
 
-	OriginPlatform      string `groups:"basic,departureboard-cache"`
-	DestinationPlatform string `groups:"basic,departureboard-cache"`
+	OriginPlatform      string `groups:"basic,departureboard-cache,web-journey"`
+	DestinationPlatform string `groups:"basic,departureboard-cache,web-journey"`
 
 	Distance int `groups:"basic"`
 
-	OriginArrivalTime      time.Time `groups:"basic,departureboard-cache"`
-	DestinationArrivalTime time.Time `groups:"basic,departureboard-cache"`
+	OriginArrivalTime      time.Time `groups:"basic,departureboard-cache,web-journey"`
+	DestinationArrivalTime time.Time `groups:"basic,departureboard-cache,web-journey"`
 
-	OriginDepartureTime time.Time `groups:"basic,departureboard-cache"`
+	OriginDepartureTime time.Time `groups:"basic,departureboard-cache,web-journey"`
 
 	DestinationDisplay string `groups:"basic,departureboard-cache"`
 
-	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
-	DestinationActivity []JourneyPathItemActivity `groups:"basic,departureboard-cache"`
+	OriginActivity      []JourneyPathItemActivity `groups:"basic,departureboard-cache,web-journey"`
+	DestinationActivity []JourneyPathItemActivity `groups:"basic,departureboard-cache,web-journey"`
 
-	Track           []Location           `groups:"basic"`
+	Track           []Location           `groups:"basic,web-journey"`
 	TrackRef        string               `groups:"internal" bson:",omitempty"`
-	TrackDataSource *DataSourceReference `groups:"basic" bson:"-"`
+	TrackDataSource *DataSourceReference `groups:"basic,web-journey" bson:"-"`
 
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
 }

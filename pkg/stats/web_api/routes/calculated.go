@@ -9,6 +9,9 @@ import (
 )
 
 func CalculatedRoute(c *fiber.Ctx) error {
+	if view := c.Query("view"); view != "" && view != "web" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "unsupported view"})
+	}
 	collection := database.GetCollection("stats")
 
 	var statsRecords []bson.M
@@ -17,7 +20,12 @@ func CalculatedRoute(c *fiber.Ctx) error {
 
 	statsRecordsMap := map[string]bson.M{}
 	for _, statsRecord := range statsRecords {
-		statsRecordsMap[statsRecord["type"].(string)] = statsRecord
+		statsType := statsRecord["type"].(string)
+		if c.Query("view") == "web" {
+			delete(statsRecord, "_id")
+			delete(statsRecord, "type")
+		}
+		statsRecordsMap[statsType] = statsRecord
 	}
 
 	return c.JSON(statsRecordsMap)

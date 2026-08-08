@@ -3,11 +3,15 @@ package batchrunner
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"github.com/liip/sheriff"
 )
 
 type Server struct {
@@ -48,7 +52,21 @@ func (s *Server) handlePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, BuildPlan())
+	plan := BuildPlan()
+	if r.URL.Query().Get("view") == "web" {
+		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-plan"}}, plan)
+		if marshalErr != nil {
+			writeError(w, http.StatusInternalServerError, marshalErr.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, reduced)
+		return
+	}
+	if r.URL.Query().Get("view") != "" {
+		writeError(w, http.StatusBadRequest, "unsupported view")
+		return
+	}
+	writeJSON(w, http.StatusOK, plan)
 }
 
 func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +77,27 @@ func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		if r.URL.Query().Get("view") == "summary" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-run-summary"}}, runs)
+			if marshalErr != nil {
+				writeError(w, http.StatusInternalServerError, marshalErr.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, reduced)
+			return
+		}
+		if r.URL.Query().Get("view") != "" {
+			writeError(w, http.StatusBadRequest, "unsupported view")
+			return
+		}
 		writeJSON(w, http.StatusOK, runs)
 	case http.MethodPost:
+		view := r.URL.Query().Get("view")
+		if view != "" && view != "summary" {
+			writeError(w, http.StatusBadRequest, "unsupported view")
+			return
+		}
+
 		var options RunOptions
 		if err := json.NewDecoder(r.Body).Decode(&options); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid run options")
@@ -70,6 +107,15 @@ func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
 		run, err := s.runner.StartRun(options)
 		if err != nil {
 			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if view == "summary" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-run-summary"}}, run)
+			if marshalErr != nil {
+				writeError(w, http.StatusInternalServerError, marshalErr.Error())
+				return
+			}
+			writeJSON(w, http.StatusCreated, reduced)
 			return
 		}
 		writeJSON(w, http.StatusCreated, run)
@@ -98,6 +144,19 @@ func (s *Server) handleRunPath(w http.ResponseWriter, r *http.Request) {
 				status = http.StatusNotFound
 			}
 			writeError(w, status, err.Error())
+			return
+		}
+		if r.URL.Query().Get("view") == "detail" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-run-detail"}}, run)
+			if marshalErr != nil {
+				writeError(w, http.StatusInternalServerError, marshalErr.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, reduced)
+			return
+		}
+		if r.URL.Query().Get("view") != "" {
+			writeError(w, http.StatusBadRequest, "unsupported view")
 			return
 		}
 		writeJSON(w, http.StatusOK, run)
@@ -154,7 +213,7 @@ func (s *Server) handleTaskLog(w http.ResponseWriter, r *http.Request, runID str
 		return
 	}
 
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -165,7 +224,45 @@ func (s *Server) handleTaskLog(w http.ResponseWriter, r *http.Request, runID str
 		return
 	}
 
+	defer file.Close()
+
+	offsetValue := r.URL.Query().Get("offset")
+	if offsetValue == "" {
+		data, readErr := io.ReadAll(file)
+		if readErr != nil {
+			writeError(w, http.StatusInternalServerError, readErr.Error())
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write(data)
+		return
+	}
+
+	offset, parseErr := strconv.ParseInt(offsetValue, 10, 64)
+	if parseErr != nil || offset < 0 {
+		writeError(w, http.StatusBadRequest, "offset must be a non-negative integer")
+		return
+	}
+	stat, statErr := file.Stat()
+	if statErr != nil {
+		writeError(w, http.StatusInternalServerError, statErr.Error())
+		return
+	}
+	if offset > stat.Size() {
+		offset = 0
+	}
+	if _, seekErr := file.Seek(offset, io.SeekStart); seekErr != nil {
+		writeError(w, http.StatusInternalServerError, seekErr.Error())
+		return
+	}
+	const maximumLogChunkBytes = 256 * 1024
+	data, readErr := io.ReadAll(io.LimitReader(file, maximumLogChunkBytes))
+	if readErr != nil {
+		writeError(w, http.StatusInternalServerError, readErr.Error())
+		return
+	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Log-Next-Offset", strconv.FormatInt(offset+int64(len(data)), 10))
 	_, _ = w.Write(data)
 }
 

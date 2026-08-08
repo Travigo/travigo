@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
@@ -127,9 +126,12 @@ func listStops(c *fiber.Ctx) error {
 	close(jobs)
 	wg.Wait()
 
-	reducedStops, _ := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{"basic"},
-	}, stops)
+	reducedStops, err := marshalWithSheriffView(c, stops, []string{"basic"}, sheriffViews{
+		"map": {"web-stop-map"},
+	})
+	if err != nil {
+		return sheriffViewError(c, err)
+	}
 
 	c.JSON(reducedStops)
 	return nil
@@ -161,9 +163,13 @@ func getStop(c *fiber.Ctx) error {
 			reduceGroupsName = []string{"stop-llm"}
 		}
 
-		reducedStop, _ := sheriff.Marshal(&sheriff.Options{
-			Groups: reduceGroupsName,
-		}, stop)
+		reducedStop, marshalErr := marshalWithSheriffView(c, stop, reduceGroupsName, sheriffViews{
+			"summary": {"web-stop-summary"},
+			"detail":  {"web-stop-detail"},
+		})
+		if marshalErr != nil {
+			return sheriffViewError(c, marshalErr)
+		}
 
 		return c.JSON(reducedStop)
 	}
@@ -212,14 +218,11 @@ func getStopOSM(c *fiber.Ctx) error {
 		})
 	}
 
-	reducedOSMStop, err := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{"basic", "detailed", "internal"},
-	}, osmStop)
+	reducedOSMStop, err := marshalWithSheriffView(c, osmStop, []string{"basic", "detailed", "internal"}, sheriffViews{
+		"map": {"web-osm-map"},
+	})
 	if err != nil {
-		c.SendStatus(fiber.StatusInternalServerError)
-		return c.JSON(fiber.Map{
-			"error": "Sherrif could not reduce OSMStop",
-		})
+		return sheriffViewError(c, err)
 	}
 
 	return c.JSON(reducedOSMStop)
@@ -240,9 +243,12 @@ func getStopDetailed(c *fiber.Ctx) error {
 		})
 	}
 
-	reducedStop, _ := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{"basic", "detailed"},
-	}, stop)
+	reducedStop, marshalErr := marshalWithSheriffView(c, stop, []string{"basic", "detailed"}, sheriffViews{
+		"web": {"web-stop-detailed"},
+	})
+	if marshalErr != nil {
+		return sheriffViewError(c, marshalErr)
+	}
 
 	return c.JSON(reducedStop)
 }
@@ -340,16 +346,13 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	}
 
 	marshalStart := time.Now()
-	departureBoardReduced, err := sheriff.Marshal(&sheriff.Options{
-		Groups: reduceGroupsName,
-	}, departureBoard)
+	departureBoardReduced, err := marshalWithSheriffView(c, departureBoard, reduceGroupsName, sheriffViews{
+		"compact": {"web-board"},
+	})
 	marshalDuration := time.Since(marshalStart)
 
 	if err != nil {
-		c.SendStatus(fiber.StatusInternalServerError)
-		return c.JSON(fiber.Map{
-			"error": "Sherrif could not reduce departureBoard",
-		})
+		return sheriffViewError(c, err)
 	}
 
 	log.Debug().
@@ -752,9 +755,12 @@ func searchStops(c *fiber.Ctx) error {
 		reduceGroupName = "search-llm"
 	}
 
-	stopsReduced, err := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{reduceGroupName},
-	}, stops)
+	stopsReduced, err := marshalWithSheriffView(c, stops, []string{reduceGroupName}, sheriffViews{
+		"web": {"web-stop-search"},
+	})
+	if err != nil {
+		return sheriffViewError(c, err)
+	}
 
 	return c.JSON(fiber.Map{
 		"stops": stopsReduced,

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
@@ -182,9 +181,38 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		journeyPlans.JourneyPlans = journeyPlans.JourneyPlans[:count]
 	}
 
-	reducedJourneyPlans, _ := sheriff.Marshal(&sheriff.Options{
-		Groups: []string{"basic"},
-	}, journeyPlans)
+	if c.Query("view") == "web" {
+		stops := map[string]*ctdf.Stop{
+			journeyPlans.OriginStop.PrimaryIdentifier:      &journeyPlans.OriginStop,
+			journeyPlans.DestinationStop.PrimaryIdentifier: &journeyPlans.DestinationStop,
+		}
+		for planIndex := range journeyPlans.JourneyPlans {
+			for itemIndex := range journeyPlans.JourneyPlans[planIndex].RouteItems {
+				item := &journeyPlans.JourneyPlans[planIndex].RouteItems[itemIndex]
+				if item.Journey != nil {
+					item.Journey.GetReferences()
+				}
+				for _, stopRef := range []string{item.OriginStopRef, item.DestinationStopRef} {
+					if stopRef == "" || stops[stopRef] != nil {
+						continue
+					}
+					stop, lookupErr := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: stopRef})
+					if lookupErr == nil {
+						stops[stopRef] = stop
+					}
+				}
+				item.OriginStop = stops[item.OriginStopRef]
+				item.DestinationStop = stops[item.DestinationStopRef]
+			}
+		}
+	}
+
+	reducedJourneyPlans, marshalErr := marshalWithSheriffView(c, journeyPlans, []string{"basic"}, sheriffViews{
+		"web": {"web-planner"},
+	})
+	if marshalErr != nil {
+		return sheriffViewError(c, marshalErr)
+	}
 
 	return c.JSON(reducedJourneyPlans)
 }

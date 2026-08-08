@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -28,6 +29,10 @@ func OperatorsRouter(router fiber.Router) {
 }
 
 func listOperators(c *fiber.Ctx) error {
+	if err := validateSheriffView(c, sheriffViews{"web": {"web-operator-list"}}); err != nil {
+		return sheriffViewError(c, err)
+	}
+
 	regions := map[string]string{
 		"UK:REGION:LONDON":       "London",
 		"UK:REGION:SOUTHWEST":    "South West England",
@@ -72,9 +77,12 @@ func listOperators(c *fiber.Ctx) error {
 		for _, region := range operator.Regions {
 
 			if !operatorInRegionCheck[region][operator.PrimaryIdentifier] {
-				reducedOperator, _ := sheriff.Marshal(&sheriff.Options{
-					Groups: []string{"basic"},
-				}, operator)
+				reducedOperator, marshalErr := marshalWithSheriffView(c, operator, []string{"basic"}, sheriffViews{
+					"web": {"web-operator-list"},
+				})
+				if marshalErr != nil {
+					return sheriffViewError(c, marshalErr)
+				}
 
 				regionOperators[region].Operators = append(regionOperators[region].Operators, reducedOperator)
 				operatorInRegionCheck[region][operator.PrimaryIdentifier] = true
@@ -108,9 +116,12 @@ func getOperator(c *fiber.Ctx) error {
 	} else {
 		operator.GetReferences()
 
-		reducedOperator, _ := sheriff.Marshal(&sheriff.Options{
-			Groups: []string{"basic", "detailed"},
-		}, operator)
+		reducedOperator, marshalErr := marshalWithSheriffView(c, operator, []string{"basic", "detailed"}, sheriffViews{
+			"web": {"web-operator-detail"},
+		})
+		if marshalErr != nil {
+			return sheriffViewError(c, marshalErr)
+		}
 		return c.JSON(reducedOperator)
 	}
 }
@@ -143,6 +154,16 @@ func getOperatorServices(c *fiber.Ctx) error {
 
 		transforms.Transform(services, 3)
 
+		if c.Query("view") == "web" {
+			reducedServices, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-service-summary"}}, services)
+			if marshalErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+			}
+			return c.JSON(reducedServices)
+		}
+		if c.Query("view") != "" {
+			return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+		}
 		return c.JSON(services)
 	}
 }

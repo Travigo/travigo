@@ -45,16 +45,16 @@ const (
 )
 
 type PlanTask struct {
-	Identifier string   `json:"identifier"`
-	Name       string   `json:"name,omitempty"`
-	Kind       TaskKind `json:"kind"`
-	Size       string   `json:"size,omitempty"`
-	Format     string   `json:"format,omitempty"`
-	Provider   string   `json:"provider,omitempty"`
+	Identifier string   `json:"identifier" groups:"web-plan"`
+	Name       string   `json:"name,omitempty" groups:"web-plan"`
+	Kind       TaskKind `json:"kind" groups:"web-plan"`
+	Size       string   `json:"size,omitempty" groups:"web-plan"`
+	Format     string   `json:"format,omitempty" groups:"web-plan"`
+	Provider   string   `json:"provider,omitempty" groups:"web-plan"`
 }
 
 type Plan struct {
-	Groups map[string][]PlanTask `json:"groups"`
+	Groups map[string][]PlanTask `json:"groups" groups:"web-plan"`
 }
 
 type RunOptions struct {
@@ -66,32 +66,32 @@ type RunOptions struct {
 }
 
 type Run struct {
-	ID              string     `json:"id"`
-	Status          RunStatus  `json:"status"`
+	ID              string     `json:"id" groups:"web-run-summary,web-run-detail"`
+	Status          RunStatus  `json:"status" groups:"web-run-summary,web-run-detail"`
 	Options         RunOptions `json:"options"`
-	Tasks           []Task     `json:"tasks"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	StartedAt       *time.Time `json:"startedAt,omitempty"`
-	FinishedAt      *time.Time `json:"finishedAt,omitempty"`
-	Error           string     `json:"error,omitempty"`
+	Tasks           []Task     `json:"tasks" groups:"web-run-detail"`
+	CreatedAt       time.Time  `json:"createdAt" groups:"web-run-summary,web-run-detail"`
+	StartedAt       *time.Time `json:"startedAt,omitempty" groups:"web-run-detail"`
+	FinishedAt      *time.Time `json:"finishedAt,omitempty" groups:"web-run-detail"`
+	Error           string     `json:"error,omitempty" groups:"web-run-detail"`
 	CancelRequested bool       `json:"cancelRequested"`
 }
 
 type Task struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	Kind       TaskKind   `json:"kind"`
-	Size       string     `json:"size,omitempty"`
+	ID         string     `json:"id" groups:"web-run-detail"`
+	Name       string     `json:"name" groups:"web-run-detail"`
+	Kind       TaskKind   `json:"kind" groups:"web-run-detail"`
+	Size       string     `json:"size,omitempty" groups:"web-run-detail"`
 	DatasetID  string     `json:"datasetId,omitempty"`
 	Args       []string   `json:"args"`
-	Status     TaskStatus `json:"status"`
-	PodStatus  PodStatus  `json:"podStatus,omitempty"`
-	JobName    string     `json:"jobName,omitempty"`
+	Status     TaskStatus `json:"status" groups:"web-run-detail"`
+	PodStatus  PodStatus  `json:"podStatus,omitempty" groups:"web-run-detail"`
+	JobName    string     `json:"jobName,omitempty" groups:"web-run-detail"`
 	LogPath    string     `json:"logPath,omitempty"`
 	StartedAt  *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	ExitCode   *int       `json:"exitCode,omitempty"`
-	Error      string     `json:"error,omitempty"`
+	Error      string     `json:"error,omitempty" groups:"web-run-detail"`
 }
 
 func defaultRunOptions(options RunOptions) RunOptions {

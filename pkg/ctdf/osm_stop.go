@@ -92,7 +92,7 @@ type OSMStop struct {
 	Station  *OSMElementRef `groups:"basic,detailed" bson:",omitempty"`
 	StopArea *OSMElementRef `groups:"basic,detailed" bson:",omitempty"`
 
-	Features []OSMStopFeature `groups:"detailed" bson:",omitempty"`
+	Features []OSMStopFeature `groups:"detailed,web-osm-map" bson:",omitempty"`
 	Elements []OSMElement     `groups:"internal" bson:",omitempty"`
 }
 
@@ -113,23 +113,23 @@ type OSMStopQuery struct {
 }
 
 type OSMStopFeature struct {
-	Type OSMStopFeatureType `groups:"detailed" bson:",omitempty"`
+	Type OSMStopFeatureType `groups:"detailed,web-osm-map" bson:",omitempty"`
 
-	Element OSMElementRef `groups:"detailed" bson:",omitempty"`
+	Element OSMElementRef `groups:"detailed,web-osm-map" bson:",omitempty"`
 	Role    string        `groups:"detailed" bson:",omitempty"`
 
-	PrimaryName string            `groups:"detailed" bson:",omitempty"`
-	Ref         string            `groups:"detailed" bson:",omitempty"`
-	LocalRef    string            `groups:"detailed" bson:",omitempty"`
+	PrimaryName string            `groups:"detailed,web-osm-map" bson:",omitempty"`
+	Ref         string            `groups:"detailed,web-osm-map" bson:",omitempty"`
+	LocalRef    string            `groups:"detailed,web-osm-map" bson:",omitempty"`
 	Tags        map[string]string `groups:"internal" bson:",omitempty"`
 
 	ParkingAssociation OSMStopParkingAssociation `groups:"detailed" bson:",omitempty"`
 	ParkingConfidence  float64                   `groups:"detailed" bson:",omitempty"`
-	Association        OSMStopFeatureAssociation `groups:"detailed" bson:",omitempty"`
+	Association        OSMStopFeatureAssociation `groups:"detailed,web-osm-map" bson:",omitempty"`
 	DistanceMetres     float64                   `groups:"detailed" bson:",omitempty"`
 
-	Location *Location  `groups:"detailed" bson:",omitempty"`
-	Geometry []Location `groups:"internal" bson:",omitempty"`
+	Location *Location  `groups:"detailed,web-osm-map" bson:",omitempty"`
+	Geometry []Location `groups:"internal,web-osm-map" bson:",omitempty"`
 }
 
 type OSMElement struct {
@@ -145,8 +145,8 @@ type OSMElement struct {
 }
 
 type OSMElementRef struct {
-	Type OSMElementType `groups:"detailed" bson:",omitempty"`
-	ID   int64          `groups:"detailed" bson:",omitempty"`
+	Type OSMElementType `groups:"detailed,web-osm-map" bson:",omitempty"`
+	ID   int64          `groups:"detailed,web-osm-map" bson:",omitempty"`
 }
 
 type OSMRelationMember struct {

@@ -15,15 +15,15 @@ import (
 )
 
 type DepartureBoard struct {
-	Journey            *Journey                 `groups:"basic,departures-llm"`
-	DestinationDisplay string                   `groups:"basic,departures-llm"`
-	Type               DepartureBoardRecordType `groups:"basic,departures-llm"`
-	Delayed            bool                     `groups:"basic,departures-llm"`
+	Journey            *Journey                 `groups:"basic,departures-llm,web-board"`
+	DestinationDisplay string                   `groups:"basic,departures-llm,web-board"`
+	Type               DepartureBoardRecordType `groups:"basic,departures-llm,web-board"`
+	Delayed            bool                     `groups:"basic,departures-llm,web-board"`
 
-	Platform     string `groups:"basic,departures-llm"`
-	PlatformType string `groups:"basic,departures-llm"`
+	Platform     string `groups:"basic,departures-llm,web-board"`
+	PlatformType string `groups:"basic,departures-llm,web-board"`
 
-	Time time.Time `groups:"basic,departures-llm"`
+	Time time.Time `groups:"basic,departures-llm,web-board"`
 }
 
 // BoardType identifies whether a board lists vehicles leaving or arriving at a

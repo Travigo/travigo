@@ -7,20 +7,20 @@ import (
 )
 
 type DataSet struct {
-	Identifier    string
-	DataSourceRef string `json:"-"`
-	Format        DataSetFormat
+	Identifier    string        `groups:"web-datasource"`
+	DataSourceRef string        `json:"-"`
+	Format        DataSetFormat `groups:"web-datasource"`
 
-	Provider Provider
+	Provider Provider `groups:"web-datasource"`
 
-	Source               string
+	Source               string                `groups:"web-datasource"`
 	SourceAuthentication *SourceAuthentication `json:"-"`
 
 	DatasetSize     string
 	RefreshInterval time.Duration
 
-	UnpackBundle      BundleFormat `json:"-"`
-	SupportedObjects  SupportedObjects
+	UnpackBundle      BundleFormat     `json:"-"`
+	SupportedObjects  SupportedObjects `groups:"web-datasource"`
 	IgnoreObjects     IgnoreObjects
 	ImportDestination ImportDestination `json:"-"`
 
@@ -61,8 +61,8 @@ const (
 )
 
 type Provider struct {
-	Name    string
-	Website string
+	Name    string `groups:"web-datasource"`
+	Website string `groups:"web-datasource"`
 }
 
 type BundleFormat string

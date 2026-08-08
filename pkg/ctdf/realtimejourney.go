@@ -11,7 +11,7 @@ type RealtimeJourney struct {
 	PrimaryIdentifier string            `groups:"basic"`
 	OtherIdentifiers  map[string]string `groups:"detailed"`
 
-	ActivelyTracked bool `groups:"basic"`
+	ActivelyTracked bool `groups:"basic,web-journey,web-journey-realtime,web-planner"`
 
 	Journey *Journey `groups:"basic"`
 
@@ -26,27 +26,27 @@ type RealtimeJourney struct {
 
 	DataSource *DataSourceReference `groups:"internal"`
 
-	VehicleLocation            Location `groups:"basic" bson:",omitempty"`
-	VehicleLocationDescription string   `groups:"basic"`
-	VehicleBearing             float64  `groups:"basic"`
+	VehicleLocation            Location `groups:"basic,web-journey,web-journey-realtime" bson:",omitempty"`
+	VehicleLocationDescription string   `groups:"basic,web-journey,web-journey-realtime"`
+	VehicleBearing             float64  `groups:"basic,web-journey,web-journey-realtime"`
 
 	DepartedStopRef string `groups:"basic"`
 	DepartedStop    *Stop  `groups:"basic" bson:"-"`
 
-	NextStopRef string `groups:"basic"`
+	NextStopRef string `groups:"basic,web-journey,web-journey-realtime"`
 	// NextStopIndex identifies the next call in Journey.Path's ordered stop list.
 	// NextStopRef alone is ambiguous when a journey revisits a stop.
-	NextStopIndex int   `groups:"basic"`
+	NextStopIndex int   `groups:"basic,web-journey,web-journey-realtime"`
 	NextStop      *Stop `groups:"basic" bson:"-"`
 
-	Stops  map[string]*RealtimeJourneyStops `groups:"basic"` // Historic & future estimates
+	Stops  map[string]*RealtimeJourneyStops `groups:"basic,web-journey,web-journey-realtime"` // Historic & future estimates
 	Offset time.Duration                    `groups:"internal"`
 
-	Reliability RealtimeJourneyReliabilityType `groups:"basic"`
+	Reliability RealtimeJourneyReliabilityType `groups:"basic,web-board,web-journey,web-journey-realtime"`
 
 	VehicleRef string `groups:"internal"`
 
-	Cancelled bool `groups:"basic"`
+	Cancelled bool `groups:"basic,web-journey,web-journey-realtime"`
 
 	// SuppressFromDepartures hides this journey from both stop-board modes for
 	// the listed service dates when it has been replaced by an STP overlay.
@@ -54,10 +54,10 @@ type RealtimeJourney struct {
 	SuppressFromDepartureDates []string `groups:"internal"`
 	ReplacedByJourneyRef       string   `groups:"basic"`
 
-	Occupancy RealtimeJourneyOccupancy `groups:"detailed"`
+	Occupancy RealtimeJourneyOccupancy `groups:"detailed,web-journey,web-journey-realtime"`
 
 	// Detailed realtime journey information
-	DetailedRailInformation JourneyDetailedRail `groups:"detailed"`
+	DetailedRailInformation JourneyDetailedRail `groups:"detailed,web-journey,web-journey-realtime"`
 }
 
 func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {
@@ -78,21 +78,21 @@ func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {
 }
 
 type RealtimeJourneyOccupancy struct {
-	OccupancyAvailable bool `groups:"basic"`
+	OccupancyAvailable bool `groups:"basic,web-journey,web-journey-realtime"`
 
 	ActualValues          bool `groups:"basic"`
-	WheelchairInformation bool `groups:"basic"`
-	SeatedInformation     bool `groups:"basic"`
+	WheelchairInformation bool `groups:"basic,web-journey,web-journey-realtime"`
+	SeatedInformation     bool `groups:"basic,web-journey,web-journey-realtime"`
 
-	TotalPercentageOccupancy int `groups:"basic"`
+	TotalPercentageOccupancy int `groups:"basic,web-journey,web-journey-realtime"`
 
 	Capacity           int `groups:"basic"`
-	SeatedCapacity     int `groups:"basic"`
-	WheelchairCapacity int `groups:"basic"`
+	SeatedCapacity     int `groups:"basic,web-journey,web-journey-realtime"`
+	WheelchairCapacity int `groups:"basic,web-journey,web-journey-realtime"`
 
 	Occupancy           int `groups:"basic"`
-	SeatedOccupancy     int `groups:"basic"`
-	WheelchairOccupancy int `groups:"basic"`
+	SeatedOccupancy     int `groups:"basic,web-journey,web-journey-realtime"`
+	WheelchairOccupancy int `groups:"basic,web-journey,web-journey-realtime"`
 }
 
 type RealtimeJourneyReliabilityType string
@@ -150,20 +150,20 @@ func (r *RealtimeJourney) IsActive() bool {
 }
 
 type RealtimeJourneyStops struct {
-	StopRef string `groups:"basic"`
+	StopRef string `groups:"basic,web-journey,web-journey-realtime"`
 	// JourneyStopIndex identifies this call in the ordered journey stop list.
 	// Stop references are not unique on circular journeys.
-	JourneyStopIndex int   `groups:"basic"`
+	JourneyStopIndex int   `groups:"basic,web-journey,web-journey-realtime"`
 	Stop             *Stop `groups:"basic" bson:"-"`
 
-	Platform string `groups:"basic"`
+	Platform string `groups:"basic,web-journey,web-journey-realtime"`
 
-	ArrivalTime   time.Time `groups:"basic"`
-	DepartureTime time.Time `groups:"basic"`
+	ArrivalTime   time.Time `groups:"basic,web-journey,web-journey-realtime"`
+	DepartureTime time.Time `groups:"basic,web-journey,web-journey-realtime"`
 
-	TimeType RealtimeJourneyStopTimeType `groups:"basic"`
+	TimeType RealtimeJourneyStopTimeType `groups:"basic,web-journey,web-journey-realtime"`
 
-	Cancelled bool `groups:"basic"`
+	Cancelled bool `groups:"basic,web-journey,web-journey-realtime"`
 }
 
 func RealtimeJourneyStopKey(stopRef string, journeyStopIndex int) string {

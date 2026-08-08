@@ -14,12 +14,12 @@ import (
 const OperatorGroupIDFormat = "gb-nocgroup-%s"
 
 type OperatorGroup struct {
-	Identifier string `groups:"basic"`
-	Name       string `groups:"basic"`
+	Identifier string `groups:"basic,web-operator-detail,web-operator-group"`
+	Name       string `groups:"basic,web-operator-detail,web-operator-group"`
 
 	DataSource *DataSourceReference `groups:"internal"`
 
-	Operators []*Operator `bson:"-" groups:"detailed"`
+	Operators []*Operator `bson:"-" groups:"detailed,web-operator-group"`
 
 	CreationDateTime     time.Time `groups:"detailed"`
 	ModificationDateTime time.Time `groups:"detailed"`

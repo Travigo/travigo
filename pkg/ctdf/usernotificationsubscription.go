@@ -15,24 +15,27 @@ import (
 // intentionally separate from UserEventSubscription until the notification
 // delivery pipeline is migrated to use it.
 type UserNotificationSubscription struct {
-	PrimaryIdentifier string `bson:"primaryidentifier" json:"id"`
+	PrimaryIdentifier string `bson:"primaryidentifier" json:"id" groups:"web-notification-subscription"`
 	UserID            string `bson:"userid" json:"-"`
 
-	EventType EventType                          `bson:"eventtype" json:"eventType"`
-	Values    UserNotificationSubscriptionValues `bson:"values" json:"values"`
+	EventType EventType                          `bson:"eventtype" json:"eventType" groups:"web-notification-subscription"`
+	Values    UserNotificationSubscriptionValues `bson:"values" json:"values" groups:"web-notification-subscription"`
 
-	CreationDateTime     time.Time `bson:"creationdatetime" json:"createdAt"`
-	ModificationDateTime time.Time `bson:"modificationdatetime" json:"updatedAt"`
+	CreationDateTime     time.Time `bson:"creationdatetime" json:"createdAt" groups:"web-notification-subscription"`
+	ModificationDateTime time.Time `bson:"modificationdatetime" json:"updatedAt" groups:"web-notification-subscription"`
+
+	Subject       interface{} `bson:"-" json:"subject,omitempty" groups:"web-notification-subscription"`
+	PlatformStops []*Stop     `bson:"-" json:"platformStops,omitempty" groups:"web-notification-subscription"`
 
 	Program *vm.Program `bson:"-" json:"-"`
 }
 
 type UserNotificationSubscriptionValues struct {
-	ServiceAlertTypes []string `bson:"servicealerttypes" json:"ServiceAlertTypes"`
-	StopRef           string   `bson:"stopref" json:"StopRef"`
-	ServiceRef        string   `bson:"serviceref" json:"ServiceRef"`
-	JourneyRef        string   `bson:"journeyref" json:"JourneyRef"`
-	StopRefs          []string `bson:"stoprefs" json:"StopRefs"`
+	ServiceAlertTypes []string `bson:"servicealerttypes" json:"ServiceAlertTypes" groups:"web-notification-subscription"`
+	StopRef           string   `bson:"stopref" json:"StopRef" groups:"web-notification-subscription"`
+	ServiceRef        string   `bson:"serviceref" json:"ServiceRef" groups:"web-notification-subscription"`
+	JourneyRef        string   `bson:"journeyref" json:"JourneyRef" groups:"web-notification-subscription"`
+	StopRefs          []string `bson:"stoprefs" json:"StopRefs" groups:"web-notification-subscription"`
 }
 
 func stringArrayExpression(values []string) string {

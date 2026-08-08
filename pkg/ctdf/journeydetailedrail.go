@@ -1,51 +1,51 @@
 package ctdf
 
 type JourneyDetailedRail struct {
-	Trains []RailTrain `groups:"detailed"`
+	Trains []RailTrain `groups:"detailed,web-journey,web-journey-realtime"`
 
-	Seating []JourneyDetailedRailSeating `groups:"detailed"`
+	Seating []JourneyDetailedRailSeating `groups:"detailed,web-journey,web-journey-realtime"`
 
-	SleeperAvailable bool                         `groups:"detailed"`
-	Sleepers         []JourneyDetailedRailSeating `groups:"detailed"`
+	SleeperAvailable bool                         `groups:"detailed,web-journey,web-journey-realtime"`
+	Sleepers         []JourneyDetailedRailSeating `groups:"detailed,web-journey,web-journey-realtime"`
 
-	ReservationRequired     bool `groups:"detailed"`
-	ReservationBikeRequired bool `groups:"detailed"`
-	ReservationRecommended  bool `groups:"detailed"`
+	ReservationRequired     bool `groups:"detailed,web-journey,web-journey-realtime"`
+	ReservationBikeRequired bool `groups:"detailed,web-journey,web-journey-realtime"`
+	ReservationRecommended  bool `groups:"detailed,web-journey,web-journey-realtime"`
 
-	CateringAvailable   bool   `groups:"detailed"`
-	CateringDescription string `groups:"detailed"`
+	CateringAvailable   bool   `groups:"detailed,web-journey,web-journey-realtime"`
+	CateringDescription string `groups:"detailed,web-journey,web-journey-realtime"`
 
-	ReplacementBus bool `groups:"detailed"`
+	ReplacementBus bool `groups:"detailed,web-journey,web-journey-realtime"`
 }
 
 type RailTrain struct {
-	ID       string `groups:"basic"`
-	Position int    `groups:"detailed"`
+	ID       string `groups:"basic,web-journey,web-journey-realtime"`
+	Position int    `groups:"detailed,web-journey,web-journey-realtime"`
 
-	AllocationSequence int    `groups:"detailed"`
+	AllocationSequence int    `groups:"detailed,web-journey,web-journey-realtime"`
 	ValidFrom          string `groups:"detailed"`
 	ValidUntil         string `groups:"detailed"`
-	Reversed           bool   `groups:"detailed"`
+	Reversed           bool   `groups:"detailed,web-journey,web-journey-realtime"`
 
-	VehicleType     string `groups:"detailed"`
-	VehicleTypeName string `groups:"detailed"`
-	PowerType       string `groups:"detailed"`
+	VehicleType     string `groups:"detailed,web-journey,web-journey-realtime"`
+	VehicleTypeName string `groups:"detailed,web-journey,web-journey-realtime"`
+	PowerType       string `groups:"detailed,web-journey,web-journey-realtime"`
 
-	FleetID string `groups:"detailed"`
+	FleetID string `groups:"detailed,web-journey,web-journey-realtime"`
 
-	TrainLength int            `groups:"detailed"`
-	Carriages   []RailCarriage `groups:"detailed"`
+	TrainLength int            `groups:"detailed,web-journey,web-journey-realtime"`
+	Carriages   []RailCarriage `groups:"detailed,web-journey,web-journey-realtime"`
 
-	SpeedKMH int `groups:"detailed"`
+	SpeedKMH int `groups:"detailed,web-journey,web-journey-realtime"`
 
-	AirConditioning bool `groups:"detailed"`
+	AirConditioning bool `groups:"detailed,web-journey,web-journey-realtime"`
 
-	WiFi           bool `groups:"detailed"`
-	Toilets        bool `groups:"detailed"`
-	PowerPlugs     bool `groups:"detailed"`
-	USBPlugs       bool `groups:"detailed"`
-	DisabledAccess bool `groups:"detailed"`
-	BicycleSpaces  bool `groups:"detailed"`
+	WiFi           bool `groups:"detailed,web-journey,web-journey-realtime"`
+	Toilets        bool `groups:"detailed,web-journey,web-journey-realtime"`
+	PowerPlugs     bool `groups:"detailed,web-journey,web-journey-realtime"`
+	USBPlugs       bool `groups:"detailed,web-journey,web-journey-realtime"`
+	DisabledAccess bool `groups:"detailed,web-journey,web-journey-realtime"`
+	BicycleSpaces  bool `groups:"detailed,web-journey,web-journey-realtime"`
 }
 
 type JourneyDetailedRailSeating string
@@ -69,24 +69,24 @@ func (carriage RailCarriage) CountsTowardsTrainLength() bool {
 }
 
 type RailCarriage struct {
-	ID             string                       `groups:"basic"`
-	CarriageType   string                       `groups:"basic"`
-	VehicleRole    RailCarriageVehicleRole      `groups:"basic"`
-	SeatingClasses []JourneyDetailedRailSeating `groups:"basic"`
-	Toilets        []RailCarriageToilet         `groups:"basic"`
+	ID             string                       `groups:"basic,web-journey,web-journey-realtime"`
+	CarriageType   string                       `groups:"basic,web-journey,web-journey-realtime"`
+	VehicleRole    RailCarriageVehicleRole      `groups:"basic,web-journey,web-journey-realtime"`
+	SeatingClasses []JourneyDetailedRailSeating `groups:"basic,web-journey,web-journey-realtime"`
+	Toilets        []RailCarriageToilet         `groups:"basic,web-journey,web-journey-realtime"`
 
-	CarriageID      string `groups:"detailed"`
-	VehicleID       string `groups:"detailed"`
-	VehiclePosition int    `groups:"detailed"`
-	SpecificType    string `groups:"detailed"`
-	Livery          string `groups:"detailed"`
-	LengthMM        int    `groups:"detailed"`
-	SeatCount       int    `groups:"detailed"`
+	CarriageID      string `groups:"detailed,web-journey,web-journey-realtime"`
+	VehicleID       string `groups:"detailed,web-journey,web-journey-realtime"`
+	VehiclePosition int    `groups:"detailed,web-journey,web-journey-realtime"`
+	SpecificType    string `groups:"detailed,web-journey,web-journey-realtime"`
+	Livery          string `groups:"detailed,web-journey,web-journey-realtime"`
+	LengthMM        int    `groups:"detailed,web-journey,web-journey-realtime"`
+	SeatCount       int    `groups:"detailed,web-journey,web-journey-realtime"`
 
-	Occupancy int `groups:"basic"`
+	Occupancy int `groups:"basic,web-journey,web-journey-realtime"`
 }
 
 type RailCarriageToilet struct {
-	Type   string `groups:"basic"`
-	Status string `groups:"basic"`
+	Type   string `groups:"basic,web-journey,web-journey-realtime"`
+	Status string `groups:"basic,web-journey,web-journey-realtime"`
 }

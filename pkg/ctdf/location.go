@@ -3,8 +3,8 @@ package ctdf
 import "math"
 
 type Location struct {
-	Type        string    `json:"point" groups:"basic,detailed,stop-llm"`
-	Coordinates []float64 `json:"coordinates" groups:"basic,detailed,stop-llm"`
+	Type        string    `json:"point" groups:"basic,detailed,stop-llm,web-stop-map,web-stop-summary,web-stop-detail,web-stop-detailed,web-journey,web-journey-realtime,web-osm-map"`
+	Coordinates []float64 `json:"coordinates" groups:"basic,detailed,stop-llm,web-stop-map,web-stop-summary,web-stop-detail,web-stop-detailed,web-journey,web-journey-realtime,web-osm-map"`
 }
 
 // Shameless taken 'inspiration' from https://stackoverflow.com/a/6853926

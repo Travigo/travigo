@@ -1,10 +1,10 @@
 package datasets
 
 type DataSource struct {
-	Identifier string
-	Region     string
-	Provider   Provider
-	Datasets   []DataSet
+	Identifier string    `groups:"web-datasource"`
+	Region     string    `groups:"web-datasource"`
+	Provider   Provider  `groups:"web-datasource"`
+	Datasets   []DataSet `groups:"web-datasource"`
 
-	SourceAuthentication *SourceAuthentication
+	SourceAuthentication *SourceAuthentication `json:"-"`
 }

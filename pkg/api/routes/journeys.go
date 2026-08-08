@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
@@ -21,6 +20,16 @@ func JourneysRouter(router fiber.Router) {
 func getJourney(c *fiber.Ctx) error {
 	identifier := c.Params("identifier")
 	realtimeOnly := c.QueryBool("realtime_only", false)
+	views := sheriffViews{
+		"web": {"web-journey"},
+	}
+	if !realtimeOnly {
+		views["saved"] = []string{"web-saved"}
+		views["notification"] = []string{"web-notification"}
+	}
+	if err := validateSheriffView(c, views); err != nil {
+		return sheriffViewError(c, err)
+	}
 
 	var journey *ctdf.Journey
 	journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{
@@ -51,9 +60,9 @@ func getJourney(c *fiber.Ctx) error {
 			if journey.RealtimeJourney == nil {
 				journeyReduced = nil
 			} else {
-				journeyReduced, err = sheriff.Marshal(&sheriff.Options{
-					Groups: []string{"basic", "detailed"},
-				}, journey.RealtimeJourney)
+				journeyReduced, err = marshalWithSheriffView(c, journey.RealtimeJourney, []string{"basic", "detailed"}, sheriffViews{
+					"web": {"web-journey-realtime"},
+				})
 			}
 		} else {
 			applyJourneyServiceStopNameOverrides(journey)
@@ -61,16 +70,15 @@ func getJourney(c *fiber.Ctx) error {
 			transforms.Transform(journey.Service, 1)
 			transforms.Transform(journey.DetailedRailInformation, 1)
 
-			journeyReduced, err = sheriff.Marshal(&sheriff.Options{
-				Groups: []string{"basic", "detailed"},
-			}, journey)
+			journeyReduced, err = marshalWithSheriffView(c, journey, []string{"basic", "detailed"}, sheriffViews{
+				"web":          {"web-journey"},
+				"saved":        {"web-saved"},
+				"notification": {"web-notification"},
+			})
 		}
 
 		if err != nil {
-			c.SendStatus(fiber.StatusInternalServerError)
-			return c.JSON(fiber.Map{
-				"error": "Sherrif could not reduce Journey",
-			})
+			return sheriffViewError(c, err)
 		}
 
 		return c.JSON(journeyReduced)

@@ -4,10 +4,15 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -52,7 +57,50 @@ func listSavedObjects(c *fiber.Ctx) error {
 		savedObjects = append(savedObjects, savedObject)
 	}
 
+	if c.Query("view") == "web" {
+		for _, savedObject := range savedObjects {
+			populateSavedObject(savedObject)
+		}
+		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-saved"}}, savedObjects)
+		if marshalErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+		}
+		return c.JSON(reduced)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(savedObjects)
+}
+
+func populateSavedObject(savedObject *ctdf.SavedObject) {
+	if savedObject == nil || savedObject.ObjectIdentifier == "" {
+		return
+	}
+	switch strings.ToLower(savedObject.Type) {
+	case "stop", "stops":
+		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: savedObject.ObjectIdentifier})
+		if err != nil {
+			return
+		}
+		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: stop})
+		transforms.Transform(stop.Services, 1)
+		savedObject.Object = stop
+	case "journey", "journeys":
+		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: savedObject.ObjectIdentifier})
+		if err != nil {
+			return
+		}
+		journey.GetService()
+		transforms.Transform(journey.Service, 1)
+		if len(journey.Path) > 0 {
+			journey.Path[0].GetOriginStop()
+			if journey.Path[0].OriginStop != nil {
+				journey.OriginDisplay = journey.Path[0].OriginStop.PrimaryName
+			}
+		}
+		savedObject.Object = journey
+	}
 }
 
 func getSavedObject(c *fiber.Ctx) error {
@@ -74,6 +122,13 @@ func getSavedObject(c *fiber.Ctx) error {
 		})
 	}
 
+	if c.Query("view") == "web" {
+		populateSavedObject(savedObject)
+		return writeSavedObject(c, savedObject)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(savedObject)
 }
 
@@ -107,6 +162,10 @@ func deleteSavedObject(c *fiber.Ctx) error {
 }
 
 func createSavedObject(c *fiber.Ctx) error {
+	if view := c.Query("view"); view != "" && view != "web" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", view))
+	}
+
 	var requestBody struct {
 		Type             string
 		ObjectIdentifier string
@@ -144,7 +203,7 @@ func createSavedObject(c *fiber.Ctx) error {
 		"userid":            userID,
 	}).Decode(&existingSavedObject)
 	if err == nil {
-		return c.JSON(existingSavedObject)
+		return writeSavedObject(c, existingSavedObject)
 	}
 	if err != mongo.ErrNoDocuments {
 		c.SendStatus(fiber.StatusInternalServerError)
@@ -176,6 +235,22 @@ func createSavedObject(c *fiber.Ctx) error {
 		})
 	}
 
+	return writeSavedObject(c, &savedObject)
+}
+
+func writeSavedObject(c *fiber.Ctx, savedObject *ctdf.SavedObject) error {
+	if c.Query("view") == "web" {
+		reduced, err := marshalWithSheriffView(c, savedObject, nil, map[string][]string{
+			"web": {"web-saved"},
+		})
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(reduced)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(savedObject)
 }
 

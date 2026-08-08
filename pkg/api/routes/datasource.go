@@ -2,8 +2,10 @@ package routes
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
@@ -30,6 +32,16 @@ func listDatasources(c *fiber.Ctx) error {
 		})
 	}
 
+	if c.Query("view") == "web" {
+		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-datasource"}}, datasources)
+		if marshalErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+		}
+		return c.JSON(reduced)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(datasources)
 }
 
@@ -47,6 +59,16 @@ func getDataset(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		if c.Query("view") == "web" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-datasource"}}, dataset)
+			if marshalErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+			}
+			return c.JSON(reduced)
+		}
+		if c.Query("view") != "" {
+			return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+		}
 		return c.JSON(dataset)
 	}
 }
@@ -72,6 +94,16 @@ func getLatestImportReport(c *fiber.Ctx) error {
 		})
 	}
 
+	if c.Query("view") == "web" {
+		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-import-report"}}, report)
+		if marshalErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+		}
+		return c.JSON(reduced)
+	}
+	if c.Query("view") != "" {
+		return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+	}
 	return c.JSON(report)
 }
 
@@ -89,6 +121,16 @@ func getProvider(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		if c.Query("view") == "web" {
+			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-datasource"}}, datasource)
+			if marshalErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": marshalErr.Error()})
+			}
+			return c.JSON(reduced)
+		}
+		if c.Query("view") != "" {
+			return sheriffViewError(c, fmt.Errorf("unsupported view %q", c.Query("view")))
+		}
 		return c.JSON(datasource)
 	}
 }

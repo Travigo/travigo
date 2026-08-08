@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/travigo/travigo/pkg/api/routes"
 	"github.com/travigo/travigo/pkg/http_server"
 )
@@ -9,6 +10,7 @@ import (
 func SetupServer(listen string) error {
 	webApp := fiber.New()
 	webApp.Use(http_server.NewLogger())
+	webApp.Use(compress.New(compress.Config{Level: compress.LevelBestSpeed}))
 
 	group := webApp.Group("/core")
 
