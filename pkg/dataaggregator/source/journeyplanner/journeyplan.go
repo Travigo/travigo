@@ -519,6 +519,13 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		return departureBoard[i].Time.Before(departureBoard[j].Time)
 	})
 
+	type departureCandidate struct {
+		departure          *ctdf.DepartureBoard
+		boardingIndex      int
+		reachesDestination bool
+	}
+	candidates := make([]departureCandidate, 0, len(departureBoard))
+
 	for _, departure := range departureBoard {
 		if runtime.searchExpired() {
 			return nil
@@ -538,37 +545,28 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 			continue
 		}
 
-		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) && len(results.JourneyPlans) >= runtime.config.count {
+		reachesDestination := runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results)
+		candidates = append(candidates, departureCandidate{
+			departure:          departure,
+			boardingIndex:      boardingIndex,
+			reachesDestination: reachesDestination,
+		})
+		if reachesDestination && len(results.JourneyPlans) >= runtime.config.count {
 			return nil
 		}
 	}
 
-	for _, departure := range departureBoard {
+	for _, candidate := range candidates {
 		if runtime.searchExpired() {
 			return nil
 		}
-		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
-			continue
-		}
-		if departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
-			continue
-		}
-		if departure.Time.Before(current.arrivalTime) || departure.Time.After(runtime.searchEndTime) {
+		if candidate.reachesDestination {
 			continue
 		}
 
-		boardingIndex := boardingPathIndex(departure.Journey, current.stop)
-		if boardingIndex < 0 {
-			continue
-		}
-
+		departure := candidate.departure
+		boardingIndex := candidate.boardingIndex
 		boardingStopRef := departure.Journey.Path[boardingIndex].OriginStopRef
-		if runtime.recordDirectDestinationFromDeparture(current, departure, boardingIndex, destinationStop, results) {
-			if len(results.JourneyPlans) >= runtime.config.count {
-				return nil
-			}
-			continue
-		}
 
 		lastTime := departure.Time
 		for pathIndex := boardingIndex; pathIndex < len(departure.Journey.Path); pathIndex++ {

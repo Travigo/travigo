@@ -85,7 +85,7 @@ func TestJourneyPublisherTask(t *testing.T) {
 	if tasks[0].Kind != TaskKindLinkJourneys {
 		t.Fatalf("expected journey linker kind, got %s", tasks[0].Kind)
 	}
-	expectedArgs := []string{"data-linker", "run", "--type", "journeys"}
+	expectedArgs := []string{"data-linker", "run", "--type", "journeys", "--skip-staging"}
 	if !slices.Equal(tasks[0].Args, expectedArgs) {
 		t.Fatalf("journey publisher args = %q, expected %q", tasks[0].Args, expectedArgs)
 	}

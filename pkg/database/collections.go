@@ -257,6 +257,10 @@ func createJourneysIndexes() {
 	_, err := journeysRawCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
 		{Keys: bson.D{
+			{Key: "datasource.datasetid", Value: 1},
+			{Key: "datasource.timestamp", Value: 1},
+		}},
+		{Keys: bson.D{
 			{Key: "datasource.originalformat", Value: 1},
 			{Key: "datasource.datasetid", Value: 1},
 			{Key: "datasource.timestamp", Value: 1},

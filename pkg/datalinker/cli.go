@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
@@ -65,6 +66,10 @@ func RegisterCLI() *cli.Command {
 						Name:  "skip-stop-linker-oplog-maintenance",
 						Usage: "Skip post-run oplog cleanup for the stops linker",
 					},
+					&cli.BoolFlag{
+						Name:  "skip-staging",
+						Usage: "Incrementally publish datasets updated in the last 24 hours without a staging collection (journeys only)",
+					},
 					&cli.IntFlag{
 						Name:  "oplog-clear-size-mb",
 						Usage: "Temporary oplog size in MB used while clearing the oplog after the stops linker",
@@ -72,6 +77,11 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
+					dataType := c.String("type")
+					if c.Bool("skip-staging") && dataType != "journeys" {
+						return fmt.Errorf("--skip-staging is only supported for journeys")
+					}
+
 					if err := database.Connect(); err != nil {
 						return err
 					}
@@ -79,8 +89,6 @@ func RegisterCLI() *cli.Command {
 						log.Fatal().Err(err).Msg("Failed to connect to Redis")
 					}
 					insertrecords.Insert()
-
-					dataType := c.String("type")
 
 					switch dataType {
 					case "stops":
@@ -168,7 +176,7 @@ func RegisterCLI() *cli.Command {
 						}
 					case "journeys":
 						linker := NewPlainCopyLinker("journey")
-						if err := linker.Run(); err != nil {
+						if err := linker.Run(PlainCopyConfig{SkipStaging: c.Bool("skip-staging")}); err != nil {
 							return err
 						}
 					default:
