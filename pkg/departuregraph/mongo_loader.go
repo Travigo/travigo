@@ -13,6 +13,10 @@ import (
 
 type MongoLoader struct{}
 
+func (MongoLoader) JourneyCount(ctx context.Context) (int64, error) {
+	return database.GetCollection(database.JourneysCollectionName).EstimatedDocumentCount(ctx)
+}
+
 func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serviceDate time.Time) ([]*ctdf.Journey, error) {
 	if len(stopRefs) == 0 {
 		return nil, nil

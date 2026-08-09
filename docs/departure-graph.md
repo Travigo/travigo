@@ -56,3 +56,26 @@ stored-journey, path, and bucket counts after the first production build.
 The current format is departures-only. An arrival index can later be added as a
 second integer index over the same compact journey/path records without changing
 the lazy fill, rolling generation, or persistence model.
+
+## Operational statistics
+
+`GET /v1/stats` returns a live JSON snapshot covering:
+
+- `Requests`: departure-request totals, failures and in-flight requests; the
+  completed request rate and latency over the last 60 seconds; and lifetime
+  average, maximum and most recent latency.
+- The existing top-level `Strings`, `Journeys`, `Paths`, `DepartureBuckets`,
+  `CompleteStops` and `CompleteDays` fields remain unchanged. `Lookups` adds hit
+  and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
+  and average/maximum fill time.
+- `BackgroundBuild`: whether a scan is active, estimated and scanned
+  journey counts, progress from `0` to `1`, scan rate, estimated time remaining,
+  duration, active journey-day count and successful/failed build history.
+- `Snapshot`: active write state, successful/failed write counts, last
+  write and restore duration, compressed file size and latest errors.
+- `Memory`: Go heap, stack, runtime system allocation, heap objects, goroutines,
+  garbage collections and latest GC pause. On Linux it also reports process RSS
+  and cgroup usage/limit when those kernel files are available.
+
+The endpoint calculates metrics from counters and current runtime state; it does
+not traverse the graph. `GET /healthz` remains the lightweight probe endpoint.

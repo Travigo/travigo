@@ -84,6 +84,10 @@ type Loader interface {
 	ScanJourneys(ctx context.Context, visit func(*ctdf.Journey) error) error
 }
 
+type JourneyCounter interface {
+	JourneyCount(ctx context.Context) (int64, error)
+}
+
 // Provider is the query boundary used by departure-board consumers. Graph
 // implements it in the graph service and Client implements it in web-api.
 type Provider interface {
@@ -153,6 +157,9 @@ type Graph struct {
 
 	current atomic.Pointer[graphData]
 	fills   singleflight.Group
+	metrics graphMetrics
+
+	snapshotMu sync.Mutex
 }
 
 func New(loader Loader, config Config) *Graph {
@@ -189,7 +196,7 @@ func (g *Graph) Start(ctx context.Context) {
 	}
 	restored := false
 	if g.config.SnapshotPath != "" {
-		if err := g.restore(g.config.SnapshotPath); err != nil {
+		if err := g.restoreTracked(g.config.SnapshotPath); err != nil {
 			log.Warn().Err(err).Str("path", g.config.SnapshotPath).Msg("Departure graph snapshot restore failed; continuing with lazy fills")
 		} else {
 			restored = g.Stats().Journeys > 0
@@ -269,16 +276,21 @@ func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDat
 		canonical = stopRefs[0]
 	}
 
-	if !data.stopComplete(day, canonical) {
+	complete := data.stopComplete(day, canonical)
+	g.metrics.lookup(complete)
+	if !complete {
 		fillKey := strconv.Itoa(int(day)) + "\x00" + canonical
 		_, err, _ := g.fills.Do(fillKey, func() (any, error) {
 			active := g.current.Load()
 			if active.stopComplete(day, canonical) {
 				return nil, nil
 			}
-			journeys, err := g.loader.LoadStopJourneys(ctx, stopRefs, serviceDate)
-			if err != nil {
-				return nil, err
+			started := g.metrics.beginLazyFill()
+			var fillErr error
+			defer func() { g.metrics.finishLazyFill(started, fillErr) }()
+			journeys, fillErr := g.loader.LoadStopJourneys(ctx, stopRefs, serviceDate)
+			if fillErr != nil {
+				return nil, fillErr
 			}
 			active.addJourneys(day, journeys)
 			active.markStopComplete(day, canonical)
@@ -298,7 +310,14 @@ func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDat
 	return data.materializeStop(day, stopRefs), nil
 }
 
-func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) error {
+func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
+	g.metrics.build.begin()
+	defer func() { g.metrics.build.finish(err) }()
+	if counter, ok := g.loader.(JourneyCounter); ok {
+		if total, countErr := counter.JourneyCount(ctx); countErr == nil {
+			g.metrics.build.setEstimatedJourneys(total)
+		}
+	}
 	dates := rollingDates(now, g.config.DaysBehind, g.config.DaysAhead)
 	next := g.current.Load()
 	if next.coversRolling(now, g.config.DaysBehind, g.config.DaysAhead) {
@@ -312,16 +331,19 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) error {
 	active := 0
 	started := time.Now()
 
-	err := g.loader.ScanJourneys(ctx, func(journey *ctdf.Journey) error {
+	err = g.loader.ScanJourneys(ctx, func(journey *ctdf.Journey) error {
 		processed++
+		activeForJourney := int64(0)
 		if journey != nil && journey.Availability != nil {
 			for _, serviceDate := range dates {
 				if journey.Availability.MatchDate(serviceDate) {
 					next.addJourney(makeDayKey(serviceDate), journey)
 					active++
+					activeForJourney++
 				}
 			}
 		}
+		g.metrics.build.scanned(activeForJourney)
 		if processed%g.config.BatchSize == 0 && g.config.BatchPause > 0 {
 			timer := time.NewTimer(g.config.BatchPause)
 			select {
@@ -351,8 +373,8 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) error {
 	next.mu.Unlock()
 
 	if g.config.SnapshotPath != "" {
-		if err := g.save(g.config.SnapshotPath, next); err != nil {
-			log.Error().Err(err).Str("path", g.config.SnapshotPath).Msg("Departure graph snapshot save failed")
+		if snapshotErr := g.saveTracked(g.config.SnapshotPath, next); snapshotErr != nil {
+			log.Error().Err(snapshotErr).Str("path", g.config.SnapshotPath).Msg("Departure graph snapshot save failed")
 		}
 	}
 	stats := next.stats()
@@ -649,13 +671,20 @@ type Stats struct {
 	DepartureBuckets int
 	CompleteStops    int
 	CompleteDays     int
+	Lookups          LookupStats
+	BackgroundBuild  BuildStats
+	Snapshot         SnapshotStats
 }
 
 func (g *Graph) Stats() Stats {
 	if g == nil {
 		return Stats{}
 	}
-	return g.current.Load().stats()
+	stats := g.current.Load().stats()
+	stats.Lookups = g.metrics.lookupStats()
+	stats.BackgroundBuild = g.metrics.build.stats()
+	stats.Snapshot = g.metrics.snapshot.stats()
+	return stats
 }
 
 func (d *graphData) stats() Stats {

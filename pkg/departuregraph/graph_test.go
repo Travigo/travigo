@@ -53,6 +53,12 @@ func (l *fakeLoader) ScanJourneys(_ context.Context, visit func(*ctdf.Journey) e
 	return nil
 }
 
+func (l *fakeLoader) JourneyCount(_ context.Context) (int64, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return int64(len(l.journeys)), nil
+}
+
 func TestGraphLazilyFillsAndMaterializesDepartureJourneys(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
@@ -142,6 +148,10 @@ func TestBackgroundRebuildCompletesRollingDays(t *testing.T) {
 	if loader.stopLoads != 0 || loader.scans != 1 {
 		t.Fatalf("stop loads=%d scans=%d, want 0 and 1", loader.stopLoads, loader.scans)
 	}
+	stats := graph.Stats().BackgroundBuild
+	if stats.Running || stats.EstimatedJourneys != 1 || stats.ScannedJourneys != 1 || stats.Progress != 1 || stats.SuccessfulBuilds != 1 {
+		t.Fatalf("unexpected background build stats: %#v", stats)
+	}
 }
 
 func TestBackgroundBuildRetainsRestoredPartialGeneration(t *testing.T) {
@@ -172,6 +182,34 @@ func TestBackgroundBuildRetainsRestoredPartialGeneration(t *testing.T) {
 	}
 	if len(journeys) != 1 || restoredLoader.stopLoads != 0 {
 		t.Fatalf("continued journeys=%d stop loads=%d, want 1 and 0", len(journeys), restoredLoader.stopLoads)
+	}
+}
+
+func TestSnapshotStatsTrackWritesAndRestore(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
+	graph := New(&fakeLoader{journeys: []*ctdf.Journey{testJourney()}}, Config{
+		Enabled:      true,
+		SnapshotPath: path,
+	})
+	if _, err := graph.JourneysForStop(context.Background(), &ctdf.Stop{PrimaryIdentifier: "stop-a"}, serviceDate); err != nil {
+		t.Fatalf("fill graph: %v", err)
+	}
+	if err := graph.Save(); err != nil {
+		t.Fatalf("save graph: %v", err)
+	}
+	written := graph.Stats().Snapshot
+	if written.SuccessfulWrites != 1 || written.FailedWrites != 0 || written.FileSizeBytes <= 0 || written.LastWriteAt == nil {
+		t.Fatalf("unexpected snapshot write stats: %#v", written)
+	}
+
+	restored := New(&fakeLoader{}, Config{Enabled: true, SnapshotPath: path})
+	if err := restored.restoreTracked(path); err != nil {
+		t.Fatalf("restore graph: %v", err)
+	}
+	restoreStats := restored.Stats().Snapshot
+	if restoreStats.RestoredAt == nil || restoreStats.FileSizeBytes != written.FileSizeBytes || restoreStats.LastRestoreError != "" {
+		t.Fatalf("unexpected snapshot restore stats: %#v", restoreStats)
 	}
 }
 

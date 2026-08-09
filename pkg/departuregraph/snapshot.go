@@ -31,7 +31,35 @@ func (g *Graph) Save() error {
 	if g == nil || g.config.SnapshotPath == "" {
 		return nil
 	}
-	return g.save(g.config.SnapshotPath, g.current.Load())
+	return g.saveTracked(g.config.SnapshotPath, g.current.Load())
+}
+
+func (g *Graph) saveTracked(path string, data *graphData) error {
+	g.snapshotMu.Lock()
+	defer g.snapshotMu.Unlock()
+	started := g.metrics.snapshot.beginWrite()
+	err := g.save(path, data)
+	var size int64
+	if info, statErr := os.Stat(path); statErr == nil {
+		size = info.Size()
+	}
+	g.metrics.snapshot.finishWrite(started, size, err)
+	return err
+}
+
+func (g *Graph) restoreTracked(path string) error {
+	info, statErr := os.Stat(path)
+	if os.IsNotExist(statErr) {
+		return nil
+	}
+	started := time.Now()
+	if statErr != nil {
+		g.metrics.snapshot.restored(started, 0, statErr)
+		return statErr
+	}
+	err := g.restore(path)
+	g.metrics.snapshot.restored(started, info.Size(), err)
+	return err
 }
 
 func (g *Graph) save(path string, data *graphData) error {

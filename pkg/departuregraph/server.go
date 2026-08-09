@@ -10,12 +10,13 @@ import (
 )
 
 type Server struct {
-	graph Provider
-	stats func() Stats
+	graph    Provider
+	stats    func() Stats
+	requests *requestTracker
 }
 
 func NewServer(graph *Graph) *Server {
-	return &Server{graph: graph, stats: graph.Stats}
+	return &Server{graph: graph, stats: graph.Stats, requests: newRequestTracker()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -31,10 +32,20 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request) {
-	writeGraphJSON(w, http.StatusOK, s.stats())
+	now := time.Now()
+	writeGraphJSON(w, http.StatusOK, ServiceStats{
+		Stats:       s.stats(),
+		GeneratedAt: now,
+		Requests:    s.requests.stats(now),
+		Memory:      currentMemoryStats(),
+	})
 }
 
 func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
+	started := s.requests.begin()
+	failed := true
+	defer func() { s.requests.finish(started, failed) }()
+
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024))
 	decoder.DisallowUnknownFields()
 	var request departuresRequest
@@ -70,6 +81,7 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeGraphError(w, http.StatusServiceUnavailable, fmt.Sprintf("load departures: %v", err))
 		return
 	}
+	failed = false
 	writeGraphJSON(w, http.StatusOK, departuresResponse{Journeys: journeys})
 }
 
