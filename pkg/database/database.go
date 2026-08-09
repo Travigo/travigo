@@ -21,7 +21,14 @@ const defaultConnectionString = "mongodb://localhost:27017/"
 const defaultDatabase = "travigo"
 
 func Connect() error {
-	err := ConnectStandard()
+	return ConnectStandard()
+}
+
+// ConnectAndCreateIndexes connects to MongoDB and ensures the application
+// indexes exist. This is intended for data importer processes only; serving
+// processes should use Connect so they can start without running migrations.
+func ConnectAndCreateIndexes() error {
+	err := Connect()
 	if err != nil {
 		return err
 	}

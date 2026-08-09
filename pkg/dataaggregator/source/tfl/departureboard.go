@@ -13,9 +13,18 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	tflRealtimeBoardHorizon        = 2 * time.Hour
+	tflRealtimeBoardMinimumPerStop = 100
+	tflRealtimeBoardMaximumPerStop = 500
 )
 
 var (
@@ -77,7 +86,24 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	}
 
 	allStopIDS := q.Stop.GetAllStopIDs()
-	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneys(context.Background(), allStopIDS, now.Add(-30*time.Second))
+	stopIDsSet := make(map[string]struct{}, len(allStopIDS))
+	for _, stopID := range allStopIDS {
+		stopIDsSet[stopID] = struct{}{}
+	}
+	realtimePerStopLimit := q.Count * 4
+	if realtimePerStopLimit < tflRealtimeBoardMinimumPerStop {
+		realtimePerStopLimit = tflRealtimeBoardMinimumPerStop
+	}
+	if realtimePerStopLimit > tflRealtimeBoardMaximumPerStop {
+		realtimePerStopLimit = tflRealtimeBoardMaximumPerStop
+	}
+	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneysBounded(
+		context.Background(),
+		allStopIDS,
+		now.Add(-30*time.Second),
+		now.Add(tflRealtimeBoardHorizon),
+		int64(realtimePerStopLimit),
+	)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
 	}
@@ -91,6 +117,8 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
 	}
+	servicesByRef := loadTFLBoardServices(services, realtimeJourneys)
+	transforms.Transform(tflOperator, 2)
 
 	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
 
@@ -102,7 +130,10 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		if !timedOut {
 			var realtimeJourneyStop *ctdf.RealtimeJourneyStops
 			for _, candidate := range realtimeJourney.Stops {
-				if candidate == nil || !util.ContainsString(allStopIDS, candidate.StopRef) || candidate.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+				if candidate == nil || candidate.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture {
+					continue
+				}
+				if _, matchesStop := stopIDsSet[candidate.StopRef]; !matchesStop {
 					continue
 				}
 				if realtimeJourneyStop == nil || candidate.ArrivalTime.Before(realtimeJourneyStop.ArrivalTime) {
@@ -131,7 +162,9 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			if wholeJourneyCancelled {
 				departure.Type = ctdf.DepartureBoardRecordTypeCancelled
 			}
-			realtimeJourney.Journey.GetService()
+			if realtimeJourney.Journey.Service == nil {
+				realtimeJourney.Journey.Service = servicesByRef[realtimeJourney.Journey.ServiceRef]
+			}
 			departure.Journey.Operator = tflOperator
 			departure.Journey.OperatorRef = tflOperator.PrimaryIdentifier
 
@@ -142,8 +175,6 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				departure.PlatformType = "ACTUAL"
 			}
 
-			transforms.Transform(departure.Journey.Service, 2)
-			transforms.Transform(departure.Journey.Operator, 2)
 			departureBoard = append(departureBoard, departure)
 
 			if direction, ok := departureBoardDirection(departure, allStopIDS, q.Type); ok {
@@ -175,6 +206,74 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	}
 
 	return ctdf.DeduplicateBoardEntries(departureBoard), nil
+}
+
+func loadTFLBoardServices(services []*ctdf.Service, realtimeJourneys []ctdf.RealtimeJourney) map[string]*ctdf.Service {
+	servicesByRef := make(map[string]*ctdf.Service, len(services))
+	serviceRefs := map[string]struct{}{}
+	for _, service := range services {
+		if service == nil {
+			continue
+		}
+		transforms.Transform(service, 2)
+		servicesByRef[service.PrimaryIdentifier] = service
+	}
+
+	for index := range realtimeJourneys {
+		journey := realtimeJourneys[index].Journey
+		if journey == nil {
+			continue
+		}
+		if journey.Service != nil {
+			transforms.Transform(journey.Service, 2)
+			servicesByRef[journey.ServiceRef] = journey.Service
+		} else if journey.ServiceRef != "" && servicesByRef[journey.ServiceRef] == nil {
+			serviceRefs[journey.ServiceRef] = struct{}{}
+		}
+	}
+	if len(serviceRefs) == 0 {
+		return servicesByRef
+	}
+
+	identifiers := make([]string, 0, len(serviceRefs))
+	for identifier := range serviceRefs {
+		identifiers = append(identifiers, identifier)
+	}
+	opts := options.Find().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "creationdatetime", Value: 0},
+		{Key: "modificationdatetime", Value: 0},
+		{Key: "datasource", Value: 0},
+		{Key: "routes", Value: 0},
+	})
+	cursor, err := database.GetCollection("services").Find(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+		},
+	}, opts)
+	if err != nil {
+		log.Error().Err(err).Int("service_refs", len(identifiers)).Msg("Failed to batch load TfL departure board services")
+		return servicesByRef
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var service ctdf.Service
+		if err := cursor.Decode(&service); err != nil {
+			log.Error().Err(err).Msg("Failed to decode TfL departure board service")
+			continue
+		}
+		transforms.Transform(&service, 2)
+		servicesByRef[service.PrimaryIdentifier] = &service
+		for _, identifier := range service.OtherIdentifiers {
+			servicesByRef[identifier] = &service
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Msg("Failed while reading TfL departure board services")
+	}
+	return servicesByRef
 }
 
 type boardDirectionKey struct {

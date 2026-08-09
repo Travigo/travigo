@@ -83,7 +83,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		Msg("Departure board journeys loaded - today")
 
 	currentTime = time.Now()
-	realtimeLookupToday := s.realtimeLookup(journeysToday, q.StartDateTime)
+	realtimeLookupToday := s.realtimeLookup(journeysToday, q.StartDateTime, allStopIDs)
 	realtimeLookupTodayDuration := time.Since(currentTime)
 
 	currentTime = time.Now()
@@ -113,7 +113,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			Msg("Departure board journeys loaded - tomorrow")
 
 		currentTime = time.Now()
-		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow, dayAfterDateTime)
+		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow, dayAfterDateTime, allStopIDs)
 		realtimeLookupTomorrowDuration := time.Since(currentTime)
 
 		currentTime = time.Now()
@@ -142,7 +142,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	return departureBoard, nil
 }
 
-func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time) *ctdf.DepartureBoardRealtimeLookup {
+func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, stopRefs []string) *ctdf.DepartureBoardRealtimeLookup {
 	lookupStart := time.Now()
 	journeyIDs := make([]string, 0, len(journeys))
 	for _, journey := range journeys {
@@ -168,26 +168,78 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time) 
 		Int("cancelled_by_alert", len(cancelledJourneyIDs)).
 		Dur("duration", time.Since(lookupStart)).
 		Msg("Prefetched realtime journeys for departure board")
+	var stopAliases map[string][]string
+	if len(realtimeJourneysByJourneyID) > 0 {
+		stopAliases = findBoardStopAliases(stopRefs)
+	}
 
 	return &ctdf.DepartureBoardRealtimeLookup{
 		ByJourneyID:         realtimeJourneysByJourneyID,
 		CancelledJourneyIDs: cancelledJourneyIDs,
-		FindByJourneyRefs: func(journeyRefs []string) *ctdf.RealtimeJourney {
-			blockLookupStart := time.Now()
-			realtimeJourney, err := realtimestore.FindCurrentByJourneyRefs(context.Background(), journeyRefs)
+		StopAliases:         stopAliases,
+		FindByJourneyIDs: func(journeyRefs []string) map[string]*ctdf.RealtimeJourney {
+			realtimeJourneys, err := realtimestore.FindCurrentForJourneyIDs(context.Background(), journeyRefs)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to query realtime journey by journey refs")
+				log.Error().Err(err).Msg("Failed to batch query realtime journeys by journey refs")
 			}
-
-			log.Debug().
-				Int("journey_refs", len(journeyRefs)).
-				Bool("found", realtimeJourney != nil).
-				Dur("duration", time.Since(blockLookupStart)).
-				Msg("Lookup realtime journey by block journey refs")
-
-			return realtimeJourney
+			return realtimeJourneys
 		},
 	}
+}
+
+func findBoardStopAliases(stopRefs []string) map[string][]string {
+	aliasesByRef := make(map[string][]string, len(stopRefs))
+	requestedRefs := make(map[string]struct{}, len(stopRefs))
+	for _, stopRef := range stopRefs {
+		if stopRef != "" {
+			requestedRefs[stopRef] = struct{}{}
+			aliasesByRef[stopRef] = []string{stopRef}
+		}
+	}
+	if len(requestedRefs) == 0 {
+		return aliasesByRef
+	}
+	identifiers := make([]string, 0, len(requestedRefs))
+	for stopRef := range requestedRefs {
+		identifiers = append(identifiers, stopRef)
+	}
+
+	opts := options.Find().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "primaryidentifier", Value: 1},
+		{Key: "otheridentifiers", Value: 1},
+	})
+	cursor, err := database.GetCollection("stops").Find(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+		},
+	}, opts)
+	if err != nil {
+		log.Error().Err(err).Int("stop_refs", len(identifiers)).Msg("Failed to batch query departure board stop aliases")
+		return aliasesByRef
+	}
+	defer cursor.Close(context.Background())
+
+	for cursor.Next(context.Background()) {
+		var stop ctdf.Stop
+		if err := cursor.Decode(&stop); err != nil {
+			log.Error().Err(err).Msg("Failed to decode departure board stop aliases")
+			continue
+		}
+		stopAliases := make([]string, 0, 1+len(stop.OtherIdentifiers))
+		stopAliases = append(stopAliases, stop.PrimaryIdentifier)
+		stopAliases = append(stopAliases, stop.OtherIdentifiers...)
+		for _, stopID := range stopAliases {
+			if _, requested := requestedRefs[stopID]; requested {
+				aliasesByRef[stopID] = stopAliases
+			}
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Msg("Failed while reading departure board stop aliases")
+	}
+	return aliasesByRef
 }
 
 func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
@@ -215,8 +267,6 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	// Reduces memory usage and execution time
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
-		bson.E{Key: "datasource", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "direction", Value: 0},
@@ -232,7 +282,9 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query Journeys")
+		return journeys
 	}
+	defer cursor.Close(context.Background())
 
 	log.Debug().
 		Str("cache_item", cacheItemPath).

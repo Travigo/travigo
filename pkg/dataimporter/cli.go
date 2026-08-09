@@ -63,7 +63,7 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
+					if err := database.ConnectAndCreateIndexes(); err != nil {
 						return err
 					}
 					if err := redis_client.Connect(); err != nil {
@@ -148,7 +148,7 @@ func RegisterCLI() *cli.Command {
 				Usage: "Import mutliple realtime datasets",
 				Flags: []cli.Flag{},
 				Action: func(c *cli.Context) error {
-					if err := database.Connect(); err != nil {
+					if err := database.ConnectAndCreateIndexes(); err != nil {
 						return err
 					}
 					if err := redis_client.Connect(); err != nil {

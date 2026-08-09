@@ -2,7 +2,8 @@ package ctdf
 
 import (
 	"context"
-	"sync"
+	"runtime"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/exp/slices"
 )
 
 type DepartureBoard struct {
@@ -53,12 +53,26 @@ const (
 type DepartureBoardRealtimeLookup struct {
 	ByJourneyID         map[string]*RealtimeJourney
 	CancelledJourneyIDs map[string]struct{}
-	FindByJourneyRefs   func(journeyRefs []string) *RealtimeJourney
+	StopAliases         map[string][]string
+	FindByJourneyIDs    func(journeyRefs []string) map[string]*RealtimeJourney
 }
 
 type blockJourneyReference struct {
 	PrimaryIdentifier string
 	DepartureTime     time.Time
+}
+
+type blockEstimateCandidate struct {
+	entry    *DepartureBoard
+	blockKey string
+	refs     []string
+}
+
+type blockEstimateStats struct {
+	candidates      int64
+	blockJourneys   int64
+	realtimeMatched int64
+	estimated       int64
 }
 
 // precedingBlockJourneyRefs returns the block journeys that run before target,
@@ -143,20 +157,23 @@ func boardPathIsUnavailable(path *JourneyPathItem, boardType BoardType) bool {
 	return len(activity) == 1 && activity[0] == unavailableActivity
 }
 
-func boardPathStop(path *JourneyPathItem, boardType BoardType) *Stop {
-	if boardType.IsArrival() {
-		path.GetDestinationStop()
-		return path.DestinationStop
-	}
-	path.GetOriginStop()
-	return path.OriginStop
-}
-
 func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time.Time {
 	if boardType.IsArrival() {
 		return stop.ArrivalTime
 	}
 	return stop.DepartureTime
+}
+
+func boardRealtimeStop(journey *RealtimeJourney, stopRef string, stopIndex int, aliases map[string][]string) *RealtimeJourneyStops {
+	if stop := journey.RealtimeStop(stopRef, stopIndex); stop != nil {
+		return stop
+	}
+	for _, alias := range aliases[stopRef] {
+		if stop := journey.RealtimeStop(alias, stopIndex); stop != nil {
+			return stop
+		}
+	}
+	return nil
 }
 
 func boardEntryIsDelayed(scheduledTime, realtimeTime time.Time, cancelled bool) bool {
@@ -304,7 +321,6 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup, boardType BoardType) []*DepartureBoard {
 	generationStart := time.Now()
 	inputJourneyCount := len(journeys)
-	journeysCollection := database.GetCollection("journeys")
 
 	journeys = FilterIdenticalJourneys(journeys, true)
 	uniqueJourneyCount := len(journeys)
@@ -322,27 +338,13 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	var cancelledCount atomic.Int64
 	var beforeStartSkippedCount atomic.Int64
 	var replacementBusCount atomic.Int64
-	var estimateCandidateCount atomic.Int64
-	var estimateBlockJourneyCount atomic.Int64
-	var estimateRealtimeMatchedCount atomic.Int64
-	var estimatedCount atomic.Int64
 
 	stopRefsSet := make(map[string]struct{}, len(stopRefs))
 	for _, stopRef := range stopRefs {
 		stopRefsSet[stopRef] = struct{}{}
 	}
-
-	// Journeys within the same vehicle block share the same block-journey list
-	// and the same block realtime journey. Memoise both per (serviceRef,
-	// blockNumber) so that qualifying journeys sharing a block don't each issue
-	// duplicate Mongo/realtime lookups during this generation.
-	var (
-		blockJourneysCache sync.Map // blockKey -> []blockJourneyReference, ordered by departure
-		blockRealtimeCache sync.Map // blockKey + target journey -> *RealtimeJourney (may be nil)
-	)
-
 	p := pool.NewWithResults[*DepartureBoard]()
-	maxGoroutines := 200
+	maxGoroutines := runtime.GOMAXPROCS(0)
 	if len(journeys) < maxGoroutines {
 		maxGoroutines = len(journeys)
 	}
@@ -412,23 +414,11 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						if journey.RealtimeJourney != nil {
 							var realtimeJourneyStop *RealtimeJourneyStops
 
-							// Lookup realtime journey stop by either direct reference or other identifiers (which requires extra db call)
 							journeyStopIndex := pathIndex
 							if boardType == BoardTypeArrival {
 								journeyStopIndex++
 							}
-							if stop := journey.RealtimeJourney.RealtimeStop(boardPathStopRef(path, boardType), journeyStopIndex); stop != nil {
-								realtimeJourneyStop = stop
-							} else {
-								boardStop := boardPathStop(path, boardType)
-
-								for _, potentialRealtimeJourneyStop := range journey.RealtimeJourney.Stops {
-									if potentialRealtimeJourneyStop != nil && boardStop != nil && (boardStop.PrimaryIdentifier == potentialRealtimeJourneyStop.StopRef || slices.Contains(boardStop.OtherIdentifiers, potentialRealtimeJourneyStop.StopRef)) && potentialRealtimeJourneyStop.JourneyStopIndex == journeyStopIndex {
-										realtimeJourneyStop = potentialRealtimeJourneyStop
-										break
-									}
-								}
-							}
+							realtimeJourneyStop = boardRealtimeStop(journey.RealtimeJourney, boardPathStopRef(path, boardType), journeyStopIndex, realtimeLookup.StopAliases)
 
 							if realtimeJourneyStop != nil {
 								realtimeStopMatchedCount.Add(1)
@@ -481,95 +471,6 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					replacementBusCount.Add(1)
 				}
 
-				// This block finds the preceding journeys in the same scheduled vehicle
-				// block. GTFS blocks can continue across routes, so serviceRef must not
-				// scope this lookup; datasource.datasetid prevents block ID collisions
-				// between independently supplied schedules.
-				// plus a realtime lookup per qualifying journey. Qualification
-				// (doEstimates + Scheduled + within 45 min + BlockNumber present) depends on
-				// stopTime and departureBoardRecordType which are only known after the
-				// path loop above, so it can't be fully hoisted into a pre-pass. As a cheaper
-				// mitigation, both lookups are memoised per (dataset, BlockNumber) via
-				// blockJourneysCache/blockRealtimeCache so journeys sharing a block reuse the
-				// result instead of each issuing duplicate Mongo/realtime round trips.
-				// A fuller batch (first pass to collect qualifiers, then one Find with $in over
-				// all blocks and one realtime lookup over all refs) remains possible.
-				// If the board entry is within 45 minutes then attempt to estimate it based on current vehicle realtime journey.
-				// We estimate the current vehicle realtime journey based on the Block Number
-				stopDepartureTimeFromNow := stopTime.Sub(dateTime).Minutes()
-				if doEstimates &&
-					departureBoardRecordType == DepartureBoardRecordTypeScheduled &&
-					stopDepartureTimeFromNow <= 45 && stopDepartureTimeFromNow >= 0 &&
-					journey.OtherIdentifiers["BlockNumber"] != "" {
-					estimateCandidateCount.Add(1)
-
-					blockNumber := journey.OtherIdentifiers["BlockNumber"]
-					datasetID := ""
-					if journey.DataSource != nil {
-						datasetID = journey.DataSource.DatasetID
-					}
-					blockKey := datasetID + "\x00" + blockNumber
-
-					var blockJourneys []blockJourneyReference
-					if cached, ok := blockJourneysCache.Load(blockKey); ok {
-						blockJourneys = cached.([]blockJourneyReference)
-					} else {
-						opts := options.Find().SetProjection(bson.D{
-							bson.E{Key: "primaryidentifier", Value: 1},
-							bson.E{Key: "departuretime", Value: 1},
-						}).SetSort(bson.D{{Key: "departuretime", Value: 1}})
-						query := bson.M{"otheridentifiers.BlockNumber": blockNumber}
-						if datasetID != "" {
-							query["datasource.datasetid"] = datasetID
-						} else {
-							// Legacy cached journeys may predate datasource cache support.
-							query["serviceref"] = journey.ServiceRef
-						}
-						cursor, err := journeysCollection.Find(context.Background(), query, opts)
-						if err != nil {
-							log.Error().Err(err).Msg("Failed to query vehicle block journeys")
-						} else {
-							defer cursor.Close(context.Background())
-
-							for cursor.Next(context.Background()) {
-								var blockJourney blockJourneyReference
-								err := cursor.Decode(&blockJourney)
-								if err != nil {
-									log.Error().Err(err).Msg("Failed to decode Journey")
-								}
-
-								blockJourneys = append(blockJourneys, blockJourney)
-							}
-						}
-
-						blockJourneysCache.Store(blockKey, blockJourneys)
-					}
-					precedingJourneyRefs := precedingBlockJourneyRefs(blockJourneys, journey)
-					estimateBlockJourneyCount.Add(int64(len(precedingJourneyRefs)))
-
-					var blockRealtimeJourney *RealtimeJourney
-					if realtimeLookup.FindByJourneyRefs != nil && len(precedingJourneyRefs) > 0 {
-						realtimeKey := blockKey + "\x00" + journey.PrimaryIdentifier
-						if cached, ok := blockRealtimeCache.Load(realtimeKey); ok {
-							blockRealtimeJourney = cached.(*RealtimeJourney)
-						} else {
-							blockRealtimeJourney = realtimeLookup.FindByJourneyRefs(precedingJourneyRefs)
-							blockRealtimeCache.Store(realtimeKey, blockRealtimeJourney)
-						}
-					}
-
-					if blockRealtimeJourney != nil {
-						estimateRealtimeMatchedCount.Add(1)
-						// Ignore negative offsets as we assume bus will right itself when turning over
-						if blockRealtimeJourney.Offset.Minutes() > 0 {
-							stopTime = stopTime.Add(blockRealtimeJourney.Offset)
-							delayed = true
-						}
-						departureBoardRecordType = DepartureBoardRecordTypeEstimated
-						estimatedCount.Add(1)
-					}
-				}
-
 				return &DepartureBoard{
 					Journey:            journey,
 					Time:               stopTime,
@@ -594,6 +495,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		}
 	}
 	departureBoard = DeduplicateBoardEntries(departureBoard)
+	estimateStats := applyBlockEstimates(departureBoard, dateTime, doEstimates, realtimeLookup)
 
 	log.Debug().
 		Int("input_journeys", inputJourneyCount).
@@ -612,10 +514,10 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		Int64("cancelled_records", cancelledCount.Load()).
 		Int64("before_start_skipped", beforeStartSkippedCount.Load()).
 		Int64("replacement_bus_records", replacementBusCount.Load()).
-		Int64("estimate_candidates", estimateCandidateCount.Load()).
-		Int64("estimate_block_journeys", estimateBlockJourneyCount.Load()).
-		Int64("estimate_realtime_matched", estimateRealtimeMatchedCount.Load()).
-		Int64("estimated_records", estimatedCount.Load()).
+		Int64("estimate_candidates", estimateStats.candidates).
+		Int64("estimate_block_journeys", estimateStats.blockJourneys).
+		Int64("estimate_realtime_matched", estimateStats.realtimeMatched).
+		Int64("estimated_records", estimateStats.estimated).
 		Int("nil_results", len(departureBoardWithNil)-len(departureBoard)).
 		Str("board_type", string(boardType)).
 		Int("generated_entries", len(departureBoard)).
@@ -623,4 +525,158 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		Msg("Departure board generation stats")
 
 	return departureBoard
+}
+
+func journeyBlockKey(journey *Journey) string {
+	if journey == nil || journey.OtherIdentifiers["BlockNumber"] == "" {
+		return ""
+	}
+	blockNumber := journey.OtherIdentifiers["BlockNumber"]
+	if journey.DataSource != nil && journey.DataSource.DatasetID != "" {
+		return "dataset\x00" + journey.DataSource.DatasetID + "\x00" + blockNumber
+	}
+	return "service\x00" + journey.ServiceRef + "\x00" + blockNumber
+}
+
+func applyBlockEstimates(entries []*DepartureBoard, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup) blockEstimateStats {
+	stats := blockEstimateStats{}
+	if !doEstimates || realtimeLookup == nil {
+		return stats
+	}
+
+	candidates := make([]blockEstimateCandidate, 0)
+	maxDepartureByBlock := make(map[string]time.Time)
+	journeyByBlock := make(map[string]*Journey)
+	for _, entry := range entries {
+		if entry == nil || entry.Journey == nil || entry.Type != DepartureBoardRecordTypeScheduled {
+			continue
+		}
+		minutesFromNow := entry.Time.Sub(dateTime).Minutes()
+		if minutesFromNow < 0 || minutesFromNow > 45 {
+			continue
+		}
+		blockKey := journeyBlockKey(entry.Journey)
+		if blockKey == "" {
+			continue
+		}
+
+		candidates = append(candidates, blockEstimateCandidate{entry: entry, blockKey: blockKey})
+		journeyByBlock[blockKey] = entry.Journey
+		if entry.Journey.DepartureTime.After(maxDepartureByBlock[blockKey]) {
+			maxDepartureByBlock[blockKey] = entry.Journey.DepartureTime
+		}
+	}
+	stats.candidates = int64(len(candidates))
+	if len(candidates) == 0 {
+		return stats
+	}
+
+	blockClauses := make([]bson.M, 0, len(journeyByBlock))
+	for blockKey, journey := range journeyByBlock {
+		clause := bson.M{
+			"otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"],
+			"departuretime":                bson.M{"$lt": maxDepartureByBlock[blockKey]},
+		}
+		if journey.DataSource != nil && journey.DataSource.DatasetID != "" {
+			clause["datasource.datasetid"] = journey.DataSource.DatasetID
+		} else {
+			clause["serviceref"] = journey.ServiceRef
+		}
+		blockClauses = append(blockClauses, clause)
+	}
+
+	journeysCollection := database.GetCollection("journeys")
+	opts := options.Find().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "primaryidentifier", Value: 1},
+		{Key: "otheridentifiers.BlockNumber", Value: 1},
+		{Key: "datasource.datasetid", Value: 1},
+		{Key: "serviceref", Value: 1},
+		{Key: "departuretime", Value: 1},
+	})
+	cursor, err := journeysCollection.Find(context.Background(), bson.M{"$or": blockClauses}, opts)
+	if err != nil {
+		log.Error().Err(err).Int("blocks", len(blockClauses)).Msg("Failed to batch query vehicle block journeys")
+		return stats
+	}
+	defer cursor.Close(context.Background())
+
+	blockJourneys := make(map[string][]blockJourneyReference, len(journeyByBlock))
+	for cursor.Next(context.Background()) {
+		var blockJourney Journey
+		if err := cursor.Decode(&blockJourney); err != nil {
+			log.Error().Err(err).Msg("Failed to decode block journey")
+			continue
+		}
+		blockKey := journeyBlockKey(&blockJourney)
+		if blockKey != "" {
+			blockJourneys[blockKey] = append(blockJourneys[blockKey], blockJourneyReference{
+				PrimaryIdentifier: blockJourney.PrimaryIdentifier,
+				DepartureTime:     blockJourney.DepartureTime,
+			})
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		log.Error().Err(err).Msg("Failed while reading vehicle block journeys")
+	}
+	for blockKey := range blockJourneys {
+		sort.Slice(blockJourneys[blockKey], func(i, j int) bool {
+			return blockJourneys[blockKey][i].DepartureTime.Before(blockJourneys[blockKey][j].DepartureTime)
+		})
+	}
+
+	realtimeStats := applyBlockRealtimeEstimates(candidates, blockJourneys, realtimeLookup)
+	stats.blockJourneys = realtimeStats.blockJourneys
+	stats.realtimeMatched = realtimeStats.realtimeMatched
+	stats.estimated = realtimeStats.estimated
+	return stats
+}
+
+func applyBlockRealtimeEstimates(candidates []blockEstimateCandidate, blockJourneys map[string][]blockJourneyReference, realtimeLookup *DepartureBoardRealtimeLookup) blockEstimateStats {
+	stats := blockEstimateStats{candidates: int64(len(candidates))}
+	if len(candidates) == 0 || realtimeLookup == nil {
+		return stats
+	}
+
+	allPrecedingRefs := make([]string, 0)
+	seenRefs := make(map[string]struct{})
+	for index, candidate := range candidates {
+		refs := precedingBlockJourneyRefs(blockJourneys[candidate.blockKey], candidate.entry.Journey)
+		candidates[index].refs = refs
+		stats.blockJourneys += int64(len(refs))
+		for _, ref := range refs {
+			if _, seen := seenRefs[ref]; seen {
+				continue
+			}
+			seenRefs[ref] = struct{}{}
+			allPrecedingRefs = append(allPrecedingRefs, ref)
+		}
+	}
+
+	realtimeByJourneyID := map[string]*RealtimeJourney{}
+	if realtimeLookup.FindByJourneyIDs != nil && len(allPrecedingRefs) > 0 {
+		realtimeByJourneyID = realtimeLookup.FindByJourneyIDs(allPrecedingRefs)
+	}
+	for _, candidate := range candidates {
+		var blockRealtimeJourney *RealtimeJourney
+		for _, ref := range candidate.refs {
+			if realtimeJourney := realtimeByJourneyID[ref]; realtimeJourney != nil {
+				blockRealtimeJourney = realtimeJourney
+				break
+			}
+		}
+		if blockRealtimeJourney == nil {
+			continue
+		}
+
+		stats.realtimeMatched++
+		if blockRealtimeJourney.Offset > 0 {
+			candidate.entry.Time = candidate.entry.Time.Add(blockRealtimeJourney.Offset)
+			candidate.entry.Delayed = true
+		}
+		candidate.entry.Type = DepartureBoardRecordTypeEstimated
+		stats.estimated++
+	}
+
+	return stats
 }

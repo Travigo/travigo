@@ -425,6 +425,15 @@ func createJourneysIndexes() {
 			Keys:    bson.D{{Key: "validuntil", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(32 * 3600), // Expire after 32 hours
 		},
+		{
+			Options: options.Index().SetName("ServiceAlertActiveJourneyCancellation"),
+			Keys: bson.D{
+				{Key: "alerttype", Value: 1},
+				{Key: "matchedidentifiers", Value: 1},
+				{Key: "validuntil", Value: 1},
+				{Key: "validfrom", Value: 1},
+			},
+		},
 	}, options.CreateIndexes())
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")

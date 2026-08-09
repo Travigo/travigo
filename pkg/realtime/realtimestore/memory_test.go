@@ -365,4 +365,33 @@ func TestTFLDepartureBoardIndexReplacesStopsAndBatchesReads(t *testing.T) {
 	if len(departures) != 1 || departures[0].PrimaryIdentifier != journey.PrimaryIdentifier {
 		t.Fatalf("expected indexed TFL journey, got %#v", departures)
 	}
+
+	futureJourney := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:      "tfl-future-journey",
+		ModificationDateTime:   now,
+		TimeoutDurationMinutes: 10,
+		Journey:                &ctdf.Journey{PrimaryIdentifier: "future-journey"},
+		Stops: map[string]*ctdf.RealtimeJourneyStops{
+			"stop-b": {
+				StopRef:       "stop-b",
+				TimeType:      ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+				ArrivalTime:   now.Add(3 * time.Hour),
+				DepartureTime: now.Add(3 * time.Hour),
+			},
+		},
+	}
+	if err := SaveRealtimeJourney(ctx, futureJourney); err != nil {
+		t.Fatalf("save future realtime journey: %v", err)
+	}
+	if err := IndexTFLDepartureBoardJourney(ctx, futureJourney); err != nil {
+		t.Fatalf("index future realtime journey: %v", err)
+	}
+
+	bounded, err := FindTFLDepartureBoardJourneysBounded(ctx, []string{"stop-b"}, now, now.Add(time.Hour), 1)
+	if err != nil {
+		t.Fatalf("find bounded TFL departure board journeys: %v", err)
+	}
+	if len(bounded) != 1 || bounded[0].PrimaryIdentifier != journey.PrimaryIdentifier {
+		t.Fatalf("expected horizon and limit to keep earliest journey, got %#v", bounded)
+	}
 }

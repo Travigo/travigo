@@ -63,6 +63,19 @@ func TestBoardRealtimeStopTime(t *testing.T) {
 	}
 }
 
+func TestBoardRealtimeStopUsesPreloadedAlias(t *testing.T) {
+	journey := &RealtimeJourney{}
+	want := &RealtimeJourneyStops{StopRef: "realtime-stop", JourneyStopIndex: 2}
+	journey.SetRealtimeStop(want)
+
+	got := boardRealtimeStop(journey, "scheduled-stop", 2, map[string][]string{
+		"scheduled-stop": {"scheduled-stop", "realtime-stop"},
+	})
+	if got != want {
+		t.Fatalf("realtime stop = %#v, want alias match %#v", got, want)
+	}
+}
+
 func TestBoardEntryIsDelayed(t *testing.T) {
 	scheduled := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 
@@ -269,6 +282,66 @@ func TestPrecedingBlockJourneyRefsUsesOnlyEarlierRunsNewestFirst(t *testing.T) {
 	refs := precedingBlockJourneyRefs(blockJourneys, target)
 	if len(refs) != 2 || refs[0] != "route-b-current" || refs[1] != "route-a-early" {
 		t.Fatalf("preceding block refs = %v, want [route-b-current route-a-early]", refs)
+	}
+}
+
+func TestApplyBlockRealtimeEstimatesBatchesRefsAndUsesNewestPrecedingRun(t *testing.T) {
+	base := time.Date(2026, 7, 21, 8, 0, 0, 0, time.UTC)
+	firstEntry := &DepartureBoard{
+		Journey: &Journey{PrimaryIdentifier: "target-1", DepartureTime: base.Add(2 * time.Hour)},
+		Time:    base.Add(2 * time.Hour),
+		Type:    DepartureBoardRecordTypeScheduled,
+	}
+	secondEntry := &DepartureBoard{
+		Journey: &Journey{PrimaryIdentifier: "target-2", DepartureTime: base.Add(3 * time.Hour)},
+		Time:    base.Add(3 * time.Hour),
+		Type:    DepartureBoardRecordTypeScheduled,
+	}
+	blockJourneys := map[string][]blockJourneyReference{
+		"block": {
+			{PrimaryIdentifier: "early", DepartureTime: base},
+			{PrimaryIdentifier: "current", DepartureTime: base.Add(time.Hour)},
+			{PrimaryIdentifier: "target-1", DepartureTime: base.Add(2 * time.Hour)},
+		},
+	}
+
+	lookupCalls := 0
+	var lookedUpRefs []string
+	stats := applyBlockRealtimeEstimates(
+		[]blockEstimateCandidate{
+			{entry: firstEntry, blockKey: "block"},
+			{entry: secondEntry, blockKey: "block"},
+		},
+		blockJourneys,
+		&DepartureBoardRealtimeLookup{
+			FindByJourneyIDs: func(refs []string) map[string]*RealtimeJourney {
+				lookupCalls++
+				lookedUpRefs = append(lookedUpRefs, refs...)
+				return map[string]*RealtimeJourney{
+					"early":   {Offset: 2 * time.Minute},
+					"current": {Offset: 5 * time.Minute},
+				}
+			},
+		},
+	)
+
+	if lookupCalls != 1 {
+		t.Fatalf("batch lookup calls = %d, want 1", lookupCalls)
+	}
+	if len(lookedUpRefs) != 3 {
+		t.Fatalf("looked up refs = %v, want three unique preceding refs", lookedUpRefs)
+	}
+	if !firstEntry.Time.Equal(base.Add(2*time.Hour + 5*time.Minute)) {
+		t.Fatalf("first estimate = %s, want current-run offset", firstEntry.Time)
+	}
+	if !secondEntry.Time.Equal(base.Add(3*time.Hour + 5*time.Minute)) {
+		t.Fatalf("second estimate = %s, want newest preceding offset", secondEntry.Time)
+	}
+	if firstEntry.Type != DepartureBoardRecordTypeEstimated || secondEntry.Type != DepartureBoardRecordTypeEstimated {
+		t.Fatal("expected both entries to be estimated")
+	}
+	if stats.realtimeMatched != 2 || stats.estimated != 2 {
+		t.Fatalf("unexpected estimate stats: %+v", stats)
 	}
 }
 

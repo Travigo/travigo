@@ -204,11 +204,19 @@ func FindCurrentByJourneyRefs(ctx context.Context, journeyRefs []string) (*ctdf.
 }
 
 func FindTFLDepartureBoardJourneys(ctx context.Context, stopIDs []string, from time.Time) ([]ctdf.RealtimeJourney, error) {
+	return FindTFLDepartureBoardJourneysBounded(ctx, stopIDs, from, time.Time{}, 0)
+}
+
+func FindTFLDepartureBoardJourneysBounded(ctx context.Context, stopIDs []string, from time.Time, until time.Time, perStopLimit int64) ([]ctdf.RealtimeJourney, error) {
 	if len(stopIDs) == 0 {
 		return nil, nil
 	}
 
 	minScore := strconv.FormatInt(from.Unix(), 10)
+	maxScore := "+inf"
+	if !until.IsZero() {
+		maxScore = strconv.FormatInt(until.Unix(), 10)
+	}
 	seenRealtimeJourneyIDs := map[string]struct{}{}
 	var realtimeJourneyIDs []string
 
@@ -217,10 +225,14 @@ func FindTFLDepartureBoardJourneys(ctx context.Context, stopIDs []string, from t
 		for _, stopID := range stopIDs {
 			key := tflDepartureBoardStopKey(stopID)
 			pipe.ZRemRangeByScore(ctx, key, "-inf", minScore)
-			rangeCommands = append(rangeCommands, pipe.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+			rangeQuery := &redis.ZRangeBy{
 				Min: minScore,
-				Max: "+inf",
-			}))
+				Max: maxScore,
+			}
+			if perStopLimit > 0 {
+				rangeQuery.Count = perStopLimit
+			}
+			rangeCommands = append(rangeCommands, pipe.ZRangeByScore(ctx, key, rangeQuery))
 		}
 		return nil
 	})
