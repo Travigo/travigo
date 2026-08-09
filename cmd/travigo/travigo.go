@@ -10,6 +10,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter"
 	"github.com/travigo/travigo/pkg/datalinker"
 	"github.com/travigo/travigo/pkg/dbwatch"
+	"github.com/travigo/travigo/pkg/departuregraph"
 	"github.com/travigo/travigo/pkg/events"
 	"github.com/travigo/travigo/pkg/indexer"
 	"github.com/travigo/travigo/pkg/notify"
@@ -59,6 +60,7 @@ func main() {
 			indexer.RegisterCLI(),
 			datalinker.RegisterCLI(),
 			batchrunner.RegisterCLI(),
+			departuregraph.RegisterCLI(),
 		},
 	}
 

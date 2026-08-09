@@ -71,7 +71,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			},
 		}
 	}
-	journeysToday := s.getDateJourneys(baseCacheItemPath, journeyQuery, q.StartDateTime)
+	journeysToday := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
 
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
@@ -101,7 +101,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if len(departureBoardToday) < q.Count {
 		currentTime = time.Now()
 
-		journeysTomorrow := s.getDateJourneys(baseCacheItemPath, journeyQuery, dayAfterDateTime)
+		journeysTomorrow := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
 
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
@@ -140,6 +140,23 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		Msg("Departure board source query complete")
 
 	return departureBoard, nil
+}
+
+func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) []*ctdf.Journey {
+	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
+		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		journeys, err := s.DepartureGraph.JourneysForStop(lookupContext, q.Stop, serviceDate)
+		if err == nil {
+			return journeys
+		}
+		log.Warn().
+			Err(err).
+			Str("stop", q.Stop.PrimaryIdentifier).
+			Time("service_date", serviceDate).
+			Msg("Departure graph lookup failed; falling back to scheduled journey cache")
+	}
+	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate)
 }
 
 func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, stopRefs []string) *ctdf.DepartureBoardRealtimeLookup {

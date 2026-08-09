@@ -1,0 +1,130 @@
+{{- if .Values.departureGraph.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "travigo-web-api.fullname" . }}-departure-graph
+  labels:
+    {{- include "travigo-web-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: departure-graph
+spec:
+  serviceName: {{ include "travigo-web-api.fullname" . }}-departure-graph
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "travigo-web-api.fullname" . }}-departure-graph
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: {{ include "travigo-web-api.fullname" . }}-departure-graph
+        app.kubernetes.io/component: departure-graph
+    spec:
+      terminationGracePeriodSeconds: 300
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "travigo-web-api.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: departure-graph
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - departure-graph
+            - run
+            - --listen
+            - :8080
+          env:
+            - name: TRAVIGO_LOG_FORMAT
+              value: JSON
+            - name: TRAVIGO_DEBUG
+              value: "YES"
+            - name: TRAVIGO_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionStringSecret }}
+                  key: connectionString.standard
+                  optional: false
+            - name: TRAVIGO_MONGODB_DATABASE
+              value: {{ .Values.database.database }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_BACKGROUND_ENABLED
+              value: {{ .Values.departureGraph.backgroundEnabled | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_DAYS_BEHIND
+              value: {{ .Values.departureGraph.daysBehind | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_DAYS_AHEAD
+              value: {{ .Values.departureGraph.daysAhead | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_BATCH_SIZE
+              value: {{ .Values.departureGraph.batchSize | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_BATCH_PAUSE
+              value: {{ .Values.departureGraph.batchPause | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_INITIAL_BUILD_DELAY
+              value: {{ .Values.departureGraph.initialBuildDelay | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_REFRESH_INTERVAL
+              value: {{ .Values.departureGraph.refreshInterval | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_INTERVAL
+              value: {{ .Values.departureGraph.snapshotInterval | quote }}
+            {{- if .Values.departureGraph.persistence.enabled }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_PATH
+              value: {{ printf "%s/%s" .Values.departureGraph.persistence.mountPath .Values.departureGraph.persistence.fileName | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.departureGraph.resources | nindent 12 }}
+          {{- if .Values.departureGraph.persistence.enabled }}
+          volumeMounts:
+            - name: departure-graph
+              mountPath: {{ .Values.departureGraph.persistence.mountPath }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.departureGraph.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: departure-graph
+      spec:
+        accessModes:
+          - {{ .Values.departureGraph.persistence.accessMode | quote }}
+        {{- with .Values.departureGraph.persistence.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.departureGraph.persistence.size }}
+  {{- end }}
+{{- end }}

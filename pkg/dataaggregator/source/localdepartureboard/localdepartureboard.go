@@ -7,15 +7,22 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
+	"github.com/travigo/travigo/pkg/departuregraph"
+	"github.com/travigo/travigo/pkg/util"
 )
 
 type Source struct {
-	CachedResults *cachedresults.Cache
+	CachedResults  *cachedresults.Cache
+	DepartureGraph departuregraph.Provider
 }
 
 func (s *Source) Setup() {
 	s.CachedResults = &cachedresults.Cache{}
 	s.CachedResults.Setup()
+
+	if address := util.GetEnvironmentVariables()["TRAVIGO_DEPARTURE_GRAPH_ADDRESS"]; address != "" {
+		s.DepartureGraph = departuregraph.NewClient(address, nil)
+	}
 }
 
 func (s Source) GetName() string {

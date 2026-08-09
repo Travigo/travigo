@@ -1,11 +1,15 @@
 package localdepartureboard
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/departuregraph"
 )
 
 func TestDepartureBoardCachePreservesBlockEstimationMetadata(t *testing.T) {
@@ -33,5 +37,53 @@ func TestDepartureBoardCachePreservesBlockEstimationMetadata(t *testing.T) {
 	}
 	if decoded[0].DataSource == nil || decoded[0].DataSource.DatasetID != "dataset-1" {
 		t.Fatalf("dataset metadata was not preserved: %#v", decoded[0].DataSource)
+	}
+}
+
+type localGraphLoader struct {
+	journey *ctdf.Journey
+	loads   int
+}
+
+func (l *localGraphLoader) LoadStopJourneys(_ context.Context, _ []string, _ time.Time) ([]*ctdf.Journey, error) {
+	l.loads++
+	return []*ctdf.Journey{l.journey}, nil
+}
+
+func (l *localGraphLoader) ScanJourneys(_ context.Context, visit func(*ctdf.Journey) error) error {
+	return visit(l.journey)
+}
+
+func TestDepartureBoardCandidateLookupUsesLazyGraph(t *testing.T) {
+	serviceTime := time.Date(0, time.January, 1, 8, 30, 0, 0, time.UTC)
+	journey := &ctdf.Journey{
+		PrimaryIdentifier: "journey-graph",
+		DepartureTime:     serviceTime,
+		Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
+			Type: ctdf.AvailabilityMatchAll,
+		}}},
+		Path: []*ctdf.JourneyPathItem{{
+			OriginStopRef:       "stop-a",
+			DestinationStopRef:  "stop-b",
+			OriginDepartureTime: serviceTime,
+		}},
+	}
+	loader := &localGraphLoader{journey: journey}
+	graph := departuregraph.New(loader, departuregraph.Config{Enabled: true})
+	source := Source{DepartureGraph: graph}
+	stop := &ctdf.Stop{PrimaryIdentifier: "stop-a"}
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+
+	journeys := source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
+	if len(journeys) != 1 || journeys[0].PrimaryIdentifier != "journey-graph" {
+		t.Fatalf("graph journeys = %#v", journeys)
+	}
+	if loader.loads != 1 {
+		t.Fatalf("graph loads = %d, want 1", loader.loads)
+	}
+
+	journeys = source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
+	if len(journeys) != 1 || loader.loads != 1 {
+		t.Fatalf("completed graph lookup journeys=%d loads=%d, want 1 and 1", len(journeys), loader.loads)
 	}
 }

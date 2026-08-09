@@ -88,6 +88,10 @@ spec:
                   name: {{ $.Values.tfl.apiKeySecret }}
                   key: api_key
                   optional: false
+            {{- if .Values.departureGraph.enabled }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_ADDRESS
+              value: {{ printf "http://%s-departure-graph:%v" (include "travigo-web-api.fullname" .) .Values.departureGraph.service.port | quote }}
+            {{- end }}
             - name: AUTH0_DOMAIN
               value: {{ $.Values.auth.domain }}
             - name: AUTH0_AUDIENCE

@@ -35,6 +35,30 @@ auth:
   domain: travigo.uk.auth0.com
   audience: https://api.travigo.app
 
+departureGraph:
+  enabled: true
+  backgroundEnabled: true
+  daysBehind: 1
+  daysAhead: 1
+  batchSize: 1000
+  batchPause: 250ms
+  initialBuildDelay: 30s
+  refreshInterval: 24h
+  snapshotInterval: 15m
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 500m
+      memory: 6Gi
+  persistence:
+    enabled: true
+    mountPath: /var/lib/travigo/departure-graph
+    fileName: snapshot.gob.zst
+    accessMode: ReadWriteOnce
+    storageClassName: ebs-gp3
+    size: 20Gi
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
