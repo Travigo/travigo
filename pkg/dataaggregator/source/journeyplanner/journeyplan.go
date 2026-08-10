@@ -25,7 +25,7 @@ const (
 	defaultJourneyPlanMaxJourneyDuration          = 6 * time.Hour
 	defaultJourneyPlanMaxTransferDistance         = 1000
 	defaultJourneyPlanDepartureBoardCount         = 12
-	defaultJourneyPlanOriginDepartureBoardCount   = 96
+	defaultJourneyPlanOriginDepartureBoardCount   = 24
 	defaultJourneyPlanOriginLocationStopCount     = 12
 	defaultJourneyPlanMaxExpandedLabels           = 500
 	defaultJourneyPlanMaxRouteItems               = 10
@@ -75,6 +75,7 @@ type plannerLabel struct {
 	departuresExpanded   bool
 	transfersExpanded    bool
 	routeItems           *routeItemNode
+	preferExpansion      bool
 	priorityClass        uint8
 	priorityTime         time.Time
 	index                int
@@ -198,8 +199,9 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 
 	if q.OriginStop != nil {
 		runtime.pushLabel(pq, &plannerLabel{
-			stop:        q.OriginStop,
-			arrivalTime: q.StartDateTime,
+			stop:            q.OriginStop,
+			arrivalTime:     q.StartDateTime,
+			preferExpansion: true,
 		})
 	} else if err := runtime.pushOriginLocationLabels(pq, originStop, q.OriginLocation, q.StartDateTime); err != nil {
 		return nil, err
@@ -223,8 +225,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if !current.transfersExpanded && current.consecutiveTransfers < config.maxConsecutiveTransfers {
-			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
+		if !current.departuresExpanded && current.vehicleLegs < config.maxVehicleLegs {
+			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -232,8 +234,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if !current.departuresExpanded && current.vehicleLegs < config.maxVehicleLegs {
-			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
+		if !current.transfersExpanded && current.consecutiveTransfers < config.maxConsecutiveTransfers {
+			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -472,6 +474,7 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			vehicleLegs:          current.vehicleLegs,
 			consecutiveTransfers: current.consecutiveTransfers + 1,
 			routeItems:           appendRouteItem(current.routeItems, routeItem),
+			preferExpansion:      true,
 		}
 		if stopMatchesStop(toStop, destinationStop) {
 			runtime.recordResult(results, nextLabel)
@@ -598,6 +601,7 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		departure := candidate.departure
 		boardingIndex := candidate.boardingIndex
 		boardingStopRef := departure.Journey.Path[boardingIndex].OriginStopRef
+		lastPathIndex := lastJourneyDestinationIndex(departure.Journey, boardingIndex)
 
 		lastTime := departure.Time
 		for pathIndex := boardingIndex; pathIndex < len(departure.Journey.Path); pathIndex++ {
@@ -633,10 +637,11 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 			}
 
 			nextLabel := &plannerLabel{
-				stop:        toStop,
-				arrivalTime: arrivalTime,
-				vehicleLegs: current.vehicleLegs + 1,
-				routeItems:  appendRouteItem(current.routeItems, routeItem),
+				stop:            toStop,
+				arrivalTime:     arrivalTime,
+				vehicleLegs:     current.vehicleLegs + 1,
+				routeItems:      appendRouteItem(current.routeItems, routeItem),
+				preferExpansion: pathIndex == lastPathIndex,
 			}
 			if stopMatchesStop(toStop, destinationStop) {
 				runtime.recordResult(results, nextLabel)
@@ -1130,10 +1135,20 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 }
 
 func (runtime *plannerRuntime) queuePriorityClass(label *plannerLabel) uint8 {
-	if label != nil && label.stop != nil && runtime.destinationStop != nil && isHighCapacityStop(label.stop) && isHighCapacityStop(runtime.destinationStop) {
+	if label == nil || label.stop == nil {
+		return 2
+	}
+	// Always expand the requested origin, explicit transfer targets, and the end
+	// of a vehicle journey before intermediate calls. Without this distinction a
+	// stopping train can spend the whole search budget rebuilding boards at each
+	// early station while its useful terminal interchange remains in the queue.
+	if label.preferExpansion || stopMatchesStop(label.stop, runtime.destinationStop) {
 		return 0
 	}
-	return 1
+	if runtime.destinationStop != nil && isHighCapacityStop(label.stop) && isHighCapacityStop(runtime.destinationStop) {
+		return 1
+	}
+	return 2
 }
 
 func (runtime *plannerRuntime) queuePriority(label *plannerLabel) time.Time {
@@ -1263,6 +1278,21 @@ func boardingPathIndex(journey *ctdf.Journey, stop *ctdf.Stop) int {
 			continue
 		}
 		if stopMatchesRef(stop, pathItem.OriginStopRef) {
+			return index
+		}
+	}
+
+	return -1
+}
+
+func lastJourneyDestinationIndex(journey *ctdf.Journey, boardingIndex int) int {
+	if journey == nil {
+		return -1
+	}
+
+	for index := len(journey.Path) - 1; index >= boardingIndex; index-- {
+		pathItem := journey.Path[index]
+		if pathItem != nil && pathItem.DestinationStopRef != "" {
 			return index
 		}
 	}

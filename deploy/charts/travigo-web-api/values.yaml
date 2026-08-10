@@ -38,7 +38,9 @@ auth:
 departureGraph:
   enabled: true
   backgroundEnabled: true
-  daysBehind: 1
+  # Departure boards only need the current and following service days warmed.
+  # Older dates can still be filled lazily when explicitly requested.
+  daysBehind: 0
   daysAhead: 1
   batchSize: 1000
   batchPause: 250ms
@@ -55,6 +57,7 @@ departureGraph:
     runAsGroup: 1000
   service:
     port: 8080
+  goMemoryLimit: 5GiB
   resources:
     requests:
       cpu: 500m

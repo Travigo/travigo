@@ -483,19 +483,26 @@ func TestPlannerPrioritizesCambridgeRailConnectionToSheffieldOverLocalLabels(t *
 	londonLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{-0.123, 51.531}}
 	sheffieldLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{-1.462, 53.378}}
 	cambridge := &ctdf.Stop{PrimaryIdentifier: "cambridge", Location: cambridgeLocation, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	shepreth := &ctdf.Stop{PrimaryIdentifier: "shepreth", Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0.132, 52.114}}, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	royston := &ctdf.Stop{PrimaryIdentifier: "royston", Location: &ctdf.Location{Type: "Point", Coordinates: []float64{-0.026, 52.053}}, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
 	kingsCross := &ctdf.Stop{PrimaryIdentifier: "kings-cross", Location: londonLocation, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
 	stPancras := &ctdf.Stop{PrimaryIdentifier: "st-pancras", Location: londonLocation, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
 	sheffield := &ctdf.Stop{PrimaryIdentifier: "sheffield", Location: sheffieldLocation, TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
 
+	boardLookups := []string{}
 	runtime := &plannerRuntime{
 		stopCache: map[string]*ctdf.Stop{
 			cambridge.PrimaryIdentifier:  cambridge,
+			shepreth.PrimaryIdentifier:   shepreth,
+			royston.PrimaryIdentifier:    royston,
 			kingsCross.PrimaryIdentifier: kingsCross,
 			stPancras.PrimaryIdentifier:  stPancras,
 			sheffield.PrimaryIdentifier:  sheffield,
 		},
 		transferCache: map[string][]*ctdf.StopTransfer{
 			cambridge.PrimaryIdentifier: {},
+			shepreth.PrimaryIdentifier:  {},
+			royston.PrimaryIdentifier:   {},
 			kingsCross.PrimaryIdentifier: {
 				{
 					FromStopRef:          kingsCross.PrimaryIdentifier,
@@ -508,18 +515,33 @@ func TestPlannerPrioritizesCambridgeRailConnectionToSheffieldOverLocalLabels(t *
 		},
 		departureBoardCache: map[string]cachedDepartureBoard{},
 		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+			boardLookups = append(boardLookups, q.Stop.PrimaryIdentifier)
 			switch q.Stop.PrimaryIdentifier {
 			case cambridge.PrimaryIdentifier:
 				return []*ctdf.DepartureBoard{{
 					Time: start.Add(20 * time.Minute),
 					Journey: &ctdf.Journey{
 						PrimaryIdentifier: "cambridge-kings-cross",
-						Path: []*ctdf.JourneyPathItem{{
-							OriginStopRef:          cambridge.PrimaryIdentifier,
-							DestinationStopRef:     kingsCross.PrimaryIdentifier,
-							OriginDepartureTime:    start.Add(20 * time.Minute),
-							DestinationArrivalTime: start.Add(100 * time.Minute),
-						}},
+						Path: []*ctdf.JourneyPathItem{
+							{
+								OriginStopRef:          cambridge.PrimaryIdentifier,
+								DestinationStopRef:     shepreth.PrimaryIdentifier,
+								OriginDepartureTime:    start.Add(20 * time.Minute),
+								DestinationArrivalTime: start.Add(30 * time.Minute),
+							},
+							{
+								OriginStopRef:          shepreth.PrimaryIdentifier,
+								DestinationStopRef:     royston.PrimaryIdentifier,
+								OriginDepartureTime:    start.Add(31 * time.Minute),
+								DestinationArrivalTime: start.Add(40 * time.Minute),
+							},
+							{
+								OriginStopRef:          royston.PrimaryIdentifier,
+								DestinationStopRef:     kingsCross.PrimaryIdentifier,
+								OriginDepartureTime:    start.Add(41 * time.Minute),
+								DestinationArrivalTime: start.Add(100 * time.Minute),
+							},
+						},
 					},
 				}}, nil
 			case stPancras.PrimaryIdentifier:
@@ -586,22 +608,27 @@ func TestPlannerPrioritizesCambridgeRailConnectionToSheffieldOverLocalLabels(t *
 			continue
 		}
 		expanded++
-		if !current.transfersExpanded && current.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
-			if err := runtime.expandTransfers(pq, current, sheffield, results); err != nil {
-				t.Fatalf("transfer expansion failed: %s", err)
-			}
-		}
-		if len(results.JourneyPlans) > 0 {
-			break
-		}
 		if !current.departuresExpanded && current.vehicleLegs < runtime.config.maxVehicleLegs {
 			if err := runtime.expandDepartures(pq, current, sheffield, results); err != nil {
 				t.Fatalf("departure expansion failed: %s", err)
 			}
 		}
+		if len(results.JourneyPlans) > 0 {
+			break
+		}
+		if !current.transfersExpanded && current.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
+			if err := runtime.expandTransfers(pq, current, sheffield, results); err != nil {
+				t.Fatalf("transfer expansion failed: %s", err)
+			}
+		}
 	}
 	if len(results.JourneyPlans) != 1 {
 		t.Fatalf("rail route was starved by local labels after %d expansions", expanded)
+	}
+	for _, stopRef := range boardLookups {
+		if stopRef == shepreth.PrimaryIdentifier || stopRef == royston.PrimaryIdentifier {
+			t.Fatalf("intermediate rail stop %q was expanded before the terminal connection: %v", stopRef, boardLookups)
+		}
 	}
 	items := results.JourneyPlans[0].RouteItems
 	if len(items) != 4 || items[1].DestinationStopRef != kingsCross.PrimaryIdentifier || items[2].DestinationStopRef != stPancras.PrimaryIdentifier || items[3].DestinationStopRef != sheffield.PrimaryIdentifier {

@@ -72,6 +72,10 @@ spec:
               value: {{ .Values.departureGraph.retryInterval | quote }}
             - name: TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_INTERVAL
               value: {{ .Values.departureGraph.snapshotInterval | quote }}
+            {{- with .Values.departureGraph.goMemoryLimit }}
+            - name: GOMEMLIMIT
+              value: {{ . | quote }}
+            {{- end }}
             {{- if .Values.departureGraph.persistence.enabled }}
             - name: TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_PATH
               value: {{ printf "%s/%s" .Values.departureGraph.persistence.mountPath .Values.departureGraph.persistence.fileName | quote }}
