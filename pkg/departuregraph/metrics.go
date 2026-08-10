@@ -27,6 +27,7 @@ type BuildStats struct {
 	StartedAt                 *time.Time `json:"startedAt,omitempty"`
 	EstimatedJourneys         int64      `json:"estimatedJourneys"`
 	ScannedJourneys           int64      `json:"scannedJourneys"`
+	ResumedJourneys           int64      `json:"resumedJourneys"`
 	ActiveJourneyDays         int64      `json:"activeJourneyDays"`
 	Progress                  float64    `json:"progress"`
 	ElapsedMillis             float64    `json:"elapsedMillis"`
@@ -162,6 +163,7 @@ type buildTracker struct {
 	running           bool
 	startedAt         time.Time
 	estimatedJourneys int64
+	resumedJourneys   int64
 	scannedJourneys   atomic.Int64
 	activeJourneyDays atomic.Int64
 	successfulBuilds  uint64
@@ -171,14 +173,15 @@ type buildTracker struct {
 	lastError         string
 }
 
-func (b *buildTracker) begin() {
+func (b *buildTracker) begin(resumedJourneys int64, resumedActiveJourneyDays int64) {
 	b.mu.Lock()
 	b.running = true
 	b.startedAt = time.Now()
 	b.estimatedJourneys = 0
+	b.resumedJourneys = resumedJourneys
 	b.lastError = ""
-	b.scannedJourneys.Store(0)
-	b.activeJourneyDays.Store(0)
+	b.scannedJourneys.Store(resumedJourneys)
+	b.activeJourneyDays.Store(resumedActiveJourneyDays)
 	b.mu.Unlock()
 }
 
@@ -214,6 +217,7 @@ func (b *buildTracker) stats() BuildStats {
 	result := BuildStats{
 		Running:            b.running,
 		EstimatedJourneys:  b.estimatedJourneys,
+		ResumedJourneys:    b.resumedJourneys,
 		ScannedJourneys:    b.scannedJourneys.Load(),
 		ActiveJourneyDays:  b.activeJourneyDays.Load(),
 		SuccessfulBuilds:   b.successfulBuilds,
@@ -238,8 +242,8 @@ func (b *buildTracker) stats() BuildStats {
 		elapsed = time.Since(*result.StartedAt).Seconds()
 	}
 	result.ElapsedMillis = elapsed * 1000
-	if elapsed > 0 {
-		result.JourneysPerSecond = float64(result.ScannedJourneys) / elapsed
+	if elapsed > 0 && result.ScannedJourneys > result.ResumedJourneys {
+		result.JourneysPerSecond = float64(result.ScannedJourneys-result.ResumedJourneys) / elapsed
 	}
 	if result.Running && result.JourneysPerSecond > 0 && result.EstimatedJourneys > result.ScannedJourneys {
 		result.EstimatedRemainingSeconds = float64(result.EstimatedJourneys-result.ScannedJourneys) / result.JourneysPerSecond

@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const snapshotVersion = 1
+const snapshotVersion = 2
 
 type stringID uint32
 type journeyID uint32
@@ -77,11 +77,15 @@ type graphData struct {
 	Departures    map[bucketKey][]journeyID
 	CompleteStops map[bucketKey]bool
 	CompleteDays  map[dayKey]bool
+	ScanDays      []dayKey
+	ScanCursor    string
+	ScanProcessed int64
+	ScanActive    int64
 }
 
 type Loader interface {
 	LoadStopJourneys(ctx context.Context, stopRefs []string, serviceDate time.Time) ([]*ctdf.Journey, error)
-	ScanJourneys(ctx context.Context, visit func(*ctdf.Journey) error) error
+	ScanJourneys(ctx context.Context, after string, visit func(*ctdf.Journey, string) error) error
 }
 
 type JourneyCounter interface {
@@ -104,6 +108,7 @@ type Config struct {
 	BatchPause        time.Duration
 	InitialBuildDelay time.Duration
 	RefreshInterval   time.Duration
+	RetryInterval     time.Duration
 	SnapshotInterval  time.Duration
 }
 
@@ -117,6 +122,7 @@ func DefaultConfig() Config {
 		BatchPause:        250 * time.Millisecond,
 		InitialBuildDelay: 30 * time.Second,
 		RefreshInterval:   24 * time.Hour,
+		RetryInterval:     time.Minute,
 		SnapshotInterval:  15 * time.Minute,
 	}
 }
@@ -132,6 +138,7 @@ func ConfigFromEnvironment(env map[string]string) Config {
 	config.BatchPause = envDuration(env, "TRAVIGO_DEPARTURE_GRAPH_BATCH_PAUSE", config.BatchPause)
 	config.InitialBuildDelay = envDuration(env, "TRAVIGO_DEPARTURE_GRAPH_INITIAL_BUILD_DELAY", config.InitialBuildDelay)
 	config.RefreshInterval = envDuration(env, "TRAVIGO_DEPARTURE_GRAPH_REFRESH_INTERVAL", config.RefreshInterval)
+	config.RetryInterval = envDuration(env, "TRAVIGO_DEPARTURE_GRAPH_RETRY_INTERVAL", config.RetryInterval)
 	config.SnapshotInterval = envDuration(env, "TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_INTERVAL", config.SnapshotInterval)
 	if config.DaysBehind < 0 {
 		config.DaysBehind = 0
@@ -144,6 +151,9 @@ func ConfigFromEnvironment(env map[string]string) Config {
 	}
 	if config.RefreshInterval <= 0 {
 		config.RefreshInterval = 24 * time.Hour
+	}
+	if config.RetryInterval <= 0 {
+		config.RetryInterval = time.Minute
 	}
 	if config.SnapshotInterval <= 0 {
 		config.SnapshotInterval = 15 * time.Minute
@@ -169,6 +179,9 @@ func New(loader Loader, config Config) *Graph {
 	}
 	if config.RefreshInterval <= 0 {
 		config.RefreshInterval = defaults.RefreshInterval
+	}
+	if config.RetryInterval <= 0 {
+		config.RetryInterval = defaults.RetryInterval
 	}
 	if config.SnapshotInterval <= 0 {
 		config.SnapshotInterval = defaults.SnapshotInterval
@@ -243,10 +256,16 @@ func (g *Graph) run(ctx context.Context, restored bool) {
 
 	for {
 		started := time.Now()
-		if err := g.rebuildRolling(ctx, time.Now()); err != nil && ctx.Err() == nil {
-			log.Error().Err(err).Msg("Departure graph background rebuild failed")
+		err := g.rebuildRolling(ctx, time.Now())
+		if err != nil && ctx.Err() == nil {
+			log.Error().Err(err).Dur("retry_in", g.config.RetryInterval).Msg("Departure graph background rebuild failed")
+			if g.config.SnapshotPath != "" {
+				if snapshotErr := g.Save(); snapshotErr != nil {
+					log.Error().Err(snapshotErr).Str("path", g.config.SnapshotPath).Msg("Departure graph failed-build checkpoint save failed")
+				}
+			}
 		}
-		wait := g.config.RefreshInterval - time.Since(started)
+		wait := g.waitAfterBuild(err, time.Since(started))
 		if wait < time.Minute {
 			wait = time.Minute
 		}
@@ -258,6 +277,13 @@ func (g *Graph) run(ctx context.Context, restored bool) {
 		case <-timer.C:
 		}
 	}
+}
+
+func (g *Graph) waitAfterBuild(err error, duration time.Duration) time.Duration {
+	if err != nil {
+		return g.config.RetryInterval
+	}
+	return g.config.RefreshInterval - duration
 }
 
 func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time) ([]*ctdf.Journey, error) {
@@ -311,13 +337,6 @@ func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDat
 }
 
 func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
-	g.metrics.build.begin()
-	defer func() { g.metrics.build.finish(err) }()
-	if counter, ok := g.loader.(JourneyCounter); ok {
-		if total, countErr := counter.JourneyCount(ctx); countErr == nil {
-			g.metrics.build.setEstimatedJourneys(total)
-		}
-	}
 	dates := rollingDates(now, g.config.DaysBehind, g.config.DaysAhead)
 	next := g.current.Load()
 	if next.coversRolling(now, g.config.DaysBehind, g.config.DaysAhead) {
@@ -327,24 +346,45 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 		// fills its stop into this generation while the scan continues.
 		g.current.Store(next)
 	}
-	processed := 0
-	active := 0
+	configured, matching, cursor, processed, active := next.scanState(dates)
+	if configured && !matching {
+		next = newGraphData()
+		g.current.Store(next)
+		cursor, processed, active = "", 0, 0
+	}
+	if !configured || !matching {
+		next.setScanProgress(dates, cursor, processed, active)
+	}
+	g.metrics.build.begin(processed, active)
+	defer func() { g.metrics.build.finish(err) }()
+	if counter, ok := g.loader.(JourneyCounter); ok {
+		if total, countErr := counter.JourneyCount(ctx); countErr == nil {
+			g.metrics.build.setEstimatedJourneys(total)
+		}
+	}
+	processedThisRun := int64(0)
+	latestCursor := cursor
 	started := time.Now()
 
-	err = g.loader.ScanJourneys(ctx, func(journey *ctdf.Journey) error {
+	err = g.loader.ScanJourneys(ctx, cursor, func(journey *ctdf.Journey, journeyCursor string) error {
 		processed++
+		processedThisRun++
 		activeForJourney := int64(0)
 		if journey != nil && journey.Availability != nil {
 			for _, serviceDate := range dates {
 				if journey.Availability.MatchDate(serviceDate) {
 					next.addJourney(makeDayKey(serviceDate), journey)
-					active++
 					activeForJourney++
 				}
 			}
 		}
+		active += activeForJourney
 		g.metrics.build.scanned(activeForJourney)
-		if processed%g.config.BatchSize == 0 && g.config.BatchPause > 0 {
+		latestCursor = journeyCursor
+		if processedThisRun%int64(g.config.BatchSize) == 0 {
+			next.setScanProgress(dates, latestCursor, processed, active)
+		}
+		if processedThisRun%int64(g.config.BatchSize) == 0 && g.config.BatchPause > 0 {
 			timer := time.NewTimer(g.config.BatchPause)
 			select {
 			case <-ctx.Done():
@@ -356,21 +396,18 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 		if processed%100000 == 0 {
 			stats := next.stats()
 			log.Info().
-				Int("scanned_journeys", processed).
+				Int64("scanned_journeys", processed).
 				Int("stored_journeys", stats.Journeys).
 				Int("stored_paths", stats.Paths).
 				Msg("Departure graph background rebuild progress")
 		}
 		return nil
 	})
+	next.setScanProgress(dates, latestCursor, processed, active)
 	if err != nil {
 		return err
 	}
-	next.mu.Lock()
-	for _, serviceDate := range dates {
-		next.CompleteDays[makeDayKey(serviceDate)] = true
-	}
-	next.mu.Unlock()
+	next.completeScan(dates)
 
 	if g.config.SnapshotPath != "" {
 		if snapshotErr := g.saveTracked(g.config.SnapshotPath, next); snapshotErr != nil {
@@ -379,8 +416,9 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	}
 	stats := next.stats()
 	log.Info().
-		Int("scanned_journeys", processed).
-		Int("active_journey_days", active).
+		Int64("scanned_journeys", processed).
+		Int64("scanned_this_run", processedThisRun).
+		Int64("active_journey_days", active).
 		Int("stored_journeys", stats.Journeys).
 		Int("stored_paths", stats.Paths).
 		Int("departure_buckets", stats.DepartureBuckets).
@@ -398,6 +436,47 @@ func (d *graphData) coversRolling(now time.Time, behind int, ahead int) bool {
 		}
 	}
 	return true
+}
+
+func (d *graphData) scanState(dates []time.Time) (configured bool, matching bool, cursor string, processed int64, active int64) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	if len(d.ScanDays) == 0 {
+		return false, false, "", 0, 0
+	}
+	if len(d.ScanDays) != len(dates) {
+		return true, false, "", 0, 0
+	}
+	for index, serviceDate := range dates {
+		if d.ScanDays[index] != makeDayKey(serviceDate) {
+			return true, false, "", 0, 0
+		}
+	}
+	return true, true, d.ScanCursor, d.ScanProcessed, d.ScanActive
+}
+
+func (d *graphData) setScanProgress(dates []time.Time, cursor string, processed int64, active int64) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.ScanDays = d.ScanDays[:0]
+	for _, serviceDate := range dates {
+		d.ScanDays = append(d.ScanDays, makeDayKey(serviceDate))
+	}
+	d.ScanCursor = cursor
+	d.ScanProcessed = processed
+	d.ScanActive = active
+}
+
+func (d *graphData) completeScan(dates []time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for _, serviceDate := range dates {
+		d.CompleteDays[makeDayKey(serviceDate)] = true
+	}
+	d.ScanDays = nil
+	d.ScanCursor = ""
+	d.ScanProcessed = 0
+	d.ScanActive = 0
 }
 
 func rollingDates(now time.Time, behind int, ahead int) []time.Time {

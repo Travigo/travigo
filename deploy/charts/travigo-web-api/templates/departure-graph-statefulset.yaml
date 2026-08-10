@@ -29,11 +29,11 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "travigo-web-api.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.departureGraph.podSecurityContext | nindent 8 }}
       containers:
         - name: departure-graph
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml .Values.departureGraph.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
@@ -68,6 +68,8 @@ spec:
               value: {{ .Values.departureGraph.initialBuildDelay | quote }}
             - name: TRAVIGO_DEPARTURE_GRAPH_REFRESH_INTERVAL
               value: {{ .Values.departureGraph.refreshInterval | quote }}
+            - name: TRAVIGO_DEPARTURE_GRAPH_RETRY_INTERVAL
+              value: {{ .Values.departureGraph.retryInterval | quote }}
             - name: TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_INTERVAL
               value: {{ .Values.departureGraph.snapshotInterval | quote }}
             {{- if .Values.departureGraph.persistence.enabled }}

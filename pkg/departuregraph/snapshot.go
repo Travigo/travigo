@@ -23,6 +23,10 @@ type snapshotFile struct {
 	Departures    map[bucketKey][]journeyID
 	CompleteStops map[bucketKey]bool
 	CompleteDays  map[dayKey]bool
+	ScanDays      []dayKey
+	ScanCursor    string
+	ScanProcessed int64
+	ScanActive    int64
 }
 
 // Save writes the current graph generation to the configured snapshot path.
@@ -101,6 +105,10 @@ func (g *Graph) save(path string, data *graphData) error {
 		Departures:    data.Departures,
 		CompleteStops: data.CompleteStops,
 		CompleteDays:  data.CompleteDays,
+		ScanDays:      data.ScanDays,
+		ScanCursor:    data.ScanCursor,
+		ScanProcessed: data.ScanProcessed,
+		ScanActive:    data.ScanActive,
 	})
 	data.mu.RUnlock()
 	if err == nil {
@@ -147,7 +155,7 @@ func (g *Graph) restore(path string) error {
 	if err := gob.NewDecoder(decoder).Decode(&snapshot); err != nil {
 		return err
 	}
-	if snapshot.Version != snapshotVersion {
+	if snapshot.Version < 1 || snapshot.Version > snapshotVersion {
 		return fmt.Errorf("unsupported departure graph snapshot version %d", snapshot.Version)
 	}
 
@@ -162,6 +170,10 @@ func (g *Graph) restore(path string) error {
 		Departures:    snapshot.Departures,
 		CompleteStops: snapshot.CompleteStops,
 		CompleteDays:  snapshot.CompleteDays,
+		ScanDays:      snapshot.ScanDays,
+		ScanCursor:    snapshot.ScanCursor,
+		ScanProcessed: snapshot.ScanProcessed,
+		ScanActive:    snapshot.ScanActive,
 	}
 	if len(restored.Strings) == 0 {
 		restored.Strings = []string{""}

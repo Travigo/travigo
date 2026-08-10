@@ -44,7 +44,15 @@ departureGraph:
   batchPause: 250ms
   initialBuildDelay: 30s
   refreshInterval: 24h
+  retryInterval: 1m
   snapshotInterval: 15m
+  podSecurityContext:
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
   service:
     port: 8080
   resources:

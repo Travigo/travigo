@@ -8,10 +8,16 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type MongoLoader struct{}
+
+type mongoJourneyRecord struct {
+	ID      primitive.ObjectID `bson:"_id"`
+	Journey ctdf.Journey       `bson:",inline"`
+}
 
 func (MongoLoader) JourneyCount(ctx context.Context) (int64, error) {
 	return database.GetCollection(database.JourneysCollectionName).EstimatedDocumentCount(ctx)
@@ -45,19 +51,31 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	return journeys, nil
 }
 
-func (MongoLoader) ScanJourneys(ctx context.Context, visit func(*ctdf.Journey) error) error {
-	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, bson.M{}, departureGraphFindOptions().SetBatchSize(1000))
+func (MongoLoader) ScanJourneys(ctx context.Context, after string, visit func(*ctdf.Journey, string) error) error {
+	filter := bson.M{}
+	if after != "" {
+		objectID, err := primitive.ObjectIDFromHex(after)
+		if err != nil {
+			return fmt.Errorf("parse departure graph scan cursor: %w", err)
+		}
+		filter["_id"] = bson.M{"$gt": objectID}
+	}
+	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(
+		ctx,
+		filter,
+		departureGraphFindOptions().SetBatchSize(1000).SetSort(bson.D{{Key: "_id", Value: 1}}),
+	)
 	if err != nil {
 		return err
 	}
 	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
-		var journey ctdf.Journey
-		if err := cursor.Decode(&journey); err != nil {
+		var record mongoJourneyRecord
+		if err := cursor.Decode(&record); err != nil {
 			return fmt.Errorf("decode journey for departure graph: %w", err)
 		}
-		if err := visit(&journey); err != nil {
+		if err := visit(&record.Journey, record.ID.Hex()); err != nil {
 			return err
 		}
 	}
@@ -66,7 +84,7 @@ func (MongoLoader) ScanJourneys(ctx context.Context, visit func(*ctdf.Journey) e
 
 func departureGraphFindOptions() *options.FindOptions {
 	return options.Find().SetProjection(bson.D{
-		{Key: "_id", Value: 0},
+		{Key: "_id", Value: 1},
 		{Key: "primaryidentifier", Value: 1},
 		{Key: "otheridentifiers.BlockNumber", Value: 1},
 		{Key: "datasource.datasetid", Value: 1},

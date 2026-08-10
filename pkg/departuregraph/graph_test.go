@@ -2,7 +2,9 @@ package departuregraph
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -11,10 +13,12 @@ import (
 )
 
 type fakeLoader struct {
-	mu        sync.Mutex
-	journeys  []*ctdf.Journey
-	stopLoads int
-	scans     int
+	mu            sync.Mutex
+	journeys      []*ctdf.Journey
+	stopLoads     int
+	scans         int
+	failScanAfter int
+	scanVisits    map[string]int
 }
 
 func (l *fakeLoader) LoadStopJourneys(_ context.Context, stopRefs []string, serviceDate time.Time) ([]*ctdf.Journey, error) {
@@ -40,13 +44,26 @@ func (l *fakeLoader) LoadStopJourneys(_ context.Context, stopRefs []string, serv
 	return result, nil
 }
 
-func (l *fakeLoader) ScanJourneys(_ context.Context, visit func(*ctdf.Journey) error) error {
+func (l *fakeLoader) ScanJourneys(_ context.Context, after string, visit func(*ctdf.Journey, string) error) error {
 	l.mu.Lock()
 	l.scans++
 	journeys := append([]*ctdf.Journey(nil), l.journeys...)
+	failAfter := l.failScanAfter
+	l.failScanAfter = 0
 	l.mu.Unlock()
-	for _, journey := range journeys {
-		if err := visit(journey); err != nil {
+	start, _ := strconv.Atoi(after)
+	for index := start; index < len(journeys); index++ {
+		if failAfter > 0 && index-start == failAfter {
+			return errors.New("interrupted scan")
+		}
+		journey := journeys[index]
+		l.mu.Lock()
+		if l.scanVisits == nil {
+			l.scanVisits = map[string]int{}
+		}
+		l.scanVisits[journey.PrimaryIdentifier]++
+		l.mu.Unlock()
+		if err := visit(journey, strconv.Itoa(index+1)); err != nil {
 			return err
 		}
 	}
@@ -185,6 +202,71 @@ func TestBackgroundBuildRetainsRestoredPartialGeneration(t *testing.T) {
 	}
 }
 
+func TestBackgroundBuildResumesFromSnapshotCursor(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	journeys := []*ctdf.Journey{
+		testJourneyWithID("journey-1"),
+		testJourneyWithID("journey-2"),
+		testJourneyWithID("journey-3"),
+	}
+	loader := &fakeLoader{journeys: journeys, failScanAfter: 2}
+	graph := New(loader, Config{Enabled: true, BatchSize: 1})
+	if err := graph.rebuildRolling(context.Background(), serviceDate); err == nil {
+		t.Fatal("expected interrupted background build")
+	}
+	if stats := graph.Stats().BackgroundBuild; stats.ScannedJourneys != 2 || stats.FailedBuilds != 1 {
+		t.Fatalf("unexpected interrupted build stats: %#v", stats)
+	}
+
+	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
+	if err := graph.save(path, graph.current.Load()); err != nil {
+		t.Fatalf("save interrupted graph: %v", err)
+	}
+
+	resumedLoader := &fakeLoader{journeys: journeys}
+	resumed := New(resumedLoader, Config{Enabled: true, BatchSize: 1})
+	if err := resumed.restore(path); err != nil {
+		t.Fatalf("restore interrupted graph: %v", err)
+	}
+	if err := resumed.rebuildRolling(context.Background(), serviceDate); err != nil {
+		t.Fatalf("resume background graph: %v", err)
+	}
+
+	if resumedLoader.scanVisits["journey-1"] != 0 || resumedLoader.scanVisits["journey-2"] != 0 || resumedLoader.scanVisits["journey-3"] != 1 {
+		t.Fatalf("resume revisited checkpointed journeys: %#v", resumedLoader.scanVisits)
+	}
+	stats := resumed.Stats()
+	if stats.Journeys != 3 || stats.CompleteDays != 1 {
+		t.Fatalf("unexpected resumed graph stats: %#v", stats)
+	}
+	if stats.BackgroundBuild.ResumedJourneys != 2 || stats.BackgroundBuild.ScannedJourneys != 3 || stats.BackgroundBuild.SuccessfulBuilds != 1 {
+		t.Fatalf("unexpected resumed build stats: %#v", stats.BackgroundBuild)
+	}
+}
+
+func TestBackgroundBuildFailureUsesRetryInterval(t *testing.T) {
+	graph := New(&fakeLoader{}, Config{
+		Enabled:         true,
+		RefreshInterval: 24 * time.Hour,
+		RetryInterval:   2 * time.Minute,
+	})
+	if wait := graph.waitAfterBuild(errors.New("failed"), 30*time.Minute); wait != 2*time.Minute {
+		t.Fatalf("failed build wait = %s, want 2m", wait)
+	}
+	if wait := graph.waitAfterBuild(nil, 30*time.Minute); wait != 23*time.Hour+30*time.Minute {
+		t.Fatalf("successful build wait = %s, want 23h30m", wait)
+	}
+}
+
+func TestConfigFromEnvironmentReadsRetryInterval(t *testing.T) {
+	config := ConfigFromEnvironment(map[string]string{
+		"TRAVIGO_DEPARTURE_GRAPH_RETRY_INTERVAL": "3m",
+	})
+	if config.RetryInterval != 3*time.Minute {
+		t.Fatalf("retry interval = %s, want 3m", config.RetryInterval)
+	}
+}
+
 func TestSnapshotStatsTrackWritesAndRestore(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
@@ -248,6 +330,12 @@ func testJourney() *ctdf.Journey {
 			},
 		},
 	}
+}
+
+func testJourneyWithID(identifier string) *ctdf.Journey {
+	journey := testJourney()
+	journey.PrimaryIdentifier = identifier
+	return journey
 }
 
 func assertMaterializedJourney(t *testing.T, journey *ctdf.Journey) {

@@ -122,6 +122,11 @@ func checkRule(rule *AvailabilityRule, dateTime time.Time) bool {
 		return (dateTime.After(startDate) && dateTime.Before(endDate)) || datesMatch(startDate, dateTime) || datesMatch(endDate, dateTime)
 	case AvailabilityMatchAll:
 		return true
+	case "":
+		// Some imported records contain a zero-value placeholder rule. It has
+		// never matched a date, so preserve that behaviour without flooding the
+		// logs during full journey scans.
+		return false
 	default:
 		log.Error().Msgf("Cannot parse rule type %s", rule.Type)
 		return false

@@ -30,13 +30,13 @@ func TestRequestTrackerSupportsConcurrentObservations(t *testing.T) {
 
 func TestBuildTrackerReportsLiveProgressAndRate(t *testing.T) {
 	var tracker buildTracker
-	tracker.begin()
+	tracker.begin(4, 8)
 	tracker.setEstimatedJourneys(10)
 	tracker.scanned(2)
 	time.Sleep(time.Millisecond)
 
 	stats := tracker.stats()
-	if !stats.Running || stats.ScannedJourneys != 1 || stats.ActiveJourneyDays != 2 || stats.Progress != 0.1 {
+	if !stats.Running || stats.ResumedJourneys != 4 || stats.ScannedJourneys != 5 || stats.ActiveJourneyDays != 10 || stats.Progress != 0.5 {
 		t.Fatalf("unexpected live build stats: %#v", stats)
 	}
 	if stats.ElapsedMillis <= 0 || stats.JourneysPerSecond <= 0 || stats.EstimatedRemainingSeconds <= 0 {

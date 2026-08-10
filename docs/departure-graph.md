@@ -19,8 +19,9 @@ The graph is deliberately non-blocking:
 - One background cursor slowly scans the journeys collection and constructs the
   configured rolling service-date window.
 - A partial generation restored after a restart remains available while its
-  background scan fills the missing graph. A later refresh replaces a complete
-  generation in place, so the process never retains two complete graphs.
+  background scan resumes after the last checkpointed MongoDB `_id`. A later
+  refresh replaces a complete generation in place, so the process never retains
+  two complete graphs.
 - The active generation is periodically checkpointed as a versioned,
   zstd-compressed snapshot using a temporary file and atomic rename. A final
   checkpoint is attempted during graceful shutdown.
@@ -44,6 +45,7 @@ applied by the shared board generator using journey and stop-occurrence identity
 | `TRAVIGO_DEPARTURE_GRAPH_BATCH_PAUSE` | `250ms` | Background throttle pause. |
 | `TRAVIGO_DEPARTURE_GRAPH_INITIAL_BUILD_DELAY` | `30s` | Delay before an uncached initial build. |
 | `TRAVIGO_DEPARTURE_GRAPH_REFRESH_INTERVAL` | `24h` | Delay between completed full rebuilds. |
+| `TRAVIGO_DEPARTURE_GRAPH_RETRY_INTERVAL` | `1m` | Delay before resuming a failed background scan. |
 | `TRAVIGO_DEPARTURE_GRAPH_SNAPSHOT_INTERVAL` | `15m` | Interval between restart checkpoints. |
 
 The web API Helm chart keeps the API as its existing stateless Deployment and
@@ -52,6 +54,8 @@ Service. The graph pod has a restart-stable `ReadWriteOnce` claim, avoiding
 concurrent snapshot writers and duplicate background MongoDB scans. It requests
 6 GiB of memory by default; this should be adjusted using the emitted
 stored-journey, path, and bucket counts after the first production build.
+The pod runs as UID/GID 1000 and mounts the claim with `fsGroup: 1000`, allowing
+atomic snapshot creation on a newly provisioned volume.
 
 The current format is departures-only. An arrival index can later be added as a
 second integer index over the same compact journey/path records without changing
@@ -69,8 +73,9 @@ the lazy fill, rolling generation, or persistence model.
   and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
   and average/maximum fill time.
 - `BackgroundBuild`: whether a scan is active, estimated and scanned
-  journey counts, progress from `0` to `1`, scan rate, estimated time remaining,
-  duration, active journey-day count and successful/failed build history.
+  journey counts, count restored from a resumable checkpoint, progress from `0`
+  to `1`, scan rate, estimated time remaining, duration, active journey-day
+  count and successful/failed build history.
 - `Snapshot`: active write state, successful/failed write counts, last
   write and restore duration, compressed file size and latest errors.
 - `Memory`: Go heap, stack, runtime system allocation, heap objects, goroutines,
