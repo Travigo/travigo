@@ -3,6 +3,7 @@ package journeyplanner
 import (
 	"container/heap"
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -19,20 +20,21 @@ import (
 )
 
 const (
-	defaultJourneyPlanCount                     = 5
-	defaultJourneyPlanMaxChanges                = 3
-	defaultJourneyPlanMaxJourneyDuration        = 6 * time.Hour
-	defaultJourneyPlanMaxTransferDistance       = 1000
-	defaultJourneyPlanDepartureBoardCount       = 12
-	defaultJourneyPlanOriginDepartureBoardCount = 96
-	defaultJourneyPlanOriginLocationStopCount   = 12
-	defaultJourneyPlanMaxExpandedLabels         = 500
-	defaultJourneyPlanMaxRouteItems             = 10
-	defaultJourneyPlanMaxConsecutiveTransfers   = 1
-	defaultJourneyPlanMaxSearchDuration         = 8 * time.Second
-	defaultJourneyPlanWalkSpeedMetresPerSecond  = 1.3
-	defaultJourneyPlanDestinationApproachMetres = 15000
-	defaultJourneyPlanAccessVehicleLegs         = 1
+	defaultJourneyPlanCount                       = 5
+	defaultJourneyPlanMaxChanges                  = 3
+	defaultJourneyPlanMaxJourneyDuration          = 6 * time.Hour
+	defaultJourneyPlanMaxTransferDistance         = 1000
+	defaultJourneyPlanDepartureBoardCount         = 12
+	defaultJourneyPlanOriginDepartureBoardCount   = 96
+	defaultJourneyPlanOriginLocationStopCount     = 12
+	defaultJourneyPlanMaxExpandedLabels           = 500
+	defaultJourneyPlanMaxRouteItems               = 10
+	defaultJourneyPlanMaxConsecutiveTransfers     = 1
+	defaultJourneyPlanMaxSearchDuration           = 8 * time.Second
+	defaultJourneyPlanWalkSpeedMetresPerSecond    = 1.3
+	defaultJourneyPlanDestinationApproachMetres   = 15000
+	defaultJourneyPlanAccessVehicleLegs           = 1
+	defaultJourneyPlanMaximumSpeedMetresPerSecond = 100
 )
 
 type plannerConfig struct {
@@ -73,7 +75,15 @@ type plannerLabel struct {
 	departuresExpanded   bool
 	transfersExpanded    bool
 	routeItems           *routeItemNode
+	priorityClass        uint8
+	priorityTime         time.Time
 	index                int
+}
+
+type departureCandidate struct {
+	departure          *ctdf.DepartureBoard
+	boardingIndex      int
+	reachesDestination bool
 }
 
 type plannerPriorityQueue []*plannerLabel
@@ -83,10 +93,28 @@ func (pq plannerPriorityQueue) Len() int {
 }
 
 func (pq plannerPriorityQueue) Less(i, j int) bool {
-	if pq[i].arrivalTime.Equal(pq[j].arrivalTime) {
+	if pq[i].priorityClass != pq[j].priorityClass {
+		return pq[i].priorityClass < pq[j].priorityClass
+	}
+	iPriority := plannerLabelPriority(pq[i])
+	jPriority := plannerLabelPriority(pq[j])
+	if iPriority.Equal(jPriority) {
+		if !pq[i].arrivalTime.Equal(pq[j].arrivalTime) {
+			return pq[i].arrivalTime.Before(pq[j].arrivalTime)
+		}
 		return pq[i].vehicleLegs < pq[j].vehicleLegs
 	}
-	return pq[i].arrivalTime.Before(pq[j].arrivalTime)
+	return iPriority.Before(jPriority)
+}
+
+func plannerLabelPriority(label *plannerLabel) time.Time {
+	if label == nil {
+		return time.Time{}
+	}
+	if label.priorityTime.IsZero() {
+		return label.arrivalTime
+	}
+	return label.priorityTime
 }
 
 func (pq plannerPriorityQueue) Swap(i, j int) {
@@ -127,6 +155,7 @@ type plannerRuntime struct {
 	config               plannerConfig
 	searchEndTime        time.Time
 	searchDeadline       time.Time
+	destinationStop      *ctdf.Stop
 	timedOut             bool
 }
 
@@ -153,6 +182,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		config:              config,
 		searchEndTime:       q.StartDateTime.Add(config.maxJourneyDuration),
 		searchDeadline:      time.Now().Add(config.maxSearchDuration),
+		destinationStop:     q.DestinationStop,
 	}
 	runtime.cacheStop(originStop)
 	runtime.cacheStop(q.DestinationStop)
@@ -193,8 +223,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if !current.departuresExpanded && current.vehicleLegs < config.maxVehicleLegs {
-			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
+		if !current.transfersExpanded && current.consecutiveTransfers < config.maxConsecutiveTransfers {
+			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -202,8 +232,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			continue
 		}
 
-		if !current.transfersExpanded && current.consecutiveTransfers < config.maxConsecutiveTransfers {
-			if err := runtime.expandTransfers(pq, current, q.DestinationStop, results); err != nil {
+		if !current.departuresExpanded && current.vehicleLegs < config.maxVehicleLegs {
+			if err := runtime.expandDepartures(pq, current, q.DestinationStop, results); err != nil {
 				return nil, err
 			}
 		}
@@ -506,7 +536,10 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	}
 
 	departureBoardCount := runtime.config.departureBoardCount
-	if current.vehicleLegs == 0 {
+	// A coordinate origin already fans out across several nearby stops. Applying
+	// the large single-origin board to every one of those walking labels multiplies
+	// the search fan-out and often forces tomorrow's board to be generated too.
+	if current.vehicleLegs == 0 && current.routeItems == nil {
 		departureBoardCount = runtime.config.originDepartureBoardCount
 	}
 
@@ -519,11 +552,6 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		return departureBoard[i].Time.Before(departureBoard[j].Time)
 	})
 
-	type departureCandidate struct {
-		departure          *ctdf.DepartureBoard
-		boardingIndex      int
-		reachesDestination bool
-	}
 	candidates := make([]departureCandidate, 0, len(departureBoard))
 
 	for _, departure := range departureBoard {
@@ -554,6 +582,9 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		if reachesDestination && len(results.JourneyPlans) >= runtime.config.count {
 			return nil
 		}
+	}
+	if err := runtime.prefetchDeparturePaths(candidates); err != nil {
+		return err
 	}
 
 	for _, candidate := range candidates {
@@ -615,16 +646,7 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				continue
 			}
 
-			labelAccepted := runtime.pushLabel(pq, nextLabel)
-			if labelAccepted && nextLabel.consecutiveTransfers < runtime.config.maxConsecutiveTransfers {
-				if err := runtime.expandTransfers(pq, nextLabel, destinationStop, results); err != nil {
-					return err
-				}
-				nextLabel.transfersExpanded = true
-				if len(results.JourneyPlans) >= runtime.config.count {
-					return nil
-				}
-			}
+			runtime.pushLabel(pq, nextLabel)
 
 		}
 	}
@@ -711,6 +733,154 @@ func (runtime *plannerRuntime) recordDirectDestinationFromDeparture(current *pla
 	}
 
 	return recorded
+}
+
+func (runtime *plannerRuntime) prefetchDeparturePaths(candidates []departureCandidate) error {
+	missingRefs := map[string]struct{}{}
+	for _, candidate := range candidates {
+		if candidate.reachesDestination || candidate.departure == nil || candidate.departure.Journey == nil {
+			continue
+		}
+		for pathIndex := candidate.boardingIndex; pathIndex < len(candidate.departure.Journey.Path); pathIndex++ {
+			pathItem := candidate.departure.Journey.Path[pathIndex]
+			if pathItem == nil || pathItem.DestinationStopRef == "" {
+				continue
+			}
+			if _, exists := runtime.stopCache[pathItem.DestinationStopRef]; !exists {
+				missingRefs[pathItem.DestinationStopRef] = struct{}{}
+			}
+		}
+	}
+
+	if len(missingRefs) > 0 {
+		identifiers := make([]string, 0, len(missingRefs))
+		for identifier := range missingRefs {
+			identifiers = append(identifiers, identifier)
+		}
+		stopsCollection := database.GetCollection("stops")
+		ctx, cancel := runtime.searchContext()
+		cursor, err := stopsCollection.Find(ctx, bson.M{
+			"$or": bson.A{
+				bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
+				bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
+				bson.M{"platforms.primaryidentifier": bson.M{"$in": identifiers}},
+			},
+		}, options.Find().SetProjection(bson.D{{Key: "_id", Value: 0}}))
+		if err != nil {
+			cancel()
+			return runtime.searchQueryError(err)
+		}
+		for cursor.Next(ctx) {
+			var stop ctdf.Stop
+			if err := cursor.Decode(&stop); err != nil {
+				_ = cursor.Close(ctx)
+				cancel()
+				return err
+			}
+			runtime.cacheStop(&stop)
+		}
+		if err := cursor.Err(); err != nil {
+			_ = cursor.Close(ctx)
+			cancel()
+			return runtime.searchQueryError(err)
+		}
+		_ = cursor.Close(ctx)
+		cancel()
+	}
+
+	stops := make([]*ctdf.Stop, 0, len(missingRefs))
+	seenStops := map[string]struct{}{}
+	for _, candidate := range candidates {
+		if candidate.reachesDestination || candidate.departure == nil || candidate.departure.Journey == nil {
+			continue
+		}
+		for pathIndex := candidate.boardingIndex; pathIndex < len(candidate.departure.Journey.Path); pathIndex++ {
+			pathItem := candidate.departure.Journey.Path[pathIndex]
+			if pathItem == nil {
+				continue
+			}
+			stop := runtime.stopCache[pathItem.DestinationStopRef]
+			if stop == nil {
+				continue
+			}
+			if _, exists := seenStops[stop.PrimaryIdentifier]; exists {
+				continue
+			}
+			seenStops[stop.PrimaryIdentifier] = struct{}{}
+			stops = append(stops, stop)
+		}
+	}
+	return runtime.prefetchTransfers(stops)
+}
+
+func (runtime *plannerRuntime) prefetchTransfers(stops []*ctdf.Stop) error {
+	pending := map[string]*ctdf.Stop{}
+	identifiers := make([]string, 0, len(stops))
+	for _, stop := range stops {
+		if stop == nil {
+			continue
+		}
+		if _, exists := runtime.transferCache[stop.PrimaryIdentifier]; exists {
+			continue
+		}
+		pending[stop.PrimaryIdentifier] = stop
+		identifiers = append(identifiers, stop.GetAllStopIDs()...)
+	}
+	if len(pending) == 0 {
+		return nil
+	}
+
+	stopTransfersCollection := database.GetCollection("stop_transfers")
+	ctx, cancel := runtime.searchContext()
+	defer cancel()
+	cursor, err := stopTransfersCollection.Find(ctx, bson.M{
+		"fromstopref": bson.M{"$in": identifiers},
+	}, options.Find().SetProjection(bson.D{{Key: "_id", Value: 0}}))
+	if err != nil {
+		return runtime.searchQueryError(err)
+	}
+	defer cursor.Close(ctx)
+
+	prefetched := make(map[string][]*ctdf.StopTransfer, len(pending))
+	for identifier := range pending {
+		prefetched[identifier] = nil
+	}
+	for cursor.Next(ctx) {
+		var transfer ctdf.StopTransfer
+		if err := cursor.Decode(&transfer); err != nil {
+			return err
+		}
+		fromStop := runtime.stopCache[transfer.FromStopRef]
+		if fromStop == nil {
+			continue
+		}
+		if _, exists := pending[fromStop.PrimaryIdentifier]; !exists {
+			continue
+		}
+		prefetched[fromStop.PrimaryIdentifier] = append(prefetched[fromStop.PrimaryIdentifier], &transfer)
+	}
+	if err := cursor.Err(); err != nil {
+		return runtime.searchQueryError(err)
+	}
+	for identifier, transfers := range prefetched {
+		runtime.transferCache[identifier] = transfers
+	}
+	return nil
+}
+
+func (runtime *plannerRuntime) searchContext() (context.Context, context.CancelFunc) {
+	if runtime.searchDeadline.IsZero() {
+		return context.WithCancel(context.Background())
+	}
+	return context.WithDeadline(context.Background(), runtime.searchDeadline)
+}
+
+func (runtime *plannerRuntime) searchQueryError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		runtime.timedOut = true
+		return nil
+	}
+	return err
 }
 
 // loadDepartureBoard returns a bounded departure board for a stop while caching
@@ -921,6 +1091,8 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 	if label == nil || label.stop == nil || label.arrivalTime.After(runtime.searchEndTime) {
 		return false
 	}
+	label.priorityTime = runtime.queuePriority(label)
+	label.priorityClass = runtime.queuePriorityClass(label)
 
 	key := plannerStateKey{
 		stopRef:              label.stop.PrimaryIdentifier,
@@ -955,6 +1127,31 @@ func (runtime *plannerRuntime) pushLabel(pq *plannerPriorityQueue, label *planne
 	runtime.bestArrivals[key] = arrivals
 	heap.Push(pq, label)
 	return true
+}
+
+func (runtime *plannerRuntime) queuePriorityClass(label *plannerLabel) uint8 {
+	if label != nil && label.stop != nil && runtime.destinationStop != nil && isHighCapacityStop(label.stop) && isHighCapacityStop(runtime.destinationStop) {
+		return 0
+	}
+	return 1
+}
+
+func (runtime *plannerRuntime) queuePriority(label *plannerLabel) time.Time {
+	if label == nil {
+		return time.Time{}
+	}
+	if runtime.destinationStop == nil || runtime.destinationStop.Location == nil || label.stop == nil || label.stop.Location == nil {
+		return label.arrivalTime
+	}
+	// Straight-line travel at an intentionally generous maximum speed is an
+	// admissible lower bound. The separate priority class keeps high-capacity
+	// progress ahead of local-network labels for high-capacity destinations.
+	distanceMetres := label.stop.Location.Distance(runtime.destinationStop.Location)
+	if distanceMetres <= 0 {
+		return label.arrivalTime
+	}
+	seconds := math.Ceil(distanceMetres / defaultJourneyPlanMaximumSpeedMetresPerSecond)
+	return label.arrivalTime.Add(time.Duration(seconds) * time.Second)
 }
 
 func (runtime *plannerRuntime) isCurrentLabel(label *plannerLabel) bool {
