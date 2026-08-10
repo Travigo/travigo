@@ -19,6 +19,8 @@ type departuresRequest struct {
 	PrimaryStopRef string   `json:"primaryStopRef"`
 	StopRefs       []string `json:"stopRefs"`
 	ServiceDate    string   `json:"serviceDate"`
+	NotBefore      string   `json:"notBefore,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
 }
 
 type departuresResponse struct {
@@ -41,15 +43,24 @@ func NewClient(baseURL string, httpClient *http.Client) *Client {
 }
 
 func (c *Client) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time) ([]*ctdf.Journey, error) {
+	return c.JourneysForStopWindow(ctx, stop, serviceDate, time.Time{}, 0)
+}
+
+func (c *Client) JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
 	if c == nil || c.baseURL == "" || stop == nil {
 		return nil, fmt.Errorf("departure graph client is not configured")
 	}
 
-	payload, err := json.Marshal(departuresRequest{
+	graphRequest := departuresRequest{
 		PrimaryStopRef: stop.PrimaryIdentifier,
 		StopRefs:       stop.GetAllStopIDs(),
 		ServiceDate:    serviceDate.Format(ctdf.YearMonthDayFormat),
-	})
+		Limit:          limit,
+	}
+	if !notBefore.IsZero() {
+		graphRequest.NotBefore = notBefore.Format(time.RFC3339Nano)
+	}
+	payload, err := json.Marshal(graphRequest)
 	if err != nil {
 		return nil, err
 	}

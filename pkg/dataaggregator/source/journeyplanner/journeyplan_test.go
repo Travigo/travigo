@@ -173,6 +173,56 @@ func TestExpandTransfersDefersDepartureBoardLookupUntilQueuedLabelIsExpanded(t *
 	}
 }
 
+func TestExpandTransfersOnlyPromotesHighCapacityTargets(t *testing.T) {
+	start := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	fromStop := &ctdf.Stop{PrimaryIdentifier: "origin"}
+	busStop := &ctdf.Stop{PrimaryIdentifier: "nearby-bus", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}
+	railStop := &ctdf.Stop{PrimaryIdentifier: "rail-interchange", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	destination := &ctdf.Stop{PrimaryIdentifier: "destination", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	runtime := &plannerRuntime{
+		stopCache: map[string]*ctdf.Stop{
+			busStop.PrimaryIdentifier:  busStop,
+			railStop.PrimaryIdentifier: railStop,
+		},
+		transferCache: map[string][]*ctdf.StopTransfer{
+			fromStop.PrimaryIdentifier: {
+				{FromStopRef: fromStop.PrimaryIdentifier, ToStopRef: busStop.PrimaryIdentifier, Type: ctdf.StopTransferTypeNearbyWalk, TotalDurationSeconds: 60},
+				{FromStopRef: fromStop.PrimaryIdentifier, ToStopRef: railStop.PrimaryIdentifier, Type: ctdf.StopTransferTypeNearbyWalk, TotalDurationSeconds: 120},
+			},
+		},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		bestArrivals:        map[plannerStateKey][]time.Time{},
+		resultKeys:          map[string]bool{},
+		config: plannerConfig{
+			maxVehicleLegs:      2,
+			maxTransferDistance: 1000,
+			maxLabelsPerState:   1,
+			maxRouteItems:       6,
+		},
+		searchEndTime:   start.Add(time.Hour),
+		destinationStop: destination,
+	}
+	pq := &plannerPriorityQueue{}
+	if err := runtime.expandTransfers(pq, &plannerLabel{stop: fromStop, arrivalTime: start}, destination, &ctdf.JourneyPlanResults{}); err != nil {
+		t.Fatalf("expand transfers: %v", err)
+	}
+	if pq.Len() != 2 {
+		t.Fatalf("queued transfers = %d, want 2", pq.Len())
+	}
+	for _, label := range *pq {
+		switch label.stop.PrimaryIdentifier {
+		case busStop.PrimaryIdentifier:
+			if label.preferExpansion || label.priorityClass == 0 {
+				t.Fatalf("nearby bus transfer was promoted: %+v", label)
+			}
+		case railStop.PrimaryIdentifier:
+			if !label.preferExpansion || label.priorityClass != 0 {
+				t.Fatalf("rail transfer was not promoted: %+v", label)
+			}
+		}
+	}
+}
+
 func TestExpandTransfersFindsDirectAndConnectingRoutesViaAccessRailInterchange(t *testing.T) {
 	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
 	cambridgeLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0.137, 52.194}}
@@ -474,6 +524,50 @@ func TestCoordinateOriginAccessUsesBoundedPerStopDepartureCount(t *testing.T) {
 	}
 	if requestedCount != 12 {
 		t.Fatalf("coordinate-origin board count = %d, want 12", requestedCount)
+	}
+}
+
+func TestExpandDeparturesKeepsDirectResultWhenLookupExhaustsBudget(t *testing.T) {
+	start := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	origin := &ctdf.Stop{PrimaryIdentifier: "origin"}
+	destination := &ctdf.Stop{PrimaryIdentifier: "destination"}
+	runtime := &plannerRuntime{
+		stopCache:           map[string]*ctdf.Stop{origin.PrimaryIdentifier: origin, destination.PrimaryIdentifier: destination},
+		transferCache:       map[string][]*ctdf.StopTransfer{},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		bestArrivals:        map[plannerStateKey][]time.Time{},
+		resultKeys:          map[string]bool{},
+		config: plannerConfig{
+			count:                     1,
+			maxVehicleLegs:            1,
+			originDepartureBoardCount: 1,
+			maxLabelsPerState:         1,
+		},
+		searchEndTime:   start.Add(time.Hour),
+		searchDeadline:  time.Now().Add(time.Hour),
+		destinationStop: destination,
+	}
+	runtime.departureBoardLookup = func(query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+		runtime.searchDeadline = time.Now().Add(-time.Second)
+		return []*ctdf.DepartureBoard{{
+			Time: start.Add(time.Minute),
+			Journey: &ctdf.Journey{
+				PrimaryIdentifier: "direct",
+				Path: []*ctdf.JourneyPathItem{{
+					OriginStopRef:          origin.PrimaryIdentifier,
+					DestinationStopRef:     destination.PrimaryIdentifier,
+					OriginDepartureTime:    start.Add(time.Minute),
+					DestinationArrivalTime: start.Add(30 * time.Minute),
+				}},
+			},
+		}}, nil
+	}
+	results := &ctdf.JourneyPlanResults{}
+	if err := runtime.expandDepartures(&plannerPriorityQueue{}, &plannerLabel{stop: origin, arrivalTime: start}, destination, results); err != nil {
+		t.Fatalf("expand direct departure: %v", err)
+	}
+	if len(results.JourneyPlans) != 1 {
+		t.Fatalf("direct results after exhausted lookup budget = %d, want 1", len(results.JourneyPlans))
 	}
 }
 

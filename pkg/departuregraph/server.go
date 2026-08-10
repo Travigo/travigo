@@ -62,6 +62,18 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeGraphError(w, http.StatusBadRequest, "serviceDate must use YYYY-MM-DD")
 		return
 	}
+	if request.Limit < 0 || request.Limit > 20000 {
+		writeGraphError(w, http.StatusBadRequest, "limit must be between 0 and 20000")
+		return
+	}
+	var notBefore time.Time
+	if request.NotBefore != "" {
+		notBefore, err = time.Parse(time.RFC3339Nano, request.NotBefore)
+		if err != nil {
+			writeGraphError(w, http.StatusBadRequest, "notBefore must use RFC3339")
+			return
+		}
+	}
 	primary := request.PrimaryStopRef
 	if primary == "" {
 		primary = request.StopRefs[0]
@@ -73,10 +85,10 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	journeys, err := s.graph.JourneysForStop(r.Context(), &ctdf.Stop{
+	journeys, err := s.graph.JourneysForStopWindow(r.Context(), &ctdf.Stop{
 		PrimaryIdentifier: primary,
 		OtherIdentifiers:  otherRefs,
-	}, serviceDate)
+	}, serviceDate, notBefore, request.Limit)
 	if err != nil {
 		writeGraphError(w, http.StatusServiceUnavailable, fmt.Sprintf("load departures: %v", err))
 		return

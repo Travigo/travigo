@@ -111,6 +111,81 @@ func TestGraphLazilyFillsAndMaterializesDepartureJourneys(t *testing.T) {
 	}
 }
 
+func TestGraphColdFillReturnsBeforeAsynchronousInsertionCompletes(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	graph := New(&fakeLoader{journeys: []*ctdf.Journey{testJourney()}}, Config{Enabled: true})
+	fillStarted := make(chan struct{})
+	releaseFill := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseFill) }) }
+	defer release()
+	graph.beforeApplyLazyFill = func() {
+		close(fillStarted)
+		<-releaseFill
+	}
+
+	stop := &ctdf.Stop{PrimaryIdentifier: "stop-a"}
+	journeys, err := graph.JourneysForStopWindow(context.Background(), stop, serviceDate, time.Time{}, 1)
+	if err != nil {
+		t.Fatalf("load cold graph stop: %v", err)
+	}
+	if len(journeys) != 1 {
+		t.Fatalf("cold graph journeys = %d, want 1", len(journeys))
+	}
+	select {
+	case <-fillStarted:
+	case <-time.After(time.Second):
+		t.Fatal("asynchronous graph insertion did not start")
+	}
+	if graph.current.Load().stopComplete(makeDayKey(serviceDate), stop.PrimaryIdentifier) {
+		t.Fatal("cold request waited for graph insertion to complete")
+	}
+
+	release()
+	waitForStopComplete(t, graph, stop, serviceDate)
+}
+
+func TestGraphWindowFiltersAndSortsByDepartureAtRequestedStop(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	serviceStart := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC)
+	journeyAt := func(identifier string, departureHour int) *ctdf.Journey {
+		return &ctdf.Journey{
+			PrimaryIdentifier: identifier,
+			Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
+				Type: ctdf.AvailabilityMatchAll,
+			}}},
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef:          "stop-a",
+				DestinationStopRef:     "stop-b",
+				OriginDepartureTime:    serviceStart.Add(time.Duration(departureHour) * time.Hour),
+				DestinationArrivalTime: serviceStart.Add(time.Duration(departureHour)*time.Hour + 30*time.Minute),
+			}},
+		}
+	}
+	graph := New(&fakeLoader{}, Config{Enabled: true})
+	data := graph.current.Load()
+	data.addJourneys(makeDayKey(serviceDate), []*ctdf.Journey{
+		journeyAt("journey-11", 11),
+		journeyAt("journey-09", 9),
+		journeyAt("journey-10", 10),
+	})
+	data.markStopComplete(makeDayKey(serviceDate), "stop-a")
+
+	journeys, err := graph.JourneysForStopWindow(
+		context.Background(),
+		&ctdf.Stop{PrimaryIdentifier: "stop-a"},
+		serviceDate,
+		serviceDate.Add(9*time.Hour+30*time.Minute),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("load graph window: %v", err)
+	}
+	if len(journeys) != 1 || journeys[0].PrimaryIdentifier != "journey-10" {
+		t.Fatalf("window journeys = %#v, want journey-10", journeys)
+	}
+}
+
 func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
@@ -119,6 +194,7 @@ func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	if _, err := graph.JourneysForStop(context.Background(), stop, serviceDate); err != nil {
 		t.Fatalf("fill graph: %v", err)
 	}
+	waitForStopComplete(t, graph, stop, serviceDate)
 
 	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
 	if err := graph.save(path, graph.current.Load()); err != nil {
@@ -179,6 +255,7 @@ func TestBackgroundBuildRetainsRestoredPartialGeneration(t *testing.T) {
 	if _, err := graph.JourneysForStop(context.Background(), stop, serviceDate); err != nil {
 		t.Fatalf("fill partial graph: %v", err)
 	}
+	waitForStopComplete(t, graph, stop, serviceDate)
 
 	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
 	if err := graph.save(path, graph.current.Load()); err != nil {
@@ -277,6 +354,7 @@ func TestSnapshotStatsTrackWritesAndRestore(t *testing.T) {
 	if _, err := graph.JourneysForStop(context.Background(), &ctdf.Stop{PrimaryIdentifier: "stop-a"}, serviceDate); err != nil {
 		t.Fatalf("fill graph: %v", err)
 	}
+	waitForStopComplete(t, graph, &ctdf.Stop{PrimaryIdentifier: "stop-a"}, serviceDate)
 	if err := graph.Save(); err != nil {
 		t.Fatalf("save graph: %v", err)
 	}
@@ -329,6 +407,17 @@ func testJourney() *ctdf.Journey {
 				DestinationArrivalTime: serviceStart.Add(25*time.Hour + 45*time.Minute),
 			},
 		},
+	}
+}
+
+func waitForStopComplete(t *testing.T, graph *Graph, stop *ctdf.Stop, serviceDate time.Time) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for !graph.current.Load().stopComplete(makeDayKey(serviceDate), stop.PrimaryIdentifier) {
+		if time.Now().After(deadline) {
+			t.Fatalf("graph stop %s did not complete", stop.PrimaryIdentifier)
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 

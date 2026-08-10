@@ -17,6 +17,11 @@ import (
 
 const snapshotVersion = 2
 
+const (
+	maximumPendingStopFills     = 4096
+	asyncFillInsertionBatchSize = 64
+)
+
 type stringID uint32
 type journeyID uint32
 type dayKey int32
@@ -95,7 +100,7 @@ type JourneyCounter interface {
 // Provider is the query boundary used by departure-board consumers. Graph
 // implements it in the graph service and Client implements it in web-api.
 type Provider interface {
-	JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time) ([]*ctdf.Journey, error)
+	JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error)
 }
 
 type Config struct {
@@ -167,9 +172,14 @@ type Graph struct {
 
 	current atomic.Pointer[graphData]
 	fills   singleflight.Group
+	pending sync.Map
 	metrics graphMetrics
 
-	snapshotMu sync.Mutex
+	snapshotMu          sync.Mutex
+	fillQueueMu         sync.Mutex
+	fillQueue           []*pendingStopFill
+	fillWorkerRunning   bool
+	beforeApplyLazyFill func()
 }
 
 func New(loader Loader, config Config) *Graph {
@@ -286,9 +296,23 @@ func (g *Graph) waitAfterBuild(err error, duration time.Duration) time.Duration 
 	return g.config.RefreshInterval - duration
 }
 
+type pendingStopFill struct {
+	fillKey   string
+	day       dayKey
+	canonical string
+	journeys  []*ctdf.Journey
+}
+
 func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time) ([]*ctdf.Journey, error) {
+	return g.JourneysForStopWindow(ctx, stop, serviceDate, time.Time{}, 0)
+}
+
+func (g *Graph) JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
 	if g == nil || g.loader == nil || stop == nil {
 		return nil, fmt.Errorf("departure graph is not configured")
+	}
+	if limit < 0 {
+		limit = 0
 	}
 
 	day := makeDayKey(serviceDate)
@@ -304,36 +328,110 @@ func (g *Graph) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDat
 
 	complete := data.stopComplete(day, canonical)
 	g.metrics.lookup(complete)
-	if !complete {
-		fillKey := strconv.Itoa(int(day)) + "\x00" + canonical
-		_, err, _ := g.fills.Do(fillKey, func() (any, error) {
-			active := g.current.Load()
-			if active.stopComplete(day, canonical) {
-				return nil, nil
-			}
-			started := g.metrics.beginLazyFill()
-			var fillErr error
-			defer func() { g.metrics.finishLazyFill(started, fillErr) }()
-			journeys, fillErr := g.loader.LoadStopJourneys(ctx, stopRefs, serviceDate)
-			if fillErr != nil {
-				return nil, fillErr
-			}
-			active.addJourneys(day, journeys)
-			active.markStopComplete(day, canonical)
-			log.Debug().
-				Str("stop", canonical).
-				Str("service_date", serviceDate.Format("2006-01-02")).
-				Int("journeys", len(journeys)).
-				Msg("Departure graph filled requested stop")
-			return nil, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		data = g.current.Load()
+	if complete {
+		return data.materializeStopWindow(day, stopRefs, notBefore, limit), nil
 	}
 
-	return data.materializeStop(day, stopRefs), nil
+	fillKey := strconv.Itoa(int(day)) + "\x00" + canonical
+	if pending, exists := g.pending.Load(fillKey); exists {
+		return filterJourneyWindow(pending.(*pendingStopFill).journeys, stopRefs, serviceDate, notBefore, limit), nil
+	}
+
+	value, err, _ := g.fills.Do(fillKey, func() (any, error) {
+		active := g.current.Load()
+		if active.stopComplete(day, canonical) {
+			return nil, nil
+		}
+		if pending, exists := g.pending.Load(fillKey); exists {
+			return pending, nil
+		}
+		started := g.metrics.beginLazyFill()
+		var fillErr error
+		defer func() { g.metrics.finishLazyFill(started, fillErr) }()
+		journeys, fillErr := g.loader.LoadStopJourneys(ctx, stopRefs, serviceDate)
+		if fillErr != nil {
+			return nil, fillErr
+		}
+		pending := &pendingStopFill{
+			fillKey:   fillKey,
+			day:       day,
+			canonical: canonical,
+			journeys:  journeys,
+		}
+		g.pending.Store(fillKey, pending)
+		g.enqueuePendingStopFill(pending)
+		return pending, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if value != nil {
+		return filterJourneyWindow(value.(*pendingStopFill).journeys, stopRefs, serviceDate, notBefore, limit), nil
+	}
+
+	return g.current.Load().materializeStopWindow(day, stopRefs, notBefore, limit), nil
+}
+
+func (g *Graph) enqueuePendingStopFill(pending *pendingStopFill) {
+	g.fillQueueMu.Lock()
+	if len(g.fillQueue) >= maximumPendingStopFills {
+		g.fillQueueMu.Unlock()
+		g.pending.Delete(pending.fillKey)
+		log.Warn().
+			Str("stop", pending.canonical).
+			Str("service_date", dayKeyDate(pending.day, time.UTC).Format(ctdf.YearMonthDayFormat)).
+			Msg("Departure graph asynchronous fill queue is full; skipping insertion")
+		return
+	}
+	g.fillQueue = append(g.fillQueue, pending)
+	if g.fillWorkerRunning {
+		g.fillQueueMu.Unlock()
+		return
+	}
+	g.fillWorkerRunning = true
+	g.fillQueueMu.Unlock()
+	go g.runPendingStopFills()
+}
+
+func (g *Graph) runPendingStopFills() {
+	for {
+		g.fillQueueMu.Lock()
+		if len(g.fillQueue) == 0 {
+			g.fillWorkerRunning = false
+			g.fillQueueMu.Unlock()
+			return
+		}
+		pending := g.fillQueue[0]
+		g.fillQueue[0] = nil
+		g.fillQueue = g.fillQueue[1:]
+		g.fillQueueMu.Unlock()
+
+		g.applyPendingStopFill(pending)
+	}
+}
+
+func (g *Graph) applyPendingStopFill(pending *pendingStopFill) {
+	defer g.pending.Delete(pending.fillKey)
+	if g.beforeApplyLazyFill != nil {
+		g.beforeApplyLazyFill()
+	}
+	active := g.current.Load()
+	if active.stopComplete(pending.day, pending.canonical) {
+		return
+	}
+	for start := 0; start < len(pending.journeys); start += asyncFillInsertionBatchSize {
+		end := start + asyncFillInsertionBatchSize
+		if end > len(pending.journeys) {
+			end = len(pending.journeys)
+		}
+		active.addJourneys(pending.day, pending.journeys[start:end])
+	}
+	active.markStopComplete(pending.day, pending.canonical)
+	log.Debug().
+		Str("stop", pending.canonical).
+		Str("service_date", dayKeyDate(pending.day, time.UTC).Format(ctdf.YearMonthDayFormat)).
+		Int("journeys", len(pending.journeys)).
+		Msg("Departure graph filled requested stop")
 }
 
 func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
@@ -666,33 +764,148 @@ func (d *graphData) markStopComplete(day dayKey, canonical string) {
 	d.CompleteStops[bucketKey{Day: day, StopRef: d.intern(canonical)}] = true
 }
 
+type journeyCandidate struct {
+	id               journeyID
+	departureSeconds int32
+}
+
 func (d *graphData) materializeStop(day dayKey, stopRefs []string) []*ctdf.Journey {
+	return d.materializeStopWindow(day, stopRefs, time.Time{}, 0)
+}
+
+func (d *graphData) materializeStopWindow(day dayKey, stopRefs []string, notBefore time.Time, limit int) []*ctdf.Journey {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
-	ids := make([]journeyID, 0, 64)
-	seen := map[journeyID]struct{}{}
+	stopIDs := make(map[stringID]struct{}, len(stopRefs))
 	for _, stopRef := range stopRefs {
-		stopID, exists := d.StringIDs[stopRef]
-		if !exists {
-			continue
+		if stopID, exists := d.StringIDs[stopRef]; exists {
+			stopIDs[stopID] = struct{}{}
 		}
+	}
+	threshold, hasThreshold := serviceWindowThreshold(dayKeyDate(day, notBefore.Location()), notBefore)
+	candidates := make([]journeyCandidate, 0, 64)
+	seen := map[journeyID]struct{}{}
+	for stopID := range stopIDs {
 		for _, id := range d.Departures[bucketKey{Day: day, StopRef: stopID}] {
 			if _, exists := seen[id]; exists {
 				continue
 			}
 			seen[id] = struct{}{}
-			ids = append(ids, id)
+			departureSeconds, matched := d.journeyDepartureSeconds(id, stopIDs, threshold, hasThreshold)
+			if !matched {
+				continue
+			}
+			candidates = append(candidates, journeyCandidate{id: id, departureSeconds: departureSeconds})
 		}
 	}
-	sort.Slice(ids, func(i, j int) bool {
-		return d.Journeys[ids[i]].DepartureSeconds < d.Journeys[ids[j]].DepartureSeconds
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].departureSeconds == candidates[j].departureSeconds {
+			return candidates[i].id < candidates[j].id
+		}
+		return candidates[i].departureSeconds < candidates[j].departureSeconds
 	})
-	journeys := make([]*ctdf.Journey, 0, len(ids))
-	for _, id := range ids {
-		journeys = append(journeys, d.materializeJourney(id))
+	if limit > 0 && len(candidates) > limit {
+		candidates = candidates[:limit]
+	}
+	journeys := make([]*ctdf.Journey, 0, len(candidates))
+	for _, candidate := range candidates {
+		journeys = append(journeys, d.materializeJourney(candidate.id))
 	}
 	return journeys
+}
+
+func (d *graphData) journeyDepartureSeconds(id journeyID, stopIDs map[stringID]struct{}, threshold int32, hasThreshold bool) (int32, bool) {
+	if int(id) >= len(d.Journeys) {
+		return 0, false
+	}
+	record := d.Journeys[id]
+	var earliest int32
+	matched := false
+	for index := uint32(0); index < record.PathCount; index++ {
+		path := d.Paths[record.PathStart+index]
+		if _, exists := stopIDs[path.OriginStopRef]; !exists {
+			continue
+		}
+		if hasThreshold && path.OriginDeparture < threshold {
+			continue
+		}
+		if !matched || path.OriginDeparture < earliest {
+			earliest = path.OriginDeparture
+			matched = true
+		}
+	}
+	return earliest, matched
+}
+
+type loadedJourneyCandidate struct {
+	journey          *ctdf.Journey
+	departureSeconds int32
+}
+
+func filterJourneyWindow(journeys []*ctdf.Journey, stopRefs []string, serviceDate time.Time, notBefore time.Time, limit int) []*ctdf.Journey {
+	if len(journeys) == 0 {
+		return journeys
+	}
+	requested := make(map[string]struct{}, len(stopRefs))
+	for _, stopRef := range stopRefs {
+		requested[stopRef] = struct{}{}
+	}
+	threshold, hasThreshold := serviceWindowThreshold(serviceDate, notBefore)
+	candidates := make([]loadedJourneyCandidate, 0, len(journeys))
+	for _, journey := range journeys {
+		if journey == nil {
+			continue
+		}
+		var earliest int32
+		matched := false
+		for _, path := range journey.Path {
+			if path == nil {
+				continue
+			}
+			if _, exists := requested[path.OriginStopRef]; !exists {
+				continue
+			}
+			departureSeconds := serviceSeconds(path.OriginDepartureTime)
+			if hasThreshold && departureSeconds < threshold {
+				continue
+			}
+			if !matched || departureSeconds < earliest {
+				earliest = departureSeconds
+				matched = true
+			}
+		}
+		if matched {
+			candidates = append(candidates, loadedJourneyCandidate{journey: journey, departureSeconds: earliest})
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].departureSeconds == candidates[j].departureSeconds {
+			return candidates[i].journey.PrimaryIdentifier < candidates[j].journey.PrimaryIdentifier
+		}
+		return candidates[i].departureSeconds < candidates[j].departureSeconds
+	})
+	if limit > 0 && len(candidates) > limit {
+		candidates = candidates[:limit]
+	}
+	filtered := make([]*ctdf.Journey, 0, len(candidates))
+	for _, candidate := range candidates {
+		filtered = append(filtered, candidate.journey)
+	}
+	return filtered
+}
+
+func serviceWindowThreshold(serviceDate time.Time, notBefore time.Time) (int32, bool) {
+	if notBefore.IsZero() {
+		return 0, false
+	}
+	location := notBefore.Location()
+	start := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 0, 0, 0, 0, location)
+	seconds := int64(notBefore.Sub(start) / time.Second)
+	if seconds < 0 {
+		seconds = 0
+	}
+	return int32(seconds), true
 }
 
 func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {

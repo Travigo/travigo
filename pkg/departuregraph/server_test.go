@@ -33,6 +33,19 @@ func TestClientQueriesGraphService(t *testing.T) {
 	if loader.stopLoads != 1 {
 		t.Fatalf("service stop loads = %d, want 1", loader.stopLoads)
 	}
+	journeys, err = client.JourneysForStopWindow(
+		context.Background(),
+		&ctdf.Stop{PrimaryIdentifier: "stop-a"},
+		serviceDate,
+		serviceDate.Add(25*time.Hour+6*time.Minute),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("query graph service window: %v", err)
+	}
+	if len(journeys) != 0 {
+		t.Fatalf("windowed journeys = %d, want 0", len(journeys))
+	}
 }
 
 func TestStatsEndpointReportsRequestsLookupsAndMemory(t *testing.T) {
@@ -46,6 +59,9 @@ func TestStatsEndpointReportsRequestsLookupsAndMemory(t *testing.T) {
 	for index := 0; index < 2; index++ {
 		if _, err := client.JourneysForStop(context.Background(), stop, serviceDate); err != nil {
 			t.Fatalf("query graph service: %v", err)
+		}
+		if index == 0 {
+			waitForStopComplete(t, graph, stop, serviceDate)
 		}
 	}
 	invalidRequest, err := http.NewRequest(http.MethodPost, "http://departure-graph/v1/departures", strings.NewReader(`{}`))

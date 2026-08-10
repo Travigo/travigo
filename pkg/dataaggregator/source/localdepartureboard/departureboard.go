@@ -21,6 +21,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	departureGraphCandidateMultiplier = 8
+	departureGraphMinimumCandidates   = 128
+	departureGraphMaximumCandidates   = 20000
+)
+
 func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 	q.Type = ctdf.BoardTypeDeparture
 	return s.BoardQuery(q)
@@ -146,7 +152,13 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
 		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		journeys, err := s.DepartureGraph.JourneysForStop(lookupContext, q.Stop, serviceDate)
+		journeys, err := s.DepartureGraph.JourneysForStopWindow(
+			lookupContext,
+			q.Stop,
+			serviceDate,
+			serviceDate,
+			departureGraphCandidateLimit(q.Count),
+		)
 		if err == nil {
 			return journeys
 		}
@@ -157,6 +169,17 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 			Msg("Departure graph lookup failed; falling back to scheduled journey cache")
 	}
 	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate)
+}
+
+func departureGraphCandidateLimit(count int) int {
+	limit := count * departureGraphCandidateMultiplier
+	if limit < departureGraphMinimumCandidates {
+		limit = departureGraphMinimumCandidates
+	}
+	if limit > departureGraphMaximumCandidates {
+		limit = departureGraphMaximumCandidates
+	}
+	return limit
 }
 
 func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, stopRefs []string) *ctdf.DepartureBoardRealtimeLookup {

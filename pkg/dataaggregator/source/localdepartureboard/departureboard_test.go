@@ -87,3 +87,19 @@ func TestDepartureBoardCandidateLookupUsesLazyGraph(t *testing.T) {
 		t.Fatalf("completed graph lookup journeys=%d loads=%d, want 1 and 1", len(journeys), loader.loads)
 	}
 }
+
+func TestDepartureGraphCandidateLimitOverfetchesAndBoundsResults(t *testing.T) {
+	for _, test := range []struct {
+		count int
+		want  int
+	}{
+		{count: 0, want: 128},
+		{count: 12, want: 128},
+		{count: 24, want: 192},
+		{count: 3000, want: 20000},
+	} {
+		if got := departureGraphCandidateLimit(test.count); got != test.want {
+			t.Errorf("candidate limit for count %d = %d, want %d", test.count, got, test.want)
+		}
+	}
+}

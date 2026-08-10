@@ -30,7 +30,7 @@ const (
 	defaultJourneyPlanMaxExpandedLabels           = 500
 	defaultJourneyPlanMaxRouteItems               = 10
 	defaultJourneyPlanMaxConsecutiveTransfers     = 1
-	defaultJourneyPlanMaxSearchDuration           = 8 * time.Second
+	defaultJourneyPlanMaxSearchDuration           = 16 * time.Second
 	defaultJourneyPlanWalkSpeedMetresPerSecond    = 1.3
 	defaultJourneyPlanDestinationApproachMetres   = 15000
 	defaultJourneyPlanAccessVehicleLegs           = 1
@@ -474,7 +474,7 @@ func (runtime *plannerRuntime) expandTransfers(pq *plannerPriorityQueue, current
 			vehicleLegs:          current.vehicleLegs,
 			consecutiveTransfers: current.consecutiveTransfers + 1,
 			routeItems:           appendRouteItem(current.routeItems, routeItem),
-			preferExpansion:      true,
+			preferExpansion:      isHighCapacityStop(toStop),
 		}
 		if stopMatchesStop(toStop, destinationStop) {
 			runtime.recordResult(results, nextLabel)
@@ -558,9 +558,6 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 	candidates := make([]departureCandidate, 0, len(departureBoard))
 
 	for _, departure := range departureBoard {
-		if runtime.searchExpired() {
-			return nil
-		}
 		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 {
 			continue
 		}
@@ -585,6 +582,12 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 		if reachesDestination && len(results.JourneyPlans) >= runtime.config.count {
 			return nil
 		}
+	}
+	// A cold graph lookup can finish just after the search deadline. The direct
+	// scan above is bounded by the requested board count, so retain any route it
+	// found before stopping further expansion.
+	if runtime.searchExpired() {
+		return nil
 	}
 	if err := runtime.prefetchDeparturePaths(candidates); err != nil {
 		return err
@@ -670,9 +673,6 @@ func (runtime *plannerRuntime) recordDirectDeparturesToDestination(current *plan
 	}
 
 	for _, departure := range departureBoard {
-		if runtime.searchExpired() {
-			return nil
-		}
 		if departure == nil || departure.Journey == nil || len(departure.Journey.Path) == 0 || departure.Type == ctdf.DepartureBoardRecordTypeCancelled {
 			continue
 		}
@@ -1138,10 +1138,11 @@ func (runtime *plannerRuntime) queuePriorityClass(label *plannerLabel) uint8 {
 	if label == nil || label.stop == nil {
 		return 2
 	}
-	// Always expand the requested origin, explicit transfer targets, and the end
-	// of a vehicle journey before intermediate calls. Without this distinction a
-	// stopping train can spend the whole search budget rebuilding boards at each
-	// early station while its useful terminal interchange remains in the queue.
+	// Always expand the requested origin, high-capacity transfer targets, and the
+	// end of a vehicle journey before intermediate calls. Without this
+	// distinction a stopping train can spend the whole search budget rebuilding
+	// boards at each early station while its useful terminal interchange remains
+	// in the queue.
 	if label.preferExpansion || stopMatchesStop(label.stop, runtime.destinationStop) {
 		return 0
 	}

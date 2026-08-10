@@ -61,7 +61,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	originDepartureBoardCount, err := parsePlannerIntQuery(c, "origin_departure_board_count", "96")
+	originDepartureBoardCount, err := parsePlannerIntQuery(c, "origin_departure_board_count", "24")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -85,7 +85,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	maxSearchSeconds, err := parsePlannerIntQuery(c, "max_search_seconds", "8")
+	maxSearchSeconds, err := parsePlannerIntQuery(c, "max_search_seconds", "16")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
