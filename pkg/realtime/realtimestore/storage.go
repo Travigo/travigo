@@ -300,7 +300,8 @@ func (stored *storedJourney) toCTDF() *ctdf.Journey {
 		return nil
 	}
 
-	return &ctdf.Journey{
+	path := stored.path()
+	journey := &ctdf.Journey{
 		PrimaryIdentifier:   stored.PrimaryIdentifier,
 		ServiceRef:          stored.ServiceRef,
 		Service:             stored.Service.toCTDF(),
@@ -309,8 +310,12 @@ func (stored *storedJourney) toCTDF() *ctdf.Journey {
 		DepartureTimezone:   stored.DepartureTimezone,
 		DestinationDisplay:  stored.DestinationDisplay,
 		ReplacesJourneyRefs: stored.ReplacesJourneyRefs,
-		Path:                stored.path(),
+		Path:                path,
 	}
+	if len(path) > 0 {
+		journey.DepartureTime = path[0].OriginDepartureTime
+	}
+	return journey
 }
 
 func (stored *storedJourney) path() []*ctdf.JourneyPathItem {

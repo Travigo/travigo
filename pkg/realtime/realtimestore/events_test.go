@@ -39,6 +39,35 @@ func TestRealtimeJourneyEventsDetectsNewCancellation(t *testing.T) {
 	}
 }
 
+func TestRealtimeJourneyEventsDetectsNextStopChanged(t *testing.T) {
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	previous := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "realtime-test",
+		NextStopRef:       "stop-a",
+		NextStopIndex:     1,
+	}
+	current := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "realtime-test",
+		NextStopRef:       "stop-b",
+		NextStopIndex:     2,
+	}
+
+	events := realtimeJourneyEvents(previous, current, true, now)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].Type != ctdf.EventTypeRealtimeJourneyNextStopChanged {
+		t.Fatalf("expected next-stop-changed event, got %s", events[0].Type)
+	}
+	if !events[0].Timestamp.Equal(now) {
+		t.Fatalf("expected timestamp %s, got %s", now, events[0].Timestamp)
+	}
+	body, ok := events[0].Body.(ctdf.RealtimeJourney)
+	if !ok || body.NextStopRef != current.NextStopRef || body.NextStopIndex != current.NextStopIndex {
+		t.Fatalf("unexpected next-stop event body: %#v", events[0].Body)
+	}
+}
+
 func TestRealtimeJourneyEventsDetectsCreatedJourney(t *testing.T) {
 	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
 	current := &ctdf.RealtimeJourney{

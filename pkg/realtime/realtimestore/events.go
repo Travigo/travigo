@@ -110,6 +110,20 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 		return events
 	}
 
+	if previous.NextStopRef != current.NextStopRef || previous.NextStopIndex != current.NextStopIndex {
+		log.Info().
+			Str("id", current.PrimaryIdentifier).
+			Str("previous_next_stop", previous.NextStopRef).
+			Str("next_stop", current.NextStopRef).
+			Msg("RealtimeJourney next stop changed")
+
+		events = append(events, ctdf.Event{
+			Type:      ctdf.EventTypeRealtimeJourneyNextStopChanged,
+			Timestamp: timestamp,
+			Body:      *current,
+		})
+	}
+
 	for id, currentStop := range current.Stops {
 		if currentStop == nil || currentStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 			continue

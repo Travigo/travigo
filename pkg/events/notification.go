@@ -67,6 +67,33 @@ func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
 		} else {
 			eventNotificationData.Message = fmt.Sprintf("A journey has been replaced by %s.", replacementRef)
 		}
+	case ctdf.EventTypeRealtimeJourneyNextStopChanged:
+		eventNotificationData.Title = "Next stop changed"
+
+		journey, _ := eventBody["Journey"].(map[string]interface{})
+		destination, _ := journey["DestinationDisplay"].(string)
+		nextStopRef, _ := eventBody["NextStopRef"].(string)
+		nextStopName := nextStopRef
+		if nextStop, ok := eventBody["NextStop"].(map[string]interface{}); ok {
+			if primaryName, ok := nextStop["PrimaryName"].(string); ok && primaryName != "" {
+				nextStopName = primaryName
+			}
+		}
+		if nextStopName == nextStopRef && nextStopRef != "" {
+			stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: nextStopRef})
+			if err != nil {
+				log.Error().Err(err).Str("stop", nextStopRef).Msg("Failed to lookup next stop")
+			}
+			if stop != nil {
+				nextStopName = stop.PrimaryName
+			}
+		}
+
+		if nextStopName == "" {
+			eventNotificationData.Message = fmt.Sprintf("The service to %s has no further stops.", destination)
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("The service to %s is now heading to %s.", destination, nextStopName)
+		}
 	case ctdf.EventTypeRealtimeJourneyPlatformSet, ctdf.EventTypeRealtimeJourneyPlatformChanged:
 		eventNotificationData.Title = "Platform Update"
 
