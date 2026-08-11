@@ -12,6 +12,7 @@ import (
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type ServiceAlertsWatch struct {
@@ -35,11 +36,17 @@ func (w *ServiceAlertsWatch) Run() {
 	matchPipeline := bson.D{
 		{
 			Key: "$match", Value: bson.D{
-				{Key: "operationType", Value: "insert"},
+				{Key: "operationType", Value: bson.D{
+					{Key: "$in", Value: bson.A{"insert", "update", "replace"}},
+				}},
 			},
 		},
 	}
-	stream, err := collection.Watch(context.Background(), mongo.Pipeline{matchPipeline})
+	stream, err := collection.Watch(
+		context.Background(),
+		mongo.Pipeline{matchPipeline},
+		options.ChangeStream().SetFullDocument(options.UpdateLookup),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -56,11 +63,12 @@ func (w *ServiceAlertsWatch) Run() {
 			continue
 		}
 
-		if data.OperationType != "insert" {
+		if data.FullDocument == nil {
+			log.Warn().Str("operation", data.OperationType).Msg("ServiceAlert change had no full document")
 			continue
 		}
 
-		log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Msg("New ServiceAlert inserted")
+		log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Str("operation", data.OperationType).Msg("ServiceAlert changed")
 
 		eventBytes, _ := json.Marshal(ctdf.Event{
 			Type:      ctdf.EventTypeServiceAlertCreated,

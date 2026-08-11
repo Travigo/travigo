@@ -87,6 +87,57 @@ func TestGetNotificationDataServiceAlertNormalisesConfiguredJourneyIdentifier(t 
 	}
 }
 
+func TestGetNotificationDataRealtimeJourneyLifecycle(t *testing.T) {
+	tests := []struct {
+		eventType ctdf.EventType
+		body      map[string]interface{}
+		title     string
+		message   string
+	}{
+		{
+			eventType: ctdf.EventTypeRealtimeJourneyCreated,
+			body: map[string]interface{}{
+				"Journey": map[string]interface{}{"DestinationDisplay": "London"},
+			},
+			title:   "Journey created",
+			message: "Live data is now available for the service to London.",
+		},
+		{
+			eventType: ctdf.EventTypeRealtimeJourneyActivelyTracked,
+			body: map[string]interface{}{
+				"Journey": map[string]interface{}{"DestinationDisplay": "London"},
+			},
+			title:   "Live tracking started",
+			message: "Live tracking has started for the service to London.",
+		},
+		{
+			eventType: ctdf.EventTypeRealtimeJourneyLocationTextChanged,
+			body: map[string]interface{}{
+				"Journey":                    map[string]interface{}{"DestinationDisplay": "London"},
+				"VehicleLocationDescription": "Approaching Cambridge",
+			},
+			title:   "Location changed",
+			message: "The service to London is now at Approaching Cambridge.",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.eventType), func(t *testing.T) {
+			data := GetNotificationData(&ctdf.Event{
+				Type: test.eventType,
+				Body: test.body,
+			}, ctdf.UserNotificationSubscription{})
+
+			if data.Title != test.title {
+				t.Fatalf("notification title = %q, want %q", data.Title, test.title)
+			}
+			if data.Message != test.message {
+				t.Fatalf("notification message = %q, want %q", data.Message, test.message)
+			}
+		})
+	}
+}
+
 func TestGetNotificationDataNextStopChanged(t *testing.T) {
 	bodyBytes, err := json.Marshal(ctdf.RealtimeJourney{
 		Journey:     &ctdf.Journey{DestinationDisplay: "London"},

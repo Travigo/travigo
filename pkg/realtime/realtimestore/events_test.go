@@ -96,6 +96,56 @@ func TestRealtimeJourneyEventsDetectsCreatedJourney(t *testing.T) {
 	}
 }
 
+func TestRealtimeJourneyEventsDetectsActivelyTracked(t *testing.T) {
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	previous := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "realtime-test",
+		ActivelyTracked:   false,
+	}
+	current := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: "realtime-test",
+		ActivelyTracked:   true,
+	}
+
+	events := realtimeJourneyEvents(previous, current, true, now)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].Type != ctdf.EventTypeRealtimeJourneyActivelyTracked {
+		t.Fatalf("expected actively-tracked event, got %s", events[0].Type)
+	}
+	if !events[0].Timestamp.Equal(now) {
+		t.Fatalf("expected timestamp %s, got %s", now, events[0].Timestamp)
+	}
+}
+
+func TestRealtimeJourneyEventsDetectsLocationTextChanged(t *testing.T) {
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	previous := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:          "realtime-test",
+		VehicleLocationDescription: "Approaching Cambridge",
+	}
+	current := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:          "realtime-test",
+		VehicleLocationDescription: "At Cambridge",
+	}
+
+	events := realtimeJourneyEvents(previous, current, true, now)
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+	if events[0].Type != ctdf.EventTypeRealtimeJourneyLocationTextChanged {
+		t.Fatalf("expected location-text-changed event, got %s", events[0].Type)
+	}
+	if !events[0].Timestamp.Equal(now) {
+		t.Fatalf("expected timestamp %s, got %s", now, events[0].Timestamp)
+	}
+	body, ok := events[0].Body.(ctdf.RealtimeJourney)
+	if !ok || body.VehicleLocationDescription != current.VehicleLocationDescription {
+		t.Fatalf("unexpected location-text event body: %#v", events[0].Body)
+	}
+}
+
 func TestRealtimeJourneyEventsDetectsOverlayCreated(t *testing.T) {
 	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
 	current := &ctdf.RealtimeJourney{

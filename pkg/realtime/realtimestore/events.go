@@ -110,6 +110,24 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 		return events
 	}
 
+	if !previous.ActivelyTracked && current.ActivelyTracked {
+		log.Info().Str("id", current.PrimaryIdentifier).Msg("RealtimeJourney is now actively tracked")
+		events = append(events, ctdf.Event{
+			Type:      ctdf.EventTypeRealtimeJourneyActivelyTracked,
+			Timestamp: timestamp,
+			Body:      *current,
+		})
+	}
+
+	if previous.VehicleLocationDescription != current.VehicleLocationDescription {
+		log.Info().Str("id", current.PrimaryIdentifier).Msg("RealtimeJourney location description changed")
+		events = append(events, ctdf.Event{
+			Type:      ctdf.EventTypeRealtimeJourneyLocationTextChanged,
+			Timestamp: timestamp,
+			Body:      *current,
+		})
+	}
+
 	if previous.NextStopRef != current.NextStopRef || previous.NextStopIndex != current.NextStopIndex {
 		log.Info().
 			Str("id", current.PrimaryIdentifier).

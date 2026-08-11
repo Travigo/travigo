@@ -81,6 +81,12 @@ func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificati
 	return identifier
 }
 
+func realtimeJourneyDestination(eventBody map[string]interface{}) string {
+	journey, _ := eventBody["Journey"].(map[string]interface{})
+	destination, _ := journey["DestinationDisplay"].(string)
+	return destination
+}
+
 func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificationSubscription) ctdf.EventNotificationData {
 	eventNotificationData := ctdf.EventNotificationData{}
 
@@ -102,6 +108,37 @@ func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificatio
 		title := eventBody["Title"].(string)
 		if title != "" {
 			eventNotificationData.Title = title
+		}
+	case ctdf.EventTypeRealtimeJourneyCreated:
+		eventNotificationData.Title = "Journey created"
+		destination := realtimeJourneyDestination(eventBody)
+		if destination == "" {
+			eventNotificationData.Message = "Live data is now available for this journey."
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("Live data is now available for the service to %s.", destination)
+		}
+	case ctdf.EventTypeRealtimeJourneyActivelyTracked:
+		eventNotificationData.Title = "Live tracking started"
+		destination := realtimeJourneyDestination(eventBody)
+		if destination == "" {
+			eventNotificationData.Message = "Live tracking has started for this journey."
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("Live tracking has started for the service to %s.", destination)
+		}
+	case ctdf.EventTypeRealtimeJourneyLocationTextChanged:
+		eventNotificationData.Title = "Location changed"
+		destination := realtimeJourneyDestination(eventBody)
+		locationDescription, _ := eventBody["VehicleLocationDescription"].(string)
+		if locationDescription == "" {
+			if destination == "" {
+				eventNotificationData.Message = "The live location description for this journey was cleared."
+			} else {
+				eventNotificationData.Message = fmt.Sprintf("The live location description for the service to %s was cleared.", destination)
+			}
+		} else if destination == "" {
+			eventNotificationData.Message = fmt.Sprintf("The journey is now at %s.", locationDescription)
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("The service to %s is now at %s.", destination, locationDescription)
 		}
 	case ctdf.EventTypeRealtimeJourneyCancelled:
 		eventNotificationData.Title = "Journey cancelled"
