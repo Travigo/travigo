@@ -644,7 +644,7 @@ func (runtime *plannerRuntime) expandDepartures(pq *plannerPriorityQueue, curren
 				arrivalTime:     arrivalTime,
 				vehicleLegs:     current.vehicleLegs + 1,
 				routeItems:      appendRouteItem(current.routeItems, routeItem),
-				preferExpansion: pathIndex == lastPathIndex,
+				preferExpansion: pathIndex == lastPathIndex && isHighCapacityStop(toStop),
 			}
 			if stopMatchesStop(toStop, destinationStop) {
 				runtime.recordResult(results, nextLabel)

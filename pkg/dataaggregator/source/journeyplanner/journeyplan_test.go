@@ -571,6 +571,78 @@ func TestExpandDeparturesKeepsDirectResultWhenLookupExhaustsBudget(t *testing.T)
 	}
 }
 
+func TestExpandDeparturesOnlyPromotesHighCapacityJourneyTerminals(t *testing.T) {
+	start := time.Date(2026, 8, 10, 10, 0, 0, 0, time.UTC)
+	origin := &ctdf.Stop{PrimaryIdentifier: "origin", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}
+	busTerminal := &ctdf.Stop{PrimaryIdentifier: "bus-terminal", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeBus}}
+	railTerminal := &ctdf.Stop{PrimaryIdentifier: "rail-terminal", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	destination := &ctdf.Stop{PrimaryIdentifier: "destination", TransportTypes: []ctdf.TransportType{ctdf.TransportTypeRail}}
+	runtime := &plannerRuntime{
+		stopCache: map[string]*ctdf.Stop{
+			origin.PrimaryIdentifier:       origin,
+			busTerminal.PrimaryIdentifier:  busTerminal,
+			railTerminal.PrimaryIdentifier: railTerminal,
+			destination.PrimaryIdentifier:  destination,
+		},
+		transferCache: map[string][]*ctdf.StopTransfer{
+			busTerminal.PrimaryIdentifier:  {},
+			railTerminal.PrimaryIdentifier: {},
+		},
+		departureBoardCache: map[string]cachedDepartureBoard{},
+		bestArrivals:        map[plannerStateKey][]time.Time{},
+		resultKeys:          map[string]bool{},
+		config: plannerConfig{
+			count:                     1,
+			maxVehicleLegs:            2,
+			originDepartureBoardCount: 2,
+			maxLabelsPerState:         1,
+		},
+		searchEndTime:   start.Add(time.Hour),
+		searchDeadline:  time.Now().Add(time.Hour),
+		destinationStop: destination,
+	}
+	runtime.departureBoardLookup = func(query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+		journeyTo := func(identifier string, terminal *ctdf.Stop, offset time.Duration) *ctdf.DepartureBoard {
+			return &ctdf.DepartureBoard{
+				Time: start.Add(offset),
+				Journey: &ctdf.Journey{
+					PrimaryIdentifier: identifier,
+					Path: []*ctdf.JourneyPathItem{{
+						OriginStopRef:          origin.PrimaryIdentifier,
+						DestinationStopRef:     terminal.PrimaryIdentifier,
+						OriginDepartureTime:    start.Add(offset),
+						DestinationArrivalTime: start.Add(offset + 10*time.Minute),
+					}},
+				},
+			}
+		}
+		return []*ctdf.DepartureBoard{
+			journeyTo("local-bus", busTerminal, time.Minute),
+			journeyTo("rail-access", railTerminal, 2*time.Minute),
+		}, nil
+	}
+
+	pq := &plannerPriorityQueue{}
+	if err := runtime.expandDepartures(pq, &plannerLabel{stop: origin, arrivalTime: start}, destination, &ctdf.JourneyPlanResults{}); err != nil {
+		t.Fatalf("expand departures: %v", err)
+	}
+	if pq.Len() != 2 {
+		t.Fatalf("queued journey terminals = %d, want 2", pq.Len())
+	}
+	for _, label := range *pq {
+		switch label.stop.PrimaryIdentifier {
+		case busTerminal.PrimaryIdentifier:
+			if label.preferExpansion || label.priorityClass == 0 {
+				t.Fatalf("local bus terminal was promoted: %+v", label)
+			}
+		case railTerminal.PrimaryIdentifier:
+			if !label.preferExpansion || label.priorityClass != 0 {
+				t.Fatalf("rail terminal was not promoted: %+v", label)
+			}
+		}
+	}
+}
+
 func TestPlannerPrioritizesCambridgeRailConnectionToSheffieldOverLocalLabels(t *testing.T) {
 	start := time.Date(2026, 8, 10, 16, 30, 0, 0, time.UTC)
 	cambridgeLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0.137, 52.194}}
