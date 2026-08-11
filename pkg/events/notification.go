@@ -12,28 +12,92 @@ import (
 	"github.com/travigo/travigo/pkg/util"
 )
 
-func GetNotificationData(e *ctdf.Event) ctdf.EventNotificationData {
+func matchingServiceAlertIdentifier(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) string {
+	for _, reference := range []string{values.StopRef, values.ServiceRef, values.JourneyRef} {
+		if reference == "" {
+			continue
+		}
+
+		for _, value := range matchedIdentifiers {
+			identifier, ok := value.(string)
+			if !ok {
+				continue
+			}
+
+			if identifier == reference {
+				return identifier
+			}
+			if reference == values.JourneyRef && strings.HasPrefix(identifier, "DAYINSTANCEOF:") && strings.HasSuffix(identifier, ":"+reference) {
+				parts := strings.SplitN(identifier, ":", 3)
+				if len(parts) == 3 {
+					return parts[2]
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificationSubscriptionValues) string {
+	if identifier == values.StopRef && identifier != "" {
+		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: identifier})
+		if err != nil {
+			log.Error().Err(err).Str("stop", identifier).Msg("Failed to lookup service alert stop")
+		}
+		if stop != nil && stop.PrimaryName != "" {
+			return stop.PrimaryName
+		}
+	}
+
+	if identifier == values.ServiceRef && identifier != "" {
+		service, err := dataaggregator.Lookup[*ctdf.Service](query.Service{PrimaryIdentifier: identifier})
+		if err != nil {
+			log.Error().Err(err).Str("service", identifier).Msg("Failed to lookup service alert service")
+		}
+		if service != nil && service.ServiceName != "" {
+			return service.ServiceName
+		}
+	}
+
+	if identifier == values.JourneyRef && identifier != "" {
+		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: identifier})
+		if err != nil {
+			log.Error().Err(err).Str("journey", identifier).Msg("Failed to lookup service alert journey")
+		}
+		if journey != nil {
+			if journey.OriginDisplay != "" && journey.DestinationDisplay != "" {
+				return fmt.Sprintf("%s → %s", journey.OriginDisplay, journey.DestinationDisplay)
+			}
+			if journey.DestinationDisplay != "" {
+				return fmt.Sprintf("Journey to %s", journey.DestinationDisplay)
+			}
+			if journey.OriginDisplay != "" {
+				return journey.OriginDisplay
+			}
+		}
+	}
+
+	return identifier
+}
+
+func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificationSubscription) ctdf.EventNotificationData {
 	eventNotificationData := ctdf.EventNotificationData{}
 
 	eventBody := e.Body.(map[string]interface{})
 
 	switch e.Type {
 	case ctdf.EventTypeServiceAlertCreated:
-		matchedIdentifiers := eventBody["MatchedIdentifiers"].([]interface{})
-		matchedIdentifiersStrings := make([]string, len(matchedIdentifiers))
-		for i, identifier := range matchedIdentifiers {
-			identifierString := identifier.(string)
-			identifierStringSplit := strings.Split(identifierString, ":")
-			if identifierStringSplit[0] == "DAYINSTANCEOF" {
-				identifierString = strings.Join(identifierStringSplit[2:], ":")
-			}
-			matchedIdentifiersStrings[i] = identifierString
-		}
-
-		alertScope := strings.Join(matchedIdentifiersStrings, ", ") // TODO needs to work out actual name
+		matchedIdentifiers, _ := eventBody["MatchedIdentifiers"].([]interface{})
+		alertScope := matchingServiceAlertIdentifier(matchedIdentifiers, notificationMatcher.Values)
+		alertScope = serviceAlertIdentifierDisplay(alertScope, notificationMatcher.Values)
 
 		eventNotificationData.Title = strings.Join(util.CamelCaseSplit(eventBody["AlertType"].(string)), " ")
-		eventNotificationData.Message = fmt.Sprintf("%s\n%s", alertScope, eventBody["Text"].(string))
+		if alertScope == "" {
+			eventNotificationData.Message = eventBody["Text"].(string)
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("%s\n%s", alertScope, eventBody["Text"].(string))
+		}
 
 		title := eventBody["Title"].(string)
 		if title != "" {

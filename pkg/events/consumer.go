@@ -62,7 +62,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 
 			// If expression matches to true then send the notification
 			if output == true {
-				notificationData := GetNotificationData(&event)
+				notificationData := GetNotificationData(&event, userEventSubscription)
 
 				notification := ctdf.Notification{
 					TargetUser: userEventSubscription.UserID,
