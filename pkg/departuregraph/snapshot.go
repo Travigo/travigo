@@ -55,6 +55,11 @@ func (g *Graph) Save() error {
 func (g *Graph) saveTracked(path string, data *graphData) error {
 	g.snapshotMu.Lock()
 	defer g.snapshotMu.Unlock()
+	complete := data != nil && data.snapshotComplete()
+	if !complete && g.completeSnapshot.Load() {
+		log.Info().Str("path", path).Msg("Departure graph incomplete checkpoint skipped to preserve complete snapshot")
+		return nil
+	}
 	started := g.metrics.snapshot.beginWrite()
 	err := g.save(path, data)
 	var size int64
@@ -62,6 +67,9 @@ func (g *Graph) saveTracked(path string, data *graphData) error {
 		size = info.Size()
 	}
 	g.metrics.snapshot.finishWrite(started, size, err)
+	if err == nil && complete {
+		g.completeSnapshot.Store(true)
+	}
 	return err
 }
 
@@ -261,7 +269,7 @@ func (g *Graph) restore(path string) error {
 		}
 	}
 	restored.buildStopIndexByStringIDLocked()
-	if !restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalJourneyOffsets) != len(restored.Stops)+1 {
+	if len(restored.CompleteDays) > 0 && (!restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalJourneyOffsets) != len(restored.Stops)+1) {
 		restored.buildStaticRoutingIndexesLocked()
 	}
 	for key := range restored.CompleteStops {
@@ -277,6 +285,9 @@ func (g *Graph) restore(path string) error {
 	}
 
 	g.current.Store(restored)
+	if restored.snapshotComplete() {
+		g.completeSnapshot.Store(true)
+	}
 
 	stats := restored.stats()
 	log.Info().

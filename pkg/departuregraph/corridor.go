@@ -33,7 +33,7 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 	d.corridors = nil
 	d.corridorClock = 0
 	d.corridorMu.Unlock()
-	if !d.TopologyReady || len(d.Stops) == 0 || len(d.TransferOffsets) != len(d.Stops)+1 || len(d.StopIndexByStringID) == 0 {
+	if !d.TopologyReady || len(d.CompleteDays) == 0 || len(d.Stops) == 0 || len(d.TransferOffsets) != len(d.Stops)+1 || len(d.StopIndexByStringID) == 0 {
 		return
 	}
 

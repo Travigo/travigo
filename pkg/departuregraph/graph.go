@@ -203,6 +203,7 @@ type Graph struct {
 	metrics graphMetrics
 
 	snapshotMu          sync.Mutex
+	completeSnapshot    atomic.Bool
 	fillQueueMu         sync.Mutex
 	fillQueue           []*pendingStopFill
 	fillWorkerRunning   bool
@@ -597,6 +598,12 @@ func (d *graphData) hasCompleteDays() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return len(d.CompleteDays) > 0
+}
+
+func (d *graphData) snapshotComplete() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.TopologyReady && d.StaticRoutingReady && len(d.CompleteDays) > 0
 }
 
 func (d *graphData) scanState(dates []time.Time) (configured bool, matching bool, cursor string, processed int64, active int64) {

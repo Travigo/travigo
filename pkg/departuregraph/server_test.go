@@ -132,6 +132,35 @@ func TestClientReturnsServiceErrors(t *testing.T) {
 	}
 }
 
+func TestLiveEndpointIsIndependentFromGraphReadiness(t *testing.T) {
+	graph := New(&fakeLoader{}, Config{Enabled: true})
+	handler := NewServer(graph).Handler()
+
+	live := httptest.NewRecorder()
+	handler.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/livez", nil))
+	if live.Code != http.StatusOK {
+		t.Fatalf("live status = %d, want 200", live.Code)
+	}
+
+	health := httptest.NewRecorder()
+	handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if health.Code != http.StatusServiceUnavailable {
+		t.Fatalf("building health status = %d, want 503", health.Code)
+	}
+
+	data := graph.current.Load()
+	data.mu.Lock()
+	data.TopologyReady = true
+	data.StaticRoutingReady = true
+	data.CompleteDays[makeDayKey(time.Now())] = true
+	data.mu.Unlock()
+	health = httptest.NewRecorder()
+	handler.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if health.Code != http.StatusOK {
+		t.Fatalf("ready health status = %d, want 200", health.Code)
+	}
+}
+
 type handlerTransport struct {
 	handler http.Handler
 }

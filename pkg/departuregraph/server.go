@@ -26,11 +26,16 @@ func NewServer(graph *Graph) *Server {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /livez", s.handleLive)
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/stats", s.handleStats)
 	mux.HandleFunc("POST "+departuresPath, s.handleDepartures)
 	mux.HandleFunc("POST "+plansPath, s.handlePlans)
 	return mux
+}
+
+func (s *Server) handleLive(w http.ResponseWriter, _ *http.Request) {
+	writeGraphJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {

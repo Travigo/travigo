@@ -110,4 +110,7 @@ atomic snapshot creation on a newly provisioned volume.
   and cgroup usage/limit when those kernel files are available.
 
 The endpoint calculates metrics from counters and current runtime state; it does
-not traverse the graph. `GET /healthz` remains the lightweight probe endpoint.
+not traverse the graph. `GET /livez` reports that the service process is alive
+and is used for startup and liveness probes. `GET /healthz` reports graph
+readiness and returns 503 while topology, timetable, or static routing indexes
+are still being built.

@@ -1,8 +1,10 @@
 package departuregraph
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -457,6 +459,40 @@ func TestSnapshotStatsTrackWritesAndRestore(t *testing.T) {
 	restoreStats := restored.Stats().Snapshot
 	if restoreStats.RestoredAt == nil || restoreStats.FileSizeBytes != written.FileSizeBytes || restoreStats.LastRestoreError != "" {
 		t.Fatalf("unexpected snapshot restore stats: %#v", restoreStats)
+	}
+}
+
+func TestIncompleteCheckpointDoesNotReplaceCompleteSnapshot(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
+	graph := New(&fakeLoader{}, Config{Enabled: true, SnapshotPath: path})
+	complete := graph.current.Load()
+	complete.mu.Lock()
+	complete.TopologyReady = true
+	complete.StaticRoutingReady = true
+	complete.CompleteDays[makeDayKey(time.Now())] = true
+	complete.mu.Unlock()
+	if err := graph.Save(); err != nil {
+		t.Fatalf("save complete graph: %v", err)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read complete snapshot: %v", err)
+	}
+
+	graph.current.Store(newGraphData())
+	if err := graph.Save(); err != nil {
+		t.Fatalf("skip incomplete graph: %v", err)
+	}
+	remaining, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read preserved snapshot: %v", err)
+	}
+	if !bytes.Equal(remaining, written) {
+		t.Fatal("incomplete checkpoint replaced the complete snapshot")
+	}
+	stats := graph.Stats().Snapshot
+	if stats.SuccessfulWrites != 1 || stats.FailedWrites != 0 {
+		t.Fatalf("skipped checkpoint changed snapshot metrics: %#v", stats)
 	}
 }
 
