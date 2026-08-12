@@ -66,6 +66,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	d.ensureBuildIndexesLocked()
 	d.Stops = nil
 	d.StopIdentifiers = nil
+	d.StopIndexByStringID = nil
 	d.StopGrid = map[spatialCell][]uint32{}
 	d.StopAliasOffsets = nil
 	d.StopAliases = nil
@@ -169,6 +170,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		d.StopIdentifiers = append(d.StopIdentifiers, stopIdentifierRecord{Identifier: d.StopIDs[identifier], Stop: stop})
 	}
 	sort.Slice(d.StopIdentifiers, func(i, j int) bool { return d.StopIdentifiers[i].Identifier < d.StopIdentifiers[j].Identifier })
+	d.buildStopIndexByStringIDLocked()
 	d.TransferOffsets = make([]uint32, len(d.Stops)+1)
 	d.StopAliasOffsets = make([]uint32, len(d.Stops)+1)
 	for stopIndex, aliases := range stopAliases {
@@ -219,6 +221,26 @@ func (d *graphData) stopIndex(identifier string) (uint32, bool) {
 		return 0, false
 	}
 	return d.StopIdentifiers[index].Stop, true
+}
+
+func (d *graphData) stopIndexForStringID(identifier stringID) (uint32, bool) {
+	if int(identifier) >= len(d.StopIndexByStringID) {
+		return 0, false
+	}
+	stop := d.StopIndexByStringID[identifier]
+	return stop, stop != math.MaxUint32
+}
+
+func (d *graphData) buildStopIndexByStringIDLocked() {
+	d.StopIndexByStringID = make([]uint32, len(d.Strings))
+	for index := range d.StopIndexByStringID {
+		d.StopIndexByStringID[index] = math.MaxUint32
+	}
+	for _, identifier := range d.StopIdentifiers {
+		if int(identifier.Identifier) < len(d.StopIndexByStringID) {
+			d.StopIndexByStringID[identifier.Identifier] = identifier.Stop
+		}
+	}
 }
 
 func cellForCoordinates(longitude, latitude float64) spatialCell {

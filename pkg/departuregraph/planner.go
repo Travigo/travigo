@@ -388,7 +388,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState]time
 		var departure time.Time
 		for index := uint32(0); index < record.PathCount; index++ {
 			path := d.Paths[record.PathStart+index]
-			stop, exists := d.stopIndex(d.stringValue(path.OriginStopRef))
+			stop, exists := d.stopIndexForStringID(path.OriginStopRef)
 			if !exists || stop != current.stop || path.OriginActivity == activitySetdown {
 				continue
 			}
@@ -408,7 +408,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState]time
 			if path.DestinationActivity == activityPickup {
 				continue
 			}
-			stop, exists := d.stopIndex(d.stringValue(path.DestinationStopRef))
+			stop, exists := d.stopIndexForStringID(path.DestinationStopRef)
 			if !exists {
 				continue
 			}

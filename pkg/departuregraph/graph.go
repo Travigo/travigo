@@ -75,6 +75,7 @@ type graphData struct {
 	StringIDs            map[string]stringID
 	StopIDs              map[string]stringID
 	StopIdentifiers      []stopIdentifierRecord
+	StopIndexByStringID  []uint32
 	Stops                []stopRecord
 	StopAliasOffsets     []uint32
 	StopAliases          []stringID

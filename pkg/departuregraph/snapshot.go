@@ -245,6 +245,7 @@ func (g *Graph) restore(path string) error {
 			restored.StopIDs[value] = identifier.Identifier
 		}
 	}
+	restored.buildStopIndexByStringIDLocked()
 	for key := range restored.CompleteStops {
 		if value := restored.stringValue(key.StopRef); value != "" {
 			restored.StopIDs[value] = key.StopRef
