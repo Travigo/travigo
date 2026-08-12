@@ -15,10 +15,10 @@ import (
 const (
 	defaultPlanCount             = 5
 	defaultPlanMaxChanges        = 3
-	defaultPlanDuration          = 6 * time.Hour
+	defaultPlanDuration          = 12 * time.Hour
 	defaultPlanTransferDistance  = 1000
 	defaultPlanOriginStops       = 12
-	defaultPlanExpandedLabels    = 100000
+	defaultPlanExpandedLabels    = 200000
 	defaultPlanSearchDuration    = 10 * time.Second
 	planWalkSpeedMetresPerSecond = 1.3
 )
@@ -115,6 +115,7 @@ func (q *planQueue) Pop() any {
 type planState struct {
 	stop        uint32
 	vehicleLegs int
+	transferred bool
 }
 
 func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, error) {
@@ -143,12 +144,12 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 
 	queue := &planQueue{}
 	heap.Init(queue)
-	best := map[planState][]time.Time{}
+	best := map[planState]time.Time{}
 	originRef := "coordinate-origin"
 	if len(request.OriginRefs) > 0 {
 		originRef = request.OriginRefs[0]
 		for node := range data.resolveStopSet(request.OriginRefs) {
-			pushPlanLabel(queue, best, config.count, &planLabel{stop: node, arrival: request.StartDateTime})
+			pushPlanLabel(queue, best, &planLabel{stop: node, arrival: request.StartDateTime})
 		}
 	} else if request.OriginLocation != nil {
 		nearbyStops := data.nearbyStops(*request.OriginLocation, config.maxTransferDistance, config.originStops)
@@ -169,7 +170,7 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		for _, nearby := range nearbyStops {
 			duration := int(math.Ceil(nearby.distance / planWalkSpeedMetresPerSecond))
 			arrival := request.StartDateTime.Add(time.Duration(duration) * time.Second)
-			pushPlanLabel(queue, best, config.count, &planLabel{
+			pushPlanLabel(queue, best, &planLabel{
 				stop:    nearby.stop,
 				arrival: arrival,
 				route: appendPlanLeg(nil, PlanLeg{
@@ -327,7 +328,7 @@ func distanceMetres(lon1, lat1, lon2, lat2 float64) float64 {
 	return 2 * radius * math.Asin(math.Sqrt(a))
 }
 
-func (d *graphData) expandPlanTransfers(queue *planQueue, best map[planState][]time.Time, config planConfig, current *planLabel, searchEnd time.Time) {
+func (d *graphData) expandPlanTransfers(queue *planQueue, best map[planState]time.Time, config planConfig, current *planLabel, searchEnd time.Time) {
 	// Stop-transfer records model a single access, egress or interchange walk;
 	// they are not a pedestrian street network. Chaining them creates fake
 	// all-walking routes through sequences of nearby public-transport stops.
@@ -344,7 +345,7 @@ func (d *graphData) expandPlanTransfers(queue *planQueue, best map[planState][]t
 		if arrival.After(searchEnd) {
 			continue
 		}
-		pushPlanLabel(queue, best, config.count, &planLabel{stop: transfer.ToStop, arrival: arrival, vehicleLegs: current.vehicleLegs, route: appendPlanLeg(current.route, PlanLeg{
+		pushPlanLabel(queue, best, &planLabel{stop: transfer.ToStop, arrival: arrival, vehicleLegs: current.vehicleLegs, route: appendPlanLeg(current.route, PlanLeg{
 			Type:               ctdf.JourneyPlanRouteItemTypeTransfer,
 			TransferType:       unpackTransferType(transfer.Type),
 			OriginStopRef:      d.stringValue(d.Stops[current.stop].PrimaryRef),
@@ -355,7 +356,7 @@ func (d *graphData) expandPlanTransfers(queue *planQueue, best map[planState][]t
 	}
 }
 
-func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]time.Time, config planConfig, current *planLabel, searchEnd time.Time) {
+func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState]time.Time, config planConfig, current *planLabel, searchEnd time.Time) {
 	journeys := map[journeyDayKey]struct{}{}
 	for dayOffset := 0; dayOffset <= 1; dayOffset++ {
 		date := current.arrival.AddDate(0, 0, dayOffset)
@@ -418,7 +419,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]ti
 			if arrival.After(searchEnd) {
 				break
 			}
-			pushPlanLabel(queue, best, config.count, &planLabel{stop: stop, arrival: arrival, vehicleLegs: current.vehicleLegs + 1, route: appendPlanLeg(current.route, PlanLeg{
+			pushPlanLabel(queue, best, &planLabel{stop: stop, arrival: arrival, vehicleLegs: current.vehicleLegs + 1, route: appendPlanLeg(current.route, PlanLeg{
 				Type:               ctdf.JourneyPlanRouteItemTypeJourney,
 				JourneyRef:         journeyRef,
 				OriginStopRef:      d.stringValue(d.Paths[record.PathStart+uint32(boardingIndex)].OriginStopRef),
@@ -429,34 +430,23 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]ti
 	}
 }
 
-func pushPlanLabel(queue *planQueue, best map[planState][]time.Time, keep int, label *planLabel) bool {
-	state := planState{stop: label.stop, vehicleLegs: label.vehicleLegs}
-	arrivals := best[state]
-	for _, arrival := range arrivals {
-		if arrival.Equal(label.arrival) {
-			return false
-		}
-	}
-	if len(arrivals) >= keep && !label.arrival.Before(arrivals[len(arrivals)-1]) {
+func pushPlanLabel(queue *planQueue, best map[planState]time.Time, label *planLabel) bool {
+	state := stateForPlanLabel(label)
+	if arrival, exists := best[state]; exists && !label.arrival.Before(arrival) {
 		return false
 	}
-	arrivals = append(arrivals, label.arrival)
-	sort.Slice(arrivals, func(i, j int) bool { return arrivals[i].Before(arrivals[j]) })
-	if len(arrivals) > keep {
-		arrivals = arrivals[:keep]
-	}
-	best[state] = arrivals
+	best[state] = label.arrival
 	heap.Push(queue, label)
 	return true
 }
 
-func currentPlanLabel(best map[planState][]time.Time, label *planLabel) bool {
-	for _, arrival := range best[planState{stop: label.stop, vehicleLegs: label.vehicleLegs}] {
-		if arrival.Equal(label.arrival) {
-			return true
-		}
-	}
-	return false
+func currentPlanLabel(best map[planState]time.Time, label *planLabel) bool {
+	return best[stateForPlanLabel(label)].Equal(label.arrival)
+}
+
+func stateForPlanLabel(label *planLabel) planState {
+	transferred := label.route != nil && label.route.leg.Type == ctdf.JourneyPlanRouteItemTypeTransfer
+	return planState{stop: label.stop, vehicleLegs: label.vehicleLegs, transferred: transferred}
 }
 
 func appendPlanLeg(parent *planRouteNode, leg PlanLeg) *planRouteNode {

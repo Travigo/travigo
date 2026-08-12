@@ -1,6 +1,7 @@
 package departuregraph
 
 import (
+	"container/heap"
 	"context"
 	"net/http"
 	"testing"
@@ -8,6 +9,38 @@ import (
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
+
+func TestPlanDefaultsCoverOvernightJourneys(t *testing.T) {
+	config := normalizePlanConfig(PlanRequest{})
+	if config.maxDuration != 12*time.Hour {
+		t.Fatalf("max duration = %s", config.maxDuration)
+	}
+	if config.maxExpandedLabels != 200000 {
+		t.Fatalf("expanded labels = %d", config.maxExpandedLabels)
+	}
+}
+
+func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
+	queue := &planQueue{}
+	heap.Init(queue)
+	best := map[planState]time.Time{}
+	base := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	first := &planLabel{stop: 1, arrival: base.Add(10 * time.Minute), vehicleLegs: 1}
+	if !pushPlanLabel(queue, best, first) {
+		t.Fatal("first label was rejected")
+	}
+	if pushPlanLabel(queue, best, &planLabel{stop: 1, arrival: base.Add(11 * time.Minute), vehicleLegs: 1}) {
+		t.Fatal("dominated later label was retained")
+	}
+	earlier := &planLabel{stop: 1, arrival: base.Add(9 * time.Minute), vehicleLegs: 1}
+	if !pushPlanLabel(queue, best, earlier) || currentPlanLabel(best, first) || !currentPlanLabel(best, earlier) {
+		t.Fatal("earlier label did not replace the previous state")
+	}
+	transferred := &planLabel{stop: 1, arrival: base.Add(12 * time.Minute), vehicleLegs: 1, route: appendPlanLeg(nil, PlanLeg{Type: ctdf.JourneyPlanRouteItemTypeTransfer})}
+	if !pushPlanLabel(queue, best, transferred) {
+		t.Fatal("transfer-constrained state was incorrectly dominated")
+	}
+}
 
 type planningTopologyLoader struct {
 	stops     []*ctdf.Stop

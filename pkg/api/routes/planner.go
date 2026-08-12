@@ -44,7 +44,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	maxJourneyDurationMinutes, err := parsePlannerIntQuery(c, "max_journey_duration_minutes", "360")
+	maxJourneyDurationMinutes, err := parsePlannerIntQuery(c, "max_journey_duration_minutes", "720")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -60,7 +60,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "100000")
+	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "200000")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
