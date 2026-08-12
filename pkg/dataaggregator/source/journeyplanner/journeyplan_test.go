@@ -100,6 +100,22 @@ func TestDirectionStopAddsJourneyPathAliasesForTransferOrigins(t *testing.T) {
 	}
 }
 
+func TestDirectionApproachStopIsPrioritizedAsGoalAdjacent(t *testing.T) {
+	destination := &ctdf.Stop{PrimaryIdentifier: "station"}
+	approach := &ctdf.Stop{PrimaryIdentifier: "nearby-bus", OtherIdentifiers: []string{"nearby-atco"}}
+	runtime := &plannerRuntime{
+		destinationStop: destination,
+		directionStop: &ctdf.Stop{
+			PrimaryIdentifier: "station",
+			OtherIdentifiers:  []string{"nearby-atco"},
+		},
+	}
+
+	if got := runtime.queuePriorityClass(&plannerLabel{stop: approach}); got != 0 {
+		t.Fatalf("direction approach priority class = %d, want 0", got)
+	}
+}
+
 func TestGPSOriginAlwaysAddsWalkableDestinationBeyondNearestStopCap(t *testing.T) {
 	start := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
 	originLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0, 0}}

@@ -1314,7 +1314,12 @@ func (runtime *plannerRuntime) queuePriorityClass(label *plannerLabel) uint8 {
 	// distinction a stopping train can spend the whole search budget rebuilding
 	// boards at each early station while its useful terminal interchange remains
 	// in the queue.
-	if label.preferExpansion || stopMatchesStop(label.stop, runtime.destinationStop) {
+	// The directed graph target also contains stops with a valid final transfer
+	// into the requested destination. They are goal-adjacent graph nodes, so
+	// expand them before unrelated local calls; otherwise the downstream stops
+	// from a handful of bus journeys can exhaust the label budget before the
+	// final walking edge is traversed.
+	if label.preferExpansion || stopMatchesStop(label.stop, runtime.destinationStop) || stopMatchesStop(label.stop, runtime.directionStop) {
 		return 0
 	}
 	if runtime.destinationStop != nil && isHighCapacityStop(label.stop) && isHighCapacityStop(runtime.destinationStop) {
