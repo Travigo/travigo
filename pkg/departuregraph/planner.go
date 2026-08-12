@@ -328,6 +328,12 @@ func distanceMetres(lon1, lat1, lon2, lat2 float64) float64 {
 }
 
 func (d *graphData) expandPlanTransfers(queue *planQueue, best map[planState][]time.Time, config planConfig, current *planLabel, searchEnd time.Time) {
+	// Stop-transfer records model a single access, egress or interchange walk;
+	// they are not a pedestrian street network. Chaining them creates fake
+	// all-walking routes through sequences of nearby public-transport stops.
+	if current.route != nil && current.route.leg.Type == ctdf.JourneyPlanRouteItemTypeTransfer {
+		return
+	}
 	start, end := d.TransferOffsets[current.stop], d.TransferOffsets[current.stop+1]
 	for index := start; index < end; index++ {
 		transfer := d.Transfers[index]

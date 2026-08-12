@@ -97,6 +97,34 @@ func TestGraphCoordinateOriginUsesSpatialStopIndex(t *testing.T) {
 	}
 }
 
+func TestGraphDoesNotTreatStopTransfersAsWalkingNetwork(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	loader := planningTopologyLoader{
+		stops: []*ctdf.Stop{
+			{PrimaryIdentifier: "origin"},
+			{PrimaryIdentifier: "middle"},
+			{PrimaryIdentifier: "destination"},
+		},
+		transfers: []*ctdf.StopTransfer{
+			{FromStopRef: "origin", ToStopRef: "middle", Type: ctdf.StopTransferTypeNearbyWalk, TotalDurationSeconds: 60},
+			{FromStopRef: "middle", ToStopRef: "destination", Type: ctdf.StopTransferTypeNearbyWalk, TotalDurationSeconds: 60},
+		},
+	}
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), loader); err != nil {
+		t.Fatal(err)
+	}
+	data.completeScan([]time.Time{serviceDate})
+	result, err := graph.Plan(context.Background(), PlanRequest{OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"}, StartDateTime: serviceDate, Count: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 0 {
+		t.Fatalf("transfer chain was returned as a journey: %#v", result.Plans)
+	}
+}
+
 func TestPlanClientUsesJourneyGraphEndpoint(t *testing.T) {
 	serviceDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
 	graph := New(nil, Config{Enabled: true})
