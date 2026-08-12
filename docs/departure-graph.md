@@ -27,10 +27,26 @@ The graph is deliberately non-blocking:
   checkpoint is attempted during graceful shutdown.
 
 Journey paths are stored once even when a journey operates on several days.
-Service-date membership and per-stop departure indexes contain integer journey
-references. CTDF journey and path objects are materialised only for board
+Service-date membership and per-stop departure and arrival indexes contain
+integer journey references. Ordinary departure-board requests use the departure
+index exactly as before. Planner requests may also provide a destination; the
+graph walks the arrival index backwards for up to four vehicle legs and returns
+useful connecting departures before unrelated local services. This ordering is
+only a search hint: the planner still validates times, transfers, cancellations
+and route limits. CTDF journey and path objects are materialised only for
 candidates returned to a request. Realtime remains outside the graph and is
 applied by the shared board generator using journey and stop-occurrence identity.
+
+Path records contain only the fields used by departure boards and planner
+searches. Destination platforms are omitted because graph-backed arrival boards
+are not supported, and each origin arrival is reconstructed from the preceding
+leg's destination arrival; only the first arrival is retained on the journey.
+This keeps each path record at 28 bytes. After a rolling scan completes, the
+graph also releases its all-string, journey-identity and completed-day build
+maps, retaining a smaller stop-reference lookup for serving requests. Those
+build maps are reconstructed only if the sealed generation later needs a lazy
+fill. Rolling rebuilds start with a fresh generation so completed-day index
+entries cannot be duplicated as the configured date window shifts.
 
 ## Configuration
 
@@ -69,7 +85,8 @@ the lazy fill, rolling generation, or persistence model.
   completed request rate and latency over the last 60 seconds; and lifetime
   average, maximum and most recent latency.
 - The existing top-level `Strings`, `Journeys`, `Paths`, `DepartureBuckets`,
-  `CompleteStops` and `CompleteDays` fields remain unchanged. `Lookups` adds hit
+  `CompleteStops` and `CompleteDays` fields remain unchanged. `ArrivalBuckets`
+  reports the reverse routing index. `Lookups` adds hit
   and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
   and average/maximum fill time.
 - `BackgroundBuild`: whether a scan is active, estimated and scanned

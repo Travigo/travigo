@@ -16,11 +16,13 @@ import (
 const departuresPath = "/v1/departures"
 
 type departuresRequest struct {
-	PrimaryStopRef string   `json:"primaryStopRef"`
-	StopRefs       []string `json:"stopRefs"`
-	ServiceDate    string   `json:"serviceDate"`
-	NotBefore      string   `json:"notBefore,omitempty"`
-	Limit          int      `json:"limit,omitempty"`
+	PrimaryStopRef     string   `json:"primaryStopRef"`
+	StopRefs           []string `json:"stopRefs"`
+	DestinationStopRef string   `json:"destinationStopRef,omitempty"`
+	DestinationRefs    []string `json:"destinationRefs,omitempty"`
+	ServiceDate        string   `json:"serviceDate"`
+	NotBefore          string   `json:"notBefore,omitempty"`
+	Limit              int      `json:"limit,omitempty"`
 }
 
 type departuresResponse struct {
@@ -47,6 +49,14 @@ func (c *Client) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDa
 }
 
 func (c *Client) JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
+	return c.journeysForStopWindow(ctx, stop, nil, serviceDate, notBefore, limit)
+}
+
+func (c *Client) JourneysTowardsStopWindow(ctx context.Context, stop *ctdf.Stop, destination *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
+	return c.journeysForStopWindow(ctx, stop, destination, serviceDate, notBefore, limit)
+}
+
+func (c *Client) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, destination *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
 	if c == nil || c.baseURL == "" || stop == nil {
 		return nil, fmt.Errorf("departure graph client is not configured")
 	}
@@ -56,6 +66,10 @@ func (c *Client) JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, ser
 		StopRefs:       stop.GetAllStopIDs(),
 		ServiceDate:    serviceDate.Format(ctdf.YearMonthDayFormat),
 		Limit:          limit,
+	}
+	if destination != nil {
+		graphRequest.DestinationStopRef = destination.PrimaryIdentifier
+		graphRequest.DestinationRefs = destination.GetAllStopIDs()
 	}
 	if !notBefore.IsZero() {
 		graphRequest.NotBefore = notBefore.Format(time.RFC3339Nano)

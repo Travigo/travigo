@@ -21,6 +21,7 @@ type snapshotFile struct {
 	Replacements  []stringID
 	JourneyDays   map[journeyDayKey]bool
 	Departures    map[bucketKey][]journeyID
+	Arrivals      map[bucketKey][]journeyID
 	CompleteStops map[bucketKey]bool
 	CompleteDays  map[dayKey]bool
 	ScanDays      []dayKey
@@ -103,6 +104,7 @@ func (g *Graph) save(path string, data *graphData) error {
 		Replacements:  data.Replacements,
 		JourneyDays:   data.JourneyDays,
 		Departures:    data.Departures,
+		Arrivals:      data.Arrivals,
 		CompleteStops: data.CompleteStops,
 		CompleteDays:  data.CompleteDays,
 		ScanDays:      data.ScanDays,
@@ -158,16 +160,30 @@ func (g *Graph) restore(path string) error {
 	if snapshot.Version < 1 || snapshot.Version > snapshotVersion {
 		return fmt.Errorf("unsupported departure graph snapshot version %d", snapshot.Version)
 	}
+	if snapshot.Version < 4 {
+		// Older snapshots stored every origin arrival on the path record. The
+		// compact v4 record cannot decode that removed field, so use the first
+		// departure as the origin-arrival fallback until the next rolling build.
+		// Board and planner searches do not consume this first arrival directly.
+		for index := range snapshot.Journeys {
+			record := &snapshot.Journeys[index]
+			if record.PathCount > 0 && int(record.PathStart) < len(snapshot.Paths) {
+				record.InitialArrival = snapshot.Paths[record.PathStart].OriginDeparture
+			}
+		}
+	}
 
 	restored := &graphData{
 		Strings:       snapshot.Strings,
 		StringIDs:     make(map[string]stringID, len(snapshot.Strings)),
+		StopIDs:       map[string]stringID{"": 0},
 		Journeys:      snapshot.Journeys,
 		Paths:         snapshot.Paths,
 		Replacements:  snapshot.Replacements,
 		JourneyIDs:    make(map[journeyKey]journeyID, len(snapshot.Journeys)),
 		JourneyDays:   snapshot.JourneyDays,
 		Departures:    snapshot.Departures,
+		Arrivals:      snapshot.Arrivals,
 		CompleteStops: snapshot.CompleteStops,
 		CompleteDays:  snapshot.CompleteDays,
 		ScanDays:      snapshot.ScanDays,
@@ -181,6 +197,23 @@ func (g *Graph) restore(path string) error {
 	if restored.Departures == nil {
 		restored.Departures = map[bucketKey][]journeyID{}
 	}
+	if restored.Arrivals == nil {
+		restored.Arrivals = map[bucketKey][]journeyID{}
+		for active := range restored.JourneyDays {
+			if int(active.Journey) >= len(restored.Journeys) {
+				continue
+			}
+			record := restored.Journeys[active.Journey]
+			for index := uint32(0); index < record.PathCount; index++ {
+				path := restored.Paths[record.PathStart+index]
+				if path.DestinationStopRef == 0 {
+					continue
+				}
+				key := bucketKey{Day: active.Day, StopRef: path.DestinationStopRef}
+				restored.Arrivals[key] = append(restored.Arrivals[key], active.Journey)
+			}
+		}
+	}
 	if restored.JourneyDays == nil {
 		restored.JourneyDays = map[journeyDayKey]bool{}
 	}
@@ -193,8 +226,23 @@ func (g *Graph) restore(path string) error {
 	for index, value := range restored.Strings {
 		restored.StringIDs[value] = stringID(index)
 	}
+	for _, path := range restored.Paths {
+		for _, stopID := range []stringID{path.OriginStopRef, path.DestinationStopRef} {
+			if value := restored.stringValue(stopID); value != "" {
+				restored.StopIDs[value] = stopID
+			}
+		}
+	}
+	for key := range restored.CompleteStops {
+		if value := restored.stringValue(key.StopRef); value != "" {
+			restored.StopIDs[value] = key.StopRef
+		}
+	}
 	for index, journey := range restored.Journeys {
 		restored.JourneyIDs[journeyKey{PrimaryID: journey.PrimaryID}] = journeyID(index)
+	}
+	if len(restored.ScanDays) == 0 && len(restored.CompleteDays) > 0 {
+		restored.sealBuildIndexesLocked()
 	}
 
 	g.current.Store(restored)
@@ -206,6 +254,7 @@ func (g *Graph) restore(path string) error {
 		Int("journeys", stats.Journeys).
 		Int("paths", stats.Paths).
 		Int("departure_buckets", stats.DepartureBuckets).
+		Int("arrival_buckets", stats.ArrivalBuckets).
 		Msg("Departure graph snapshot restored")
 	return nil
 }

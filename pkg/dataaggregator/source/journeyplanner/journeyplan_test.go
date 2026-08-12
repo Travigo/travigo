@@ -88,16 +88,21 @@ func TestLimitDepartureBoardSortsAndLimits(t *testing.T) {
 func TestLoadDepartureBoardReusesFullGeneratedBoardForLaterArrival(t *testing.T) {
 	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
 	lookupCalls := 0
+	destination := &ctdf.Stop{PrimaryIdentifier: "destination"}
 	runtime := &plannerRuntime{
 		departureBoardCache: map[string]cachedDepartureBoard{},
 		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 			lookupCalls++
+			if q.DestinationStop != destination {
+				t.Fatalf("departure lookup destination = %#v, want destination", q.DestinationStop)
+			}
 			board := make([]*ctdf.DepartureBoard, 10)
 			for index := range board {
 				board[index] = &ctdf.DepartureBoard{Time: start.Add(time.Duration(index) * time.Minute)}
 			}
 			return board, nil
 		},
+		destinationStop: destination,
 	}
 	stop := &ctdf.Stop{PrimaryIdentifier: "interchange"}
 

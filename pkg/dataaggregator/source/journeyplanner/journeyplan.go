@@ -912,9 +912,10 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 	}
 
 	board, err := runtime.lookupDepartureBoard(query.DepartureBoard{
-		Stop:          stop,
-		Count:         departureBoardCount,
-		StartDateTime: startDateTime,
+		Stop:            stop,
+		DestinationStop: runtime.destinationStop,
+		Count:           departureBoardCount,
+		StartDateTime:   startDateTime,
 	})
 	if err != nil {
 		return nil, err

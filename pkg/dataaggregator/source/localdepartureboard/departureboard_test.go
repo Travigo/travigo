@@ -74,7 +74,7 @@ func TestDepartureBoardCandidateLookupUsesLazyGraph(t *testing.T) {
 	stop := &ctdf.Stop{PrimaryIdentifier: "stop-a"}
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 
-	journeys := source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
+	journeys, _ := source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
 	if len(journeys) != 1 || journeys[0].PrimaryIdentifier != "journey-graph" {
 		t.Fatalf("graph journeys = %#v", journeys)
 	}
@@ -82,7 +82,7 @@ func TestDepartureBoardCandidateLookupUsesLazyGraph(t *testing.T) {
 		t.Fatalf("graph loads = %d, want 1", loader.loads)
 	}
 
-	journeys = source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
+	journeys, _ = source.getBoardJourneys(query.DepartureBoard{Stop: stop}, "unused", nil, serviceDate, ctdf.BoardTypeDeparture)
 	if len(journeys) != 1 || loader.loads != 1 {
 		t.Fatalf("completed graph lookup journeys=%d loads=%d, want 1 and 1", len(journeys), loader.loads)
 	}
@@ -101,5 +101,20 @@ func TestDepartureGraphCandidateLimitOverfetchesAndBoundsResults(t *testing.T) {
 		if got := departureGraphCandidateLimit(test.count); got != test.want {
 			t.Errorf("candidate limit for count %d = %d, want %d", test.count, got, test.want)
 		}
+	}
+}
+
+func TestDirectedBoardSubsetKeepsGraphRankAheadOfDepartureTime(t *testing.T) {
+	start := time.Date(2026, time.August, 10, 9, 0, 0, 0, time.UTC)
+	local := &ctdf.Journey{PrimaryIdentifier: "local"}
+	feeder := &ctdf.Journey{PrimaryIdentifier: "feeder"}
+	board := []*ctdf.DepartureBoard{
+		{Journey: local, Time: start},
+		{Journey: feeder, Time: start.Add(10 * time.Minute)},
+	}
+
+	selected := directedBoardSubset(board, []*ctdf.Journey{feeder, local}, 1)
+	if len(selected) != 1 || selected[0].Journey.PrimaryIdentifier != "feeder" {
+		t.Fatalf("directed subset = %#v, want feeder", selected)
 	}
 }

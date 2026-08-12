@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
@@ -186,6 +187,64 @@ func TestGraphWindowFiltersAndSortsByDepartureAtRequestedStop(t *testing.T) {
 	}
 }
 
+func TestGraphRanksJourneyThatConnectsTowardsDestinationBeforeEarlierLocalDepartures(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	serviceStart := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC)
+	journey := func(identifier, origin, destination string, departure time.Duration) *ctdf.Journey {
+		return &ctdf.Journey{
+			PrimaryIdentifier: identifier,
+			Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
+				Type: ctdf.AvailabilityMatchAll,
+			}}},
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef:          origin,
+				DestinationStopRef:     destination,
+				OriginDepartureTime:    serviceStart.Add(departure),
+				DestinationArrivalTime: serviceStart.Add(departure + 10*time.Minute),
+			}},
+		}
+	}
+
+	graph := New(&fakeLoader{}, Config{Enabled: true})
+	data := graph.current.Load()
+	data.addJourneys(makeDayKey(serviceDate), []*ctdf.Journey{
+		journey("local-1", "origin", "local-a", 9*time.Hour),
+		journey("local-2", "origin", "local-b", 9*time.Hour+5*time.Minute),
+		journey("feeder", "origin", "interchange", 9*time.Hour+10*time.Minute),
+		journey("connector", "interchange", "destination", 9*time.Hour+25*time.Minute),
+	})
+	data.markStopComplete(makeDayKey(serviceDate), "origin")
+
+	ordinary, err := graph.JourneysForStopWindow(
+		context.Background(),
+		&ctdf.Stop{PrimaryIdentifier: "origin"},
+		serviceDate,
+		serviceDate.Add(8*time.Hour),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("ordinary graph lookup: %v", err)
+	}
+	if len(ordinary) != 1 || ordinary[0].PrimaryIdentifier != "local-1" {
+		t.Fatalf("ordinary first journey = %#v, want local-1", ordinary)
+	}
+
+	directed, err := graph.JourneysTowardsStopWindow(
+		context.Background(),
+		&ctdf.Stop{PrimaryIdentifier: "origin"},
+		&ctdf.Stop{PrimaryIdentifier: "destination"},
+		serviceDate,
+		serviceDate.Add(8*time.Hour),
+		1,
+	)
+	if err != nil {
+		t.Fatalf("directed graph lookup: %v", err)
+	}
+	if len(directed) != 1 || directed[0].PrimaryIdentifier != "feeder" {
+		t.Fatalf("directed first journey = %#v, want feeder", directed)
+	}
+}
+
 func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
@@ -212,6 +271,9 @@ func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	}
 	if len(journeys) != 1 || restoredLoader.stopLoads != 0 {
 		t.Fatalf("restored journeys=%d loads=%d, want 1 and 0", len(journeys), restoredLoader.stopLoads)
+	}
+	if restored.Stats().ArrivalBuckets == 0 {
+		t.Fatal("restored graph is missing its reverse arrival index")
 	}
 	assertMaterializedJourney(t, journeys[0])
 }
@@ -241,9 +303,92 @@ func TestBackgroundRebuildCompletesRollingDays(t *testing.T) {
 	if loader.stopLoads != 0 || loader.scans != 1 {
 		t.Fatalf("stop loads=%d scans=%d, want 0 and 1", loader.stopLoads, loader.scans)
 	}
+	data := graph.current.Load()
+	if data.StringIDs != nil || data.JourneyIDs != nil || data.JourneyDays != nil {
+		t.Fatalf("completed graph retained build-only indexes: strings=%t journeys=%t days=%t", data.StringIDs != nil, data.JourneyIDs != nil, data.JourneyDays != nil)
+	}
+	if len(data.StopIDs) == 0 {
+		t.Fatal("completed graph dropped its request-facing stop index")
+	}
 	stats := graph.Stats().BackgroundBuild
 	if stats.Running || stats.EstimatedJourneys != 1 || stats.ScannedJourneys != 1 || stats.Progress != 1 || stats.SuccessfulBuilds != 1 {
 		t.Fatalf("unexpected background build stats: %#v", stats)
+	}
+}
+
+func TestShiftedRollingRebuildStartsFreshAfterSealing(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
+	graph := New(loader, Config{Enabled: true, BatchSize: 1000})
+	if err := graph.rebuildRolling(context.Background(), serviceDate); err != nil {
+		t.Fatalf("initial rebuild: %v", err)
+	}
+	first := graph.current.Load()
+
+	if err := graph.rebuildRolling(context.Background(), serviceDate.AddDate(0, 0, 1)); err != nil {
+		t.Fatalf("shifted rebuild: %v", err)
+	}
+	second := graph.current.Load()
+	if first == second {
+		t.Fatal("shifted rebuild reused a sealed generation")
+	}
+	if len(second.Journeys) != 1 || len(second.Paths) != 2 || len(second.Departures) != 2 || len(second.Arrivals) != 2 {
+		t.Fatalf("shifted rebuild duplicated graph records: journeys=%d paths=%d departures=%d arrivals=%d", len(second.Journeys), len(second.Paths), len(second.Departures), len(second.Arrivals))
+	}
+}
+
+func TestSealedGraphRehydratesBuildIndexesForLaterLazyFill(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
+	graph := New(loader, Config{Enabled: true, BatchSize: 1000})
+	if err := graph.rebuildRolling(context.Background(), serviceDate); err != nil {
+		t.Fatalf("rebuild graph: %v", err)
+	}
+
+	laterDate := serviceDate.AddDate(0, 0, 2)
+	stop := &ctdf.Stop{PrimaryIdentifier: "stop-a"}
+	journeys, err := graph.JourneysForStop(context.Background(), stop, laterDate)
+	if err != nil {
+		t.Fatalf("lazy fill sealed graph: %v", err)
+	}
+	if len(journeys) != 1 {
+		t.Fatalf("lazy fill journeys = %d, want 1", len(journeys))
+	}
+	waitForStopComplete(t, graph, stop, laterDate)
+
+	data := graph.current.Load()
+	if data.StringIDs == nil || data.JourneyIDs == nil || data.JourneyDays == nil {
+		t.Fatal("sealed graph did not restore its build indexes for mutation")
+	}
+	if len(data.Journeys) != 1 || len(data.Paths) != 2 {
+		t.Fatalf("lazy fill duplicated compact records: journeys=%d paths=%d", len(data.Journeys), len(data.Paths))
+	}
+}
+
+func TestCompactRecordSizes(t *testing.T) {
+	if size := unsafe.Sizeof(pathRecord{}); size != 28 {
+		t.Fatalf("path record size = %d bytes, want 28", size)
+	}
+	if size := unsafe.Sizeof(journeyRecord{}); size != 56 {
+		t.Fatalf("journey record size = %d bytes, want 56", size)
+	}
+}
+
+func TestCompactGraphReconstructsOriginArrivalsWithoutDestinationPlatforms(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	data := newGraphData()
+	data.addJourney(makeDayKey(serviceDate), testJourney())
+
+	journey := data.materializeJourney(0)
+	if journey == nil || len(journey.Path) != 2 {
+		t.Fatalf("unexpected materialized journey: %#v", journey)
+	}
+	if journey.Path[0].OriginArrivalTime != time.Date(0, time.January, 2, 1, 0, 0, 0, time.UTC) ||
+		journey.Path[1].OriginArrivalTime != journey.Path[0].DestinationArrivalTime {
+		t.Fatalf("origin arrivals not reconstructed: %#v", journey.Path)
+	}
+	if journey.Path[0].DestinationPlatform != "" {
+		t.Fatalf("unused destination platform was materialized: %q", journey.Path[0].DestinationPlatform)
 	}
 }
 
@@ -394,6 +539,7 @@ func testJourney() *ctdf.Journey {
 				DestinationStopRef:     "stop-b",
 				OriginPlatform:         "1",
 				DestinationPlatform:    "2",
+				OriginArrivalTime:      serviceStart.Add(25 * time.Hour),
 				OriginDepartureTime:    serviceStart.Add(25*time.Hour + 5*time.Minute),
 				DestinationArrivalTime: serviceStart.Add(25*time.Hour + 20*time.Minute),
 				DestinationDisplay:     "Central",
@@ -403,6 +549,7 @@ func testJourney() *ctdf.Journey {
 			{
 				OriginStopRef:          "stop-b",
 				DestinationStopRef:     "stop-c",
+				OriginArrivalTime:      serviceStart.Add(25*time.Hour + 20*time.Minute),
 				OriginDepartureTime:    serviceStart.Add(25*time.Hour + 25*time.Minute),
 				DestinationArrivalTime: serviceStart.Add(25*time.Hour + 45*time.Minute),
 			},

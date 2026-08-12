@@ -57,6 +57,10 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeGraphError(w, http.StatusBadRequest, "stopRefs must contain between 1 and 256 identifiers")
 		return
 	}
+	if len(request.DestinationRefs) > 256 {
+		writeGraphError(w, http.StatusBadRequest, "destinationRefs must contain no more than 256 identifiers")
+		return
+	}
 	serviceDate, err := time.Parse(ctdf.YearMonthDayFormat, request.ServiceDate)
 	if err != nil {
 		writeGraphError(w, http.StatusBadRequest, "serviceDate must use YYYY-MM-DD")
@@ -85,10 +89,29 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	journeys, err := s.graph.JourneysForStopWindow(r.Context(), &ctdf.Stop{
+	stop := &ctdf.Stop{
 		PrimaryIdentifier: primary,
 		OtherIdentifiers:  otherRefs,
-	}, serviceDate, notBefore, request.Limit)
+	}
+	var journeys []*ctdf.Journey
+	if len(request.DestinationRefs) > 0 {
+		destinationPrimary := request.DestinationStopRef
+		if destinationPrimary == "" {
+			destinationPrimary = request.DestinationRefs[0]
+		}
+		destinationOtherRefs := make([]string, 0, len(request.DestinationRefs))
+		for _, stopRef := range request.DestinationRefs {
+			if stopRef != "" && stopRef != destinationPrimary {
+				destinationOtherRefs = append(destinationOtherRefs, stopRef)
+			}
+		}
+		journeys, err = s.graph.JourneysTowardsStopWindow(r.Context(), stop, &ctdf.Stop{
+			PrimaryIdentifier: destinationPrimary,
+			OtherIdentifiers:  destinationOtherRefs,
+		}, serviceDate, notBefore, request.Limit)
+	} else {
+		journeys, err = s.graph.JourneysForStopWindow(r.Context(), stop, serviceDate, notBefore, request.Limit)
+	}
 	if err != nil {
 		writeGraphError(w, http.StatusServiceUnavailable, fmt.Sprintf("load departures: %v", err))
 		return

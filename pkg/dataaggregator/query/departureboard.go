@@ -8,9 +8,10 @@ import (
 )
 
 type DepartureBoard struct {
-	Stop          *ctdf.Stop
-	Count         int
-	StartDateTime time.Time
-	Filter        *bson.M
-	Type          ctdf.BoardType
+	Stop            *ctdf.Stop
+	DestinationStop *ctdf.Stop
+	Count           int
+	StartDateTime   time.Time
+	Filter          *bson.M
+	Type            ctdf.BoardType
 }
