@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const snapshotVersion = 5
+const snapshotVersion = 6
 
 const (
 	maximumPendingStopFills     = 4096
@@ -71,31 +71,40 @@ type pathRecord struct {
 type graphData struct {
 	mu sync.RWMutex
 
-	Strings              []string
-	StringIDs            map[string]stringID
-	StopIDs              map[string]stringID
-	StopIdentifiers      []stopIdentifierRecord
-	StopIndexByStringID  []uint32
-	Stops                []stopRecord
-	StopAliasOffsets     []uint32
-	StopAliases          []stringID
-	StopGrid             map[spatialCell][]uint32
-	TransferOffsets      []uint32
-	Transfers            []transferRecord
-	TransferRestrictions []transferRestriction
-	TopologyReady        bool
-	Journeys             []journeyRecord
-	Paths                []pathRecord
-	Replacements         []stringID
-	JourneyIDs           map[journeyKey]journeyID
-	JourneyDays          map[journeyDayKey]bool
-	Departures           map[bucketKey][]journeyID
-	CompleteStops        map[bucketKey]bool
-	CompleteDays         map[dayKey]bool
-	ScanDays             []dayKey
-	ScanCursor           string
-	ScanProcessed        int64
-	ScanActive           int64
+	Strings                []string
+	StringIDs              map[string]stringID
+	StopIDs                map[string]stringID
+	StopIdentifiers        []stopIdentifierRecord
+	StopIndexByStringID    []uint32
+	Stops                  []stopRecord
+	StopAliasOffsets       []uint32
+	StopAliases            []stringID
+	StopGrid               map[spatialCell][]uint32
+	TransferOffsets        []uint32
+	Transfers              []transferRecord
+	TransferRestrictions   []transferRestriction
+	TopologyReady          bool
+	ReverseTransferOffsets []uint32
+	ReverseTransferOrigins []uint32
+	ArrivalJourneyOffsets  []uint32
+	ArrivalJourneys        []journeyID
+	StaticRoutingReady     bool
+	Journeys               []journeyRecord
+	Paths                  []pathRecord
+	Replacements           []stringID
+	JourneyIDs             map[journeyKey]journeyID
+	JourneyDays            map[journeyDayKey]bool
+	Departures             map[bucketKey][]journeyID
+	CompleteStops          map[bucketKey]bool
+	CompleteDays           map[dayKey]bool
+	ScanDays               []dayKey
+	ScanCursor             string
+	ScanProcessed          int64
+	ScanActive             int64
+
+	corridorMu    sync.Mutex
+	corridors     map[corridorKey]*corridorCacheEntry
+	corridorClock uint64
 }
 
 type Loader interface {
@@ -629,6 +638,7 @@ func (d *graphData) completeScan(dates []time.Time) {
 	d.ScanCursor = ""
 	d.ScanProcessed = 0
 	d.ScanActive = 0
+	d.buildStaticRoutingIndexesLocked()
 	d.sealBuildIndexesLocked()
 }
 
@@ -1067,20 +1077,22 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 }
 
 type Stats struct {
-	Strings          int
-	Stops            int
-	StopIdentifiers  int
-	TransferEdges    int
-	TopologyReady    bool
-	Journeys         int
-	Paths            int
-	DepartureBuckets int
-	ArrivalBuckets   int
-	CompleteStops    int
-	CompleteDays     int
-	Lookups          LookupStats
-	BackgroundBuild  BuildStats
-	Snapshot         SnapshotStats
+	Strings            int
+	Stops              int
+	StopIdentifiers    int
+	TransferEdges      int
+	TopologyReady      bool
+	StaticRideLinks    int
+	StaticRoutingReady bool
+	Journeys           int
+	Paths              int
+	DepartureBuckets   int
+	ArrivalBuckets     int
+	CompleteStops      int
+	CompleteDays       int
+	Lookups            LookupStats
+	BackgroundBuild    BuildStats
+	Snapshot           SnapshotStats
 }
 
 func (g *Graph) Stats() Stats {
@@ -1098,17 +1110,19 @@ func (d *graphData) stats() Stats {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return Stats{
-		Strings:          len(d.Strings),
-		Stops:            len(d.Stops),
-		StopIdentifiers:  len(d.StopIdentifiers),
-		TransferEdges:    len(d.Transfers),
-		TopologyReady:    d.TopologyReady,
-		Journeys:         len(d.Journeys),
-		Paths:            len(d.Paths),
-		DepartureBuckets: len(d.Departures),
-		ArrivalBuckets:   0,
-		CompleteStops:    len(d.CompleteStops),
-		CompleteDays:     len(d.CompleteDays),
+		Strings:            len(d.Strings),
+		Stops:              len(d.Stops),
+		StopIdentifiers:    len(d.StopIdentifiers),
+		TransferEdges:      len(d.Transfers),
+		TopologyReady:      d.TopologyReady,
+		StaticRideLinks:    len(d.ArrivalJourneys),
+		StaticRoutingReady: d.StaticRoutingReady,
+		Journeys:           len(d.Journeys),
+		Paths:              len(d.Paths),
+		DepartureBuckets:   len(d.Departures),
+		ArrivalBuckets:     0,
+		CompleteStops:      len(d.CompleteStops),
+		CompleteDays:       len(d.CompleteDays),
 	}
 }
 

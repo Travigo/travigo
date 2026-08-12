@@ -13,29 +13,34 @@ import (
 )
 
 type snapshotFile struct {
-	Version              int
-	WrittenAt            time.Time
-	Strings              []string
-	StopIdentifiers      []stopIdentifierRecord
-	Stops                []stopRecord
-	StopAliasOffsets     []uint32
-	StopAliases          []stringID
-	StopGrid             map[spatialCell][]uint32
-	TransferOffsets      []uint32
-	Transfers            []transferRecord
-	TransferRestrictions []transferRestriction
-	TopologyReady        bool
-	Journeys             []journeyRecord
-	Paths                []pathRecord
-	Replacements         []stringID
-	JourneyDays          map[journeyDayKey]bool
-	Departures           map[bucketKey][]journeyID
-	CompleteStops        map[bucketKey]bool
-	CompleteDays         map[dayKey]bool
-	ScanDays             []dayKey
-	ScanCursor           string
-	ScanProcessed        int64
-	ScanActive           int64
+	Version                int
+	WrittenAt              time.Time
+	Strings                []string
+	StopIdentifiers        []stopIdentifierRecord
+	Stops                  []stopRecord
+	StopAliasOffsets       []uint32
+	StopAliases            []stringID
+	StopGrid               map[spatialCell][]uint32
+	TransferOffsets        []uint32
+	Transfers              []transferRecord
+	TransferRestrictions   []transferRestriction
+	TopologyReady          bool
+	ReverseTransferOffsets []uint32
+	ReverseTransferOrigins []uint32
+	ArrivalJourneyOffsets  []uint32
+	ArrivalJourneys        []journeyID
+	StaticRoutingReady     bool
+	Journeys               []journeyRecord
+	Paths                  []pathRecord
+	Replacements           []stringID
+	JourneyDays            map[journeyDayKey]bool
+	Departures             map[bucketKey][]journeyID
+	CompleteStops          map[bucketKey]bool
+	CompleteDays           map[dayKey]bool
+	ScanDays               []dayKey
+	ScanCursor             string
+	ScanProcessed          int64
+	ScanActive             int64
 }
 
 // Save writes the current graph generation to the configured snapshot path.
@@ -104,29 +109,34 @@ func (g *Graph) save(path string, data *graphData) error {
 
 	data.mu.RLock()
 	err = gob.NewEncoder(compressor).Encode(snapshotFile{
-		Version:              snapshotVersion,
-		WrittenAt:            time.Now(),
-		Strings:              data.Strings,
-		StopIdentifiers:      data.StopIdentifiers,
-		Stops:                data.Stops,
-		StopAliasOffsets:     data.StopAliasOffsets,
-		StopAliases:          data.StopAliases,
-		StopGrid:             data.StopGrid,
-		TransferOffsets:      data.TransferOffsets,
-		Transfers:            data.Transfers,
-		TransferRestrictions: data.TransferRestrictions,
-		TopologyReady:        data.TopologyReady,
-		Journeys:             data.Journeys,
-		Paths:                data.Paths,
-		Replacements:         data.Replacements,
-		JourneyDays:          data.JourneyDays,
-		Departures:           data.Departures,
-		CompleteStops:        data.CompleteStops,
-		CompleteDays:         data.CompleteDays,
-		ScanDays:             data.ScanDays,
-		ScanCursor:           data.ScanCursor,
-		ScanProcessed:        data.ScanProcessed,
-		ScanActive:           data.ScanActive,
+		Version:                snapshotVersion,
+		WrittenAt:              time.Now(),
+		Strings:                data.Strings,
+		StopIdentifiers:        data.StopIdentifiers,
+		Stops:                  data.Stops,
+		StopAliasOffsets:       data.StopAliasOffsets,
+		StopAliases:            data.StopAliases,
+		StopGrid:               data.StopGrid,
+		TransferOffsets:        data.TransferOffsets,
+		Transfers:              data.Transfers,
+		TransferRestrictions:   data.TransferRestrictions,
+		TopologyReady:          data.TopologyReady,
+		ReverseTransferOffsets: data.ReverseTransferOffsets,
+		ReverseTransferOrigins: data.ReverseTransferOrigins,
+		ArrivalJourneyOffsets:  data.ArrivalJourneyOffsets,
+		ArrivalJourneys:        data.ArrivalJourneys,
+		StaticRoutingReady:     data.StaticRoutingReady,
+		Journeys:               data.Journeys,
+		Paths:                  data.Paths,
+		Replacements:           data.Replacements,
+		JourneyDays:            data.JourneyDays,
+		Departures:             data.Departures,
+		CompleteStops:          data.CompleteStops,
+		CompleteDays:           data.CompleteDays,
+		ScanDays:               data.ScanDays,
+		ScanCursor:             data.ScanCursor,
+		ScanProcessed:          data.ScanProcessed,
+		ScanActive:             data.ScanActive,
 	})
 	data.mu.RUnlock()
 	if err == nil {
@@ -190,30 +200,35 @@ func (g *Graph) restore(path string) error {
 	}
 
 	restored := &graphData{
-		Strings:              snapshot.Strings,
-		StringIDs:            make(map[string]stringID, len(snapshot.Strings)),
-		StopIDs:              map[string]stringID{"": 0},
-		StopIdentifiers:      snapshot.StopIdentifiers,
-		Stops:                snapshot.Stops,
-		StopAliasOffsets:     snapshot.StopAliasOffsets,
-		StopAliases:          snapshot.StopAliases,
-		StopGrid:             snapshot.StopGrid,
-		TransferOffsets:      snapshot.TransferOffsets,
-		Transfers:            snapshot.Transfers,
-		TransferRestrictions: snapshot.TransferRestrictions,
-		TopologyReady:        snapshot.TopologyReady,
-		Journeys:             snapshot.Journeys,
-		Paths:                snapshot.Paths,
-		Replacements:         snapshot.Replacements,
-		JourneyIDs:           make(map[journeyKey]journeyID, len(snapshot.Journeys)),
-		JourneyDays:          snapshot.JourneyDays,
-		Departures:           snapshot.Departures,
-		CompleteStops:        snapshot.CompleteStops,
-		CompleteDays:         snapshot.CompleteDays,
-		ScanDays:             snapshot.ScanDays,
-		ScanCursor:           snapshot.ScanCursor,
-		ScanProcessed:        snapshot.ScanProcessed,
-		ScanActive:           snapshot.ScanActive,
+		Strings:                snapshot.Strings,
+		StringIDs:              make(map[string]stringID, len(snapshot.Strings)),
+		StopIDs:                map[string]stringID{"": 0},
+		StopIdentifiers:        snapshot.StopIdentifiers,
+		Stops:                  snapshot.Stops,
+		StopAliasOffsets:       snapshot.StopAliasOffsets,
+		StopAliases:            snapshot.StopAliases,
+		StopGrid:               snapshot.StopGrid,
+		TransferOffsets:        snapshot.TransferOffsets,
+		Transfers:              snapshot.Transfers,
+		TransferRestrictions:   snapshot.TransferRestrictions,
+		TopologyReady:          snapshot.TopologyReady,
+		ReverseTransferOffsets: snapshot.ReverseTransferOffsets,
+		ReverseTransferOrigins: snapshot.ReverseTransferOrigins,
+		ArrivalJourneyOffsets:  snapshot.ArrivalJourneyOffsets,
+		ArrivalJourneys:        snapshot.ArrivalJourneys,
+		StaticRoutingReady:     snapshot.StaticRoutingReady,
+		Journeys:               snapshot.Journeys,
+		Paths:                  snapshot.Paths,
+		Replacements:           snapshot.Replacements,
+		JourneyIDs:             make(map[journeyKey]journeyID, len(snapshot.Journeys)),
+		JourneyDays:            snapshot.JourneyDays,
+		Departures:             snapshot.Departures,
+		CompleteStops:          snapshot.CompleteStops,
+		CompleteDays:           snapshot.CompleteDays,
+		ScanDays:               snapshot.ScanDays,
+		ScanCursor:             snapshot.ScanCursor,
+		ScanProcessed:          snapshot.ScanProcessed,
+		ScanActive:             snapshot.ScanActive,
 	}
 	if len(restored.Strings) == 0 {
 		restored.Strings = []string{""}
@@ -246,6 +261,9 @@ func (g *Graph) restore(path string) error {
 		}
 	}
 	restored.buildStopIndexByStringIDLocked()
+	if !restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalJourneyOffsets) != len(restored.Stops)+1 {
+		restored.buildStaticRoutingIndexesLocked()
+	}
 	for key := range restored.CompleteStops {
 		if value := restored.stringValue(key.StopRef); value != "" {
 			restored.StopIDs[value] = key.StopRef

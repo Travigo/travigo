@@ -67,7 +67,7 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	stats := s.stats()
-	if !stats.TopologyReady || stats.CompleteDays == 0 {
+	if !stats.TopologyReady || !stats.StaticRoutingReady || stats.CompleteDays == 0 {
 		writeGraphJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "building"})
 		return
 	}

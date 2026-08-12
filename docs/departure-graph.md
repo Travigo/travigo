@@ -13,6 +13,14 @@ attaches realtime/reference data, and formats the public response. It does not
 expand departure boards, query transfers or calculate routes. `POST
 /v1/departures` continues to serve the departure board from the same graph.
 
+Before expanding any departure times, the graph performs a bounded reverse
+search over its static transit topology. Compact reverse-transfer and
+stop-to-arriving-journey indexes identify the stops that can reach the requested
+destination within the remaining vehicle-leg limit. The time-dependent search
+only expands states inside that corridor. This is a safe superset rather than a
+fixed guessed path, so timetable-valid alternatives are not discarded. Up to
+eight single-destination corridors are cached on the active graph generation.
+
 The graph is deliberately non-blocking:
 
 - Snapshot restore runs before the graph service starts listening. The readiness
@@ -86,8 +94,9 @@ atomic snapshot creation on a newly provisioned volume.
   average, maximum and most recent latency.
 - The existing top-level `Strings`, `Journeys`, `Paths`, `DepartureBuckets`,
   `CompleteStops` and `CompleteDays` fields remain unchanged. `Stops`,
-  `StopIdentifiers`, `TransferEdges` and `TopologyReady` report planner
-  topology; `ArrivalBuckets` remains zero for compatibility. `Lookups` adds hit
+  `StopIdentifiers`, `TransferEdges`, `StaticRideLinks`, `TopologyReady` and
+  `StaticRoutingReady` report planner topology; `ArrivalBuckets` remains zero
+  for compatibility. `Lookups` adds hit
   and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
   and average/maximum fill time.
 - `BackgroundBuild`: whether a scan is active, estimated and scanned

@@ -125,6 +125,40 @@ func TestGraphPlansJourneyAndFinalTransferEntirelyInMemory(t *testing.T) {
 	}
 }
 
+func TestStaticCorridorFindsUpstreamRideAndTransferLinks(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	loader := planningTopologyLoader{
+		stops: []*ctdf.Stop{
+			{PrimaryIdentifier: "origin"},
+			{PrimaryIdentifier: "approach"},
+			{PrimaryIdentifier: "destination"},
+			{PrimaryIdentifier: "unrelated"},
+		},
+		transfers: []*ctdf.StopTransfer{{FromStopRef: "approach", ToStopRef: "destination", Type: ctdf.StopTransferTypeNearbyWalk, TotalDurationSeconds: 60}},
+	}
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), loader); err != nil {
+		t.Fatal(err)
+	}
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "approach", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)}}})
+	data.completeScan([]time.Time{serviceDate})
+	destination, _ := data.stopIndex("destination")
+	origin, _ := data.stopIndex("origin")
+	approach, _ := data.stopIndex("approach")
+	unrelated, _ := data.stopIndex("unrelated")
+	corridor := data.planCorridor(map[uint32]bool{destination: true}, 2)
+	if corridor[destination] != 0 || corridor[approach] != 0 || corridor[origin] != 1 {
+		t.Fatalf("corridor rides destination=%d approach=%d origin=%d", corridor[destination], corridor[approach], corridor[origin])
+	}
+	if corridor[unrelated] != unreachableCorridorRides {
+		t.Fatalf("unrelated stop rides = %d", corridor[unrelated])
+	}
+	if cached := data.planCorridor(map[uint32]bool{destination: true}, 2); len(cached) == 0 || &cached[0] != &corridor[0] {
+		t.Fatal("destination corridor was not cached")
+	}
+}
+
 func TestGraphCoordinateOriginUsesSpatialStopIndex(t *testing.T) {
 	serviceDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
 	loader := planningTopologyLoader{stops: []*ctdf.Stop{

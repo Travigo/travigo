@@ -73,6 +73,11 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	d.TransferOffsets = nil
 	d.Transfers = nil
 	d.TransferRestrictions = nil
+	d.ReverseTransferOffsets = nil
+	d.ReverseTransferOrigins = nil
+	d.ArrivalJourneyOffsets = nil
+	d.ArrivalJourneys = nil
+	d.StaticRoutingReady = false
 	d.TopologyReady = false
 	d.mu.Unlock()
 
@@ -198,6 +203,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	d.TransferOffsets[len(d.Stops)] = uint32(len(d.Transfers))
 	d.TopologyReady = true
 	if len(d.CompleteDays) > 0 {
+		d.buildStaticRoutingIndexesLocked()
 		d.sealBuildIndexesLocked()
 	}
 	log.Info().

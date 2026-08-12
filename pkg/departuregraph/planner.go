@@ -100,6 +100,8 @@ type planQueue struct {
 	data             *graphData
 	destinations     []PlanLocation
 	heuristicSeconds []uint32
+	corridor         []uint8
+	maxVehicleLegs   int
 }
 
 func (q planQueue) Len() int { return len(q.labels) }
@@ -184,6 +186,8 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	}
 
 	queue := newPlanQueue(data, destinationNodes)
+	queue.corridor = data.planCorridor(destinationNodes, config.maxVehicleLegs)
+	queue.maxVehicleLegs = config.maxVehicleLegs
 	heap.Init(queue)
 	best := map[planState]time.Time{}
 	originRef := "coordinate-origin"
@@ -486,6 +490,12 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState]time
 }
 
 func pushPlanLabel(queue *planQueue, best map[planState]time.Time, label *planLabel) bool {
+	if queue != nil && len(queue.corridor) > 0 {
+		remainingVehicleLegs := queue.maxVehicleLegs - label.vehicleLegs
+		if remainingVehicleLegs < 0 || int(label.stop) >= len(queue.corridor) || queue.corridor[label.stop] > uint8(remainingVehicleLegs) {
+			return false
+		}
+	}
 	state := stateForPlanLabel(label)
 	if arrival, exists := best[state]; exists && !label.arrival.Before(arrival) {
 		return false
