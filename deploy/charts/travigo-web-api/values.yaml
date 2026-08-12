@@ -43,7 +43,7 @@ departureGraph:
   daysBehind: 0
   daysAhead: 1
   batchSize: 1000
-  batchPause: 250ms
+  batchPause: 50ms
   initialBuildDelay: 30s
   refreshInterval: 24h
   retryInterval: 1m
