@@ -369,6 +369,13 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]ti
 			continue
 		}
 		record := d.Journeys[active.Journey]
+		journeyRef := d.stringValue(record.PrimaryID)
+		// A ride expansion already reaches every downstream alighting stop.
+		// Re-boarding the same vehicle at its next stop only creates segmented
+		// duplicates of that ride and incorrectly consumes another change.
+		if current.route != nil && current.route.leg.Type == ctdf.JourneyPlanRouteItemTypeJourney && current.route.leg.JourneyRef == journeyRef {
+			continue
+		}
 		serviceDate := dayKeyDate(active.Day, current.arrival.Location())
 		boardingIndex := -1
 		var departure time.Time
@@ -407,7 +414,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]ti
 			}
 			pushPlanLabel(queue, best, config.count, &planLabel{stop: stop, arrival: arrival, vehicleLegs: current.vehicleLegs + 1, route: appendPlanLeg(current.route, PlanLeg{
 				Type:               ctdf.JourneyPlanRouteItemTypeJourney,
-				JourneyRef:         d.stringValue(record.PrimaryID),
+				JourneyRef:         journeyRef,
 				OriginStopRef:      d.stringValue(d.Paths[record.PathStart+uint32(boardingIndex)].OriginStopRef),
 				DestinationStopRef: d.stringValue(path.DestinationStopRef),
 				StartTime:          departure, ArrivalTime: arrival,

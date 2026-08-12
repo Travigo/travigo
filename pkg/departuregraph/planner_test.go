@@ -37,6 +37,7 @@ func TestGraphPlansJourneyAndFinalTransferEntirelyInMemory(t *testing.T) {
 	loader := planningTopologyLoader{
 		stops: []*ctdf.Stop{
 			{PrimaryIdentifier: "origin", OtherIdentifiers: []string{"origin-alias"}, Location: &ctdf.Location{Coordinates: []float64{0, 52}}},
+			{PrimaryIdentifier: "middle", OtherIdentifiers: []string{"middle-alias"}, Location: &ctdf.Location{Coordinates: []float64{0.05, 52}}},
 			{PrimaryIdentifier: "approach", OtherIdentifiers: []string{"approach-alias"}, Location: &ctdf.Location{Coordinates: []float64{0.1, 52}}},
 			{PrimaryIdentifier: "destination", Location: &ctdf.Location{Coordinates: []float64{0.101, 52}}},
 		},
@@ -49,10 +50,16 @@ func TestGraphPlansJourneyAndFinalTransferEntirelyInMemory(t *testing.T) {
 	}
 	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 		PrimaryIdentifier: "journey-1",
-		Path: []*ctdf.JourneyPathItem{{
-			OriginStopRef: "origin-alias", DestinationStopRef: "approach-alias",
-			OriginDepartureTime: serviceTime(10*3600 + 5*60), DestinationArrivalTime: serviceTime(10*3600 + 25*60),
-		}},
+		Path: []*ctdf.JourneyPathItem{
+			{
+				OriginStopRef: "origin-alias", DestinationStopRef: "middle-alias",
+				OriginDepartureTime: serviceTime(10*3600 + 5*60), DestinationArrivalTime: serviceTime(10*3600 + 15*60),
+			},
+			{
+				OriginStopRef: "middle-alias", DestinationStopRef: "approach-alias",
+				OriginDepartureTime: serviceTime(10*3600 + 15*60), DestinationArrivalTime: serviceTime(10*3600 + 25*60),
+			},
+		},
 	})
 	data.completeScan([]time.Time{serviceDate})
 
