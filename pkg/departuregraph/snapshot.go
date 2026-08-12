@@ -13,21 +13,29 @@ import (
 )
 
 type snapshotFile struct {
-	Version       int
-	WrittenAt     time.Time
-	Strings       []string
-	Journeys      []journeyRecord
-	Paths         []pathRecord
-	Replacements  []stringID
-	JourneyDays   map[journeyDayKey]bool
-	Departures    map[bucketKey][]journeyID
-	Arrivals      map[bucketKey][]journeyID
-	CompleteStops map[bucketKey]bool
-	CompleteDays  map[dayKey]bool
-	ScanDays      []dayKey
-	ScanCursor    string
-	ScanProcessed int64
-	ScanActive    int64
+	Version              int
+	WrittenAt            time.Time
+	Strings              []string
+	StopIdentifiers      []stopIdentifierRecord
+	Stops                []stopRecord
+	StopAliasOffsets     []uint32
+	StopAliases          []stringID
+	StopGrid             map[spatialCell][]uint32
+	TransferOffsets      []uint32
+	Transfers            []transferRecord
+	TransferRestrictions []transferRestriction
+	TopologyReady        bool
+	Journeys             []journeyRecord
+	Paths                []pathRecord
+	Replacements         []stringID
+	JourneyDays          map[journeyDayKey]bool
+	Departures           map[bucketKey][]journeyID
+	CompleteStops        map[bucketKey]bool
+	CompleteDays         map[dayKey]bool
+	ScanDays             []dayKey
+	ScanCursor           string
+	ScanProcessed        int64
+	ScanActive           int64
 }
 
 // Save writes the current graph generation to the configured snapshot path.
@@ -96,21 +104,29 @@ func (g *Graph) save(path string, data *graphData) error {
 
 	data.mu.RLock()
 	err = gob.NewEncoder(compressor).Encode(snapshotFile{
-		Version:       snapshotVersion,
-		WrittenAt:     time.Now(),
-		Strings:       data.Strings,
-		Journeys:      data.Journeys,
-		Paths:         data.Paths,
-		Replacements:  data.Replacements,
-		JourneyDays:   data.JourneyDays,
-		Departures:    data.Departures,
-		Arrivals:      data.Arrivals,
-		CompleteStops: data.CompleteStops,
-		CompleteDays:  data.CompleteDays,
-		ScanDays:      data.ScanDays,
-		ScanCursor:    data.ScanCursor,
-		ScanProcessed: data.ScanProcessed,
-		ScanActive:    data.ScanActive,
+		Version:              snapshotVersion,
+		WrittenAt:            time.Now(),
+		Strings:              data.Strings,
+		StopIdentifiers:      data.StopIdentifiers,
+		Stops:                data.Stops,
+		StopAliasOffsets:     data.StopAliasOffsets,
+		StopAliases:          data.StopAliases,
+		StopGrid:             data.StopGrid,
+		TransferOffsets:      data.TransferOffsets,
+		Transfers:            data.Transfers,
+		TransferRestrictions: data.TransferRestrictions,
+		TopologyReady:        data.TopologyReady,
+		Journeys:             data.Journeys,
+		Paths:                data.Paths,
+		Replacements:         data.Replacements,
+		JourneyDays:          data.JourneyDays,
+		Departures:           data.Departures,
+		CompleteStops:        data.CompleteStops,
+		CompleteDays:         data.CompleteDays,
+		ScanDays:             data.ScanDays,
+		ScanCursor:           data.ScanCursor,
+		ScanProcessed:        data.ScanProcessed,
+		ScanActive:           data.ScanActive,
 	})
 	data.mu.RUnlock()
 	if err == nil {
@@ -174,45 +190,36 @@ func (g *Graph) restore(path string) error {
 	}
 
 	restored := &graphData{
-		Strings:       snapshot.Strings,
-		StringIDs:     make(map[string]stringID, len(snapshot.Strings)),
-		StopIDs:       map[string]stringID{"": 0},
-		Journeys:      snapshot.Journeys,
-		Paths:         snapshot.Paths,
-		Replacements:  snapshot.Replacements,
-		JourneyIDs:    make(map[journeyKey]journeyID, len(snapshot.Journeys)),
-		JourneyDays:   snapshot.JourneyDays,
-		Departures:    snapshot.Departures,
-		Arrivals:      snapshot.Arrivals,
-		CompleteStops: snapshot.CompleteStops,
-		CompleteDays:  snapshot.CompleteDays,
-		ScanDays:      snapshot.ScanDays,
-		ScanCursor:    snapshot.ScanCursor,
-		ScanProcessed: snapshot.ScanProcessed,
-		ScanActive:    snapshot.ScanActive,
+		Strings:              snapshot.Strings,
+		StringIDs:            make(map[string]stringID, len(snapshot.Strings)),
+		StopIDs:              map[string]stringID{"": 0},
+		StopIdentifiers:      snapshot.StopIdentifiers,
+		Stops:                snapshot.Stops,
+		StopAliasOffsets:     snapshot.StopAliasOffsets,
+		StopAliases:          snapshot.StopAliases,
+		StopGrid:             snapshot.StopGrid,
+		TransferOffsets:      snapshot.TransferOffsets,
+		Transfers:            snapshot.Transfers,
+		TransferRestrictions: snapshot.TransferRestrictions,
+		TopologyReady:        snapshot.TopologyReady,
+		Journeys:             snapshot.Journeys,
+		Paths:                snapshot.Paths,
+		Replacements:         snapshot.Replacements,
+		JourneyIDs:           make(map[journeyKey]journeyID, len(snapshot.Journeys)),
+		JourneyDays:          snapshot.JourneyDays,
+		Departures:           snapshot.Departures,
+		CompleteStops:        snapshot.CompleteStops,
+		CompleteDays:         snapshot.CompleteDays,
+		ScanDays:             snapshot.ScanDays,
+		ScanCursor:           snapshot.ScanCursor,
+		ScanProcessed:        snapshot.ScanProcessed,
+		ScanActive:           snapshot.ScanActive,
 	}
 	if len(restored.Strings) == 0 {
 		restored.Strings = []string{""}
 	}
 	if restored.Departures == nil {
 		restored.Departures = map[bucketKey][]journeyID{}
-	}
-	if restored.Arrivals == nil {
-		restored.Arrivals = map[bucketKey][]journeyID{}
-		for active := range restored.JourneyDays {
-			if int(active.Journey) >= len(restored.Journeys) {
-				continue
-			}
-			record := restored.Journeys[active.Journey]
-			for index := uint32(0); index < record.PathCount; index++ {
-				path := restored.Paths[record.PathStart+index]
-				if path.DestinationStopRef == 0 {
-					continue
-				}
-				key := bucketKey{Day: active.Day, StopRef: path.DestinationStopRef}
-				restored.Arrivals[key] = append(restored.Arrivals[key], active.Journey)
-			}
-		}
 	}
 	if restored.JourneyDays == nil {
 		restored.JourneyDays = map[journeyDayKey]bool{}
@@ -231,6 +238,11 @@ func (g *Graph) restore(path string) error {
 			if value := restored.stringValue(stopID); value != "" {
 				restored.StopIDs[value] = stopID
 			}
+		}
+	}
+	for _, identifier := range restored.StopIdentifiers {
+		if value := restored.stringValue(identifier.Identifier); value != "" {
+			restored.StopIDs[value] = identifier.Identifier
 		}
 	}
 	for key := range restored.CompleteStops {

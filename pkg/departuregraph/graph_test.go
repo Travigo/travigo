@@ -187,64 +187,6 @@ func TestGraphWindowFiltersAndSortsByDepartureAtRequestedStop(t *testing.T) {
 	}
 }
 
-func TestGraphRanksJourneyThatConnectsTowardsDestinationBeforeEarlierLocalDepartures(t *testing.T) {
-	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
-	serviceStart := time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC)
-	journey := func(identifier, origin, destination string, departure time.Duration) *ctdf.Journey {
-		return &ctdf.Journey{
-			PrimaryIdentifier: identifier,
-			Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
-				Type: ctdf.AvailabilityMatchAll,
-			}}},
-			Path: []*ctdf.JourneyPathItem{{
-				OriginStopRef:          origin,
-				DestinationStopRef:     destination,
-				OriginDepartureTime:    serviceStart.Add(departure),
-				DestinationArrivalTime: serviceStart.Add(departure + 10*time.Minute),
-			}},
-		}
-	}
-
-	graph := New(&fakeLoader{}, Config{Enabled: true})
-	data := graph.current.Load()
-	data.addJourneys(makeDayKey(serviceDate), []*ctdf.Journey{
-		journey("local-1", "origin", "local-a", 9*time.Hour),
-		journey("local-2", "origin", "local-b", 9*time.Hour+5*time.Minute),
-		journey("feeder", "origin", "interchange", 9*time.Hour+10*time.Minute),
-		journey("connector", "interchange", "destination", 9*time.Hour+25*time.Minute),
-	})
-	data.markStopComplete(makeDayKey(serviceDate), "origin")
-
-	ordinary, err := graph.JourneysForStopWindow(
-		context.Background(),
-		&ctdf.Stop{PrimaryIdentifier: "origin"},
-		serviceDate,
-		serviceDate.Add(8*time.Hour),
-		1,
-	)
-	if err != nil {
-		t.Fatalf("ordinary graph lookup: %v", err)
-	}
-	if len(ordinary) != 1 || ordinary[0].PrimaryIdentifier != "local-1" {
-		t.Fatalf("ordinary first journey = %#v, want local-1", ordinary)
-	}
-
-	directed, err := graph.JourneysTowardsStopWindow(
-		context.Background(),
-		&ctdf.Stop{PrimaryIdentifier: "origin"},
-		&ctdf.Stop{PrimaryIdentifier: "destination"},
-		serviceDate,
-		serviceDate.Add(8*time.Hour),
-		1,
-	)
-	if err != nil {
-		t.Fatalf("directed graph lookup: %v", err)
-	}
-	if len(directed) != 1 || directed[0].PrimaryIdentifier != "feeder" {
-		t.Fatalf("directed first journey = %#v, want feeder", directed)
-	}
-}
-
 func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
@@ -272,8 +214,8 @@ func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	if len(journeys) != 1 || restoredLoader.stopLoads != 0 {
 		t.Fatalf("restored journeys=%d loads=%d, want 1 and 0", len(journeys), restoredLoader.stopLoads)
 	}
-	if restored.Stats().ArrivalBuckets == 0 {
-		t.Fatal("restored graph is missing its reverse arrival index")
+	if restored.Stats().ArrivalBuckets != 0 {
+		t.Fatal("restored graph retained its obsolete reverse arrival index")
 	}
 	assertMaterializedJourney(t, journeys[0])
 }
@@ -332,8 +274,8 @@ func TestShiftedRollingRebuildStartsFreshAfterSealing(t *testing.T) {
 	if first == second {
 		t.Fatal("shifted rebuild reused a sealed generation")
 	}
-	if len(second.Journeys) != 1 || len(second.Paths) != 2 || len(second.Departures) != 2 || len(second.Arrivals) != 2 {
-		t.Fatalf("shifted rebuild duplicated graph records: journeys=%d paths=%d departures=%d arrivals=%d", len(second.Journeys), len(second.Paths), len(second.Departures), len(second.Arrivals))
+	if len(second.Journeys) != 1 || len(second.Paths) != 2 || len(second.Departures) != 2 {
+		t.Fatalf("shifted rebuild duplicated graph records: journeys=%d paths=%d departures=%d", len(second.Journeys), len(second.Paths), len(second.Departures))
 	}
 }
 

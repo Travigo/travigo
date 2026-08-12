@@ -1,17 +1,23 @@
-# Rolling departure graph
+# Rolling journey graph
 
-The departure graph runs as a separate internal service using
-`travigo departure-graph run`. Web API replicas make HTTP requests to it for
-scheduled departure candidates. Journey planning uses the same source because
-its vehicle expansion already reads departure boards. Arrival boards and
-filtered board queries continue to use the existing MongoDB/Redis candidate
-path.
+The journey graph runs as a separate internal service using
+`travigo departure-graph run`. It owns the complete in-memory scheduled network:
+canonical stop nodes and aliases, spatial origin cells, walking/change edges,
+journey path edges, service-day membership and per-stop departures.
+
+`POST /v1/plans` performs the complete time-dependent label-setting search in
+that process. Web API sends stop identifiers or origin coordinates and search
+constraints directly to it. The response contains compact journey references
+and timed transfer legs; Web API only batch-hydrates those journey references,
+attaches realtime/reference data, and formats the public response. It does not
+expand departure boards, query transfers or calculate routes. `POST
+/v1/departures` continues to serve the departure board from the same graph.
 
 The graph is deliberately non-blocking:
 
-- Snapshot restore runs before the graph service starts listening. Web API
-  requests fall back to the existing scheduled-journey path while it is
-  unavailable.
+- Snapshot restore runs before the graph service starts listening. The readiness
+  endpoint stays unavailable until both timetable and topology are ready;
+  journey planning has no MongoDB calculation fallback.
 - A request for an incomplete stop/date performs the existing indexed MongoDB
   lookup, adds those journeys to the graph, and marks only that stop complete.
 - Adding a journey indexes all of its origin stops, but propagated stops remain
@@ -27,15 +33,13 @@ The graph is deliberately non-blocking:
   checkpoint is attempted during graceful shutdown.
 
 Journey paths are stored once even when a journey operates on several days.
-Service-date membership and per-stop departure and arrival indexes contain
-integer journey references. Ordinary departure-board requests use the departure
-index exactly as before. Planner requests may also provide a destination; the
-graph walks the arrival index backwards for up to four vehicle legs and returns
-useful connecting departures before unrelated local services. This ordering is
-only a search hint: the planner still validates times, transfers, cancellations
-and route limits. CTDF journey and path objects are materialised only for
-candidates returned to a request. Realtime remains outside the graph and is
-applied by the shared board generator using journey and stop-occurrence identity.
+Service-date membership and the departure index contain integer journey
+references. Transfer adjacency uses compact fixed-width records and offsets;
+stop aliases are canonicalised to graph node numbers. Coordinate origins use a
+small in-memory spatial grid. Planning is a forward earliest-arrival search over
+these scheduled and transfer edges with dominance by stop and vehicle-leg count.
+The old reverse arrival hint index is no longer retained, freeing its
+multi-million map buckets for the actual topology.
 
 Path records contain only the fields used by departure boards and planner
 searches. Destination platforms are omitted because graph-backed arrival boards
@@ -73,10 +77,6 @@ stored-journey, path, and bucket counts after the first production build.
 The pod runs as UID/GID 1000 and mounts the claim with `fsGroup: 1000`, allowing
 atomic snapshot creation on a newly provisioned volume.
 
-The current format is departures-only. An arrival index can later be added as a
-second integer index over the same compact journey/path records without changing
-the lazy fill, rolling generation, or persistence model.
-
 ## Operational statistics
 
 `GET /v1/stats` returns a live JSON snapshot covering:
@@ -85,8 +85,9 @@ the lazy fill, rolling generation, or persistence model.
   completed request rate and latency over the last 60 seconds; and lifetime
   average, maximum and most recent latency.
 - The existing top-level `Strings`, `Journeys`, `Paths`, `DepartureBuckets`,
-  `CompleteStops` and `CompleteDays` fields remain unchanged. `ArrivalBuckets`
-  reports the reverse routing index. `Lookups` adds hit
+  `CompleteStops` and `CompleteDays` fields remain unchanged. `Stops`,
+  `StopIdentifiers`, `TransferEdges` and `TopologyReady` report planner
+  topology; `ArrivalBuckets` remains zero for compatibility. `Lookups` adds hit
   and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
   and average/maximum fill time.
 - `BackgroundBuild`: whether a scan is active, estimated and scanned

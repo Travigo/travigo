@@ -4,10 +4,19 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source"
+	"github.com/travigo/travigo/pkg/departuregraph"
+	"github.com/travigo/travigo/pkg/util"
 	"reflect"
 )
 
 type Source struct {
+	JourneyGraph *departuregraph.Client
+}
+
+func (s *Source) Setup() {
+	if address := util.GetEnvironmentVariables()["TRAVIGO_DEPARTURE_GRAPH_ADDRESS"]; address != "" {
+		s.JourneyGraph = departuregraph.NewClient(address, nil)
+	}
 }
 
 func (s Source) GetName() string {

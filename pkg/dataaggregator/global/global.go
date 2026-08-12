@@ -27,6 +27,8 @@ func Setup() {
 	localdepartureboardSource.Setup()
 	dataaggregator.GlobalAggregator.RegisterSource(localdepartureboardSource)
 
-	dataaggregator.GlobalAggregator.RegisterSource(journeyplanner.Source{})
+	journeyPlannerSource := journeyplanner.Source{}
+	journeyPlannerSource.Setup()
+	dataaggregator.GlobalAggregator.RegisterSource(journeyPlannerSource)
 	dataaggregator.GlobalAggregator.RegisterSource(datasources.Source{})
 }

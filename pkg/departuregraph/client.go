@@ -14,15 +14,14 @@ import (
 )
 
 const departuresPath = "/v1/departures"
+const plansPath = "/v1/plans"
 
 type departuresRequest struct {
-	PrimaryStopRef     string   `json:"primaryStopRef"`
-	StopRefs           []string `json:"stopRefs"`
-	DestinationStopRef string   `json:"destinationStopRef,omitempty"`
-	DestinationRefs    []string `json:"destinationRefs,omitempty"`
-	ServiceDate        string   `json:"serviceDate"`
-	NotBefore          string   `json:"notBefore,omitempty"`
-	Limit              int      `json:"limit,omitempty"`
+	PrimaryStopRef string   `json:"primaryStopRef"`
+	StopRefs       []string `json:"stopRefs"`
+	ServiceDate    string   `json:"serviceDate"`
+	NotBefore      string   `json:"notBefore,omitempty"`
+	Limit          int      `json:"limit,omitempty"`
 }
 
 type departuresResponse struct {
@@ -32,6 +31,35 @@ type departuresResponse struct {
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+}
+
+func (c *Client) Plan(ctx context.Context, request PlanRequest) (PlanResponse, error) {
+	if c == nil || c.baseURL == "" {
+		return PlanResponse{}, fmt.Errorf("journey graph client is not configured")
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return PlanResponse{}, err
+	}
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+plansPath, bytes.NewReader(payload))
+	if err != nil {
+		return PlanResponse{}, err
+	}
+	httpRequest.Header.Set("Content-Type", "application/json")
+	response, err := c.httpClient.Do(httpRequest)
+	if err != nil {
+		return PlanResponse{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		return PlanResponse{}, fmt.Errorf("journey graph returned %s: %s", response.Status, strings.TrimSpace(string(body)))
+	}
+	var result PlanResponse
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		return PlanResponse{}, fmt.Errorf("decode journey graph response: %w", err)
+	}
+	return result, nil
 }
 
 func NewClient(baseURL string, httpClient *http.Client) *Client {
@@ -49,14 +77,10 @@ func (c *Client) JourneysForStop(ctx context.Context, stop *ctdf.Stop, serviceDa
 }
 
 func (c *Client) JourneysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
-	return c.journeysForStopWindow(ctx, stop, nil, serviceDate, notBefore, limit)
+	return c.journeysForStopWindow(ctx, stop, serviceDate, notBefore, limit)
 }
 
-func (c *Client) JourneysTowardsStopWindow(ctx context.Context, stop *ctdf.Stop, destination *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
-	return c.journeysForStopWindow(ctx, stop, destination, serviceDate, notBefore, limit)
-}
-
-func (c *Client) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, destination *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
+func (c *Client) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, serviceDate time.Time, notBefore time.Time, limit int) ([]*ctdf.Journey, error) {
 	if c == nil || c.baseURL == "" || stop == nil {
 		return nil, fmt.Errorf("departure graph client is not configured")
 	}
@@ -66,10 +90,6 @@ func (c *Client) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, des
 		StopRefs:       stop.GetAllStopIDs(),
 		ServiceDate:    serviceDate.Format(ctdf.YearMonthDayFormat),
 		Limit:          limit,
-	}
-	if destination != nil {
-		graphRequest.DestinationStopRef = destination.PrimaryIdentifier
-		graphRequest.DestinationRefs = destination.GetAllStopIDs()
 	}
 	if !notBefore.IsZero() {
 		graphRequest.NotBefore = notBefore.Format(time.RFC3339Nano)

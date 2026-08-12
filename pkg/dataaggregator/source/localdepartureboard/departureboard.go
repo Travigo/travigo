@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/liip/sheriff"
@@ -78,7 +77,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			},
 		}
 	}
-	journeysToday, directedToday := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
+	journeysToday := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
 
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
@@ -95,9 +94,6 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 	currentTime = time.Now()
 	departureBoardToday := ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
-	if directedToday {
-		departureBoardToday = directedBoardSubset(departureBoardToday, journeysToday, q.Count)
-	}
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
 		Int("journeys", len(journeysToday)).
@@ -111,7 +107,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if len(departureBoardToday) < q.Count {
 		currentTime = time.Now()
 
-		journeysTomorrow, directedTomorrow := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
+		journeysTomorrow := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
 
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
@@ -128,9 +124,6 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 		currentTime = time.Now()
 		departureBoardTomorrow := ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
-		if directedTomorrow {
-			departureBoardTomorrow = directedBoardSubset(departureBoardTomorrow, journeysTomorrow, q.Count-len(departureBoardToday))
-		}
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
 			Int("journeys", len(journeysTomorrow)).
@@ -155,32 +148,19 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	return departureBoard, nil
 }
 
-func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) ([]*ctdf.Journey, bool) {
+func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) []*ctdf.Journey {
 	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
 		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		var journeys []*ctdf.Journey
-		var err error
-		if q.DestinationStop != nil {
-			journeys, err = s.DepartureGraph.JourneysTowardsStopWindow(
-				lookupContext,
-				q.Stop,
-				q.DestinationStop,
-				serviceDate,
-				serviceDate,
-				departureGraphCandidateLimit(q.Count),
-			)
-		} else {
-			journeys, err = s.DepartureGraph.JourneysForStopWindow(
-				lookupContext,
-				q.Stop,
-				serviceDate,
-				serviceDate,
-				departureGraphCandidateLimit(q.Count),
-			)
-		}
+		journeys, err := s.DepartureGraph.JourneysForStopWindow(
+			lookupContext,
+			q.Stop,
+			serviceDate,
+			serviceDate,
+			departureGraphCandidateLimit(q.Count),
+		)
 		if err == nil {
-			return journeys, q.DestinationStop != nil
+			return journeys
 		}
 		log.Warn().
 			Err(err).
@@ -188,39 +168,7 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 			Time("service_date", serviceDate).
 			Msg("Departure graph lookup failed; falling back to scheduled journey cache")
 	}
-	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate), false
-}
-
-func directedBoardSubset(board []*ctdf.DepartureBoard, rankedJourneys []*ctdf.Journey, count int) []*ctdf.DepartureBoard {
-	if count <= 0 || len(board) <= count {
-		return board
-	}
-	ranks := make(map[string]int, len(rankedJourneys))
-	for index, journey := range rankedJourneys {
-		if journey != nil {
-			ranks[journey.PrimaryIdentifier] = index
-		}
-	}
-	sort.SliceStable(board, func(i, j int) bool {
-		iRank, iExists := boardJourneyRank(board[i], ranks)
-		jRank, jExists := boardJourneyRank(board[j], ranks)
-		if iExists != jExists {
-			return iExists
-		}
-		if iRank != jRank {
-			return iRank < jRank
-		}
-		return board[i].Time.Before(board[j].Time)
-	})
-	return board[:count]
-}
-
-func boardJourneyRank(entry *ctdf.DepartureBoard, ranks map[string]int) (int, bool) {
-	if entry == nil || entry.Journey == nil {
-		return 0, false
-	}
-	rank, exists := ranks[entry.Journey.PrimaryIdentifier]
-	return rank, exists
+	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate)
 }
 
 func departureGraphCandidateLimit(count int) int {

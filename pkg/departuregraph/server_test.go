@@ -46,20 +46,6 @@ func TestClientQueriesGraphService(t *testing.T) {
 	if len(journeys) != 0 {
 		t.Fatalf("windowed journeys = %d, want 0", len(journeys))
 	}
-	journeys, err = client.JourneysTowardsStopWindow(
-		context.Background(),
-		&ctdf.Stop{PrimaryIdentifier: "stop-a"},
-		&ctdf.Stop{PrimaryIdentifier: "stop-c"},
-		serviceDate,
-		serviceDate,
-		1,
-	)
-	if err != nil {
-		t.Fatalf("query directed graph service window: %v", err)
-	}
-	if len(journeys) != 1 || journeys[0].PrimaryIdentifier != "journey-1" {
-		t.Fatalf("directed service journeys = %#v, want journey-1", journeys)
-	}
 }
 
 func TestStatsEndpointReportsRequestsLookupsAndMemory(t *testing.T) {

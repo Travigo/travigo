@@ -2,7 +2,6 @@ package routes
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -53,22 +52,6 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	departureBoardCountPerStop, err := parsePlannerIntQuery(c, "departure_board_count_per_stop", "12")
-	if err != nil {
-		c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"error": "Parameter departure_board_count_per_stop should be an integer",
-		})
-	}
-
-	originDepartureBoardCount, err := parsePlannerIntQuery(c, "origin_departure_board_count", "24")
-	if err != nil {
-		c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"error": "Parameter origin_departure_board_count should be an integer",
-		})
-	}
-
 	originLocationStopCount, err := parsePlannerIntQuery(c, "origin_location_stop_count", "12")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
@@ -77,7 +60,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		})
 	}
 
-	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "500")
+	maxExpandedLabels, err := parsePlannerIntQuery(c, "max_expanded_labels", "100000")
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -150,35 +133,23 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	var journeyPlans *ctdf.JourneyPlanResults
 
 	journeyPlans, err = dataaggregator.Lookup[*ctdf.JourneyPlanResults](query.JourneyPlan{
-		OriginStop:                 originStop,
-		OriginLocation:             originLocation,
-		DestinationStop:            destinationStop,
-		Count:                      count,
-		StartDateTime:              startDateTime,
-		MaxChanges:                 maxChanges,
-		MaxTransferDistanceMetres:  maxTransferDistanceMetres,
-		MaxJourneyDuration:         time.Duration(maxJourneyDurationMinutes) * time.Minute,
-		DepartureBoardCountPerStop: departureBoardCountPerStop,
-		OriginDepartureBoardCount:  originDepartureBoardCount,
-		OriginLocationStopCount:    originLocationStopCount,
-		MaxExpandedLabels:          maxExpandedLabels,
-		MaxSearchDuration:          time.Duration(maxSearchSeconds) * time.Second,
+		OriginStop:                originStop,
+		OriginLocation:            originLocation,
+		DestinationStop:           destinationStop,
+		Count:                     count,
+		StartDateTime:             startDateTime,
+		MaxChanges:                maxChanges,
+		MaxTransferDistanceMetres: maxTransferDistanceMetres,
+		MaxJourneyDuration:        time.Duration(maxJourneyDurationMinutes) * time.Minute,
+		OriginLocationStopCount:   originLocationStopCount,
+		MaxExpandedLabels:         maxExpandedLabels,
+		MaxSearchDuration:         time.Duration(maxSearchSeconds) * time.Second,
 	})
 	if err != nil {
 		c.SendStatus(fiber.StatusInternalServerError)
 		return c.JSON(fiber.Map{
 			"error": err.Error(),
 		})
-	}
-
-	// Sort departures by DepartureBoard time
-	sort.Slice(journeyPlans.JourneyPlans, func(i, j int) bool {
-		return journeyPlans.JourneyPlans[i].StartTime.Before(journeyPlans.JourneyPlans[j].StartTime)
-	})
-
-	// Once sorted cut off any records higher than our max count
-	if len(journeyPlans.JourneyPlans) > count {
-		journeyPlans.JourneyPlans = journeyPlans.JourneyPlans[:count]
 	}
 
 	if c.Query("view") == "web" {

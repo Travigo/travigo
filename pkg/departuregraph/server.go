@@ -1,7 +1,9 @@
 package departuregraph
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,13 +12,16 @@ import (
 )
 
 type Server struct {
-	graph    Provider
+	graph   Provider
+	planner interface {
+		Plan(context.Context, PlanRequest) (PlanResponse, error)
+	}
 	stats    func() Stats
 	requests *requestTracker
 }
 
 func NewServer(graph *Graph) *Server {
-	return &Server{graph: graph, stats: graph.Stats, requests: newRequestTracker()}
+	return &Server{graph: graph, planner: graph, stats: graph.Stats, requests: newRequestTracker()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -24,10 +29,48 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/stats", s.handleStats)
 	mux.HandleFunc("POST "+departuresPath, s.handleDepartures)
+	mux.HandleFunc("POST "+plansPath, s.handlePlans)
 	return mux
 }
 
+func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
+	started := s.requests.begin()
+	failed := true
+	defer func() { s.requests.finish(started, failed) }()
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024))
+	decoder.DisallowUnknownFields()
+	var request PlanRequest
+	if err := decoder.Decode(&request); err != nil {
+		writeGraphError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if (len(request.OriginRefs) == 0) == (request.OriginLocation == nil) || len(request.DestinationRefs) == 0 {
+		writeGraphError(w, http.StatusBadRequest, "request requires one origin and at least one destination identifier")
+		return
+	}
+	if len(request.OriginRefs) > 256 || len(request.DestinationRefs) > 256 || request.Count < 0 || request.Count > 20 {
+		writeGraphError(w, http.StatusBadRequest, "request limits are invalid")
+		return
+	}
+	result, err := s.planner.Plan(r.Context(), request)
+	if errors.Is(err, ErrGraphNotReady) {
+		writeGraphError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err != nil {
+		writeGraphError(w, http.StatusInternalServerError, fmt.Sprintf("plan journey: %v", err))
+		return
+	}
+	failed = false
+	writeGraphJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	stats := s.stats()
+	if !stats.TopologyReady || stats.CompleteDays == 0 {
+		writeGraphJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "building"})
+		return
+	}
 	writeGraphJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -55,10 +98,6 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(request.StopRefs) == 0 || len(request.StopRefs) > 256 {
 		writeGraphError(w, http.StatusBadRequest, "stopRefs must contain between 1 and 256 identifiers")
-		return
-	}
-	if len(request.DestinationRefs) > 256 {
-		writeGraphError(w, http.StatusBadRequest, "destinationRefs must contain no more than 256 identifiers")
 		return
 	}
 	serviceDate, err := time.Parse(ctdf.YearMonthDayFormat, request.ServiceDate)
@@ -93,25 +132,7 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		PrimaryIdentifier: primary,
 		OtherIdentifiers:  otherRefs,
 	}
-	var journeys []*ctdf.Journey
-	if len(request.DestinationRefs) > 0 {
-		destinationPrimary := request.DestinationStopRef
-		if destinationPrimary == "" {
-			destinationPrimary = request.DestinationRefs[0]
-		}
-		destinationOtherRefs := make([]string, 0, len(request.DestinationRefs))
-		for _, stopRef := range request.DestinationRefs {
-			if stopRef != "" && stopRef != destinationPrimary {
-				destinationOtherRefs = append(destinationOtherRefs, stopRef)
-			}
-		}
-		journeys, err = s.graph.JourneysTowardsStopWindow(r.Context(), stop, &ctdf.Stop{
-			PrimaryIdentifier: destinationPrimary,
-			OtherIdentifiers:  destinationOtherRefs,
-		}, serviceDate, notBefore, request.Limit)
-	} else {
-		journeys, err = s.graph.JourneysForStopWindow(r.Context(), stop, serviceDate, notBefore, request.Limit)
-	}
+	journeys, err := s.graph.JourneysForStopWindow(r.Context(), stop, serviceDate, notBefore, request.Limit)
 	if err != nil {
 		writeGraphError(w, http.StatusServiceUnavailable, fmt.Sprintf("load departures: %v", err))
 		return
