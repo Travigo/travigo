@@ -1130,11 +1130,47 @@ func (runtime *plannerRuntime) loadDirectionStop() error {
 		return runtime.searchQueryError(err)
 	}
 	runtime.directionStop = directionStopForTransfers(destination, transfers, runtime.config.maxTransferDistance)
+	if err := runtime.loadDirectionStopAliases(ctx, directionTransferOrigins(transfers, runtime.config.maxTransferDistance)); err != nil {
+		return err
+	}
 	log.Debug().
 		Str("destination", destination.PrimaryIdentifier).
 		Int("transfer_candidates", len(transfers)).
 		Int("direction_stop_refs", len(runtime.directionStop.GetAllStopIDs())).
 		Msg("Journey planner destination graph targets loaded")
+	return nil
+}
+
+func (runtime *plannerRuntime) loadDirectionStopAliases(ctx context.Context, approachRefs []string) error {
+	if len(approachRefs) == 0 || runtime.directionStop == nil {
+		return nil
+	}
+	cursor, err := database.GetCollection("stops").Find(ctx, bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": approachRefs}},
+			bson.M{"otheridentifiers": bson.M{"$in": approachRefs}},
+		},
+	}, options.Find().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "primaryidentifier", Value: 1},
+		{Key: "otheridentifiers", Value: 1},
+		{Key: "platforms.primaryidentifier", Value: 1},
+	}))
+	if err != nil {
+		return runtime.searchQueryError(err)
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var stop ctdf.Stop
+		if err := cursor.Decode(&stop); err != nil {
+			return err
+		}
+		appendDirectionIdentifiers(runtime.directionStop, stop.GetAllStopIDs())
+	}
+	if err := cursor.Err(); err != nil {
+		return runtime.searchQueryError(err)
+	}
 	return nil
 }
 
@@ -1148,6 +1184,19 @@ func directionStopForTransfers(destination *ctdf.Stop, transfers []*ctdf.StopTra
 	for _, identifier := range destination.GetAllStopIDs() {
 		seen[identifier] = struct{}{}
 	}
+	for _, identifier := range directionTransferOrigins(transfers, maxDistanceMetres) {
+		if _, exists := seen[identifier]; exists {
+			continue
+		}
+		seen[identifier] = struct{}{}
+		direction.OtherIdentifiers = append(direction.OtherIdentifiers, identifier)
+	}
+	return &direction
+}
+
+func directionTransferOrigins(transfers []*ctdf.StopTransfer, maxDistanceMetres int) []string {
+	origins := make([]string, 0, len(transfers))
+	seen := map[string]struct{}{}
 	for _, transfer := range transfers {
 		if transfer == nil || transfer.FromStopRef == "" || transfer.Type == ctdf.StopTransferTypeForbidden {
 			continue
@@ -1159,9 +1208,29 @@ func directionStopForTransfers(destination *ctdf.Stop, transfers []*ctdf.StopTra
 			continue
 		}
 		seen[transfer.FromStopRef] = struct{}{}
-		direction.OtherIdentifiers = append(direction.OtherIdentifiers, transfer.FromStopRef)
+		origins = append(origins, transfer.FromStopRef)
 	}
-	return &direction
+	return origins
+}
+
+func appendDirectionIdentifiers(direction *ctdf.Stop, identifiers []string) {
+	if direction == nil {
+		return
+	}
+	seen := make(map[string]struct{}, len(direction.GetAllStopIDs())+len(identifiers))
+	for _, identifier := range direction.GetAllStopIDs() {
+		seen[identifier] = struct{}{}
+	}
+	for _, identifier := range identifiers {
+		if identifier == "" {
+			continue
+		}
+		if _, exists := seen[identifier]; exists {
+			continue
+		}
+		seen[identifier] = struct{}{}
+		direction.OtherIdentifiers = append(direction.OtherIdentifiers, identifier)
+	}
 }
 
 func (runtime *plannerRuntime) lookupStop(identifier string) (*ctdf.Stop, error) {

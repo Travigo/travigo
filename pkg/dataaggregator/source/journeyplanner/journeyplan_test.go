@@ -88,6 +88,18 @@ func TestDirectionStopIncludesValidFinalTransferOrigins(t *testing.T) {
 	}
 }
 
+func TestDirectionStopAddsJourneyPathAliasesForTransferOrigins(t *testing.T) {
+	direction := &ctdf.Stop{
+		PrimaryIdentifier: "station",
+		OtherIdentifiers:  []string{"nearby-canonical"},
+	}
+	appendDirectionIdentifiers(direction, []string{"nearby-canonical", "nearby-atco", "nearby-platform", ""})
+
+	if got := fmt.Sprint(direction.GetAllStopIDs()); got != "[station nearby-canonical nearby-atco nearby-platform]" {
+		t.Fatalf("direction identifiers = %s", got)
+	}
+}
+
 func TestGPSOriginAlwaysAddsWalkableDestinationBeyondNearestStopCap(t *testing.T) {
 	start := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
 	originLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0, 0}}
