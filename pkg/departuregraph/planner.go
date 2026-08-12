@@ -21,6 +21,7 @@ const (
 	defaultPlanExpandedLabels    = 200000
 	defaultPlanSearchDuration    = 10 * time.Second
 	planWalkSpeedMetresPerSecond = 1.3
+	planMaximumNetworkSpeed      = 100.0
 )
 
 var ErrGraphNotReady = errors.New("journey graph is not ready for the requested service day")
@@ -94,22 +95,62 @@ type planLabel struct {
 	index       int
 }
 
-type planQueue []*planLabel
+type planQueue struct {
+	labels           []*planLabel
+	data             *graphData
+	destinations     []PlanLocation
+	heuristicSeconds []uint32
+}
 
-func (q planQueue) Len() int           { return len(q) }
-func (q planQueue) Less(i, j int) bool { return q[i].arrival.Before(q[j].arrival) }
-func (q planQueue) Swap(i, j int)      { q[i], q[j] = q[j], q[i]; q[i].index = i; q[j].index = j }
+func (q planQueue) Len() int { return len(q.labels) }
+func (q planQueue) Less(i, j int) bool {
+	iPriority := q.priority(q.labels[i])
+	jPriority := q.priority(q.labels[j])
+	if iPriority.Equal(jPriority) {
+		return q.labels[i].arrival.Before(q.labels[j].arrival)
+	}
+	return iPriority.Before(jPriority)
+}
+func (q planQueue) Swap(i, j int) {
+	q.labels[i], q.labels[j] = q.labels[j], q.labels[i]
+	q.labels[i].index = i
+	q.labels[j].index = j
+}
 func (q *planQueue) Push(value any) {
 	label := value.(*planLabel)
-	label.index = len(*q)
-	*q = append(*q, label)
+	label.index = len(q.labels)
+	q.labels = append(q.labels, label)
 }
 func (q *planQueue) Pop() any {
-	old := *q
+	old := q.labels
 	label := old[len(old)-1]
 	old[len(old)-1] = nil
-	*q = old[:len(old)-1]
+	q.labels = old[:len(old)-1]
 	return label
+}
+
+func (q *planQueue) priority(label *planLabel) time.Time {
+	if q == nil || q.data == nil || int(label.stop) >= len(q.heuristicSeconds) || len(q.destinations) == 0 {
+		return label.arrival
+	}
+	encodedSeconds := q.heuristicSeconds[label.stop]
+	if encodedSeconds == 0 {
+		stop := q.data.Stops[label.stop]
+		seconds := uint32(0)
+		if stop.HasLocation {
+			minimumDistance := math.MaxFloat64
+			for _, destination := range q.destinations {
+				distance := distanceMetres(float64(stop.Longitude), float64(stop.Latitude), destination.Longitude, destination.Latitude)
+				if distance < minimumDistance {
+					minimumDistance = distance
+				}
+			}
+			seconds = uint32(minimumDistance / planMaximumNetworkSpeed)
+		}
+		encodedSeconds = seconds + 1
+		q.heuristicSeconds[label.stop] = encodedSeconds
+	}
+	return label.arrival.Add(time.Duration(encodedSeconds-1) * time.Second)
 }
 
 type planState struct {
@@ -142,7 +183,7 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		return PlanResponse{Plans: []Plan{}}, nil
 	}
 
-	queue := &planQueue{}
+	queue := newPlanQueue(data, destinationNodes)
 	heap.Init(queue)
 	best := map[planState]time.Time{}
 	originRef := "coordinate-origin"
@@ -242,6 +283,20 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		Dur("duration", time.Since(started)).
 		Msg("Journey graph plan complete")
 	return response, nil
+}
+
+func newPlanQueue(data *graphData, destinationNodes map[uint32]bool) *planQueue {
+	queue := &planQueue{data: data, heuristicSeconds: make([]uint32, len(data.Stops))}
+	for destination := range destinationNodes {
+		if int(destination) >= len(data.Stops) {
+			continue
+		}
+		stop := data.Stops[destination]
+		if stop.HasLocation {
+			queue.destinations = append(queue.destinations, PlanLocation{Longitude: float64(stop.Longitude), Latitude: float64(stop.Latitude)})
+		}
+	}
+	return queue
 }
 
 func normalizePlanConfig(request PlanRequest) planConfig {

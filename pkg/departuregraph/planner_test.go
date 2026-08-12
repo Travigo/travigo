@@ -42,6 +42,23 @@ func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
 	}
 }
 
+func TestPlanQueuePrioritisesAdmissibleDestinationEstimate(t *testing.T) {
+	data := newGraphData()
+	data.Stops = []stopRecord{
+		{Longitude: 0, Latitude: 52, HasLocation: true},
+		{Longitude: 1.99, Latitude: 52, HasLocation: true},
+		{Longitude: 2, Latitude: 52, HasLocation: true},
+	}
+	queue := newPlanQueue(data, map[uint32]bool{2: true})
+	heap.Init(queue)
+	base := time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)
+	heap.Push(queue, &planLabel{stop: 0, arrival: base})
+	heap.Push(queue, &planLabel{stop: 1, arrival: base.Add(10 * time.Minute)})
+	if got := heap.Pop(queue).(*planLabel).stop; got != 1 {
+		t.Fatalf("first stop = %d, want destination-directed stop 1", got)
+	}
+}
+
 type planningTopologyLoader struct {
 	stops     []*ctdf.Stop
 	transfers []*ctdf.StopTransfer
