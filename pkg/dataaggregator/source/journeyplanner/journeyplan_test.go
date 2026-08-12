@@ -63,6 +63,57 @@ func TestJourneyPlanConfigAllowsSearchBudgetOverrides(t *testing.T) {
 	}
 }
 
+func TestDirectionStopIncludesValidFinalTransferOrigins(t *testing.T) {
+	destination := &ctdf.Stop{
+		PrimaryIdentifier: "station",
+		OtherIdentifiers:  []string{"station-alias"},
+	}
+	transfers := []*ctdf.StopTransfer{
+		{FromStopRef: "nearby-bus", ToStopRef: "station", Type: ctdf.StopTransferTypeNearbyWalk, DistanceMetres: 300},
+		{FromStopRef: "nearby-bus", ToStopRef: "station-alias", Type: ctdf.StopTransferTypeNearbyWalk, DistanceMetres: 300},
+		{FromStopRef: "too-far", ToStopRef: "station", Type: ctdf.StopTransferTypeNearbyWalk, DistanceMetres: 1200},
+		{FromStopRef: "forbidden", ToStopRef: "station", Type: ctdf.StopTransferTypeForbidden, DistanceMetres: 100},
+		{FromStopRef: "route-specific", ToStopRef: "station", Type: ctdf.StopTransferTypeNearbyWalk, DistanceMetres: 100, FromRouteRef: "route"},
+	}
+
+	direction := directionStopForTransfers(destination, transfers, 1000)
+	if direction == destination {
+		t.Fatal("direction stop should be a copy")
+	}
+	if got := fmt.Sprint(direction.GetAllStopIDs()); got != "[station station-alias nearby-bus]" {
+		t.Fatalf("direction identifiers = %s", got)
+	}
+	if got := fmt.Sprint(destination.GetAllStopIDs()); got != "[station station-alias]" {
+		t.Fatalf("destination was mutated: %s", got)
+	}
+}
+
+func TestGPSOriginAlwaysAddsWalkableDestinationBeyondNearestStopCap(t *testing.T) {
+	start := time.Date(2026, 8, 12, 12, 0, 0, 0, time.UTC)
+	originLocation := &ctdf.Location{Type: "Point", Coordinates: []float64{0, 0}}
+	destination := &ctdf.Stop{
+		PrimaryIdentifier: "destination",
+		Location:          &ctdf.Location{Type: "Point", Coordinates: []float64{0.01, 0}},
+	}
+	runtime := &plannerRuntime{
+		bestArrivals:    map[plannerStateKey][]time.Time{},
+		config:          plannerConfig{maxTransferDistance: 1500, maxLabelsPerState: 1},
+		destinationStop: destination,
+		searchEndTime:   start.Add(6 * time.Hour),
+	}
+	pq := &plannerPriorityQueue{}
+	heap.Init(pq)
+
+	runtime.pushWalkableDestinationLabel(pq, coordinateOriginStop(originLocation), originLocation, start)
+	if pq.Len() != 1 {
+		t.Fatalf("walkable destination labels = %d, want 1", pq.Len())
+	}
+	label := heap.Pop(pq).(*plannerLabel)
+	if label.stop != destination || label.routeItems == nil || label.routeItems.item.DestinationStopRef != "destination" {
+		t.Fatalf("unexpected walkable destination label: %#v", label)
+	}
+}
+
 func TestLimitDepartureBoardSortsAndLimits(t *testing.T) {
 	start := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
 	board := []*ctdf.DepartureBoard{
@@ -89,12 +140,13 @@ func TestLoadDepartureBoardReusesFullGeneratedBoardForLaterArrival(t *testing.T)
 	start := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
 	lookupCalls := 0
 	destination := &ctdf.Stop{PrimaryIdentifier: "destination"}
+	direction := &ctdf.Stop{PrimaryIdentifier: "destination", OtherIdentifiers: []string{"final-transfer-stop"}}
 	runtime := &plannerRuntime{
 		departureBoardCache: map[string]cachedDepartureBoard{},
 		departureBoardLookup: func(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
 			lookupCalls++
-			if q.DestinationStop != destination {
-				t.Fatalf("departure lookup destination = %#v, want destination", q.DestinationStop)
+			if q.DestinationStop != direction {
+				t.Fatalf("departure lookup destination = %#v, want direction target", q.DestinationStop)
 			}
 			board := make([]*ctdf.DepartureBoard, 10)
 			for index := range board {
@@ -103,6 +155,7 @@ func TestLoadDepartureBoardReusesFullGeneratedBoardForLaterArrival(t *testing.T)
 			return board, nil
 		},
 		destinationStop: destination,
+		directionStop:   direction,
 	}
 	stop := &ctdf.Stop{PrimaryIdentifier: "interchange"}
 

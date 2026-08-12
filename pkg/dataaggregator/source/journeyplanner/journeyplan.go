@@ -157,6 +157,7 @@ type plannerRuntime struct {
 	searchEndTime        time.Time
 	searchDeadline       time.Time
 	destinationStop      *ctdf.Stop
+	directionStop        *ctdf.Stop
 	timedOut             bool
 }
 
@@ -184,6 +185,9 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		searchEndTime:       q.StartDateTime.Add(config.maxJourneyDuration),
 		searchDeadline:      time.Now().Add(config.maxSearchDuration),
 		destinationStop:     q.DestinationStop,
+	}
+	if err := runtime.loadDirectionStop(); err != nil {
+		return nil, err
 	}
 	runtime.cacheStop(originStop)
 	runtime.cacheStop(q.DestinationStop)
@@ -371,8 +375,21 @@ func (runtime *plannerRuntime) pushOriginLocationLabels(pq *plannerPriorityQueue
 		label := originLocationLabel(originStop, originLocation, stop, startDateTime)
 		runtime.pushLabel(pq, label)
 	}
+	// The nearest-stop cap must not hide a walkable destination in a dense stop
+	// area. pushLabel deduplicates it if MongoDB already returned the destination.
+	runtime.pushWalkableDestinationLabel(pq, originStop, originLocation, startDateTime)
 
 	return nil
+}
+
+func (runtime *plannerRuntime) pushWalkableDestinationLabel(pq *plannerPriorityQueue, originStop *ctdf.Stop, originLocation *ctdf.Location, startDateTime time.Time) {
+	if runtime.destinationStop == nil || runtime.destinationStop.Location == nil || originLocation == nil {
+		return
+	}
+	if originLocation.Distance(runtime.destinationStop.Location) > float64(runtime.config.maxTransferDistance) {
+		return
+	}
+	runtime.pushLabel(pq, originLocationLabel(originStop, originLocation, runtime.destinationStop, startDateTime))
 }
 
 func originLocationLabel(originStop *ctdf.Stop, originLocation *ctdf.Location, stop *ctdf.Stop, startDateTime time.Time) *plannerLabel {
@@ -913,7 +930,7 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 
 	board, err := runtime.lookupDepartureBoard(query.DepartureBoard{
 		Stop:            stop,
-		DestinationStop: runtime.destinationStop,
+		DestinationStop: runtime.departureDirectionStop(),
 		Count:           departureBoardCount,
 		StartDateTime:   startDateTime,
 	})
@@ -932,6 +949,13 @@ func (runtime *plannerRuntime) loadDepartureBoard(stop *ctdf.Stop, startDateTime
 	}
 
 	return limitDepartureBoard(board, departureBoardCount), nil
+}
+
+func (runtime *plannerRuntime) departureDirectionStop() *ctdf.Stop {
+	if runtime.directionStop != nil {
+		return runtime.directionStop
+	}
+	return runtime.destinationStop
 }
 
 func (runtime *plannerRuntime) lookupDepartureBoard(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
@@ -1061,6 +1085,83 @@ func (runtime *plannerRuntime) loadTransfers(stop *ctdf.Stop) ([]*ctdf.StopTrans
 
 	runtime.transferCache[stop.PrimaryIdentifier] = transfers
 	return transfers, nil
+}
+
+// loadDirectionStop expands the graph target with stops that have a valid
+// final transfer into the requested destination. The planner still validates
+// and records that transfer normally; these identifiers only guide graph
+// candidate ordering so useful feeder services are not starved by local ones.
+func (runtime *plannerRuntime) loadDirectionStop() error {
+	destination := runtime.destinationStop
+	if destination == nil {
+		return nil
+	}
+	runtime.directionStop = destination
+
+	stopTransfersCollection := database.GetCollection("stop_transfers")
+	ctx, cancel := runtime.searchContext()
+	defer cancel()
+	cursor, err := stopTransfersCollection.Find(ctx, bson.M{
+		"tostopref": bson.M{"$in": destination.GetAllStopIDs()},
+	}, options.Find().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "fromstopref", Value: 1},
+		{Key: "type", Value: 1},
+		{Key: "distancemetres", Value: 1},
+		{Key: "fromrouteref", Value: 1},
+		{Key: "fromtripref", Value: 1},
+		{Key: "torouteref", Value: 1},
+		{Key: "totripref", Value: 1},
+	}))
+	if err != nil {
+		return runtime.searchQueryError(err)
+	}
+	defer cursor.Close(ctx)
+
+	transfers := make([]*ctdf.StopTransfer, 0, 16)
+	for cursor.Next(ctx) {
+		var transfer ctdf.StopTransfer
+		if err := cursor.Decode(&transfer); err != nil {
+			return err
+		}
+		transfers = append(transfers, &transfer)
+	}
+	if err := cursor.Err(); err != nil {
+		return runtime.searchQueryError(err)
+	}
+	runtime.directionStop = directionStopForTransfers(destination, transfers, runtime.config.maxTransferDistance)
+	log.Debug().
+		Str("destination", destination.PrimaryIdentifier).
+		Int("transfer_candidates", len(transfers)).
+		Int("direction_stop_refs", len(runtime.directionStop.GetAllStopIDs())).
+		Msg("Journey planner destination graph targets loaded")
+	return nil
+}
+
+func directionStopForTransfers(destination *ctdf.Stop, transfers []*ctdf.StopTransfer, maxDistanceMetres int) *ctdf.Stop {
+	if destination == nil {
+		return nil
+	}
+	direction := *destination
+	direction.OtherIdentifiers = append([]string(nil), destination.OtherIdentifiers...)
+	seen := make(map[string]struct{}, len(destination.GetAllStopIDs())+len(transfers))
+	for _, identifier := range destination.GetAllStopIDs() {
+		seen[identifier] = struct{}{}
+	}
+	for _, transfer := range transfers {
+		if transfer == nil || transfer.FromStopRef == "" || transfer.Type == ctdf.StopTransferTypeForbidden {
+			continue
+		}
+		if transfer.DistanceMetres > maxDistanceMetres || transfer.FromRouteRef != "" || transfer.FromTripRef != "" || transfer.ToRouteRef != "" || transfer.ToTripRef != "" {
+			continue
+		}
+		if _, exists := seen[transfer.FromStopRef]; exists {
+			continue
+		}
+		seen[transfer.FromStopRef] = struct{}{}
+		direction.OtherIdentifiers = append(direction.OtherIdentifiers, transfer.FromStopRef)
+	}
+	return &direction
 }
 
 func (runtime *plannerRuntime) lookupStop(identifier string) (*ctdf.Stop, error) {
