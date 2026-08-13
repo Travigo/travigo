@@ -3,6 +3,7 @@ package localdepartureboard
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -101,5 +102,17 @@ func TestDepartureGraphCandidateLimitOverfetchesAndBoundsResults(t *testing.T) {
 		if got := departureGraphCandidateLimit(test.count); got != test.want {
 			t.Errorf("candidate limit for count %d = %d, want %d", test.count, got, test.want)
 		}
+	}
+}
+
+func TestBoardStopAliasFallbackIncludesAllBoardIdentifiers(t *testing.T) {
+	aliases, requested := boardStopAliasFallback([]string{"station", "platform", "station"})
+
+	want := []string{"station", "platform"}
+	if !reflect.DeepEqual(aliases["station"], want) || !reflect.DeepEqual(aliases["platform"], want) {
+		t.Fatalf("fallback aliases = %#v, want both board identifiers: %v", aliases, want)
+	}
+	if len(requested) != 2 {
+		t.Fatalf("requested identifiers = %#v, want two unique identifiers", requested)
 	}
 }

@@ -77,7 +77,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			},
 		}
 	}
-	journeysToday := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
+	journeysToday, journeysTodayFromGraph := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
 
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
@@ -94,6 +94,14 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 	currentTime = time.Now()
 	departureBoardToday := ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
+	if journeysTodayFromGraph && !hasRealtimeBoardEntry(departureBoardToday) {
+		log.Warn().
+			Str("stop", q.Stop.PrimaryIdentifier).
+			Msg("Departure graph board produced no realtime entries; falling back to scheduled journey cache")
+		journeysToday = s.getDateJourneys(baseCacheItemPath, journeyQuery, q.StartDateTime)
+		realtimeLookupToday = s.realtimeLookup(journeysToday, q.StartDateTime, allStopIDs)
+		departureBoardToday = ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
+	}
 	log.Debug().
 		Str("stop", q.Stop.PrimaryIdentifier).
 		Int("journeys", len(journeysToday)).
@@ -107,7 +115,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if len(departureBoardToday) < q.Count {
 		currentTime = time.Now()
 
-		journeysTomorrow := s.getBoardJourneys(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
+		journeysTomorrow, journeysTomorrowFromGraph := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
 
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
@@ -124,6 +132,14 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 		currentTime = time.Now()
 		departureBoardTomorrow := ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
+		if journeysTomorrowFromGraph && !hasRealtimeBoardEntry(departureBoardTomorrow) {
+			log.Warn().
+				Str("stop", q.Stop.PrimaryIdentifier).
+				Msg("Departure graph tomorrow board produced no realtime entries; falling back to scheduled journey cache")
+			journeysTomorrow = s.getDateJourneys(baseCacheItemPath, journeyQuery, dayAfterDateTime)
+			realtimeLookupTomorrow = s.realtimeLookup(journeysTomorrow, dayAfterDateTime, allStopIDs)
+			departureBoardTomorrow = ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
+		}
 		log.Debug().
 			Str("stop", q.Stop.PrimaryIdentifier).
 			Int("journeys", len(journeysTomorrow)).
@@ -149,6 +165,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 }
 
 func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) []*ctdf.Journey {
+	journeys, _ := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, serviceDate, boardType)
+	return journeys
+}
+
+func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) ([]*ctdf.Journey, bool) {
 	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
 		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -160,7 +181,7 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 			departureGraphCandidateLimit(q.Count),
 		)
 		if err == nil {
-			return journeys
+			return journeys, true
 		}
 		log.Warn().
 			Err(err).
@@ -168,7 +189,22 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 			Time("service_date", serviceDate).
 			Msg("Departure graph lookup failed; falling back to scheduled journey cache")
 	}
-	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate)
+	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate), false
+}
+
+func hasRealtimeBoardEntry(entries []*ctdf.DepartureBoard) bool {
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Type == ctdf.DepartureBoardRecordTypeRealtimeTracked || entry.Type == ctdf.DepartureBoardRecordTypeCancelled {
+			return true
+		}
+		if entry.Journey != nil && entry.Journey.RealtimeJourney != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func departureGraphCandidateLimit(count int) int {
@@ -228,14 +264,7 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, 
 }
 
 func findBoardStopAliases(stopRefs []string) map[string][]string {
-	aliasesByRef := make(map[string][]string, len(stopRefs))
-	requestedRefs := make(map[string]struct{}, len(stopRefs))
-	for _, stopRef := range stopRefs {
-		if stopRef != "" {
-			requestedRefs[stopRef] = struct{}{}
-			aliasesByRef[stopRef] = []string{stopRef}
-		}
-	}
+	aliasesByRef, requestedRefs := boardStopAliasFallback(stopRefs)
 	if len(requestedRefs) == 0 {
 		return aliasesByRef
 	}
@@ -280,6 +309,33 @@ func findBoardStopAliases(stopRefs []string) map[string][]string {
 		log.Error().Err(err).Msg("Failed while reading departure board stop aliases")
 	}
 	return aliasesByRef
+}
+
+func boardStopAliasFallback(stopRefs []string) (map[string][]string, map[string]struct{}) {
+	aliasesByRef := make(map[string][]string, len(stopRefs))
+	requestedRefs := make(map[string]struct{}, len(stopRefs))
+	allRequestedRefs := make([]string, 0, len(stopRefs))
+	for _, stopRef := range stopRefs {
+		if stopRef == "" {
+			continue
+		}
+		if _, exists := requestedRefs[stopRef]; exists {
+			continue
+		}
+		requestedRefs[stopRef] = struct{}{}
+		allRequestedRefs = append(allRequestedRefs, stopRef)
+	}
+
+	// Keep the complete set of identifiers supplied for the board as the
+	// fallback alias set. The database enrichment below is best-effort, and
+	// platform boards can contain identifiers represented on the parent stop
+	// rather than in the top-level identifier fields. Without this fallback, a
+	// failed or incomplete alias query silently reduces realtime matching to
+	// exact stop references.
+	for _, stopRef := range allRequestedRefs {
+		aliasesByRef[stopRef] = append([]string(nil), allRequestedRefs...)
+	}
+	return aliasesByRef, requestedRefs
 }
 
 func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
