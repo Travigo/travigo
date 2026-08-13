@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"os"
+	"strings"
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
@@ -17,6 +18,16 @@ import (
 
 type PushManager struct {
 	FirebaseApp *firebase.App
+}
+
+const notificationWebAppURL = "https://travigo.app"
+
+func notificationWebLink(path string) string {
+	if path == "" || strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
+
+	return strings.TrimRight(notificationWebAppURL, "/") + "/" + strings.TrimLeft(path, "/")
 }
 
 func (m *PushManager) Setup() error {
@@ -79,13 +90,20 @@ func (m *PushManager) SendPush(notification ctdf.Notification) error {
 	sentCount := 0
 	var lastErr error
 	for _, userPushNotificationTarget := range userPushNotificationTargets {
-		_, err = fcmClient.Send(context.Background(), &messaging.Message{
+		message := &messaging.Message{
 			Notification: &messaging.Notification{
 				Title: notification.Title,
 				Body:  notification.Message,
 			},
 			Token: userPushNotificationTarget.PushNotificationToken,
-		})
+		}
+		if notification.URL != "" {
+			message.Webpush = &messaging.WebpushConfig{
+				FCMOptions: &messaging.WebpushFCMOptions{Link: notificationWebLink(notification.URL)},
+			}
+		}
+
+		_, err = fcmClient.Send(context.Background(), message)
 
 		if err != nil {
 			lastErr = err

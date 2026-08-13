@@ -2,6 +2,7 @@ package events
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -12,9 +13,22 @@ import (
 	"github.com/travigo/travigo/pkg/util"
 )
 
-func matchingServiceAlertIdentifier(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) string {
-	for _, reference := range []string{values.StopRef, values.ServiceRef, values.JourneyRef} {
-		if reference == "" {
+type serviceAlertReference struct {
+	kind       string
+	identifier string
+	date       string
+}
+
+func matchingServiceAlertReference(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) serviceAlertReference {
+	for _, reference := range []struct {
+		kind       string
+		identifier string
+	}{
+		{kind: "stop", identifier: values.StopRef},
+		{kind: "service", identifier: values.ServiceRef},
+		{kind: "journey", identifier: values.JourneyRef},
+	} {
+		if reference.identifier == "" {
 			continue
 		}
 
@@ -24,19 +38,99 @@ func matchingServiceAlertIdentifier(matchedIdentifiers []interface{}, values ctd
 				continue
 			}
 
-			if identifier == reference {
-				return identifier
+			if identifier == reference.identifier {
+				return serviceAlertReference{kind: reference.kind, identifier: identifier}
 			}
-			if reference == values.JourneyRef && strings.HasPrefix(identifier, "DAYINSTANCEOF:") && strings.HasSuffix(identifier, ":"+reference) {
+			if reference.kind == "journey" && strings.HasPrefix(identifier, "DAYINSTANCEOF:") && strings.HasSuffix(identifier, ":"+reference.identifier) {
 				parts := strings.SplitN(identifier, ":", 3)
 				if len(parts) == 3 {
-					return parts[2]
+					return serviceAlertReference{
+						kind:       reference.kind,
+						identifier: parts[2],
+						date:       dayInstanceDate(parts[1]),
+					}
 				}
 			}
 		}
 	}
 
+	return serviceAlertReference{}
+}
+
+func matchingServiceAlertIdentifier(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) string {
+	return matchingServiceAlertReference(matchedIdentifiers, values).identifier
+}
+
+func dayInstanceDate(value string) string {
+	for _, layout := range []string{"2006-01-02", "20060102"} {
+		parsed, err := time.Parse(layout, value)
+		if err == nil {
+			return parsed.Format("2006-01-02")
+		}
+	}
+
 	return ""
+}
+
+func notificationPathIdentifier(identifier string) string {
+	return strings.NewReplacer("%3A", ":", "%3a", ":").Replace(url.PathEscape(identifier))
+}
+
+func notificationTargetURL(e *ctdf.Event, notificationMatcher ctdf.UserNotificationSubscription) string {
+	if e == nil {
+		return ""
+	}
+
+	eventBody, ok := e.Body.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	if e.Type == ctdf.EventTypeServiceAlertCreated {
+		matchedIdentifiers, _ := eventBody["MatchedIdentifiers"].([]interface{})
+		reference := matchingServiceAlertReference(matchedIdentifiers, notificationMatcher.Values)
+		if reference.identifier == "" {
+			return ""
+		}
+
+		path := ""
+		switch reference.kind {
+		case "stop":
+			path = "/stops/" + notificationPathIdentifier(reference.identifier)
+		case "service":
+			path = "/services/" + notificationPathIdentifier(reference.identifier)
+		case "journey":
+			path = "/journeys/" + notificationPathIdentifier(reference.identifier)
+			if reference.date != "" {
+				path += "?date=" + url.QueryEscape(reference.date)
+			}
+		}
+
+		return path
+	}
+
+	journeyBody := eventBody
+	if nested, ok := eventBody["RealtimeJourney"].(map[string]interface{}); ok {
+		journeyBody = nested
+	}
+
+	journey, _ := journeyBody["Journey"].(map[string]interface{})
+	journeyIdentifier, _ := journey["PrimaryIdentifier"].(string)
+	if journeyIdentifier == "" {
+		journeyIdentifier, _ = journeyBody["PrimaryIdentifier"].(string)
+	}
+	if journeyIdentifier == "" {
+		return ""
+	}
+
+	path := "/journeys/" + notificationPathIdentifier(journeyIdentifier)
+	if runDate, _ := journeyBody["JourneyRunDate"].(string); runDate != "" {
+		if parsed, err := time.Parse(time.RFC3339, runDate); err == nil {
+			path += "?date=" + url.QueryEscape(parsed.Format("2006-01-02"))
+		}
+	}
+
+	return path
 }
 
 func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificationSubscriptionValues) string {

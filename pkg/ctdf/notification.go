@@ -6,6 +6,7 @@ type Notification struct {
 
 	Title   string
 	Message string
+	URL     string `json:"url,omitempty"`
 }
 
 type NotificationType string

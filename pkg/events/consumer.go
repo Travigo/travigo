@@ -69,6 +69,7 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 					Type:       ctdf.NotificationTypePush, // TODO currently only supported method
 					Title:      notificationData.Title,
 					Message:    notificationData.Message,
+					URL:        notificationTargetURL(&event, userEventSubscription),
 				}
 
 				notificationBytes, _ := json.Marshal(notification)

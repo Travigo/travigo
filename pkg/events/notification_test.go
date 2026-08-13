@@ -165,3 +165,92 @@ func TestGetNotificationDataNextStopChanged(t *testing.T) {
 		t.Fatalf("notification message = %q", data.Message)
 	}
 }
+
+func TestNotificationTargetURLServiceAlert(t *testing.T) {
+	tests := []struct {
+		name    string
+		values  ctdf.UserNotificationSubscriptionValues
+		matched []interface{}
+		want    string
+	}{
+		{
+			name:    "stop",
+			values:  ctdf.UserNotificationSubscriptionValues{StopRef: "stop-1"},
+			matched: []interface{}{"stop-1"},
+			want:    "/stops/stop-1",
+		},
+		{
+			name:    "service",
+			values:  ctdf.UserNotificationSubscriptionValues{ServiceRef: "service:1"},
+			matched: []interface{}{"service:1"},
+			want:    "/services/service:1",
+		},
+		{
+			name:    "dated journey compact",
+			values:  ctdf.UserNotificationSubscriptionValues{JourneyRef: "journey-1"},
+			matched: []interface{}{"DAYINSTANCEOF:20260811:journey-1"},
+			want:    "/journeys/journey-1?date=2026-08-11",
+		},
+		{
+			name:    "dated journey ISO",
+			values:  ctdf.UserNotificationSubscriptionValues{JourneyRef: "journey-1"},
+			matched: []interface{}{"DAYINSTANCEOF:2026-08-11:journey-1"},
+			want:    "/journeys/journey-1?date=2026-08-11",
+		},
+		{
+			name:    "no configured match",
+			values:  ctdf.UserNotificationSubscriptionValues{ServiceRef: "service-1"},
+			matched: []interface{}{"service-2"},
+			want:    "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := notificationTargetURL(&ctdf.Event{
+				Type: ctdf.EventTypeServiceAlertCreated,
+				Body: map[string]interface{}{"MatchedIdentifiers": test.matched},
+			}, ctdf.UserNotificationSubscription{Values: test.values})
+
+			if got != test.want {
+				t.Fatalf("notification target URL = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestNotificationTargetURLRealtimeJourney(t *testing.T) {
+	tests := []struct {
+		name string
+		body map[string]interface{}
+		want string
+	}{
+		{
+			name: "realtime journey",
+			body: map[string]interface{}{
+				"Journey":        map[string]interface{}{"PrimaryIdentifier": "journey:1"},
+				"JourneyRunDate": "2026-08-11T00:00:00Z",
+			},
+			want: "/journeys/journey:1?date=2026-08-11",
+		},
+		{
+			name: "platform update",
+			body: map[string]interface{}{
+				"RealtimeJourney": map[string]interface{}{
+					"Journey":        map[string]interface{}{"PrimaryIdentifier": "journey-2"},
+					"JourneyRunDate": "2026-08-12T00:00:00Z",
+				},
+			},
+			want: "/journeys/journey-2?date=2026-08-12",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := notificationTargetURL(&ctdf.Event{Body: test.body}, ctdf.UserNotificationSubscription{})
+			if got != test.want {
+				t.Fatalf("notification target URL = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
