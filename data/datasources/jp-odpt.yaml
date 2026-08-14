@@ -2,7 +2,7 @@ identifier: jp-odpt
 region: jp
 provider:
   name: ODPT
-  website: "https://odpt.org"
+  website: "https://www.odpt.org"
 sourceauthentication:
   query:
     "acl:consumerKey": TRAVIGO_JP_ODPT_API_KEY

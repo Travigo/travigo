@@ -85,9 +85,11 @@ type MemoryStats struct {
 
 type ServiceStats struct {
 	Stats
-	GeneratedAt time.Time
-	Requests    RequestStats
-	Memory      MemoryStats
+	GeneratedAt       time.Time
+	Requests          RequestStats
+	PlanRequests      RequestStats
+	DepartureRequests RequestStats
+	Memory            MemoryStats
 }
 
 type graphMetrics struct {
@@ -205,6 +207,12 @@ func (b *buildTracker) finish(err error) {
 		b.failedBuilds++
 		b.lastError = err.Error()
 	} else {
+		if scanned := b.scannedJourneys.Load(); b.estimatedJourneys > scanned {
+			// A date-scoped loader may use the cheap collection estimate as an
+			// upper bound while running. Once complete, report the observed
+			// total so successful builds settle at 100 percent.
+			b.estimatedJourneys = scanned
+		}
 		b.successfulBuilds++
 		b.lastCompletedAt = finished
 		b.lastError = ""

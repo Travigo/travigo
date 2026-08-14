@@ -8,6 +8,7 @@ metadata:
     app.kubernetes.io/component: departure-graph
 spec:
   clusterIP: None
+  publishNotReadyAddresses: true
   ports:
     - name: http
       port: {{ .Values.departureGraph.service.port }}

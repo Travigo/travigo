@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
+
+var ErrServiceUnavailable = errors.New("journey graph service is unavailable")
 
 const departuresPath = "/v1/departures"
 const plansPath = "/v1/plans"
@@ -48,11 +51,14 @@ func (c *Client) Plan(ctx context.Context, request PlanRequest) (PlanResponse, e
 	httpRequest.Header.Set("Content-Type", "application/json")
 	response, err := c.httpClient.Do(httpRequest)
 	if err != nil {
-		return PlanResponse{}, err
+		return PlanResponse{}, fmt.Errorf("%w: %v", ErrServiceUnavailable, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+		if response.StatusCode == http.StatusServiceUnavailable {
+			return PlanResponse{}, fmt.Errorf("%w: %s", ErrServiceUnavailable, strings.TrimSpace(string(body)))
+		}
 		return PlanResponse{}, fmt.Errorf("journey graph returned %s: %s", response.Status, strings.TrimSpace(string(body)))
 	}
 	var result PlanResponse

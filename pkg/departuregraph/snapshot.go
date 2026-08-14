@@ -29,12 +29,18 @@ type snapshotFile struct {
 	ReverseTransferOrigins []uint32
 	ArrivalJourneyOffsets  []uint32
 	ArrivalJourneys        []journeyID
+	ArrivalPatternOffsets  []uint32
+	ArrivalPatterns        []uint64
+	StaticPatterns         []staticPatternRecord
+	StaticPatternStops     []uint32
 	StaticRoutingReady     bool
 	Journeys               []journeyRecord
 	Paths                  []pathRecord
 	Replacements           []stringID
 	JourneyDays            map[journeyDayKey]bool
-	Departures             map[bucketKey][]journeyID
+	DayJourneys            map[dayKey][]journeyID
+	Departures             map[bucketKey][]journeyID // v1-v7
+	Boardings              map[bucketKey][]departureEntry
 	CompleteStops          map[bucketKey]bool
 	CompleteDays           map[dayKey]bool
 	ScanDays               []dayKey
@@ -131,14 +137,17 @@ func (g *Graph) save(path string, data *graphData) error {
 		TopologyReady:          data.TopologyReady,
 		ReverseTransferOffsets: data.ReverseTransferOffsets,
 		ReverseTransferOrigins: data.ReverseTransferOrigins,
-		ArrivalJourneyOffsets:  data.ArrivalJourneyOffsets,
-		ArrivalJourneys:        data.ArrivalJourneys,
+		ArrivalPatternOffsets:  data.ArrivalPatternOffsets,
+		ArrivalPatterns:        data.ArrivalPatterns,
+		StaticPatterns:         data.StaticPatterns,
+		StaticPatternStops:     data.StaticPatternStops,
 		StaticRoutingReady:     data.StaticRoutingReady,
 		Journeys:               data.Journeys,
 		Paths:                  data.Paths,
 		Replacements:           data.Replacements,
 		JourneyDays:            data.JourneyDays,
-		Departures:             data.Departures,
+		DayJourneys:            data.DayJourneys,
+		Boardings:              data.Departures,
 		CompleteStops:          data.CompleteStops,
 		CompleteDays:           data.CompleteDays,
 		ScanDays:               data.ScanDays,
@@ -206,6 +215,7 @@ func (g *Graph) restore(path string) error {
 			}
 		}
 	}
+	legacyDepartures := snapshot.Boardings == nil
 
 	restored := &graphData{
 		Strings:                snapshot.Strings,
@@ -222,15 +232,18 @@ func (g *Graph) restore(path string) error {
 		TopologyReady:          snapshot.TopologyReady,
 		ReverseTransferOffsets: snapshot.ReverseTransferOffsets,
 		ReverseTransferOrigins: snapshot.ReverseTransferOrigins,
-		ArrivalJourneyOffsets:  snapshot.ArrivalJourneyOffsets,
-		ArrivalJourneys:        snapshot.ArrivalJourneys,
+		ArrivalPatternOffsets:  snapshot.ArrivalPatternOffsets,
+		ArrivalPatterns:        snapshot.ArrivalPatterns,
+		StaticPatterns:         snapshot.StaticPatterns,
+		StaticPatternStops:     snapshot.StaticPatternStops,
 		StaticRoutingReady:     snapshot.StaticRoutingReady,
 		Journeys:               snapshot.Journeys,
 		Paths:                  snapshot.Paths,
 		Replacements:           snapshot.Replacements,
 		JourneyIDs:             make(map[journeyKey]journeyID, len(snapshot.Journeys)),
 		JourneyDays:            snapshot.JourneyDays,
-		Departures:             snapshot.Departures,
+		DayJourneys:            snapshot.DayJourneys,
+		Departures:             snapshot.Boardings,
 		CompleteStops:          snapshot.CompleteStops,
 		CompleteDays:           snapshot.CompleteDays,
 		ScanDays:               snapshot.ScanDays,
@@ -242,11 +255,72 @@ func (g *Graph) restore(path string) error {
 		restored.Strings = []string{""}
 	}
 	if restored.Departures == nil {
-		restored.Departures = map[bucketKey][]journeyID{}
+		restored.Departures = map[bucketKey][]departureEntry{}
 	}
 	if restored.JourneyDays == nil {
 		restored.JourneyDays = map[journeyDayKey]bool{}
 	}
+	if restored.DayJourneys == nil {
+		restored.DayJourneys = map[dayKey][]journeyID{}
+		for day := range restored.CompleteDays {
+			seen := make([]bool, len(restored.Journeys))
+			if legacyDepartures {
+				for key, journeys := range snapshot.Departures {
+					if key.Day != day {
+						continue
+					}
+					for _, journey := range journeys {
+						if int(journey) < len(seen) {
+							seen[journey] = true
+						}
+					}
+				}
+			} else {
+				for key, journeys := range restored.Departures {
+					if key.Day != day {
+						continue
+					}
+					for _, entry := range journeys {
+						journey := entry.journey()
+						if int(journey) < len(seen) {
+							seen[journey] = true
+						}
+					}
+				}
+			}
+			for journey, active := range seen {
+				if active {
+					restored.DayJourneys[day] = append(restored.DayJourneys[day], journeyID(journey))
+				}
+			}
+		}
+	}
+	if legacyDepartures {
+		for day, journeys := range restored.DayJourneys {
+			for _, journey := range journeys {
+				if int(journey) >= len(restored.Journeys) {
+					continue
+				}
+				record := restored.Journeys[journey]
+				for pathIndex := uint32(0); pathIndex < record.PathCount; pathIndex++ {
+					path := restored.Paths[record.PathStart+pathIndex]
+					if path.OriginStopRef == 0 || path.OriginActivity == activitySetdown {
+						continue
+					}
+					if entry, ok := packDepartureEntry(journey, pathIndex, path.OriginDeparture); ok {
+						key := bucketKey{Day: day, StopRef: path.OriginStopRef}
+						restored.Departures[key] = append(restored.Departures[key], entry)
+					}
+				}
+			}
+		}
+		// Release the legacy four-byte index before rebuilding the static
+		// corridor structures; migration temporarily holds both formats.
+		snapshot.Departures = nil
+		restored.sortDepartureBucketsLocked()
+	}
+	snapshot.ArrivalJourneyOffsets = nil
+	snapshot.ArrivalJourneys = nil
 	if restored.CompleteStops == nil {
 		restored.CompleteStops = map[bucketKey]bool{}
 	}
@@ -269,7 +343,7 @@ func (g *Graph) restore(path string) error {
 		}
 	}
 	restored.buildStopIndexByStringIDLocked()
-	if len(restored.CompleteDays) > 0 && (!restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalJourneyOffsets) != len(restored.Stops)+1) {
+	if len(restored.CompleteDays) > 0 && (!restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalPatternOffsets) != len(restored.Stops)+1) {
 		restored.buildStaticRoutingIndexesLocked()
 	}
 	for key := range restored.CompleteStops {

@@ -1,11 +1,14 @@
 package query
 
 import (
-	"github.com/travigo/travigo/pkg/ctdf"
+	"context"
 	"time"
+
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type JourneyPlan struct {
+	Context         context.Context
 	OriginStop      *ctdf.Stop
 	OriginLocation  *ctdf.Location
 	DestinationStop *ctdf.Stop

@@ -27,8 +27,10 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 	d.StaticRoutingReady = false
 	d.ReverseTransferOffsets = nil
 	d.ReverseTransferOrigins = nil
-	d.ArrivalJourneyOffsets = nil
-	d.ArrivalJourneys = nil
+	d.ArrivalPatternOffsets = nil
+	d.ArrivalPatterns = nil
+	d.StaticPatterns = nil
+	d.StaticPatternStops = nil
 	d.corridorMu.Lock()
 	d.corridors = nil
 	d.corridorClock = 0
@@ -60,33 +62,91 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 		}
 	}
 
-	arrivalCounts := make([]uint32, len(d.Stops))
-	for _, path := range d.Paths {
-		if stop, exists := d.stopIndexForStringID(path.DestinationStopRef); exists {
-			arrivalCounts[stop]++
+	d.buildStaticPatternsLocked()
+	d.StaticRoutingReady = true
+	log.Info().
+		Int("reverse_transfer_links", len(d.ReverseTransferOrigins)).
+		Int("static_patterns", len(d.StaticPatterns)).
+		Int("static_ride_arrivals", len(d.ArrivalPatterns)).
+		Dur("duration", time.Since(started)).
+		Msg("Journey graph static routing indexes built")
+}
+
+func (d *graphData) buildStaticPatternsLocked() {
+	byHash := make(map[uint64][]uint32)
+	calls := make([]uint32, 0, 64)
+	for _, journey := range d.Journeys {
+		calls = calls[:0]
+		if uint32(cap(calls)) < journey.PathCount+1 {
+			calls = make([]uint32, 0, journey.PathCount+1)
 		}
-	}
-	d.ArrivalJourneyOffsets = offsetsForCounts(arrivalCounts)
-	d.ArrivalJourneys = make([]journeyID, d.ArrivalJourneyOffsets[len(d.Stops)])
-	arrivalCursors := append([]uint32(nil), d.ArrivalJourneyOffsets[:len(d.Stops)]...)
-	for journeyIndex, journey := range d.Journeys {
 		for pathIndex := uint32(0); pathIndex < journey.PathCount; pathIndex++ {
 			pathOffset := journey.PathStart + pathIndex
 			if int(pathOffset) >= len(d.Paths) {
 				break
 			}
-			if stop, exists := d.stopIndexForStringID(d.Paths[pathOffset].DestinationStopRef); exists {
-				d.ArrivalJourneys[arrivalCursors[stop]] = journeyID(journeyIndex)
-				arrivalCursors[stop]++
+			path := d.Paths[pathOffset]
+			if origin, exists := d.stopIndexForStringID(path.OriginStopRef); exists && (len(calls) == 0 || calls[len(calls)-1] != origin) {
+				calls = append(calls, origin)
+			}
+			if destination, exists := d.stopIndexForStringID(path.DestinationStopRef); exists && (len(calls) == 0 || calls[len(calls)-1] != destination) {
+				calls = append(calls, destination)
 			}
 		}
+		if len(calls) < 2 {
+			continue
+		}
+		hash := uint64(1469598103934665603)
+		for _, stop := range calls {
+			hash ^= uint64(stop) + 1
+			hash *= 1099511628211
+		}
+		matched := false
+		for _, patternID := range byHash[hash] {
+			pattern := d.StaticPatterns[patternID]
+			stored := d.StaticPatternStops[pattern.StopStart : pattern.StopStart+pattern.StopCount]
+			if equalStopPattern(stored, calls) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+		patternID := uint32(len(d.StaticPatterns))
+		d.StaticPatterns = append(d.StaticPatterns, staticPatternRecord{StopStart: uint32(len(d.StaticPatternStops)), StopCount: uint32(len(calls))})
+		d.StaticPatternStops = append(d.StaticPatternStops, calls...)
+		byHash[hash] = append(byHash[hash], patternID)
 	}
-	d.StaticRoutingReady = true
-	log.Info().
-		Int("reverse_transfer_links", len(d.ReverseTransferOrigins)).
-		Int("static_ride_arrivals", len(d.ArrivalJourneys)).
-		Dur("duration", time.Since(started)).
-		Msg("Journey graph static routing indexes built")
+
+	arrivalCounts := make([]uint32, len(d.Stops))
+	for _, pattern := range d.StaticPatterns {
+		for position := uint32(1); position < pattern.StopCount; position++ {
+			arrivalCounts[d.StaticPatternStops[pattern.StopStart+position]]++
+		}
+	}
+	d.ArrivalPatternOffsets = offsetsForCounts(arrivalCounts)
+	d.ArrivalPatterns = make([]uint64, d.ArrivalPatternOffsets[len(d.Stops)])
+	arrivalCursors := append([]uint32(nil), d.ArrivalPatternOffsets[:len(d.Stops)]...)
+	for patternID, pattern := range d.StaticPatterns {
+		for position := uint32(1); position < pattern.StopCount; position++ {
+			stop := d.StaticPatternStops[pattern.StopStart+position]
+			d.ArrivalPatterns[arrivalCursors[stop]] = uint64(uint32(patternID))<<32 | uint64(position)
+			arrivalCursors[stop]++
+		}
+	}
+}
+
+func equalStopPattern(left, right []uint32) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func offsetsForCounts(counts []uint32) []uint32 {
@@ -158,12 +218,12 @@ func (d *graphData) planCorridor(destinations map[uint32]bool, maxVehicleLegs in
 
 func (d *graphData) buildPlanCorridor(destinations map[uint32]bool, maxVehicleLegs int) []uint8 {
 	minimumRides := make([]uint8, len(d.Stops))
-	journeyRides := make([]uint8, len(d.Journeys))
+	patternRides := make([]uint8, len(d.StaticPatterns))
 	for index := range minimumRides {
 		minimumRides[index] = unreachableCorridorRides
 	}
-	for index := range journeyRides {
-		journeyRides[index] = unreachableCorridorRides
+	for index := range patternRides {
+		patternRides[index] = unreachableCorridorRides
 	}
 	buckets := make([][]uint32, maxVehicleLegs+1)
 	for destination := range destinations {
@@ -189,20 +249,20 @@ func (d *graphData) buildPlanCorridor(destinations map[uint32]bool, maxVehicleLe
 			if rides == maxVehicleLegs {
 				continue
 			}
-			for index := d.ArrivalJourneyOffsets[stop]; index < d.ArrivalJourneyOffsets[stop+1]; index++ {
-				journeyID := d.ArrivalJourneys[index]
-				if int(journeyID) >= len(d.Journeys) || journeyRides[journeyID] <= uint8(rides+1) {
+			for index := d.ArrivalPatternOffsets[stop]; index < d.ArrivalPatternOffsets[stop+1]; index++ {
+				arrival := d.ArrivalPatterns[index]
+				patternID, position := uint32(arrival>>32), uint32(arrival)
+				if int(patternID) >= len(d.StaticPatterns) || patternRides[patternID] <= uint8(rides+1) {
 					continue
 				}
-				journeyRides[journeyID] = uint8(rides + 1)
-				journey := d.Journeys[journeyID]
-				for pathIndex := uint32(0); pathIndex < journey.PathCount; pathIndex++ {
-					pathOffset := journey.PathStart + pathIndex
-					if int(pathOffset) >= len(d.Paths) {
-						break
-					}
-					origin, exists := d.stopIndexForStringID(d.Paths[pathOffset].OriginStopRef)
-					if exists && minimumRides[origin] > uint8(rides+1) {
+				patternRides[patternID] = uint8(rides + 1)
+				pattern := d.StaticPatterns[patternID]
+				if position > pattern.StopCount {
+					continue
+				}
+				for callPosition := uint32(0); callPosition < position; callPosition++ {
+					origin := d.StaticPatternStops[pattern.StopStart+callPosition]
+					if minimumRides[origin] > uint8(rides+1) {
 						minimumRides[origin] = uint8(rides + 1)
 						buckets[rides+1] = append(buckets[rides+1], origin)
 					}

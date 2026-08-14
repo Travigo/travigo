@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const snapshotVersion = 6
+const snapshotVersion = 8
 
 const (
 	maximumPendingStopFills     = 4096
@@ -38,6 +38,43 @@ type journeyDayKey struct {
 type bucketKey struct {
 	Day     dayKey
 	StopRef stringID
+}
+
+// departureEntry packs the journey, boarding path and departure time into one
+// word. The previous index stored only a journey ID, forcing every planner and
+// board lookup to scan that journey's entire path again to rediscover where it
+// boarded.
+type departureEntry uint64
+
+const (
+	departureJourneyBits = 28
+	departurePathBits    = 16
+	departureTimeBits    = 20
+	departureTimeBias    = 1 << (departureTimeBits - 1)
+	departureJourneyMask = 1<<departureJourneyBits - 1
+	departurePathMask    = 1<<departurePathBits - 1
+	departureTimeMask    = 1<<departureTimeBits - 1
+)
+
+func packDepartureEntry(journey journeyID, pathIndex uint32, departureSeconds int32) (departureEntry, bool) {
+	encodedTime := int64(departureSeconds) + departureTimeBias
+	if uint64(journey) > departureJourneyMask || uint64(pathIndex) > departurePathMask || encodedTime < 0 || encodedTime > departureTimeMask {
+		return 0, false
+	}
+	return departureEntry(uint64(journey)<<uint(departurePathBits+departureTimeBits) |
+		uint64(pathIndex)<<departureTimeBits | uint64(encodedTime)), true
+}
+
+func (entry departureEntry) journey() journeyID {
+	return journeyID(uint64(entry) >> uint(departurePathBits+departureTimeBits))
+}
+
+func (entry departureEntry) pathIndex() uint32 {
+	return uint32(uint64(entry)>>departureTimeBits) & departurePathMask
+}
+
+func (entry departureEntry) departureSeconds() int32 {
+	return int32(uint64(entry)&departureTimeMask) - departureTimeBias
 }
 
 type journeyRecord struct {
@@ -68,6 +105,11 @@ type pathRecord struct {
 	DestinationActivity uint8
 }
 
+type staticPatternRecord struct {
+	StopStart uint32
+	StopCount uint32
+}
+
 type graphData struct {
 	mu sync.RWMutex
 
@@ -86,15 +128,18 @@ type graphData struct {
 	TopologyReady          bool
 	ReverseTransferOffsets []uint32
 	ReverseTransferOrigins []uint32
-	ArrivalJourneyOffsets  []uint32
-	ArrivalJourneys        []journeyID
+	ArrivalPatternOffsets  []uint32
+	ArrivalPatterns        []uint64
+	StaticPatterns         []staticPatternRecord
+	StaticPatternStops     []uint32
 	StaticRoutingReady     bool
 	Journeys               []journeyRecord
 	Paths                  []pathRecord
 	Replacements           []stringID
 	JourneyIDs             map[journeyKey]journeyID
 	JourneyDays            map[journeyDayKey]bool
-	Departures             map[bucketKey][]journeyID
+	DayJourneys            map[dayKey][]journeyID
+	Departures             map[bucketKey][]departureEntry
 	CompleteStops          map[bucketKey]bool
 	CompleteDays           map[dayKey]bool
 	ScanDays               []dayKey
@@ -109,7 +154,7 @@ type graphData struct {
 
 type Loader interface {
 	LoadStopJourneys(ctx context.Context, stopRefs []string, serviceDate time.Time) ([]*ctdf.Journey, error)
-	ScanJourneys(ctx context.Context, after string, visit func(*ctdf.Journey, string) error) error
+	ScanJourneys(ctx context.Context, serviceDates []time.Time, after string, visit func(*ctdf.Journey, string) error) error
 }
 
 // TopologyLoader supplies the non-timetable edges and canonical stop nodes used
@@ -121,7 +166,7 @@ type TopologyLoader interface {
 }
 
 type JourneyCounter interface {
-	JourneyCount(ctx context.Context) (int64, error)
+	JourneyCount(ctx context.Context, serviceDates []time.Time) (int64, error)
 }
 
 // Provider is the query boundary used by departure-board consumers. Graph
@@ -237,7 +282,8 @@ func newGraphData() *graphData {
 		StopGrid:      map[spatialCell][]uint32{},
 		JourneyIDs:    map[journeyKey]journeyID{},
 		JourneyDays:   map[journeyDayKey]bool{},
-		Departures:    map[bucketKey][]journeyID{},
+		DayJourneys:   map[dayKey][]journeyID{},
+		Departures:    map[bucketKey][]departureEntry{},
 		CompleteStops: map[bucketKey]bool{},
 		CompleteDays:  map[dayKey]bool{},
 	}
@@ -473,31 +519,11 @@ func (g *Graph) applyPendingStopFill(pending *pendingStopFill) {
 func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	dates := rollingDates(now, g.config.DaysBehind, g.config.DaysAhead)
 	next := g.current.Load()
-	if next.hasCompleteDays() {
-		if !next.topologyReady() {
-			topologyLoader, ok := g.loader.(TopologyLoader)
-			if ok {
-				if err := next.loadTopology(ctx, topologyLoader); err != nil {
-					return err
-				}
-				if g.config.SnapshotPath != "" {
-					return g.saveTracked(g.config.SnapshotPath, next)
-				}
-				return nil
-			}
-		}
-		next = newGraphData()
-		// Refresh in place from an empty generation so peak memory does not
-		// contain two multi-gigabyte graphs. This also prevents a shifted date
-		// window from re-indexing overlapping completed days after their build
-		// membership map has been released. Requests remain available: a miss
-		// fills its stop into this generation while the scan continues.
-		g.current.Store(next)
-	}
 	configured, matching, cursor, processed, active := next.scanState(dates)
 	if configured && !matching {
-		next = newGraphData()
-		g.current.Store(next)
+		// A stale partial refresh must not replace the last complete generation.
+		// Discard only its progress marker; appended journey records are compacted
+		// after the next successful rolling scan.
 		cursor, processed, active = "", 0, 0
 	}
 	if !configured || !matching {
@@ -510,23 +536,23 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 			}
 		}
 	}
+	missingDates := next.missingRollingDates(dates)
 	g.metrics.build.begin(processed, active)
 	defer func() { g.metrics.build.finish(err) }()
 	if counter, ok := g.loader.(JourneyCounter); ok {
-		if total, countErr := counter.JourneyCount(ctx); countErr == nil {
+		if total, countErr := counter.JourneyCount(ctx, missingDates); countErr == nil {
 			g.metrics.build.setEstimatedJourneys(total)
 		}
 	}
 	processedThisRun := int64(0)
 	latestCursor := cursor
 	started := time.Now()
-
-	err = g.loader.ScanJourneys(ctx, cursor, func(journey *ctdf.Journey, journeyCursor string) error {
+	err = g.loader.ScanJourneys(ctx, missingDates, cursor, func(journey *ctdf.Journey, journeyCursor string) error {
 		processed++
 		processedThisRun++
 		activeForJourney := int64(0)
 		if journey != nil && journey.Availability != nil {
-			for _, serviceDate := range dates {
+			for _, serviceDate := range missingDates {
 				if journey.Availability.MatchDate(serviceDate) {
 					next.addJourney(makeDayKey(serviceDate), journey)
 					activeForJourney++
@@ -562,7 +588,7 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	if err != nil {
 		return err
 	}
-	next.completeScan(dates)
+	next.completeRollingScan(dates)
 
 	if g.config.SnapshotPath != "" {
 		if snapshotErr := g.saveTracked(g.config.SnapshotPath, next); snapshotErr != nil {
@@ -603,7 +629,7 @@ func (d *graphData) hasCompleteDays() bool {
 func (d *graphData) snapshotComplete() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return d.TopologyReady && d.StaticRoutingReady && len(d.CompleteDays) > 0
+	return d.TopologyReady && d.StaticRoutingReady && len(d.CompleteDays) > 0 && len(d.ScanDays) == 0
 }
 
 func (d *graphData) scanState(dates []time.Time) (configured bool, matching bool, cursor string, processed int64, active int64) {
@@ -636,17 +662,137 @@ func (d *graphData) setScanProgress(dates []time.Time, cursor string, processed 
 }
 
 func (d *graphData) completeScan(dates []time.Time) {
+	d.completeRollingScan(dates)
+}
+
+func (d *graphData) missingRollingDates(dates []time.Time) []time.Time {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	missing := make([]time.Time, 0, len(dates))
+	for _, serviceDate := range dates {
+		if !d.CompleteDays[makeDayKey(serviceDate)] {
+			missing = append(missing, serviceDate)
+		}
+	}
+	return missing
+}
+
+func (d *graphData) completeRollingScan(dates []time.Time) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	keepDays := make(map[dayKey]bool, len(dates))
 	for _, serviceDate := range dates {
-		d.CompleteDays[makeDayKey(serviceDate)] = true
+		day := makeDayKey(serviceDate)
+		keepDays[day] = true
+		d.CompleteDays[day] = true
 	}
+	for day := range d.CompleteDays {
+		if !keepDays[day] {
+			delete(d.CompleteDays, day)
+		}
+	}
+	d.compactRollingDaysLocked(keepDays)
+	d.sortDepartureBucketsLocked()
 	d.ScanDays = nil
 	d.ScanCursor = ""
 	d.ScanProcessed = 0
 	d.ScanActive = 0
 	d.buildStaticRoutingIndexesLocked()
 	d.sealBuildIndexesLocked()
+}
+
+func (d *graphData) sortDepartureBucketsLocked() {
+	for key, entries := range d.Departures {
+		sort.Slice(entries, func(i, j int) bool {
+			if entries[i].departureSeconds() != entries[j].departureSeconds() {
+				return entries[i].departureSeconds() < entries[j].departureSeconds()
+			}
+			if entries[i].journey() != entries[j].journey() {
+				return entries[i].journey() < entries[j].journey()
+			}
+			return entries[i].pathIndex() < entries[j].pathIndex()
+		})
+		d.Departures[key] = entries
+	}
+}
+
+func (d *graphData) compactRollingDaysLocked(keepDays map[dayKey]bool) {
+	if len(d.Journeys) == 0 || len(d.DayJourneys) == 0 {
+		for key := range d.Departures {
+			if !keepDays[key.Day] {
+				delete(d.Departures, key)
+			}
+		}
+		return
+	}
+
+	active := make([]bool, len(d.Journeys))
+	for day, journeys := range d.DayJourneys {
+		if !keepDays[day] {
+			delete(d.DayJourneys, day)
+			continue
+		}
+		for _, journey := range journeys {
+			if int(journey) < len(active) {
+				active[journey] = true
+			}
+		}
+	}
+
+	remap := make([]journeyID, len(d.Journeys))
+	nextJourney, nextPath, nextReplacement := 0, uint32(0), uint32(0)
+	for oldIndex, record := range d.Journeys {
+		if !active[oldIndex] {
+			continue
+		}
+		oldPathStart := record.PathStart
+		oldReplacementStart := record.ReplacementStart
+		copy(d.Paths[nextPath:nextPath+record.PathCount], d.Paths[oldPathStart:oldPathStart+record.PathCount])
+		copy(d.Replacements[nextReplacement:nextReplacement+record.ReplacementCount], d.Replacements[oldReplacementStart:oldReplacementStart+record.ReplacementCount])
+		record.PathStart = nextPath
+		record.ReplacementStart = nextReplacement
+		d.Journeys[nextJourney] = record
+		remap[oldIndex] = journeyID(nextJourney)
+		nextJourney++
+		nextPath += record.PathCount
+		nextReplacement += record.ReplacementCount
+	}
+	d.Journeys = d.Journeys[:nextJourney]
+	d.Paths = d.Paths[:nextPath]
+	d.Replacements = d.Replacements[:nextReplacement]
+
+	for day, journeys := range d.DayJourneys {
+		for index, journey := range journeys {
+			journeys[index] = remap[journey]
+		}
+		d.DayJourneys[day] = journeys
+	}
+	for key, journeys := range d.Departures {
+		if !keepDays[key.Day] {
+			delete(d.Departures, key)
+			continue
+		}
+		for index, entry := range journeys {
+			if int(entry.journey()) >= len(remap) || !active[entry.journey()] {
+				continue
+			}
+			remapped, ok := packDepartureEntry(remap[entry.journey()], entry.pathIndex(), entry.departureSeconds())
+			if ok {
+				journeys[index] = remapped
+			}
+		}
+		d.Departures[key] = journeys
+	}
+	for key := range d.CompleteStops {
+		if !keepDays[key.Day] {
+			delete(d.CompleteStops, key)
+		}
+	}
+
+	d.JourneyIDs = make(map[journeyKey]journeyID, len(d.Journeys))
+	for index, journey := range d.Journeys {
+		d.JourneyIDs[journeyKey{PrimaryID: journey.PrimaryID}] = journeyID(index)
+	}
 }
 
 func rollingDates(now time.Time, behind int, ahead int) []time.Time {
@@ -750,6 +896,9 @@ func (d *graphData) ensureBuildIndexesLocked() {
 	}
 	if d.JourneyDays == nil {
 		d.JourneyDays = map[journeyDayKey]bool{}
+	}
+	if d.DayJourneys == nil {
+		d.DayJourneys = map[dayKey][]journeyID{}
 	}
 }
 
@@ -855,12 +1004,20 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 		return
 	}
 	d.JourneyDays[activeKey] = true
+	d.DayJourneys[day] = append(d.DayJourneys[day], id)
 	record := d.Journeys[id]
 	for index := uint32(0); index < record.PathCount; index++ {
 		path := d.Paths[record.PathStart+index]
-		if d.stringValue(path.OriginStopRef) != "" {
+		if d.stringValue(path.OriginStopRef) != "" && path.OriginActivity != activitySetdown {
 			key := bucketKey{Day: day, StopRef: path.OriginStopRef}
-			d.Departures[key] = append(d.Departures[key], id)
+			if entry, ok := packDepartureEntry(id, index, path.OriginDeparture); ok {
+				d.Departures[key] = append(d.Departures[key], entry)
+			} else {
+				// The packed bounds are deliberately generous (65k calls and
+				// roughly six days either side of midnight). Do not silently
+				// create an unrouteable journey if corrupt input exceeds them.
+				log.Warn().Str("journey", journey.PrimaryIdentifier).Uint32("path_index", index).Int32("departure_seconds", path.OriginDeparture).Msg("Journey omitted from departure index because its path or time exceeds packed bounds")
+			}
 		}
 	}
 }
@@ -903,17 +1060,26 @@ func (d *graphData) materializeStopWindow(day dayKey, stopRefs []string, notBefo
 	}
 	threshold, hasThreshold := serviceWindowThreshold(dayKeyDate(day, notBefore.Location()), notBefore)
 	candidates := make([]journeyCandidate, 0, 64)
-	seen := map[journeyID]struct{}{}
+	seen := map[journeyID]int{}
 	for stopID := range stopIDs {
-		for _, id := range d.Departures[bucketKey{Day: day, StopRef: stopID}] {
-			if _, exists := seen[id]; exists {
+		entries := d.Departures[bucketKey{Day: day, StopRef: stopID}]
+		start := 0
+		if hasThreshold && d.CompleteDays[day] {
+			start = sort.Search(len(entries), func(index int) bool { return entries[index].departureSeconds() >= threshold })
+		}
+		for _, entry := range entries[start:] {
+			id := entry.journey()
+			departureSeconds := entry.departureSeconds()
+			if hasThreshold && departureSeconds < threshold {
 				continue
 			}
-			seen[id] = struct{}{}
-			departureSeconds, matched := d.journeyDepartureSeconds(id, stopIDs, threshold, hasThreshold)
-			if !matched {
+			if existing, exists := seen[id]; exists {
+				if departureSeconds < candidates[existing].departureSeconds {
+					candidates[existing].departureSeconds = departureSeconds
+				}
 				continue
 			}
+			seen[id] = len(candidates)
 			candidates = append(candidates, journeyCandidate{
 				id:               id,
 				departureSeconds: departureSeconds,
@@ -934,29 +1100,6 @@ func (d *graphData) materializeStopWindow(day dayKey, stopRefs []string, notBefo
 		journeys = append(journeys, d.materializeJourney(candidate.id))
 	}
 	return journeys
-}
-
-func (d *graphData) journeyDepartureSeconds(id journeyID, stopIDs map[stringID]struct{}, threshold int32, hasThreshold bool) (int32, bool) {
-	if int(id) >= len(d.Journeys) {
-		return 0, false
-	}
-	record := d.Journeys[id]
-	var earliest int32
-	matched := false
-	for index := uint32(0); index < record.PathCount; index++ {
-		path := d.Paths[record.PathStart+index]
-		if _, exists := stopIDs[path.OriginStopRef]; !exists {
-			continue
-		}
-		if hasThreshold && path.OriginDeparture < threshold {
-			continue
-		}
-		if !matched || path.OriginDeparture < earliest {
-			earliest = path.OriginDeparture
-			matched = true
-		}
-	}
-	return earliest, matched
 }
 
 type loadedJourneyCandidate struct {
@@ -1097,6 +1240,7 @@ type Stats struct {
 	ArrivalBuckets     int
 	CompleteStops      int
 	CompleteDays       int
+	ServingToday       bool
 	Lookups            LookupStats
 	BackgroundBuild    BuildStats
 	Snapshot           SnapshotStats
@@ -1122,7 +1266,7 @@ func (d *graphData) stats() Stats {
 		StopIdentifiers:    len(d.StopIdentifiers),
 		TransferEdges:      len(d.Transfers),
 		TopologyReady:      d.TopologyReady,
-		StaticRideLinks:    len(d.ArrivalJourneys),
+		StaticRideLinks:    len(d.ArrivalPatterns),
 		StaticRoutingReady: d.StaticRoutingReady,
 		Journeys:           len(d.Journeys),
 		Paths:              len(d.Paths),
@@ -1130,6 +1274,7 @@ func (d *graphData) stats() Stats {
 		ArrivalBuckets:     0,
 		CompleteStops:      len(d.CompleteStops),
 		CompleteDays:       len(d.CompleteDays),
+		ServingToday:       d.CompleteDays[makeDayKey(time.Now())],
 	}
 }
 

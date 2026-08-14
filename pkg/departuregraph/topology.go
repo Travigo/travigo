@@ -50,8 +50,12 @@ type transferRestriction struct {
 }
 
 type topologyTransfer struct {
-	from   uint32
-	record transferRecord
+	from         uint32
+	record       transferRecord
+	fromRouteRef string
+	toRouteRef   string
+	fromTripRef  string
+	toTripRef    string
 }
 
 func (d *graphData) topologyReady() bool {
@@ -75,8 +79,10 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	d.TransferRestrictions = nil
 	d.ReverseTransferOffsets = nil
 	d.ReverseTransferOrigins = nil
-	d.ArrivalJourneyOffsets = nil
-	d.ArrivalJourneys = nil
+	d.ArrivalPatternOffsets = nil
+	d.ArrivalPatterns = nil
+	d.StaticPatterns = nil
+	d.StaticPatternStops = nil
 	d.StaticRoutingReady = false
 	d.TopologyReady = false
 	d.mu.Unlock()
@@ -129,13 +135,9 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		}
 		key := [2]uint32{from, to}
 		if transfer.Type == ctdf.StopTransferTypeForbidden {
-			forbidden[key] = true
-			return nil
-		}
-		// Restricted GTFS transfers require service-aware matching. Keep the
-		// unrestricted graph correct now; the compact restriction table is
-		// reserved for adding those edges without changing the snapshot shape.
-		if transfer.FromRouteRef != "" || transfer.ToRouteRef != "" || transfer.FromTripRef != "" || transfer.ToTripRef != "" {
+			if transfer.FromRouteRef == "" && transfer.ToRouteRef == "" && transfer.FromTripRef == "" && transfer.ToTripRef == "" {
+				forbidden[key] = true
+			}
 			return nil
 		}
 		total := transfer.TotalDurationSeconds
@@ -152,7 +154,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 			WalkDurationSeconds:      positiveUint32(transfer.WalkDurationSeconds),
 			MinChangeDurationSeconds: positiveUint32(transfer.MinChangeDurationSeconds),
 			TotalDurationSeconds:     positiveUint32(total),
-		}})
+		}, fromRouteRef: transfer.FromRouteRef, toRouteRef: transfer.ToRouteRef, fromTripRef: transfer.FromTripRef, toTripRef: transfer.ToTripRef})
 		return nil
 	}); err != nil {
 		return fmt.Errorf("load journey graph transfers: %w", err)
@@ -161,6 +163,21 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	sort.Slice(transfers, func(i, j int) bool {
 		if transfers[i].from == transfers[j].from {
 			if transfers[i].record.ToStop == transfers[j].record.ToStop {
+				if transfers[i].fromRouteRef != transfers[j].fromRouteRef {
+					return transfers[i].fromRouteRef < transfers[j].fromRouteRef
+				}
+				if transfers[i].toRouteRef != transfers[j].toRouteRef {
+					return transfers[i].toRouteRef < transfers[j].toRouteRef
+				}
+				if transfers[i].fromTripRef != transfers[j].fromTripRef {
+					return transfers[i].fromTripRef < transfers[j].fromTripRef
+				}
+				if transfers[i].toTripRef != transfers[j].toTripRef {
+					return transfers[i].toTripRef < transfers[j].toTripRef
+				}
+				if transfers[i].record.Type != transfers[j].record.Type {
+					return transfers[i].record.Type < transfers[j].record.Type
+				}
 				return transfers[i].record.TotalDurationSeconds < transfers[j].record.TotalDurationSeconds
 			}
 			return transfers[i].record.ToStop < transfers[j].record.ToStop
@@ -183,7 +200,12 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		d.StopAliases = append(d.StopAliases, aliases...)
 	}
 	d.StopAliasOffsets[len(d.Stops)] = uint32(len(d.StopAliases))
-	var previous [2]uint32
+	type transferIdentity struct {
+		from, to                             uint32
+		kind                                 uint8
+		fromRoute, toRoute, fromTrip, toTrip string
+	}
+	var previous transferIdentity
 	previousSet := false
 	transferIndex := 0
 	for stopIndex := range d.Stops {
@@ -192,11 +214,24 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 			transfer := transfers[transferIndex]
 			transferIndex++
 			key := [2]uint32{transfer.from, transfer.record.ToStop}
-			if forbidden[key] || (previousSet && key == previous) {
+			identity := transferIdentity{
+				from: transfer.from, to: transfer.record.ToStop, kind: transfer.record.Type,
+				fromRoute: transfer.fromRouteRef, toRoute: transfer.toRouteRef,
+				fromTrip: transfer.fromTripRef, toTrip: transfer.toTripRef,
+			}
+			if forbidden[key] || (previousSet && identity == previous) {
 				continue
 			}
+			transferOffset := uint32(len(d.Transfers))
 			d.Transfers = append(d.Transfers, transfer.record)
-			previous = key
+			if transfer.fromRouteRef != "" || transfer.toRouteRef != "" || transfer.fromTripRef != "" || transfer.toTripRef != "" {
+				d.TransferRestrictions = append(d.TransferRestrictions, transferRestriction{
+					Transfer:     transferOffset,
+					FromRouteRef: d.intern(transfer.fromRouteRef), ToRouteRef: d.intern(transfer.toRouteRef),
+					FromTripRef: d.intern(transfer.fromTripRef), ToTripRef: d.intern(transfer.toTripRef),
+				})
+			}
+			previous = identity
 			previousSet = true
 		}
 	}

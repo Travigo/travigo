@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/departuregraph"
 )
 
 func PlannerRouter(router fiber.Router) {
@@ -133,6 +135,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	var journeyPlans *ctdf.JourneyPlanResults
 
 	journeyPlans, err = dataaggregator.Lookup[*ctdf.JourneyPlanResults](query.JourneyPlan{
+		Context:                   c.UserContext(),
 		OriginStop:                originStop,
 		OriginLocation:            originLocation,
 		DestinationStop:           destinationStop,
@@ -146,7 +149,11 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		MaxSearchDuration:         time.Duration(maxSearchSeconds) * time.Second,
 	})
 	if err != nil {
-		c.SendStatus(fiber.StatusInternalServerError)
+		status := fiber.StatusInternalServerError
+		if errors.Is(err, departuregraph.ErrServiceUnavailable) {
+			status = fiber.StatusServiceUnavailable
+		}
+		c.SendStatus(status)
 		return c.JSON(fiber.Map{
 			"error": err.Error(),
 		})

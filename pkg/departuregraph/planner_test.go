@@ -3,6 +3,7 @@ package departuregraph
 import (
 	"container/heap"
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -21,9 +22,9 @@ func TestPlanDefaultsCoverOvernightJourneys(t *testing.T) {
 }
 
 func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
-	queue := &planQueue{}
+	queue := &planQueue{maxLabelsPerState: 1}
 	heap.Init(queue)
-	best := map[planState]time.Time{}
+	best := map[planState][]planArrival{}
 	base := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
 	first := &planLabel{stop: 1, arrival: base.Add(10 * time.Minute), vehicleLegs: 1}
 	if !pushPlanLabel(queue, best, first) {
@@ -36,9 +37,113 @@ func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
 	if !pushPlanLabel(queue, best, earlier) || currentPlanLabel(best, first) || !currentPlanLabel(best, earlier) {
 		t.Fatal("earlier label did not replace the previous state")
 	}
-	transferred := &planLabel{stop: 1, arrival: base.Add(12 * time.Minute), vehicleLegs: 1, route: appendPlanLeg(nil, PlanLeg{Type: ctdf.JourneyPlanRouteItemTypeTransfer})}
+	transferred := &planLabel{stop: 1, arrival: base.Add(12 * time.Minute), vehicleLegs: 1, walked: true, route: appendPlanLeg(nil, PlanLeg{Type: ctdf.JourneyPlanRouteItemTypeTransfer})}
 	if !pushPlanLabel(queue, best, transferred) {
 		t.Fatal("transfer-constrained state was incorrectly dominated")
+	}
+}
+
+func TestGraphReturnsRequestedDirectAlternatives(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "destination"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 3; index++ {
+		departure := int32(10*3600 + index*10*60)
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
+			PrimaryIdentifier: "journey-" + string(rune('a'+index)),
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef: "origin", DestinationStopRef: "destination",
+				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
+			}},
+		})
+	}
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(9 * time.Hour), Count: 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 3 || result.SearchTruncated {
+		t.Fatalf("result = %#v, want three complete alternatives", result)
+	}
+}
+
+func TestGraphCoordinateAccessCanTraversePlatformAlias(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{
+		stops: []*ctdf.Stop{
+			{PrimaryIdentifier: "access", Location: &ctdf.Location{Coordinates: []float64{0, 52}}},
+			{PrimaryIdentifier: "station", Location: &ctdf.Location{Coordinates: []float64{0.001, 52}}},
+			{PrimaryIdentifier: "destination", Location: &ctdf.Location{Coordinates: []float64{0.1, 52}}},
+		},
+		transfers: []*ctdf.StopTransfer{{
+			FromStopRef: "access", ToStopRef: "station", Type: ctdf.StopTransferTypePlatformAlias,
+			DistanceMetres: 50, WalkDurationSeconds: 60, TotalDurationSeconds: 60,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
+		PrimaryIdentifier: "journey",
+		Path: []*ctdf.JourneyPathItem{{
+			OriginStopRef: "station", DestinationStopRef: "destination",
+			OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
+		}},
+	})
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginLocation: &PlanLocation{Longitude: 0, Latitude: 52}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(9 * time.Hour), Count: 1,
+		MaxTransferDistanceMetres: 80, OriginLocationStopCount: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 1 || len(result.Plans[0].Legs) != 3 || result.Plans[0].Legs[1].TransferType != ctdf.StopTransferTypePlatformAlias {
+		t.Fatalf("plans = %#v", result.Plans)
+	}
+}
+
+func TestGraphAppliesRouteRestrictedTransfer(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{
+		stops: []*ctdf.Stop{{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "arrival"}, {PrimaryIdentifier: "departure"}, {PrimaryIdentifier: "destination"}},
+		transfers: []*ctdf.StopTransfer{{
+			FromStopRef: "arrival", ToStopRef: "departure", Type: ctdf.StopTransferTypeTimed,
+			FromRouteRef: "service-in", ToRouteRef: "service-out", TotalDurationSeconds: 120,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "in", ServiceRef: "service-in", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "origin", DestinationStopRef: "arrival", OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 30*60),
+	}}})
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "out", ServiceRef: "service-out", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "departure", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
+	}}})
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"}, StartDateTime: serviceDate.Add(8 * time.Hour), Count: 1, MaxChanges: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 1 || len(result.Plans[0].Legs) != 3 {
+		t.Fatalf("plans = %#v", result.Plans)
 	}
 }
 
@@ -156,6 +261,33 @@ func TestStaticCorridorFindsUpstreamRideAndTransferLinks(t *testing.T) {
 	}
 	if cached := data.planCorridor(map[uint32]bool{destination: true}, 2); len(cached) == 0 || &cached[0] != &corridor[0] {
 		t.Fatal("destination corridor was not cached")
+	}
+}
+
+func TestStaticCorridorDeduplicatesIdenticalStopPatterns(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)
+	loader := planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"},
+		{PrimaryIdentifier: "middle"},
+		{PrimaryIdentifier: "destination"},
+	}}
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), loader); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 2; index++ {
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
+			PrimaryIdentifier: fmt.Sprintf("journey-%d", index),
+			Path: []*ctdf.JourneyPathItem{
+				{OriginStopRef: "origin", DestinationStopRef: "middle", OriginDepartureTime: serviceTime(3600 + int32(index*600)), DestinationArrivalTime: serviceTime(3900 + int32(index*600))},
+				{OriginStopRef: "middle", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3960 + int32(index*600)), DestinationArrivalTime: serviceTime(4260 + int32(index*600))},
+			},
+		})
+	}
+	data.completeScan([]time.Time{serviceDate})
+	if len(data.StaticPatterns) != 1 || len(data.StaticPatternStops) != 3 || len(data.ArrivalPatterns) != 2 {
+		t.Fatalf("patterns=%d stops=%d arrivals=%d", len(data.StaticPatterns), len(data.StaticPatternStops), len(data.ArrivalPatterns))
 	}
 }
 

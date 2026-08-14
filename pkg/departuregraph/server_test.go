@@ -3,6 +3,7 @@ package departuregraph
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -109,6 +110,9 @@ func TestStatsEndpointReportsRequestsLookupsAndMemory(t *testing.T) {
 	if stats.Requests.RequestsPerSecondLastMinute <= 0 || stats.Requests.AverageLatencyMillis < 0 {
 		t.Fatalf("missing request performance stats: %#v", stats.Requests)
 	}
+	if stats.DepartureRequests.Total != 3 || stats.DepartureRequests.Failed != 1 || stats.PlanRequests.Total != 0 {
+		t.Fatalf("unexpected per-endpoint request stats: departures=%#v plans=%#v", stats.DepartureRequests, stats.PlanRequests)
+	}
 	if stats.Lookups.Total != 2 || stats.Lookups.Hits != 1 || stats.Lookups.Misses != 1 || stats.Lookups.LazyFills != 1 {
 		t.Fatalf("unexpected lookup stats: %#v", stats.Lookups)
 	}
@@ -129,6 +133,10 @@ func TestClientReturnsServiceErrors(t *testing.T) {
 	_, err := client.JourneysForStop(context.Background(), &ctdf.Stop{PrimaryIdentifier: "stop-a"}, time.Now())
 	if err == nil {
 		t.Fatal("expected graph service error")
+	}
+	_, err = client.Plan(context.Background(), PlanRequest{OriginRefs: []string{"stop-a"}, DestinationRefs: []string{"stop-b"}})
+	if !errors.Is(err, ErrServiceUnavailable) {
+		t.Fatalf("plan service error = %v", err)
 	}
 }
 

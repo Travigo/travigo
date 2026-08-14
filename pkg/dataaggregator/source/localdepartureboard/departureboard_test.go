@@ -51,7 +51,7 @@ func (l *localGraphLoader) LoadStopJourneys(_ context.Context, _ []string, _ tim
 	return []*ctdf.Journey{l.journey}, nil
 }
 
-func (l *localGraphLoader) ScanJourneys(_ context.Context, _ string, visit func(*ctdf.Journey, string) error) error {
+func (l *localGraphLoader) ScanJourneys(_ context.Context, _ []time.Time, _ string, visit func(*ctdf.Journey, string) error) error {
 	return visit(l.journey, l.journey.PrimaryIdentifier)
 }
 

@@ -47,7 +47,7 @@ func (l *fakeLoader) LoadStopJourneys(_ context.Context, stopRefs []string, serv
 	return result, nil
 }
 
-func (l *fakeLoader) ScanJourneys(_ context.Context, after string, visit func(*ctdf.Journey, string) error) error {
+func (l *fakeLoader) ScanJourneys(_ context.Context, _ []time.Time, after string, visit func(*ctdf.Journey, string) error) error {
 	l.mu.Lock()
 	l.scans++
 	journeys := append([]*ctdf.Journey(nil), l.journeys...)
@@ -73,7 +73,7 @@ func (l *fakeLoader) ScanJourneys(_ context.Context, after string, visit func(*c
 	return nil
 }
 
-func (l *fakeLoader) JourneyCount(_ context.Context) (int64, error) {
+func (l *fakeLoader) JourneyCount(_ context.Context, _ []time.Time) (int64, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return int64(len(l.journeys)), nil
@@ -260,7 +260,7 @@ func TestBackgroundRebuildCompletesRollingDays(t *testing.T) {
 	}
 }
 
-func TestShiftedRollingRebuildStartsFreshAfterSealing(t *testing.T) {
+func TestShiftedRollingRebuildKeepsServingAndCompactsInPlace(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
 	graph := New(loader, Config{Enabled: true, BatchSize: 1000})
@@ -273,11 +273,33 @@ func TestShiftedRollingRebuildStartsFreshAfterSealing(t *testing.T) {
 		t.Fatalf("shifted rebuild: %v", err)
 	}
 	second := graph.current.Load()
-	if first == second {
-		t.Fatal("shifted rebuild reused a sealed generation")
+	if first != second {
+		t.Fatal("shifted rebuild replaced the serving generation")
 	}
 	if len(second.Journeys) != 1 || len(second.Paths) != 2 || len(second.Departures) != 2 {
 		t.Fatalf("shifted rebuild duplicated graph records: journeys=%d paths=%d departures=%d", len(second.Journeys), len(second.Paths), len(second.Departures))
+	}
+}
+
+func TestFailedShiftedRebuildPreservesCompleteServingDay(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
+	graph := New(loader, Config{Enabled: true, BatchSize: 1})
+	if err := graph.rebuildRolling(context.Background(), serviceDate); err != nil {
+		t.Fatalf("initial rebuild: %v", err)
+	}
+	serving := graph.current.Load()
+	loader.failScanAfter = 1
+	loader.journeys = append(loader.journeys, testJourneyWithID("journey-2"))
+	if err := graph.rebuildRolling(context.Background(), serviceDate.AddDate(0, 0, 1)); err == nil {
+		t.Fatal("expected interrupted refresh")
+	}
+	if graph.current.Load() != serving || !serving.CompleteDays[makeDayKey(serviceDate)] {
+		t.Fatal("interrupted refresh replaced or invalidated the complete serving day")
+	}
+	journeys, err := graph.JourneysForStop(context.Background(), &ctdf.Stop{PrimaryIdentifier: "stop-a"}, serviceDate)
+	if err != nil || len(journeys) != 1 {
+		t.Fatalf("serving day after failed refresh: journeys=%d err=%v", len(journeys), err)
 	}
 }
 

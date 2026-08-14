@@ -16,12 +16,17 @@ type Server struct {
 	planner interface {
 		Plan(context.Context, PlanRequest) (PlanResponse, error)
 	}
-	stats    func() Stats
-	requests *requestTracker
+	stats             func() Stats
+	requests          *requestTracker
+	planRequests      *requestTracker
+	departureRequests *requestTracker
 }
 
 func NewServer(graph *Graph) *Server {
-	return &Server{graph: graph, planner: graph, stats: graph.Stats, requests: newRequestTracker()}
+	return &Server{
+		graph: graph, planner: graph, stats: graph.Stats,
+		requests: newRequestTracker(), planRequests: newRequestTracker(), departureRequests: newRequestTracker(),
+	}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -40,8 +45,12 @@ func (s *Server) handleLive(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 	started := s.requests.begin()
+	planStarted := s.planRequests.begin()
 	failed := true
-	defer func() { s.requests.finish(started, failed) }()
+	defer func() {
+		s.requests.finish(started, failed)
+		s.planRequests.finish(planStarted, failed)
+	}()
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024))
 	decoder.DisallowUnknownFields()
 	var request PlanRequest
@@ -72,7 +81,7 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	stats := s.stats()
-	if !stats.TopologyReady || !stats.StaticRoutingReady || stats.CompleteDays == 0 {
+	if !stats.TopologyReady || !stats.StaticRoutingReady || !stats.ServingToday {
 		writeGraphJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "building"})
 		return
 	}
@@ -82,17 +91,23 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request) {
 	now := time.Now()
 	writeGraphJSON(w, http.StatusOK, ServiceStats{
-		Stats:       s.stats(),
-		GeneratedAt: now,
-		Requests:    s.requests.stats(now),
-		Memory:      currentMemoryStats(),
+		Stats:             s.stats(),
+		GeneratedAt:       now,
+		Requests:          s.requests.stats(now),
+		PlanRequests:      s.planRequests.stats(now),
+		DepartureRequests: s.departureRequests.stats(now),
+		Memory:            currentMemoryStats(),
 	})
 }
 
 func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 	started := s.requests.begin()
+	departureStarted := s.departureRequests.begin()
 	failed := true
-	defer func() { s.requests.finish(started, failed) }()
+	defer func() {
+		s.requests.finish(started, failed)
+		s.departureRequests.finish(departureStarted, failed)
+	}()
 
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024*1024))
 	decoder.DisallowUnknownFields()

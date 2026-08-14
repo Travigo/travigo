@@ -74,7 +74,7 @@ type mongoJourneyRecord struct {
 	Journey ctdf.Journey       `bson:",inline"`
 }
 
-func (MongoLoader) JourneyCount(ctx context.Context) (int64, error) {
+func (MongoLoader) JourneyCount(ctx context.Context, _ []time.Time) (int64, error) {
 	return database.GetCollection(database.JourneysCollectionName).EstimatedDocumentCount(ctx)
 }
 
@@ -106,8 +106,8 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	return journeys, nil
 }
 
-func (MongoLoader) ScanJourneys(ctx context.Context, after string, visit func(*ctdf.Journey, string) error) error {
-	filter := bson.M{}
+func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, after string, visit func(*ctdf.Journey, string) error) error {
+	filter := journeyServiceDateFilter(serviceDates)
 	if after != "" {
 		objectID, err := primitive.ObjectIDFromHex(after)
 		if err != nil {
@@ -135,6 +135,33 @@ func (MongoLoader) ScanJourneys(ctx context.Context, after string, visit func(*c
 		}
 	}
 	return cursor.Err()
+}
+
+// journeyServiceDateFilter is a conservative, indexable first pass. It only
+// eliminates journeys whose primary match rules cannot match any requested
+// service date; MatchDate remains the final authority for conditions,
+// secondary matches and exclusions after decoding.
+func journeyServiceDateFilter(serviceDates []time.Time) bson.M {
+	if len(serviceDates) == 0 {
+		return bson.M{"_id": bson.M{"$exists": false}}
+	}
+	dates := make([]string, 0, len(serviceDates))
+	weekdays := make([]string, 0, len(serviceDates))
+	seenWeekday := map[string]bool{}
+	for _, serviceDate := range serviceDates {
+		dates = append(dates, serviceDate.Format(ctdf.YearMonthDayFormat))
+		weekday := serviceDate.Weekday().String()
+		if !seenWeekday[weekday] {
+			seenWeekday[weekday] = true
+			weekdays = append(weekdays, weekday)
+		}
+	}
+	return bson.M{"$or": bson.A{
+		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityMatchAll}}},
+		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityDateRange}}},
+		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityDate, "value": bson.M{"$in": dates}}}},
+		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityDayOfWeek, "value": bson.M{"$in": weekdays}}}},
+	}}
 }
 
 func departureGraphFindOptions() *options.FindOptions {
