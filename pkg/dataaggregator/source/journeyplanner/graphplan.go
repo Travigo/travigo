@@ -45,14 +45,10 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	if requestedCount > 20 {
 		requestedCount = 20
 	}
-	graphCount := requestedCount * 3
-	if graphCount > 20 {
-		graphCount = 20
-	}
 	request := departuregraph.PlanRequest{
 		DestinationRefs:           q.DestinationStop.GetAllStopIDs(),
 		StartDateTime:             q.StartDateTime,
-		Count:                     graphCount,
+		Count:                     requestedCount,
 		MaxChanges:                q.MaxChanges,
 		MaxJourneyDurationSeconds: int(q.MaxJourneyDuration / time.Second),
 		MaxTransferDistanceMetres: q.MaxTransferDistanceMetres,

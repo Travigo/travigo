@@ -61,7 +61,9 @@ departureGraph:
   resources:
     requests:
       cpu: 500m
-      memory: 6Gi
+      memory: 10Gi
+    limits:
+      memory: 12Gi
   persistence:
     enabled: true
     mountPath: /var/lib/travigo/departure-graph

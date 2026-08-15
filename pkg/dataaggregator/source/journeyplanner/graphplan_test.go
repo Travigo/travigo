@@ -1,11 +1,51 @@
 package journeyplanner
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/departuregraph"
 )
+
+type graphRequestTransport struct {
+	request departuregraph.PlanRequest
+}
+
+func (transport *graphRequestTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if err := json.NewDecoder(request.Body).Decode(&transport.request); err != nil {
+		return nil, err
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(strings.NewReader(`{"plans":[]}`)),
+		Request:    request,
+	}, nil
+}
+
+func TestJourneyPlanRequestsOnlyTheRequiredGraphCandidates(t *testing.T) {
+	transport := &graphRequestTransport{}
+	client := departuregraph.NewClient("http://journey-graph", &http.Client{Transport: transport})
+
+	_, err := (Source{JourneyGraph: client}).JourneyPlanQuery(query.JourneyPlan{
+		OriginStop:      &ctdf.Stop{PrimaryIdentifier: "origin"},
+		DestinationStop: &ctdf.Stop{PrimaryIdentifier: "destination"},
+		StartDateTime:   time.Date(2026, time.August, 15, 10, 0, 0, 0, time.UTC),
+		Count:           5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if transport.request.Count != 5 {
+		t.Fatalf("graph candidate count = %d, want requested count 5", transport.request.Count)
+	}
+}
 
 func TestApplyRealtimeLegTimesUsesOccurrenceAndRejectsCancelledCall(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)
