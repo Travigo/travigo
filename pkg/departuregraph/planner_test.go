@@ -34,12 +34,115 @@ func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
 		t.Fatal("dominated later label was retained")
 	}
 	earlier := &planLabel{stop: 1, arrival: base.Add(9 * time.Minute), vehicleLegs: 1}
-	if !pushPlanLabel(queue, best, earlier) || currentPlanLabel(best, first) || !currentPlanLabel(best, earlier) {
+	if !pushPlanLabel(queue, best, earlier) || currentPlanLabel(queue, best, first) || !currentPlanLabel(queue, best, earlier) {
 		t.Fatal("earlier label did not replace the previous state")
 	}
 	transferred := &planLabel{stop: 1, arrival: base.Add(12 * time.Minute), vehicleLegs: 1, walked: true, route: appendPlanLeg(nil, PlanLeg{Type: ctdf.JourneyPlanRouteItemTypeTransfer})}
 	if !pushPlanLabel(queue, best, transferred) {
 		t.Fatal("transfer-constrained state was incorrectly dominated")
+	}
+}
+
+func TestPlanStateOnlyKeepsIncomingJourneyForRestrictedTransfers(t *testing.T) {
+	data := newGraphData()
+	data.Stops = make([]stopRecord, 2)
+	data.IncomingJourneyStateStops = []bool{false, true}
+	queue := &planQueue{data: data, maxLabelsPerState: 1}
+	heap.Init(queue)
+	base := time.Date(2026, 8, 16, 10, 0, 0, 0, time.UTC)
+
+	unrestricted := map[planState][]planArrival{}
+	if !pushPlanLabel(queue, unrestricted, &planLabel{stop: 0, arrival: base, lastJourney: 1, hasLastJourney: true}) {
+		t.Fatal("first unrestricted arrival was rejected")
+	}
+	if pushPlanLabel(queue, unrestricted, &planLabel{stop: 0, arrival: base, lastJourney: 2, hasLastJourney: true}) {
+		t.Fatal("incoming journey unnecessarily split an unrestricted stop state")
+	}
+
+	restricted := map[planState][]planArrival{}
+	if !pushPlanLabel(queue, restricted, &planLabel{stop: 1, arrival: base, lastJourney: 1, hasLastJourney: true}) ||
+		!pushPlanLabel(queue, restricted, &planLabel{stop: 1, arrival: base, lastJourney: 2, hasLastJourney: true}) {
+		t.Fatal("route-restricted stop did not retain distinct incoming journeys")
+	}
+}
+
+func TestIncomingJourneyStateFollowsPlatformAliasesToRestrictedTransfer(t *testing.T) {
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{
+		stops: []*ctdf.Stop{
+			{PrimaryIdentifier: "arrival"},
+			{PrimaryIdentifier: "station"},
+			{PrimaryIdentifier: "platform"},
+			{PrimaryIdentifier: "destination"},
+		},
+		transfers: []*ctdf.StopTransfer{
+			{FromStopRef: "arrival", ToStopRef: "station", Type: ctdf.StopTransferTypeSameStopGroup, TotalDurationSeconds: 30},
+			{FromStopRef: "station", ToStopRef: "platform", Type: ctdf.StopTransferTypePlatformAlias, TotalDurationSeconds: 30},
+			{FromStopRef: "platform", ToStopRef: "destination", Type: ctdf.StopTransferTypeTimed, FromRouteRef: "incoming", TotalDurationSeconds: 60},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, identifier := range []string{"arrival", "station", "platform"} {
+		stop, exists := data.stopIndex(identifier)
+		if !exists || !data.IncomingJourneyStateStops[stop] {
+			t.Fatalf("incoming journey state was not retained at %s", identifier)
+		}
+	}
+	destination, exists := data.stopIndex("destination")
+	if !exists || data.IncomingJourneyStateStops[destination] {
+		t.Fatal("unrelated destination unnecessarily retained incoming journey state")
+	}
+}
+
+func TestGraphSimpleRouteIsNotStarvedByIncomingJourneyStates(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 16, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin", Location: &ctdf.Location{Coordinates: []float64{0, 52}}},
+		{PrimaryIdentifier: "station", Location: &ctdf.Location{Coordinates: []float64{0.1, 52}}},
+		{PrimaryIdentifier: "distractor", Location: &ctdf.Location{Coordinates: []float64{0.99, 52}}},
+		{PrimaryIdentifier: "distractor-2", Location: &ctdf.Location{Coordinates: []float64{0.995, 52}}},
+		{PrimaryIdentifier: "distractor-3", Location: &ctdf.Location{Coordinates: []float64{0.997, 52}}},
+		{PrimaryIdentifier: "destination", Location: &ctdf.Location{Coordinates: []float64{1, 52}}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	day := makeDayKey(serviceDate)
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "access-bus", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "origin", DestinationStopRef: "station",
+		OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 20*60),
+	}}})
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "destination-train", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "station", DestinationStopRef: "destination",
+		OriginDepartureTime: serviceTime(9*3600 + 30*60), DestinationArrivalTime: serviceTime(10*3600 + 30*60),
+	}}})
+	for index := 0; index < 20; index++ {
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("distractor-arrival-%d", index), Path: []*ctdf.JourneyPathItem{{
+			OriginStopRef: "origin", DestinationStopRef: "distractor",
+			OriginDepartureTime: serviceTime(8*3600 + 55*60), DestinationArrivalTime: serviceTime(9*3600 + 60),
+		}}})
+	}
+	for index, leg := range [][2]string{{"distractor", "distractor-2"}, {"distractor-2", "distractor-3"}, {"distractor-3", "destination"}} {
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("late-connection-%d", index), Path: []*ctdf.JourneyPathItem{{
+			OriginStopRef: leg[0], DestinationStopRef: leg[1],
+			OriginDepartureTime: serviceTime(int32((11 + index) * 3600)), DestinationArrivalTime: serviceTime(int32((11+index)*3600 + 30*60)),
+		}}})
+	}
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(8*time.Hour + 50*time.Minute), Count: 1, MaxChanges: 3,
+		MaxExpandedLabels: 8, MaxSearchDurationMillis: 1000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 1 || len(result.Plans[0].Legs) != 2 || result.SearchTruncated {
+		t.Fatalf("simple access route was starved: %#v", result)
 	}
 }
 

@@ -343,6 +343,7 @@ func (g *Graph) restore(path string) error {
 		}
 	}
 	restored.buildStopIndexByStringIDLocked()
+	restored.rebuildIncomingJourneyStateStopsLocked()
 	if len(restored.CompleteDays) > 0 && (!restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalPatternOffsets) != len(restored.Stops)+1) {
 		restored.buildStaticRoutingIndexesLocked()
 	}

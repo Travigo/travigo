@@ -77,6 +77,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 	d.TransferOffsets = nil
 	d.Transfers = nil
 	d.TransferRestrictions = nil
+	d.IncomingJourneyStateStops = nil
 	d.ReverseTransferOffsets = nil
 	d.ReverseTransferOrigins = nil
 	d.ArrivalPatternOffsets = nil
@@ -236,6 +237,7 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		}
 	}
 	d.TransferOffsets[len(d.Stops)] = uint32(len(d.Transfers))
+	d.rebuildIncomingJourneyStateStopsLocked()
 	d.TopologyReady = true
 	if len(d.CompleteDays) > 0 {
 		d.buildStaticRoutingIndexesLocked()
@@ -248,6 +250,60 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		Dur("duration", time.Since(started)).
 		Msg("Journey graph topology loaded")
 	return nil
+}
+
+func (d *graphData) rebuildIncomingJourneyStateStopsLocked() {
+	d.IncomingJourneyStateStops = make([]bool, len(d.Stops))
+	if len(d.TransferOffsets) != len(d.Stops)+1 {
+		return
+	}
+	queue := make([]uint32, 0, len(d.TransferRestrictions))
+	stop := 0
+	for _, restriction := range d.TransferRestrictions {
+		for stop < len(d.Stops) && restriction.Transfer >= d.TransferOffsets[stop+1] {
+			stop++
+		}
+		if stop < len(d.Stops) && restriction.Transfer >= d.TransferOffsets[stop] && !d.IncomingJourneyStateStops[stop] {
+			d.IncomingJourneyStateStops[stop] = true
+			queue = append(queue, uint32(stop))
+		}
+	}
+
+	// Same-stop and platform-alias edges preserve the incoming journey. Keep
+	// that identity at every stop that can reach a restricted transfer through
+	// one of those equivalence edges, not just at the restricted edge itself.
+	reverseCounts := make([]uint32, len(d.Stops))
+	for origin := range d.Stops {
+		for index := d.TransferOffsets[origin]; index < d.TransferOffsets[origin+1]; index++ {
+			transfer := d.Transfers[index]
+			if int(transfer.ToStop) < len(d.Stops) && isEquivalenceTransfer(unpackTransferType(transfer.Type)) {
+				reverseCounts[transfer.ToStop]++
+			}
+		}
+	}
+	reverseOffsets := offsetsForCounts(reverseCounts)
+	reverseOrigins := make([]uint32, reverseOffsets[len(d.Stops)])
+	reverseCursors := append([]uint32(nil), reverseOffsets[:len(d.Stops)]...)
+	for origin := range d.Stops {
+		for index := d.TransferOffsets[origin]; index < d.TransferOffsets[origin+1]; index++ {
+			transfer := d.Transfers[index]
+			if int(transfer.ToStop) >= len(d.Stops) || !isEquivalenceTransfer(unpackTransferType(transfer.Type)) {
+				continue
+			}
+			reverseOrigins[reverseCursors[transfer.ToStop]] = uint32(origin)
+			reverseCursors[transfer.ToStop]++
+		}
+	}
+	for cursor := 0; cursor < len(queue); cursor++ {
+		current := queue[cursor]
+		for index := reverseOffsets[current]; index < reverseOffsets[current+1]; index++ {
+			origin := reverseOrigins[index]
+			if !d.IncomingJourneyStateStops[origin] {
+				d.IncomingJourneyStateStops[origin] = true
+				queue = append(queue, origin)
+			}
+		}
+	}
 }
 
 func (d *graphData) stopIndex(identifier string) (uint32, bool) {

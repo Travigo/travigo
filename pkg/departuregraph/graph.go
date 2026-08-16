@@ -147,6 +147,8 @@ type graphData struct {
 	ScanProcessed          int64
 	ScanActive             int64
 
+	IncomingJourneyStateStops []bool
+
 	corridorMu    sync.Mutex
 	corridors     map[corridorKey]*corridorCacheEntry
 	corridorClock uint64

@@ -265,7 +265,7 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		default:
 		}
 		current := heap.Pop(queue).(*planLabel)
-		if !currentPlanLabel(best, current) {
+		if !currentPlanLabel(queue, best, current) {
 			continue
 		}
 		expanded++
@@ -577,7 +577,7 @@ func pushPlanLabel(queue *planQueue, best map[planState][]planArrival, label *pl
 			return false
 		}
 	}
-	state := stateForPlanLabel(label)
+	state := stateForPlanLabel(queue, label)
 	arrivals := best[state]
 	signature := uint64(0)
 	if label.route != nil {
@@ -610,12 +610,12 @@ func pushPlanLabel(queue *planQueue, best map[planState][]planArrival, label *pl
 	return true
 }
 
-func currentPlanLabel(best map[planState][]planArrival, label *planLabel) bool {
+func currentPlanLabel(queue *planQueue, best map[planState][]planArrival, label *planLabel) bool {
 	signature := uint64(0)
 	if label.route != nil {
 		signature = label.route.signature
 	}
-	for _, arrival := range best[stateForPlanLabel(label)] {
+	for _, arrival := range best[stateForPlanLabel(queue, label)] {
 		if arrival.at.Equal(label.arrival) && arrival.signature == signature {
 			return true
 		}
@@ -623,10 +623,19 @@ func currentPlanLabel(best map[planState][]planArrival, label *planLabel) bool {
 	return false
 }
 
-func stateForPlanLabel(label *planLabel) planState {
+func stateForPlanLabel(queue *planQueue, label *planLabel) planState {
+	lastJourney := label.lastJourney
+	hasLastJourney := label.hasLastJourney
+	if queue != nil && queue.data != nil && int(label.stop) < len(queue.data.IncomingJourneyStateStops) && !queue.data.IncomingJourneyStateStops[label.stop] {
+		// The incoming journey only affects which route/trip-restricted transfer
+		// can be used next. At ordinary stops it must not split an otherwise
+		// identical state by every service that happened to arrive there.
+		lastJourney = 0
+		hasLastJourney = false
+	}
 	return planState{
 		stop: label.stop, vehicleLegs: label.vehicleLegs, walked: label.walked,
-		lastJourney: label.lastJourney, hasLastJourney: label.hasLastJourney,
+		lastJourney: lastJourney, hasLastJourney: hasLastJourney,
 		requiredRoute: label.requiredRoute, requiredTrip: label.requiredTrip,
 	}
 }
