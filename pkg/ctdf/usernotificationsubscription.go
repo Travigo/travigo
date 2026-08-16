@@ -18,8 +18,9 @@ type UserNotificationSubscription struct {
 	PrimaryIdentifier string `bson:"primaryidentifier" json:"id" groups:"web-notification-subscription"`
 	UserID            string `bson:"userid" json:"-"`
 
-	EventType EventType                          `bson:"eventtype" json:"eventType" groups:"web-notification-subscription"`
-	Values    UserNotificationSubscriptionValues `bson:"values" json:"values" groups:"web-notification-subscription"`
+	EventType  EventType                          `bson:"eventtype" json:"eventType" groups:"web-notification-subscription"`
+	DaysOfWeek []string                           `bson:"daysofweek,omitempty" json:"daysOfWeek,omitempty" groups:"web-notification-subscription"`
+	Values     UserNotificationSubscriptionValues `bson:"values" json:"values" groups:"web-notification-subscription"`
 
 	CreationDateTime     time.Time `bson:"creationdatetime" json:"createdAt" groups:"web-notification-subscription"`
 	ModificationDateTime time.Time `bson:"modificationdatetime" json:"updatedAt" groups:"web-notification-subscription"`
@@ -36,6 +37,21 @@ type UserNotificationSubscriptionValues struct {
 	ServiceRef        string   `bson:"serviceref" json:"ServiceRef" groups:"web-notification-subscription"`
 	JourneyRef        string   `bson:"journeyref" json:"JourneyRef" groups:"web-notification-subscription"`
 	StopRefs          []string `bson:"stoprefs" json:"StopRefs" groups:"web-notification-subscription"`
+}
+
+var validNotificationDays = map[string]struct{}{
+	"Monday":    {},
+	"Tuesday":   {},
+	"Wednesday": {},
+	"Thursday":  {},
+	"Friday":    {},
+	"Saturday":  {},
+	"Sunday":    {},
+}
+
+func ValidNotificationDay(day string) bool {
+	_, ok := validNotificationDays[day]
+	return ok
 }
 
 func stringArrayExpression(values []string) string {

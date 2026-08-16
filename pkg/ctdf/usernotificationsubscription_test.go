@@ -43,6 +43,22 @@ func TestUserNotificationSubscriptionJSONStoresSingleEventType(t *testing.T) {
 	}
 }
 
+func TestUserNotificationSubscriptionJSONStoresDaysOfWeek(t *testing.T) {
+	subscription := UserNotificationSubscription{
+		EventType:  EventTypeServiceAlertCreated,
+		DaysOfWeek: []string{"Monday", "Friday"},
+	}
+
+	data, err := json.Marshal(subscription)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	if body := string(data); !strings.Contains(body, `"daysOfWeek":["Monday","Friday"]`) {
+		t.Fatalf("json.Marshal() = %s, want configured days of week", body)
+	}
+}
+
 func TestUserNotificationSubscriptionCompileServiceAlerts(t *testing.T) {
 	tests := []struct {
 		name              string

@@ -57,10 +57,20 @@ func TestValidateNotificationSubscriptionRequestRejectsUnknownEventType(t *testi
 	}
 }
 
+func TestValidateNotificationSubscriptionRequestRejectsUnknownNotificationDay(t *testing.T) {
+	request := validJourneyNotificationSubscriptionRequest()
+	request.DaysOfWeek = []string{"Monday", "Funday"}
+
+	if got := validateNotificationSubscriptionRequest(request); got != "Invalid notification day" {
+		t.Fatalf("validateNotificationSubscriptionRequest() = %q, want invalid notification day error", got)
+	}
+}
+
 func TestNotificationSubscriptionRequestDecodesWebUIValues(t *testing.T) {
 	var request notificationSubscriptionRequest
 	err := json.Unmarshal([]byte(`{
 		"eventType": "RealtimeJourneyPlatformChanged",
+		"daysOfWeek": ["Monday", "Friday"],
 		"values": {
 			"JourneyRef": "journey-1",
 			"StopRefs": ["stop-1", "stop-2"]
@@ -72,6 +82,9 @@ func TestNotificationSubscriptionRequestDecodesWebUIValues(t *testing.T) {
 
 	if request.Values.JourneyRef != "journey-1" {
 		t.Fatalf("JourneyRef = %q, want journey-1", request.Values.JourneyRef)
+	}
+	if len(request.DaysOfWeek) != 2 || request.DaysOfWeek[0] != "Monday" || request.DaysOfWeek[1] != "Friday" {
+		t.Fatalf("DaysOfWeek = %#v, want [Monday Friday]", request.DaysOfWeek)
 	}
 	if len(request.Values.StopRefs) != 2 || request.Values.StopRefs[0] != "stop-1" || request.Values.StopRefs[1] != "stop-2" {
 		t.Fatalf("StopRefs = %#v, want [stop-1 stop-2]", request.Values.StopRefs)

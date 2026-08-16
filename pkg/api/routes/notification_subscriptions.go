@@ -21,8 +21,9 @@ import (
 const defaultUserNotificationSubscriptionLimit int64 = 10
 
 type notificationSubscriptionRequest struct {
-	EventType ctdf.EventType                          `json:"eventType"`
-	Values    ctdf.UserNotificationSubscriptionValues `json:"values"`
+	EventType  ctdf.EventType                          `json:"eventType"`
+	DaysOfWeek []string                                `json:"daysOfWeek"`
+	Values     ctdf.UserNotificationSubscriptionValues `json:"values"`
 }
 
 type notificationSubscriptionQuota struct {
@@ -89,6 +90,7 @@ func createNotificationSubscription(c *fiber.Ctx) error {
 		PrimaryIdentifier:    "travigo-notification-subscription-" + primitive.NewObjectID().Hex(),
 		UserID:               userID,
 		EventType:            request.EventType,
+		DaysOfWeek:           request.DaysOfWeek,
 		Values:               request.Values,
 		CreationDateTime:     now,
 		ModificationDateTime: now,
@@ -152,6 +154,7 @@ func updateNotificationSubscription(c *fiber.Ctx) error {
 		},
 		bson.M{"$set": bson.M{
 			"eventtype":            request.EventType,
+			"daysofweek":           request.DaysOfWeek,
 			"values":               request.Values,
 			"modificationdatetime": now,
 		}},
@@ -290,6 +293,11 @@ func buildNotificationSubscriptionQuota(userID string, used int64) notificationS
 func validateNotificationSubscriptionRequest(request notificationSubscriptionRequest) string {
 	if !request.EventType.Valid() {
 		return "Invalid notification event type"
+	}
+	for _, day := range request.DaysOfWeek {
+		if !ctdf.ValidNotificationDay(day) {
+			return "Invalid notification day"
+		}
 	}
 	if len(request.Values.ServiceAlertTypes) == 0 &&
 		request.Values.StopRef == "" &&

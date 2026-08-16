@@ -26,15 +26,25 @@ func newEventSubscriptionCache() *notificationSubscriptionCache {
 
 func (c *notificationSubscriptionCache) StartBackgroundReload(interval time.Duration) {
 	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
+		for {
+			wait := interval
+			untilNextDay := durationUntilNextLocalDay(time.Now())
+			if untilNextDay < wait {
+				wait = untilNextDay
+			}
 
-		for range ticker.C {
+			timer := time.NewTimer(wait)
+			<-timer.C
 			if err := c.Reload(context.Background()); err != nil {
 				log.Error().Err(err).Msg("Failed to reload event subscriptions")
 			}
 		}
 	}()
+}
+
+func durationUntilNextLocalDay(now time.Time) time.Duration {
+	nextDay := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, now.Location())
+	return nextDay.Sub(now)
 }
 
 func (c *notificationSubscriptionCache) Reload(ctx context.Context) error {
@@ -59,7 +69,7 @@ func (c *notificationSubscriptionCache) Reload(ctx context.Context) error {
 		return err
 	}
 
-	compiledSubscriptions := compileEventSubscriptions(subscriptions)
+	compiledSubscriptions := compileEventSubscriptionsForDay(subscriptions, time.Now().Weekday())
 
 	c.mu.Lock()
 	c.byEventType = compiledSubscriptions
@@ -89,9 +99,17 @@ func (c *notificationSubscriptionCache) ForEventType(eventType ctdf.EventType) [
 }
 
 func compileEventSubscriptions(subscriptions []ctdf.UserNotificationSubscription) map[ctdf.EventType][]ctdf.UserNotificationSubscription {
+	return compileEventSubscriptionsForDay(subscriptions, time.Now().Weekday())
+}
+
+func compileEventSubscriptionsForDay(subscriptions []ctdf.UserNotificationSubscription, day time.Weekday) map[ctdf.EventType][]ctdf.UserNotificationSubscription {
 	compiledSubscriptions := map[ctdf.EventType][]ctdf.UserNotificationSubscription{}
 
 	for _, subscription := range subscriptions {
+		if len(subscription.DaysOfWeek) > 0 && !subscriptionMatchesDay(subscription, day) {
+			continue
+		}
+
 		err := subscription.Compile()
 		if err != nil {
 			log.Error().
@@ -106,6 +124,16 @@ func compileEventSubscriptions(subscriptions []ctdf.UserNotificationSubscription
 	}
 
 	return compiledSubscriptions
+}
+
+func subscriptionMatchesDay(subscription ctdf.UserNotificationSubscription, day time.Weekday) bool {
+	for _, configuredDay := range subscription.DaysOfWeek {
+		if configuredDay == day.String() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func countCompiledEventSubscriptions(subscriptions map[ctdf.EventType][]ctdf.UserNotificationSubscription) int {
