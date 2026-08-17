@@ -20,41 +20,49 @@ type serviceAlertReference struct {
 }
 
 func matchingServiceAlertReference(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) serviceAlertReference {
-	for _, reference := range []struct {
-		kind       string
-		identifier string
-	}{
-		{kind: "stop", identifier: values.StopRef},
-		{kind: "service", identifier: values.ServiceRef},
-		{kind: "journey", identifier: values.JourneyRef},
-	} {
-		if reference.identifier == "" {
-			continue
-		}
-
+	for _, reference := range notificationReferenceCandidates(values) {
 		for _, value := range matchedIdentifiers {
 			identifier, ok := value.(string)
 			if !ok {
 				continue
 			}
-
 			if identifier == reference.identifier {
 				return serviceAlertReference{kind: reference.kind, identifier: identifier}
 			}
 			if reference.kind == "journey" && strings.HasPrefix(identifier, "DAYINSTANCEOF:") && strings.HasSuffix(identifier, ":"+reference.identifier) {
 				parts := strings.SplitN(identifier, ":", 3)
 				if len(parts) == 3 {
-					return serviceAlertReference{
-						kind:       reference.kind,
-						identifier: parts[2],
-						date:       dayInstanceDate(parts[1]),
-					}
+					return serviceAlertReference{kind: reference.kind, identifier: parts[2], date: dayInstanceDate(parts[1])}
 				}
 			}
 		}
 	}
 
 	return serviceAlertReference{}
+}
+
+type notificationReferenceCandidate struct {
+	kind       string
+	identifier string
+}
+
+func notificationReferenceCandidates(values ctdf.UserNotificationSubscriptionValues) []notificationReferenceCandidate {
+	candidates := []notificationReferenceCandidate{}
+	seen := map[string]bool{}
+	appendReferences := func(kind string, values []string) {
+		for _, value := range values {
+			key := kind + "\x00" + value
+			if value == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			candidates = append(candidates, notificationReferenceCandidate{kind: kind, identifier: value})
+		}
+	}
+	appendReferences("stop", append([]string{values.StopRef}, values.StopRefs...))
+	appendReferences("service", append([]string{values.ServiceRef}, values.ServiceRefs...))
+	appendReferences("journey", append([]string{values.JourneyRef}, values.JourneyRefs...))
+	return candidates
 }
 
 func matchingServiceAlertIdentifier(matchedIdentifiers []interface{}, values ctdf.UserNotificationSubscriptionValues) string {
@@ -134,7 +142,7 @@ func notificationTargetURL(e *ctdf.Event, notificationMatcher ctdf.UserNotificat
 }
 
 func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificationSubscriptionValues) string {
-	if identifier == values.StopRef && identifier != "" {
+	if identifier != "" && containsNotificationReference(identifier, append([]string{values.StopRef}, values.StopRefs...)) {
 		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: identifier})
 		if err != nil {
 			log.Error().Err(err).Str("stop", identifier).Msg("Failed to lookup service alert stop")
@@ -144,7 +152,7 @@ func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificati
 		}
 	}
 
-	if identifier == values.ServiceRef && identifier != "" {
+	if identifier != "" && containsNotificationReference(identifier, append([]string{values.ServiceRef}, values.ServiceRefs...)) {
 		service, err := dataaggregator.Lookup[*ctdf.Service](query.Service{PrimaryIdentifier: identifier})
 		if err != nil {
 			log.Error().Err(err).Str("service", identifier).Msg("Failed to lookup service alert service")
@@ -154,7 +162,7 @@ func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificati
 		}
 	}
 
-	if identifier == values.JourneyRef && identifier != "" {
+	if identifier != "" && containsNotificationReference(identifier, append([]string{values.JourneyRef}, values.JourneyRefs...)) {
 		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: identifier})
 		if err != nil {
 			log.Error().Err(err).Str("journey", identifier).Msg("Failed to lookup service alert journey")
@@ -175,7 +183,19 @@ func serviceAlertIdentifierDisplay(identifier string, values ctdf.UserNotificati
 	return identifier
 }
 
+func containsNotificationReference(identifier string, references []string) bool {
+	for _, reference := range references {
+		if identifier == reference {
+			return true
+		}
+	}
+	return false
+}
+
 func realtimeJourneyDestination(eventBody map[string]interface{}) string {
+	if nested, ok := eventBody["RealtimeJourney"].(map[string]interface{}); ok {
+		eventBody = nested
+	}
 	journey, _ := eventBody["Journey"].(map[string]interface{})
 	destination, _ := journey["DestinationDisplay"].(string)
 	return destination
@@ -318,6 +338,18 @@ func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificatio
 		} else if e.Type == ctdf.EventTypeRealtimeJourneyPlatformChanged {
 			oldPlatform := eventBody["OldPlatform"]
 			eventNotificationData.Message = fmt.Sprintf("The %s service to %s from %s will now be departing from platform %s instead of %s", departureTimeText, destination, originStop, platform, oldPlatform)
+		}
+	case ctdf.EventTypeRealtimeJourneyDelayed:
+		eventNotificationData.Title = "Journey delayed"
+		destination := realtimeJourneyDestination(eventBody)
+		delaySeconds, _ := eventBody["DelaySeconds"].(float64)
+		delay := time.Duration(delaySeconds * float64(time.Second))
+		if delay < time.Minute {
+			eventNotificationData.Message = "A service in this commute is now running late."
+		} else if destination == "" {
+			eventNotificationData.Message = fmt.Sprintf("A service in this commute is now %d minutes late.", int(delay.Round(time.Minute)/time.Minute))
+		} else {
+			eventNotificationData.Message = fmt.Sprintf("The service to %s is now %d minutes late.", destination, int(delay.Round(time.Minute)/time.Minute))
 		}
 	}
 

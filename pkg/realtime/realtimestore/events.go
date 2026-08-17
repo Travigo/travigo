@@ -142,6 +142,21 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 		})
 	}
 
+	previousDelay, _ := realtimeJourneyDelay(previous)
+	currentDelay, delayedStop := realtimeJourneyDelay(current)
+	if currentDelay > 0 && currentDelay > previousDelay {
+		log.Info().Str("id", current.PrimaryIdentifier).Dur("delay", currentDelay).Msg("RealtimeJourney delay increased")
+		events = append(events, ctdf.Event{
+			Type:      ctdf.EventTypeRealtimeJourneyDelayed,
+			Timestamp: timestamp,
+			Body: map[string]interface{}{
+				"RealtimeJourney": *current,
+				"DelaySeconds":    int(currentDelay / time.Second),
+				"Stop":            delayedStop,
+			},
+		})
+	}
+
 	for id, currentStop := range current.Stops {
 		if currentStop == nil || currentStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 			continue
@@ -197,4 +212,61 @@ func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.Realtim
 	}
 
 	return events
+}
+
+func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration, string) {
+	if realtimeJourney == nil || realtimeJourney.Journey == nil {
+		return 0, ""
+	}
+	maximumDelay := time.Duration(0)
+	delayedStop := ""
+	for pathIndex, path := range realtimeJourney.Journey.Path {
+		if path == nil {
+			continue
+		}
+		for _, candidate := range []struct {
+			stopRef   string
+			stopIndex int
+			scheduled time.Time
+			actual    time.Time
+		}{
+			{stopRef: path.OriginStopRef, stopIndex: pathIndex, scheduled: path.OriginDepartureTime, actual: realtimeStopDepartureTime(realtimeJourney, path.OriginStopRef, pathIndex)},
+			{stopRef: path.DestinationStopRef, stopIndex: pathIndex + 1, scheduled: path.DestinationArrivalTime, actual: realtimeStopArrivalTime(realtimeJourney, path.DestinationStopRef, pathIndex+1)},
+		} {
+			if candidate.actual.IsZero() || candidate.scheduled.IsZero() {
+				continue
+			}
+			scheduled := scheduledJourneyTime(realtimeJourney.JourneyRunDate, candidate.scheduled, candidate.actual.Location())
+			delay := candidate.actual.Sub(scheduled)
+			if delay > maximumDelay {
+				maximumDelay, delayedStop = delay, candidate.stopRef
+			}
+		}
+	}
+	return maximumDelay, delayedStop
+}
+
+func realtimeStopDepartureTime(realtimeJourney *ctdf.RealtimeJourney, stopRef string, stopIndex int) time.Time {
+	if stop := realtimeJourney.RealtimeStop(stopRef, stopIndex); stop != nil {
+		return stop.DepartureTime
+	}
+	return time.Time{}
+}
+
+func realtimeStopArrivalTime(realtimeJourney *ctdf.RealtimeJourney, stopRef string, stopIndex int) time.Time {
+	if stop := realtimeJourney.RealtimeStop(stopRef, stopIndex); stop != nil {
+		return stop.ArrivalTime
+	}
+	return time.Time{}
+}
+
+func scheduledJourneyTime(runDate time.Time, scheduled time.Time, location *time.Location) time.Time {
+	if location == nil {
+		location = time.Local
+	}
+	if runDate.IsZero() {
+		runDate = scheduled
+	}
+	result := time.Date(runDate.In(location).Year(), runDate.In(location).Month(), runDate.In(location).Day(), scheduled.Hour(), scheduled.Minute(), scheduled.Second(), scheduled.Nanosecond(), location)
+	return result
 }

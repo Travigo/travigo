@@ -39,6 +39,15 @@ const (
 	ServiceAlertTypeJourneyCancelled          ServiceAlertType = "JourneyCancelled"
 )
 
+func AllServiceAlertTypes() []string {
+	return []string{
+		string(ServiceAlertTypeInformation), string(ServiceAlertTypeWarning), string(ServiceAlertTypeStopClosed),
+		string(ServiceAlertTypeServiceSuspended), string(ServiceAlertTypeServicePartSuspended), string(ServiceAlertTypeSevereDelays),
+		string(ServiceAlertTypeDelays), string(ServiceAlertTypeMinorDelays), string(ServiceAlertTypePlanned),
+		string(ServiceAlertTypeJourneyDelayed), string(ServiceAlertTypeJourneyPartiallyCancelled), string(ServiceAlertTypeJourneyCancelled),
+	}
+}
+
 func (a *ServiceAlert) IsValid(checkTime time.Time) bool {
 	return checkTime.After(a.ValidFrom) && checkTime.Before(a.ValidUntil)
 }

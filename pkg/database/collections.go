@@ -24,6 +24,18 @@ func createIndexes() {
 	createSavedObjectsIndexes()
 	createDatasetImportReportIndexes()
 	createUserNotificationSubscriptionsIndexes()
+	createUserCommutesIndexes()
+}
+
+func createUserCommutesIndexes() {
+	collection := GetCollection("user_commutes")
+	_, err := collection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "userid", Value: 1}}},
+		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}, Options: options.Index().SetUnique(true)},
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating User Commutes Index")
+	}
 }
 
 func createUserNotificationSubscriptionsIndexes() {

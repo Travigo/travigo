@@ -219,6 +219,17 @@ func TestNotificationTargetURLServiceAlert(t *testing.T) {
 	}
 }
 
+func TestNotificationTargetURLServiceAlertUsesCommuteRouteReferences(t *testing.T) {
+	values := ctdf.UserNotificationSubscriptionValues{JourneyRefs: []string{"journey-1"}}
+	got := notificationTargetURL(&ctdf.Event{
+		Type: ctdf.EventTypeServiceAlertCreated,
+		Body: map[string]interface{}{"MatchedIdentifiers": []interface{}{"DAYINSTANCEOF:20260811:journey-1"}},
+	}, ctdf.UserNotificationSubscription{Values: values})
+	if got != "/journeys/journey-1?date=2026-08-11" {
+		t.Fatalf("commute service-alert target URL = %q", got)
+	}
+}
+
 func TestNotificationTargetURLRealtimeJourney(t *testing.T) {
 	tests := []struct {
 		name string

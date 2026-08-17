@@ -35,6 +35,7 @@ func SetupServer(listen string) error {
 	routes.AccountRouter(group.Group("/account", EnsureValidToken()))
 
 	routes.NotificationSubscriptionsRouter(group.Group("/notification_subscriptions", EnsureValidToken()))
+	routes.CommutesRouter(group.Group("/commutes", EnsureValidToken()))
 
 	routes.SavedRouter(group.Group("/saved", EnsureValidToken()))
 

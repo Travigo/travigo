@@ -23,6 +23,7 @@ const (
 	EventTypeRealtimeJourneyOverlayCreated      EventType = "RealtimeJourneyOverlayCreated"
 	EventTypeRealtimeJourneyLocationTextChanged EventType = "RealtimeJourneyLocationTextChanged"
 	EventTypeRealtimeJourneyNextStopChanged     EventType = "RealtimeJourneyNextStopChanged"
+	EventTypeRealtimeJourneyDelayed             EventType = "RealtimeJourneyDelayed"
 )
 
 func (eventType EventType) Valid() bool {
@@ -35,7 +36,8 @@ func (eventType EventType) Valid() bool {
 		EventTypeRealtimeJourneyCancelled,
 		EventTypeRealtimeJourneyOverlayCreated,
 		EventTypeRealtimeJourneyLocationTextChanged,
-		EventTypeRealtimeJourneyNextStopChanged:
+		EventTypeRealtimeJourneyNextStopChanged,
+		EventTypeRealtimeJourneyDelayed:
 		return true
 	default:
 		return false

@@ -1,6 +1,7 @@
 package journeyplanner
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,6 +16,28 @@ import (
 
 type graphRequestTransport struct {
 	request departuregraph.PlanRequest
+}
+
+type arrivalByTransport struct {
+	latestDeparture time.Time
+}
+
+func (transport arrivalByTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	var planRequest departuregraph.PlanRequest
+	if err := json.NewDecoder(request.Body).Decode(&planRequest); err != nil {
+		return nil, err
+	}
+	departure := transport.latestDeparture
+	arrival := departure.Add(30 * time.Minute)
+	if planRequest.StartDateTime.After(transport.latestDeparture) {
+		departure = planRequest.StartDateTime
+		arrival = departure.Add(2 * time.Hour)
+	}
+	response, err := json.Marshal(departuregraph.PlanResponse{Plans: []departuregraph.Plan{{StartTime: departure, ArrivalTime: arrival}}})
+	if err != nil {
+		return nil, err
+	}
+	return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(string(response))), Request: request}, nil
 }
 
 func (transport *graphRequestTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -44,6 +67,25 @@ func TestJourneyPlanRequestsOnlyTheRequiredGraphCandidates(t *testing.T) {
 	}
 	if transport.request.Count != 5 {
 		t.Fatalf("graph candidate count = %d, want requested count 5", transport.request.Count)
+	}
+}
+
+func TestPlanArrivingByChoosesLatestDepartureThatMeetsDeadline(t *testing.T) {
+	deadline := time.Date(2026, time.August, 18, 9, 0, 0, 0, time.UTC)
+	latestDeparture := deadline.Add(-30 * time.Minute)
+	client := departuregraph.NewClient("http://journey-graph", &http.Client{Transport: arrivalByTransport{latestDeparture: latestDeparture}})
+
+	result, err := (Source{JourneyGraph: client}).planArrivingBy(context.Background(), departuregraph.PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"}, StartDateTime: deadline.Add(-12 * time.Hour), Count: 1,
+	}, deadline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Response.Plans) != 1 {
+		t.Fatalf("arrival-by plans = %#v", result.Response.Plans)
+	}
+	if got := result.Response.Plans[0].StartTime; !got.Equal(latestDeparture) {
+		t.Fatalf("departure = %s, want %s", got, latestDeparture)
 	}
 }
 

@@ -119,3 +119,25 @@ func TestEventSubscriptionCacheForEventTypeReturnsCopy(t *testing.T) {
 		t.Fatalf("expected cached subscription to be unchanged, got %s", subscriptions[0].UserID)
 	}
 }
+
+func TestSubscriptionsForCommutePlansWatchRouteStopsJourneysAndPlatforms(t *testing.T) {
+	commute := ctdf.UserCommute{PrimaryIdentifier: "commute-1", UserID: "user-1"}
+	plans := []ctdf.JourneyPlan{{RouteItems: []ctdf.JourneyPlanRouteItem{{
+		Type: ctdf.JourneyPlanRouteItemTypeJourney, OriginStopRef: "origin", DestinationStopRef: "destination",
+		Journey: &ctdf.Journey{PrimaryIdentifier: "journey-1", ServiceRef: "service-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "via"}, {OriginStopRef: "via", DestinationStopRef: "destination"}}},
+	}}}}
+
+	subscriptions := subscriptionsForCommutePlans(commute, plans)
+	if len(subscriptions) != 6 {
+		t.Fatalf("commute subscriptions = %d, want 6", len(subscriptions))
+	}
+	for _, subscription := range subscriptions {
+		if subscription.UserID != "user-1" || len(subscription.Values.JourneyRefs) != 1 || subscription.Values.JourneyRefs[0] != "journey-1" {
+			t.Fatalf("unexpected commute subscription: %#v", subscription)
+		}
+	}
+	platform := subscriptions[4]
+	if len(platform.Values.PlatformStopRefs) != 1 || platform.Values.PlatformStopRefs[0] != "origin" {
+		t.Fatalf("platform stops = %#v, want only boarding stop", platform.Values.PlatformStopRefs)
+	}
+}

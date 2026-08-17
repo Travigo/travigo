@@ -306,6 +306,20 @@ func TestRealtimeJourneyEventsCompareLegacyPreviousStop(t *testing.T) {
 	assertPlatformEventBody(t, events[0], "waterloo", 1, "1", "2")
 }
 
+func TestRealtimeJourneyEventsDetectsIncreasingDelay(t *testing.T) {
+	runDate := time.Date(2026, time.August, 17, 0, 0, 0, 0, time.Local)
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "destination", OriginDepartureTime: time.Date(1, 1, 1, 8, 0, 0, 0, time.Local), DestinationArrivalTime: time.Date(1, 1, 1, 9, 0, 0, 0, time.Local)}}}
+	previous := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Journey: journey, JourneyRunDate: runDate}
+	previous.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "origin", JourneyStopIndex: 0, DepartureTime: runDate.Add(5*time.Minute + 8*time.Hour), TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+	current := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Journey: journey, JourneyRunDate: runDate}
+	current.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "origin", JourneyStopIndex: 0, DepartureTime: runDate.Add(10*time.Minute + 8*time.Hour), TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
+
+	events := realtimeJourneyEvents(previous, current, true, time.Now())
+	if len(events) != 1 || events[0].Type != ctdf.EventTypeRealtimeJourneyDelayed {
+		t.Fatalf("delay events = %#v, want one delay event", events)
+	}
+}
+
 func assertPlatformEventBody(t *testing.T, event ctdf.Event, stop string, journeyStopIndex int, oldPlatform string, newPlatform string) {
 	t.Helper()
 

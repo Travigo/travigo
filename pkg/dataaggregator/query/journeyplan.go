@@ -8,12 +8,13 @@ import (
 )
 
 type JourneyPlan struct {
-	Context         context.Context
-	OriginStop      *ctdf.Stop
-	OriginLocation  *ctdf.Location
-	DestinationStop *ctdf.Stop
-	Count           int
-	StartDateTime   time.Time
+	Context           context.Context
+	OriginStop        *ctdf.Stop
+	OriginLocation    *ctdf.Location
+	DestinationStop   *ctdf.Stop
+	Count             int
+	StartDateTime     time.Time
+	ArrivalByDateTime time.Time
 
 	MaxChanges                int
 	MaxJourneyDuration        time.Duration

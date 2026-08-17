@@ -45,6 +45,16 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	if requestedCount > 20 {
 		requestedCount = 20
 	}
+	ctx := q.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	searchTimeout := q.MaxSearchDuration + 10*time.Second
+	if searchTimeout <= 10*time.Second {
+		searchTimeout = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
+	defer cancel()
 	request := departuregraph.PlanRequest{
 		DestinationRefs:           q.DestinationStop.GetAllStopIDs(),
 		StartDateTime:             q.StartDateTime,
@@ -64,18 +74,23 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			Latitude:  q.OriginLocation.Coordinates[1],
 		}
 	}
-
-	ctx := q.Context
-	if ctx == nil {
-		ctx = context.Background()
+	var graphResult departuregraph.PlanResponse
+	var err error
+	if !q.ArrivalByDateTime.IsZero() {
+		request.StartDateTime = q.ArrivalByDateTime.Add(-q.MaxJourneyDuration)
+		if q.MaxJourneyDuration <= 0 {
+			request.StartDateTime = q.ArrivalByDateTime.Add(-12 * time.Hour)
+		}
+		request.Count = 1
+		arrivalPlan, arrivalErr := s.planArrivingBy(ctx, request, q.ArrivalByDateTime)
+		if arrivalErr != nil {
+			return nil, arrivalErr
+		}
+		request = arrivalPlan.Request
+		graphResult = arrivalPlan.Response
+	} else {
+		graphResult, err = s.JourneyGraph.Plan(ctx, request)
 	}
-	searchTimeout := q.MaxSearchDuration + 10*time.Second
-	if searchTimeout <= 10*time.Second {
-		searchTimeout = 30 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
-	defer cancel()
-	graphResult, err := s.JourneyGraph.Plan(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +100,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	}
 	identifiers := graphJourneyIdentifiers(graphResult)
 	staleReferences := len(journeys) != len(identifiers)
-	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(ctx, identifiers, q.StartDateTime, time.Now())
+	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(ctx, identifiers, request.StartDateTime, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -187,6 +202,80 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		result.SearchTruncatedReason = "post_hydration_filter"
 	}
 	return result, nil
+}
+
+// planArrivingBy finds the latest usable departure by repeatedly asking the
+// forward-only graph for its earliest arrival. Earliest arrival is monotonic
+// as the permitted start time moves later, which lets this remain a small
+// logarithmic number of normal graph searches without restoring the large
+// reverse timetable index the graph intentionally no longer retains.
+func (s Source) planArrivingBy(ctx context.Context, request departuregraph.PlanRequest, arrivalBy time.Time) (arrivalPlanResult, error) {
+	if s.JourneyGraph == nil {
+		return arrivalPlanResult{}, fmt.Errorf("journey graph service is not configured")
+	}
+	start := request.StartDateTime
+	if start.After(arrivalBy) {
+		return arrivalPlanResult{Request: request}, nil
+	}
+	latest := start.Add(-time.Minute)
+	low, high := start, arrivalBy
+	for low.Before(high) {
+		midpoint := low.Add(high.Sub(low) / 2).Truncate(time.Minute)
+		if midpoint.Before(low) {
+			midpoint = low
+		}
+		probe := request
+		probe.StartDateTime = midpoint
+		probe.Count = 1
+		response, err := s.JourneyGraph.Plan(ctx, probe)
+		if err != nil {
+			return arrivalPlanResult{}, err
+		}
+		if len(response.Plans) > 0 && !response.Plans[0].ArrivalTime.After(arrivalBy) {
+			latest = midpoint
+			low = midpoint.Add(time.Minute)
+			continue
+		}
+		high = midpoint.Add(-time.Minute)
+	}
+	if !low.After(arrivalBy) {
+		probe := request
+		probe.StartDateTime = low
+		probe.Count = 1
+		response, err := s.JourneyGraph.Plan(ctx, probe)
+		if err != nil {
+			return arrivalPlanResult{}, err
+		}
+		if len(response.Plans) > 0 && !response.Plans[0].ArrivalTime.After(arrivalBy) {
+			latest = low
+		}
+	}
+	if latest.Before(start) {
+		return arrivalPlanResult{Request: request}, nil
+	}
+	request.StartDateTime = latest
+	request.Count = 1
+	response, err := s.JourneyGraph.Plan(ctx, request)
+	if err != nil {
+		return arrivalPlanResult{}, err
+	}
+	response.Plans = filterPlansArrivingBy(response.Plans, arrivalBy)
+	return arrivalPlanResult{Request: request, Response: response}, nil
+}
+
+type arrivalPlanResult struct {
+	Request  departuregraph.PlanRequest
+	Response departuregraph.PlanResponse
+}
+
+func filterPlansArrivingBy(plans []departuregraph.Plan, arrivalBy time.Time) []departuregraph.Plan {
+	filtered := make([]departuregraph.Plan, 0, len(plans))
+	for _, plan := range plans {
+		if !plan.ArrivalTime.After(arrivalBy) {
+			filtered = append(filtered, plan)
+		}
+	}
+	return filtered
 }
 
 func graphJourneyIdentifiers(result departuregraph.PlanResponse) []string {

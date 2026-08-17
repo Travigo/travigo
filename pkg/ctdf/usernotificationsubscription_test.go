@@ -206,6 +206,25 @@ func TestUserNotificationSubscriptionCompileRealtimeJourneyPlatformEvents(t *tes
 	}
 }
 
+func TestUserNotificationSubscriptionCompileExpandedCommuteReferences(t *testing.T) {
+	subscription := UserNotificationSubscription{
+		EventType: EventTypeServiceAlertCreated,
+		Values: UserNotificationSubscriptionValues{
+			ServiceAlertTypes: AllServiceAlertTypes(),
+			StopRefs:          []string{"stop-a", "stop-b"},
+			ServiceRefs:       []string{"service-a"},
+			JourneyRefs:       []string{"journey-a"},
+		},
+	}
+	assertSubscriptionMatchesEvent(t, &subscription, Event{Type: EventTypeServiceAlertCreated, Body: ServiceAlert{AlertType: ServiceAlertTypeDelays, MatchedIdentifiers: []string{"DAYINSTANCEOF:20260817:journey-a"}}}, true)
+	assertSubscriptionMatchesEvent(t, &subscription, Event{Type: EventTypeServiceAlertCreated, Body: ServiceAlert{AlertType: ServiceAlertTypeDelays, MatchedIdentifiers: []string{"service-other"}}}, false)
+
+	subscription.EventType = EventTypeRealtimeJourneyPlatformSet
+	subscription.Values.PlatformStopRefs = []string{"stop-a"}
+	assertSubscriptionMatchesEvent(t, &subscription, Event{Type: EventTypeRealtimeJourneyPlatformSet, Body: map[string]interface{}{"RealtimeJourney": RealtimeJourney{Journey: &Journey{PrimaryIdentifier: "journey-a"}}, "Stop": "stop-a"}}, true)
+	assertSubscriptionMatchesEvent(t, &subscription, Event{Type: EventTypeRealtimeJourneyPlatformSet, Body: map[string]interface{}{"RealtimeJourney": RealtimeJourney{Journey: &Journey{PrimaryIdentifier: "journey-a"}}, "Stop": "stop-b"}}, false)
+}
+
 func assertSubscriptionMatchesEvent(t *testing.T, subscription *UserNotificationSubscription, event Event, want bool) {
 	t.Helper()
 

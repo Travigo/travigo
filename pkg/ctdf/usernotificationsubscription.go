@@ -37,6 +37,9 @@ type UserNotificationSubscriptionValues struct {
 	ServiceRef        string   `bson:"serviceref" json:"ServiceRef" groups:"web-notification-subscription"`
 	JourneyRef        string   `bson:"journeyref" json:"JourneyRef" groups:"web-notification-subscription"`
 	StopRefs          []string `bson:"stoprefs" json:"StopRefs" groups:"web-notification-subscription"`
+	ServiceRefs       []string `bson:"servicerefs,omitempty" json:"ServiceRefs,omitempty" groups:"web-notification-subscription"`
+	JourneyRefs       []string `bson:"journeyrefs,omitempty" json:"JourneyRefs,omitempty" groups:"web-notification-subscription"`
+	PlatformStopRefs  []string `bson:"platformstoprefs,omitempty" json:"PlatformStopRefs,omitempty" groups:"web-notification-subscription"`
 }
 
 var validNotificationDays = map[string]struct{}{
@@ -68,41 +71,65 @@ func (s *UserNotificationSubscription) serviceAlertExpression() string {
 		fmt.Sprintf("Body.AlertType in %s", stringArrayExpression(s.Values.ServiceAlertTypes)),
 	}
 
-	for _, reference := range []string{s.Values.StopRef, s.Values.ServiceRef} {
-		if reference != "" {
-			filters = append(filters, fmt.Sprintf("%s in Body.MatchedIdentifiers", strconv.Quote(reference)))
-		}
+	stopRefs := appendUniqueStrings([]string{s.Values.StopRef}, s.Values.StopRefs)
+	serviceRefs := appendUniqueStrings([]string{s.Values.ServiceRef}, s.Values.ServiceRefs)
+	journeyRefs := appendUniqueStrings([]string{s.Values.JourneyRef}, s.Values.JourneyRefs)
+	referenceFilters := []string{}
+	if references := append(stopRefs, serviceRefs...); len(references) > 0 {
+		referenceFilters = append(referenceFilters, fmt.Sprintf("# in %s", stringArrayExpression(references)))
 	}
-
-	if s.Values.JourneyRef != "" {
-		filters = append(filters, fmt.Sprintf(
-			"any(Body.MatchedIdentifiers, {# == %[1]s || (# startsWith \"DAYINSTANCEOF:\" && # endsWith %[2]s)})",
-			strconv.Quote(s.Values.JourneyRef),
-			strconv.Quote(":"+s.Values.JourneyRef),
+	if len(journeyRefs) > 0 {
+		suffixFilters := make([]string, 0, len(journeyRefs))
+		for _, journeyRef := range journeyRefs {
+			suffixFilters = append(suffixFilters, fmt.Sprintf("# endsWith %s", strconv.Quote(":"+journeyRef)))
+		}
+		referenceFilters = append(referenceFilters, fmt.Sprintf(
+			"# in %s || (# startsWith \"DAYINSTANCEOF:\" && (%s))",
+			stringArrayExpression(journeyRefs), strings.Join(suffixFilters, " || "),
 		))
+	}
+	if len(referenceFilters) > 0 {
+		filters = append(filters, fmt.Sprintf("any(Body.MatchedIdentifiers, {%s})", strings.Join(referenceFilters, " || ")))
 	}
 
 	return strings.Join(filters, " && ")
 }
 
 func (s *UserNotificationSubscription) realtimeJourneyExpression() string {
-	if s.Values.JourneyRef == "" {
+	journeyRefs := appendUniqueStrings([]string{s.Values.JourneyRef}, s.Values.JourneyRefs)
+	if len(journeyRefs) == 0 {
 		return "false"
 	}
 
-	journeyRef := strconv.Quote(s.Values.JourneyRef)
 	return fmt.Sprintf(
-		"(Body?.Journey?.PrimaryIdentifier == %[1]s || Body?.RealtimeJourney?.Journey?.PrimaryIdentifier == %[1]s)",
-		journeyRef,
+		"(Body?.Journey?.PrimaryIdentifier in %[1]s || Body?.RealtimeJourney?.Journey?.PrimaryIdentifier in %[1]s)",
+		stringArrayExpression(journeyRefs),
 	)
 }
 
 func (s *UserNotificationSubscription) realtimeJourneyPlatformExpression() string {
+	platformStopRefs := s.Values.PlatformStopRefs
+	if len(platformStopRefs) == 0 {
+		platformStopRefs = s.Values.StopRefs
+	}
 	return fmt.Sprintf(
 		"%s && Body?.Stop in %s",
 		s.realtimeJourneyExpression(),
-		stringArrayExpression(s.Values.StopRefs),
+		stringArrayExpression(platformStopRefs),
 	)
+}
+
+func appendUniqueStrings(initial []string, values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(initial)+len(values))
+	for _, value := range append(initial, values...) {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
 }
 
 func (s *UserNotificationSubscription) Compile() error {
@@ -118,7 +145,8 @@ func (s *UserNotificationSubscription) Compile() error {
 		EventTypeRealtimeJourneyCancelled,
 		EventTypeRealtimeJourneyOverlayCreated,
 		EventTypeRealtimeJourneyLocationTextChanged,
-		EventTypeRealtimeJourneyNextStopChanged:
+		EventTypeRealtimeJourneyNextStopChanged,
+		EventTypeRealtimeJourneyDelayed:
 		expression = s.realtimeJourneyExpression()
 	default:
 		log.Warn().Str("event_type", string(s.EventType)).Msg("Unknown event type for UserNotificationSubscription")

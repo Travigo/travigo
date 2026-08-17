@@ -99,3 +99,17 @@ func validJourneyNotificationSubscriptionRequest() notificationSubscriptionReque
 		},
 	}
 }
+
+func TestValidateCommuteRequest(t *testing.T) {
+	request := commuteRequest{
+		Name: "Work", OriginRef: "stop-a", DestinationRef: "stop-b", DaysOfWeek: []string{"Monday", "Tuesday"},
+		ArrivalAtDestinationTime: "09:00", ReturnDepartureTime: "18:00",
+	}
+	if got := validateCommuteRequest(request); got != "" {
+		t.Fatalf("validateCommuteRequest() = %q, want no error", got)
+	}
+	request.ArrivalAtDestinationTime = "9:00"
+	if got := validateCommuteRequest(request); got != "Commute times must be in HH:MM format" {
+		t.Fatalf("validateCommuteRequest() = %q, want clock-time error", got)
+	}
+}
