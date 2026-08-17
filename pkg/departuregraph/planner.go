@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -20,6 +21,8 @@ const (
 	defaultPlanOriginStops       = 12
 	defaultPlanExpandedLabels    = 200000
 	defaultPlanSearchDuration    = 10 * time.Second
+	defaultPlanLabelsPerState    = 1
+	planVehicleLegPenalty        = 12 * time.Minute
 	planWalkSpeedMetresPerSecond = 1.3
 	planMaximumNetworkSpeed      = 100.0
 )
@@ -34,7 +37,9 @@ type PlanLocation struct {
 type PlanRequest struct {
 	OriginRefs                []string      `json:"originRefs,omitempty"`
 	OriginLocation            *PlanLocation `json:"originLocation,omitempty"`
-	DestinationRefs           []string      `json:"destinationRefs"`
+	DestinationRefs           []string      `json:"destinationRefs,omitempty"`
+	DestinationLocation       *PlanLocation `json:"destinationLocation,omitempty"`
+	ExcludedJourneyRefs       []string      `json:"excludedJourneyRefs,omitempty"`
 	StartDateTime             time.Time     `json:"startDateTime"`
 	Count                     int           `json:"count,omitempty"`
 	MaxChanges                int           `json:"maxChanges,omitempty"`
@@ -49,6 +54,9 @@ type PlanResponse struct {
 	Plans                 []Plan `json:"plans"`
 	SearchTruncated       bool   `json:"searchTruncated,omitempty"`
 	SearchTruncatedReason string `json:"searchTruncatedReason,omitempty"`
+	ExpandedLabels        int    `json:"expandedLabels,omitempty"`
+	SearchDurationMillis  int64  `json:"searchDurationMillis,omitempty"`
+	FirstPlanMillis       int64  `json:"firstPlanMillis,omitempty"`
 }
 
 type Plan struct {
@@ -115,8 +123,11 @@ type planQueue struct {
 	destinations      []PlanLocation
 	heuristicSeconds  []uint32
 	corridor          []uint8
+	destinationStops  map[uint32]bool
+	excludedJourneys  map[string]bool
 	maxVehicleLegs    int
 	maxLabelsPerState int
+	destinationLabels int
 }
 
 func (q planQueue) Len() int { return len(q.labels) }
@@ -147,8 +158,16 @@ func (q *planQueue) Pop() any {
 }
 
 func (q *planQueue) priority(label *planLabel) time.Time {
+	priority := label.arrival
+	if label.vehicleLegs > 1 {
+		// Search useful low-change journeys before exploring routes that happen
+		// to reach an intermediate stop slightly earlier through many vehicles.
+		// Vehicle-leg count remains in the Pareto state, so higher-change routes
+		// are still available when they are genuinely required.
+		priority = priority.Add(time.Duration(label.vehicleLegs-1) * planVehicleLegPenalty)
+	}
 	if q == nil || q.data == nil || int(label.stop) >= len(q.heuristicSeconds) || len(q.destinations) == 0 {
-		return label.arrival
+		return priority
 	}
 	encodedSeconds := q.heuristicSeconds[label.stop]
 	if encodedSeconds == 0 {
@@ -167,7 +186,7 @@ func (q *planQueue) priority(label *planLabel) time.Time {
 		encodedSeconds = seconds + 1
 		q.heuristicSeconds[label.stop] = encodedSeconds
 	}
-	return label.arrival.Add(time.Duration(encodedSeconds-1) * time.Second)
+	return priority.Add(time.Duration(encodedSeconds-1) * time.Second)
 }
 
 type planState struct {
@@ -188,7 +207,7 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	data := g.current.Load()
 	data.mu.RLock()
 	defer data.mu.RUnlock()
-	if !data.TopologyReady || len(data.Stops) == 0 || len(data.TransferOffsets) != len(data.Stops)+1 {
+	if !data.TopologyReady || !data.StaticRoutingReady || len(data.Stops) == 0 || len(data.TransferOffsets) != len(data.Stops)+1 || len(data.JourneyPatterns) != len(data.Journeys) || data.PatternDepartures == nil {
 		return PlanResponse{}, ErrGraphNotReady
 	}
 	config := normalizePlanConfig(request)
@@ -200,14 +219,28 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	}
 	deadline := time.Now().Add(config.maxSearchDuration)
 	destinationNodes := data.resolveStopSet(request.DestinationRefs)
+	destinationWalks := map[uint32]nearbyStop{}
+	destinationRef := "coordinate-destination"
+	if request.DestinationLocation != nil {
+		destinationRef = fmt.Sprintf("coordinate-destination:%.6f,%.6f", request.DestinationLocation.Longitude, request.DestinationLocation.Latitude)
+		for _, nearby := range data.nearbyStops(*request.DestinationLocation, config.maxTransferDistance, config.originStops) {
+			destinationNodes[nearby.stop] = true
+			destinationWalks[nearby.stop] = nearby
+		}
+	}
 	if len(destinationNodes) == 0 {
 		return PlanResponse{Plans: []Plan{}}, nil
 	}
 
-	queue := newPlanQueue(data, destinationNodes)
+	queue := newPlanQueue(data, destinationNodes, request.DestinationLocation)
 	queue.corridor = data.planCorridor(destinationNodes, config.maxVehicleLegs)
 	queue.maxVehicleLegs = config.maxVehicleLegs
 	queue.maxLabelsPerState = config.maxLabelsPerState
+	queue.destinationLabels = config.count
+	queue.excludedJourneys = make(map[string]bool, len(request.ExcludedJourneyRefs))
+	for _, ref := range request.ExcludedJourneyRefs {
+		queue.excludedJourneys[ref] = true
+	}
 	heap.Init(queue)
 	best := map[planState][]planArrival{}
 	originRef := "coordinate-origin"
@@ -269,12 +302,25 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 			continue
 		}
 		expanded++
-		if destinationNodes[current.stop] && current.route != nil {
+		if destinationNodes[current.stop] && (current.route != nil || request.DestinationLocation != nil) {
+			if egress, exists := destinationWalks[current.stop]; exists && egress.distance > 0 {
+				duration := int(math.Ceil(egress.distance / planWalkSpeedMetresPerSecond))
+				arrival := current.arrival.Add(time.Duration(duration) * time.Second)
+				current = &planLabel{stop: current.stop, arrival: arrival, vehicleLegs: current.vehicleLegs, walked: true, route: appendPlanLeg(current.route, PlanLeg{
+					Type: ctdf.JourneyPlanRouteItemTypeTransfer, TransferType: ctdf.StopTransferTypeNearbyWalk,
+					OriginStopRef: data.stringValue(data.Stops[current.stop].PrimaryRef), DestinationStopRef: destinationRef,
+					StartTime: current.arrival, ArrivalTime: arrival, DistanceMetres: int(math.Ceil(egress.distance)),
+					WalkDurationSeconds: duration, TotalDurationSeconds: duration,
+				})}
+			}
 			plan := materializePlan(current)
 			key := planKey(plan)
 			if !resultKeys[key] {
 				resultKeys[key] = true
 				response.Plans = append(response.Plans, plan)
+				if len(response.Plans) == 1 {
+					response.FirstPlanMillis = time.Since(started).Milliseconds()
+				}
 			}
 			continue
 		}
@@ -300,6 +346,8 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		}
 		return response.Plans[i].StartTime.Before(response.Plans[j].StartTime)
 	})
+	response.ExpandedLabels = expanded
+	response.SearchDurationMillis = time.Since(started).Milliseconds()
 	log.Info().
 		Int("expanded_labels", expanded).
 		Int("plans", len(response.Plans)).
@@ -310,8 +358,12 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	return response, nil
 }
 
-func newPlanQueue(data *graphData, destinationNodes map[uint32]bool) *planQueue {
-	queue := &planQueue{data: data, heuristicSeconds: make([]uint32, len(data.Stops))}
+func newPlanQueue(data *graphData, destinationNodes map[uint32]bool, destinationLocation ...*PlanLocation) *planQueue {
+	queue := &planQueue{data: data, heuristicSeconds: make([]uint32, len(data.Stops)), destinationStops: destinationNodes}
+	if len(destinationLocation) > 0 && destinationLocation[0] != nil {
+		queue.destinations = append(queue.destinations, *destinationLocation[0])
+		return queue
+	}
 	for destination := range destinationNodes {
 		if int(destination) >= len(data.Stops) {
 			continue
@@ -329,7 +381,14 @@ func normalizePlanConfig(request PlanRequest) planConfig {
 	if config.count <= 0 {
 		config.count = defaultPlanCount
 	}
-	config.maxLabelsPerState = config.count
+	if config.count > 20 {
+		config.count = 20
+	}
+	// FIFO timetable routing only needs the earliest arrival for an ordinary
+	// intermediate state: an earlier arrival can wait for every journey a later
+	// arrival could board. Requested result count must not multiply the entire
+	// search frontier. Destination states retain the requested alternatives.
+	config.maxLabelsPerState = defaultPlanLabelsPerState
 	if request.MaxChanges < 0 {
 		config.maxVehicleLegs = defaultPlanMaxChanges + 1
 	}
@@ -499,20 +558,33 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]pl
 		serviceDate := dayKeyDate(day, current.arrival.Location())
 		aliasStart, aliasEnd := d.StopAliasOffsets[current.stop], d.StopAliasOffsets[current.stop+1]
 		for _, alias := range d.StopAliases[aliasStart:aliasEnd] {
-			entries := d.Departures[bucketKey{Day: day, StopRef: alias}]
+			bucket := bucketKey{Day: day, StopRef: alias}
 			threshold := int32(current.arrival.Sub(serviceDate) / time.Second)
-			start := sort.Search(len(entries), func(index int) bool { return entries[index].departureSeconds() >= threshold })
-			for _, entry := range entries[start:] {
-				key := journeyDayKey{Day: day, Journey: entry.journey()}
-				candidateDeparture := serviceDate.Add(time.Duration(entry.departureSeconds()) * time.Second)
-				if candidateDeparture.Before(current.arrival) {
-					continue
-				}
-				if candidateDeparture.After(searchEnd) {
-					break
-				}
-				if existing, exists := journeys[key]; !exists || entry.departureSeconds() < existing.departureSeconds() {
-					journeys[key] = entry
+			for _, pattern := range d.DeparturePatterns[bucket] {
+				entries := d.PatternDepartures[patternDepartureKey{Day: day, StopRef: alias, Pattern: pattern}]
+				start := sort.Search(len(entries), func(index int) bool { return entries[index].departureSeconds() >= threshold })
+				retained := 0
+				for _, entry := range entries[start:] {
+					candidateDeparture := serviceDate.Add(time.Duration(entry.departureSeconds()) * time.Second)
+					if candidateDeparture.After(searchEnd) {
+						break
+					}
+					if int(entry.journey()) >= len(d.Journeys) {
+						continue
+					}
+					record := d.Journeys[entry.journey()]
+					journeyRef := d.stringValue(record.PrimaryID)
+					if queue.excludedJourneys[journeyRef] || current.requiredRoute != 0 && current.requiredRoute != record.ServiceRef || current.requiredTrip != 0 && current.requiredTrip != record.PrimaryID {
+						continue
+					}
+					key := journeyDayKey{Day: day, Journey: entry.journey()}
+					if existing, exists := journeys[key]; !exists || entry.departureSeconds() < existing.departureSeconds() {
+						journeys[key] = entry
+					}
+					retained++
+					if retained >= max(1, config.count) {
+						break
+					}
 				}
 			}
 		}
@@ -529,6 +601,9 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]pl
 			continue
 		}
 		journeyRef := d.stringValue(record.PrimaryID)
+		if queue.excludedJourneys[journeyRef] {
+			continue
+		}
 		// A ride expansion already reaches every downstream alighting stop.
 		// Re-boarding the same vehicle at its next stop only creates segmented
 		// duplicates of that ride and incorrectly consumes another change.
@@ -591,6 +666,9 @@ func pushPlanLabel(queue *planQueue, best map[planState][]planArrival, label *pl
 	limit := defaultPlanCount
 	if queue != nil {
 		limit = queue.maxLabelsPerState
+		if queue.destinationStops[label.stop] {
+			limit = queue.destinationLabels
+		}
 	}
 	if limit <= 0 {
 		limit = defaultPlanCount

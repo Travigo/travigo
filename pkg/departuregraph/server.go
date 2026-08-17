@@ -58,11 +58,11 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 		writeGraphError(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if (len(request.OriginRefs) == 0) == (request.OriginLocation == nil) || len(request.DestinationRefs) == 0 {
-		writeGraphError(w, http.StatusBadRequest, "request requires one origin and at least one destination identifier")
+	if (len(request.OriginRefs) == 0) == (request.OriginLocation == nil) || (len(request.DestinationRefs) == 0) == (request.DestinationLocation == nil) {
+		writeGraphError(w, http.StatusBadRequest, "request requires exactly one origin and one destination")
 		return
 	}
-	if len(request.OriginRefs) > 256 || len(request.DestinationRefs) > 256 || request.Count < 0 || request.Count > 20 {
+	if len(request.OriginRefs) > 256 || len(request.DestinationRefs) > 256 || len(request.ExcludedJourneyRefs) > 256 || request.Count < 0 || request.Count > 20 {
 		writeGraphError(w, http.StatusBadRequest, "request limits are invalid")
 		return
 	}

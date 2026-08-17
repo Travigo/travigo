@@ -70,6 +70,23 @@ func TestJourneyPlanRequestsOnlyTheRequiredGraphCandidates(t *testing.T) {
 	}
 }
 
+func TestJourneyPlanForwardsRealtimeRecoveryExclusions(t *testing.T) {
+	transport := &graphRequestTransport{}
+	client := departuregraph.NewClient("http://journey-graph", &http.Client{Transport: transport})
+
+	_, err := (Source{JourneyGraph: client}).JourneyPlanQuery(query.JourneyPlan{
+		OriginStop: &ctdf.Stop{PrimaryIdentifier: "origin"}, DestinationStop: &ctdf.Stop{PrimaryIdentifier: "destination"},
+		StartDateTime: time.Date(2026, time.August, 15, 10, 0, 0, 0, time.UTC), Count: 1,
+		ExcludedJourneyRefs: []string{"cancelled-journey"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transport.request.ExcludedJourneyRefs) != 1 || transport.request.ExcludedJourneyRefs[0] != "cancelled-journey" {
+		t.Fatalf("excluded journeys = %#v", transport.request.ExcludedJourneyRefs)
+	}
+}
+
 func TestPlanArrivingByChoosesLatestDepartureThatMeetsDeadline(t *testing.T) {
 	deadline := time.Date(2026, time.August, 18, 9, 0, 0, 0, time.UTC)
 	latestDeparture := deadline.Add(-30 * time.Minute)

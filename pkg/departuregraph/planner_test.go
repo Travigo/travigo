@@ -21,6 +21,13 @@ func TestPlanDefaultsCoverOvernightJourneys(t *testing.T) {
 	}
 }
 
+func TestPlanResultCountDoesNotMultiplyIntermediateState(t *testing.T) {
+	config := normalizePlanConfig(PlanRequest{Count: 20})
+	if config.maxLabelsPerState != 1 {
+		t.Fatalf("labels per intermediate state = %d, want 1", config.maxLabelsPerState)
+	}
+}
+
 func TestPlanLabelDominanceKeepsOnlyEarliestCompleteState(t *testing.T) {
 	queue := &planQueue{maxLabelsPerState: 1}
 	heap.Init(queue)
@@ -133,16 +140,25 @@ func TestGraphSimpleRouteIsNotStarvedByIncomingJourneyStates(t *testing.T) {
 	}
 	data.completeScan([]time.Time{serviceDate})
 
-	result, err := graph.Plan(context.Background(), PlanRequest{
-		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
-		StartDateTime: serviceDate.Add(8*time.Hour + 50*time.Minute), Count: 1, MaxChanges: 3,
-		MaxExpandedLabels: 8, MaxSearchDurationMillis: 1000,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(result.Plans) != 1 || len(result.Plans[0].Legs) != 2 || result.SearchTruncated {
-		t.Fatalf("simple access route was starved: %#v", result)
+	for _, count := range []int{1, 5} {
+		result, err := graph.Plan(context.Background(), PlanRequest{
+			OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+			StartDateTime: serviceDate.Add(8*time.Hour + 50*time.Minute), Count: count, MaxChanges: 3,
+			MaxExpandedLabels: 8, MaxSearchDurationMillis: 1000,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundSimple := false
+		for _, plan := range result.Plans {
+			if len(plan.Legs) == 2 && plan.Legs[0].JourneyRef == "access-bus" {
+				foundSimple = true
+				break
+			}
+		}
+		if !foundSimple {
+			t.Fatalf("simple access route was starved for count %d: %#v", count, result)
+		}
 	}
 }
 
@@ -176,6 +192,160 @@ func TestGraphReturnsRequestedDirectAlternatives(t *testing.T) {
 	}
 	if len(result.Plans) != 3 || result.SearchTruncated {
 		t.Fatalf("result = %#v, want three complete alternatives", result)
+	}
+}
+
+func TestGraphReturnsPartialAlternativesWhenBudgetEnds(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "destination"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 5; index++ {
+		departure := int32(10*3600 + index*10*60)
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("journey-%d", index), Path: []*ctdf.JourneyPathItem{{
+			OriginStopRef: "origin", DestinationStopRef: "destination",
+			OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
+		}}})
+	}
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(9 * time.Hour), Count: 5, MaxExpandedLabels: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) == 0 || !result.SearchTruncated || result.SearchTruncatedReason != "expanded_label_budget" {
+		t.Fatalf("partial result = %#v", result)
+	}
+}
+
+func TestGraphUsesPatternDepartureIndexAndHonoursExclusions(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "destination"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 20; index++ {
+		departure := int32(10*3600 + index*60)
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
+			PrimaryIdentifier: fmt.Sprintf("journey-%02d", index),
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef: "origin", DestinationStopRef: "destination",
+				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
+			}},
+		})
+	}
+	data.completeScan([]time.Time{serviceDate})
+
+	originID := data.StopIDs["origin"]
+	bucket := bucketKey{Day: makeDayKey(serviceDate), StopRef: originID}
+	if got := len(data.DeparturePatterns[bucket]); got != 1 {
+		t.Fatalf("departure patterns = %d, want one shared pattern", got)
+	}
+	pattern := data.DeparturePatterns[bucket][0]
+	if got := len(data.PatternDepartures[patternDepartureKey{Day: bucket.Day, StopRef: bucket.StopRef, Pattern: pattern}]); got != 20 {
+		t.Fatalf("pattern departures = %d, want 20", got)
+	}
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(9 * time.Hour), Count: 1,
+		ExcludedJourneyRefs: []string{"journey-00"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 1 || result.Plans[0].Legs[0].JourneyRef != "journey-01" {
+		t.Fatalf("excluded journey was not bypassed: %#v", result.Plans)
+	}
+}
+
+func BenchmarkGraphPatternIndexedPlanner(b *testing.B) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "destination"},
+	}}); err != nil {
+		b.Fatal(err)
+	}
+	for index := 0; index < 5000; index++ {
+		departure := int32(10*3600 + index*60)
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
+			PrimaryIdentifier: fmt.Sprintf("journey-%04d", index), ServiceRef: "service",
+			Path: []*ctdf.JourneyPathItem{{
+				OriginStopRef: "origin", DestinationStopRef: "destination",
+				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
+			}},
+		})
+	}
+	data.completeScan([]time.Time{serviceDate})
+	request := PlanRequest{
+		OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"},
+		StartDateTime: serviceDate.Add(9 * time.Hour), Count: 3,
+	}
+	b.ResetTimer()
+	for index := 0; index < b.N; index++ {
+		result, err := graph.Plan(context.Background(), request)
+		if err != nil || len(result.Plans) != 3 {
+			b.Fatalf("plan result = %#v, err = %v", result, err)
+		}
+	}
+}
+
+func TestGraphCoordinatesAllowAccessInterchangeAndEgressWalks(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 14, 0, 0, 0, 0, time.UTC)
+	graph := New(nil, Config{Enabled: true})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{
+		stops: []*ctdf.Stop{
+			{PrimaryIdentifier: "access", Location: &ctdf.Location{Coordinates: []float64{0, 52}}},
+			{PrimaryIdentifier: "arrival", Location: &ctdf.Location{Coordinates: []float64{0.1, 52}}},
+			{PrimaryIdentifier: "departure", Location: &ctdf.Location{Coordinates: []float64{0.101, 52}}},
+			{PrimaryIdentifier: "approach", Location: &ctdf.Location{Coordinates: []float64{0.2, 52}}},
+		},
+		transfers: []*ctdf.StopTransfer{{
+			FromStopRef: "arrival", ToStopRef: "departure", Type: ctdf.StopTransferTypeNearbyWalk,
+			DistanceMetres: 100, WalkDurationSeconds: 90, TotalDurationSeconds: 90,
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	day := makeDayKey(serviceDate)
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "first", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "access", DestinationStopRef: "arrival",
+		OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 20*60),
+	}}})
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "second", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "departure", DestinationStopRef: "approach",
+		OriginDepartureTime: serviceTime(9*3600 + 30*60), DestinationArrivalTime: serviceTime(10 * 3600),
+	}}})
+	data.completeScan([]time.Time{serviceDate})
+
+	result, err := graph.Plan(context.Background(), PlanRequest{
+		OriginLocation:      &PlanLocation{Longitude: 0, Latitude: 52},
+		DestinationLocation: &PlanLocation{Longitude: 0.2005, Latitude: 52},
+		StartDateTime:       serviceDate.Add(8 * time.Hour), Count: 1, MaxChanges: 1,
+		MaxTransferDistanceMetres: 500, OriginLocationStopCount: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Plans) != 1 || len(result.Plans[0].Legs) != 5 {
+		t.Fatalf("coordinate plan = %#v", result.Plans)
+	}
+	legs := result.Plans[0].Legs
+	if legs[0].Type != ctdf.JourneyPlanRouteItemTypeTransfer || legs[2].TransferType != ctdf.StopTransferTypeNearbyWalk || legs[4].DestinationStopRef[:22] != "coordinate-destination" {
+		t.Fatalf("access/interchange/egress legs = %#v", legs)
 	}
 }
 
@@ -264,6 +434,17 @@ func TestPlanQueuePrioritisesAdmissibleDestinationEstimate(t *testing.T) {
 	heap.Push(queue, &planLabel{stop: 1, arrival: base.Add(10 * time.Minute)})
 	if got := heap.Pop(queue).(*planLabel).stop; got != 1 {
 		t.Fatalf("first stop = %d, want destination-directed stop 1", got)
+	}
+}
+
+func TestPlanQueuePrioritisesUsefulLowChangeRoute(t *testing.T) {
+	queue := &planQueue{}
+	heap.Init(queue)
+	base := time.Date(2026, 8, 13, 10, 0, 0, 0, time.UTC)
+	heap.Push(queue, &planLabel{stop: 0, arrival: base, vehicleLegs: 3})
+	heap.Push(queue, &planLabel{stop: 1, arrival: base.Add(3 * time.Minute), vehicleLegs: 1})
+	if got := heap.Pop(queue).(*planLabel).stop; got != 1 {
+		t.Fatalf("first stop = %d, want lower-change route", got)
 	}
 }
 

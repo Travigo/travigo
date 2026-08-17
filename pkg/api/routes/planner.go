@@ -104,15 +104,26 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		}
 	}
 	var destinationStop *ctdf.Stop
-	destinationStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
-		Identifier: destinationIdentifier,
-	})
+	var destinationLocation *ctdf.Location
+	destinationLocation, destinationIsCoordinate, err := parsePlannerCoordinate(destinationIdentifier)
 	if err != nil {
-		c.SendStatus(fiber.StatusNotFound)
+		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
 			"field": "destination",
 			"error": err.Error(),
 		})
+	}
+	if !destinationIsCoordinate {
+		destinationStop, err = dataaggregator.Lookup[*ctdf.Stop](query.Stop{
+			Identifier: destinationIdentifier,
+		})
+		if err != nil {
+			c.SendStatus(fiber.StatusNotFound)
+			return c.JSON(fiber.Map{
+				"field": "destination",
+				"error": err.Error(),
+			})
+		}
 	}
 
 	// Get start time
@@ -139,6 +150,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		OriginStop:                originStop,
 		OriginLocation:            originLocation,
 		DestinationStop:           destinationStop,
+		DestinationLocation:       destinationLocation,
 		Count:                     count,
 		StartDateTime:             startDateTime,
 		MaxChanges:                maxChanges,

@@ -40,6 +40,16 @@ type bucketKey struct {
 	StopRef stringID
 }
 
+// patternDepartureKey groups boardable journey occurrences by their static
+// stop pattern. Planner expansion can then binary-search the next trip on each
+// route pattern instead of rescanning every later departure at a stop for
+// every label it expands.
+type patternDepartureKey struct {
+	Day     dayKey
+	StopRef stringID
+	Pattern uint32
+}
+
 // departureEntry packs the journey, boarding path and departure time into one
 // word. The previous index stored only a journey ID, forcing every planner and
 // board lookup to scan that journey's entire path again to rediscover where it
@@ -106,8 +116,9 @@ type pathRecord struct {
 }
 
 type staticPatternRecord struct {
-	StopStart uint32
-	StopCount uint32
+	StopStart  uint32
+	StopCount  uint32
+	ServiceRef stringID
 }
 
 type graphData struct {
@@ -132,6 +143,9 @@ type graphData struct {
 	ArrivalPatterns        []uint64
 	StaticPatterns         []staticPatternRecord
 	StaticPatternStops     []uint32
+	JourneyPatterns        []uint32
+	DeparturePatterns      map[bucketKey][]uint32
+	PatternDepartures      map[patternDepartureKey][]departureEntry
 	StaticRoutingReady     bool
 	Journeys               []journeyRecord
 	Paths                  []pathRecord

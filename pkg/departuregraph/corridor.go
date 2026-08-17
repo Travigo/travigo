@@ -31,6 +31,9 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 	d.ArrivalPatterns = nil
 	d.StaticPatterns = nil
 	d.StaticPatternStops = nil
+	d.JourneyPatterns = nil
+	d.DeparturePatterns = nil
+	d.PatternDepartures = nil
 	d.corridorMu.Lock()
 	d.corridors = nil
 	d.corridorClock = 0
@@ -75,7 +78,11 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 func (d *graphData) buildStaticPatternsLocked() {
 	byHash := make(map[uint64][]uint32)
 	calls := make([]uint32, 0, 64)
-	for _, journey := range d.Journeys {
+	d.JourneyPatterns = make([]uint32, len(d.Journeys))
+	for index := range d.JourneyPatterns {
+		d.JourneyPatterns[index] = math.MaxUint32
+	}
+	for journeyIndex, journey := range d.Journeys {
 		calls = calls[:0]
 		if uint32(cap(calls)) < journey.PathCount+1 {
 			calls = make([]uint32, 0, journey.PathCount+1)
@@ -97,26 +104,29 @@ func (d *graphData) buildStaticPatternsLocked() {
 			continue
 		}
 		hash := uint64(1469598103934665603)
+		hash ^= uint64(journey.ServiceRef) + 1
+		hash *= 1099511628211
 		for _, stop := range calls {
 			hash ^= uint64(stop) + 1
 			hash *= 1099511628211
 		}
-		matched := false
+		patternID := uint32(math.MaxUint32)
 		for _, patternID := range byHash[hash] {
 			pattern := d.StaticPatterns[patternID]
 			stored := d.StaticPatternStops[pattern.StopStart : pattern.StopStart+pattern.StopCount]
-			if equalStopPattern(stored, calls) {
-				matched = true
+			if pattern.ServiceRef == journey.ServiceRef && equalStopPattern(stored, calls) {
+				d.JourneyPatterns[journeyIndex] = patternID
 				break
 			}
 		}
-		if matched {
+		if d.JourneyPatterns[journeyIndex] != math.MaxUint32 {
 			continue
 		}
-		patternID := uint32(len(d.StaticPatterns))
-		d.StaticPatterns = append(d.StaticPatterns, staticPatternRecord{StopStart: uint32(len(d.StaticPatternStops)), StopCount: uint32(len(calls))})
+		patternID = uint32(len(d.StaticPatterns))
+		d.StaticPatterns = append(d.StaticPatterns, staticPatternRecord{StopStart: uint32(len(d.StaticPatternStops)), StopCount: uint32(len(calls)), ServiceRef: journey.ServiceRef})
 		d.StaticPatternStops = append(d.StaticPatternStops, calls...)
 		byHash[hash] = append(byHash[hash], patternID)
+		d.JourneyPatterns[journeyIndex] = patternID
 	}
 
 	arrivalCounts := make([]uint32, len(d.Stops))
@@ -133,6 +143,29 @@ func (d *graphData) buildStaticPatternsLocked() {
 			stop := d.StaticPatternStops[pattern.StopStart+position]
 			d.ArrivalPatterns[arrivalCursors[stop]] = uint64(uint32(patternID))<<32 | uint64(position)
 			arrivalCursors[stop]++
+		}
+	}
+	d.buildPatternDepartureIndexesLocked()
+}
+
+func (d *graphData) buildPatternDepartureIndexesLocked() {
+	d.DeparturePatterns = make(map[bucketKey][]uint32, len(d.Departures))
+	d.PatternDepartures = make(map[patternDepartureKey][]departureEntry, len(d.Departures))
+	for bucket, departures := range d.Departures {
+		for _, departure := range departures {
+			journey := departure.journey()
+			if int(journey) >= len(d.JourneyPatterns) {
+				continue
+			}
+			pattern := d.JourneyPatterns[journey]
+			if pattern == math.MaxUint32 {
+				continue
+			}
+			key := patternDepartureKey{Day: bucket.Day, StopRef: bucket.StopRef, Pattern: pattern}
+			if _, exists := d.PatternDepartures[key]; !exists {
+				d.DeparturePatterns[bucket] = append(d.DeparturePatterns[bucket], pattern)
+			}
+			d.PatternDepartures[key] = append(d.PatternDepartures[key], departure)
 		}
 	}
 }

@@ -17,6 +17,9 @@ type JourneyPlanResults struct {
 
 	SearchTruncated       bool   `groups:"basic,detailed,web-planner"`
 	SearchTruncatedReason string `groups:"basic,detailed,web-planner" json:",omitempty"`
+	ExpandedLabels        int    `groups:"detailed,web-planner" json:",omitempty"`
+	SearchDurationMillis  int64  `groups:"detailed,web-planner" json:",omitempty"`
+	FirstPlanMillis       int64  `groups:"detailed,web-planner" json:",omitempty"`
 }
 
 type JourneyPlan struct {

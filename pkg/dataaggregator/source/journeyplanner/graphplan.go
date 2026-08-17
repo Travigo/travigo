@@ -14,6 +14,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+const maximumRealtimePlanRecoveryAttempts = 3
+
 func coordinateOriginStop(location *ctdf.Location) *ctdf.Stop {
 	stop := &ctdf.Stop{PrimaryIdentifier: "coordinate-origin", PrimaryName: "Selected location", Active: true}
 	if location == nil || len(location.Coordinates) != 2 {
@@ -24,6 +26,16 @@ func coordinateOriginStop(location *ctdf.Location) *ctdf.Stop {
 	return stop
 }
 
+func coordinateDestinationStop(location *ctdf.Location) *ctdf.Stop {
+	stop := coordinateOriginStop(location)
+	stop.PrimaryIdentifier = "coordinate-destination"
+	stop.PrimaryName = "Selected destination"
+	if location != nil && len(location.Coordinates) == 2 {
+		stop.PrimaryIdentifier = fmt.Sprintf("coordinate-destination:%.6f,%.6f", location.Coordinates[0], location.Coordinates[1])
+	}
+	return stop
+}
+
 // JourneyPlanQuery is intentionally a thin service boundary. The journey graph
 // owns topology and route calculation; web-api only hydrates the compact
 // journey references required by the public CTDF response.
@@ -31,11 +43,11 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	if s.JourneyGraph == nil {
 		return nil, fmt.Errorf("journey graph service is not configured")
 	}
-	if q.DestinationStop == nil {
-		return nil, fmt.Errorf("journey plan requires a destination stop")
+	if (q.DestinationStop == nil) == (q.DestinationLocation == nil) {
+		return nil, fmt.Errorf("journey plan requires exactly one destination stop or location")
 	}
-	if q.OriginStop == nil && q.OriginLocation == nil {
-		return nil, fmt.Errorf("journey plan requires an origin stop or location")
+	if (q.OriginStop == nil) == (q.OriginLocation == nil) {
+		return nil, fmt.Errorf("journey plan requires exactly one origin stop or location")
 	}
 
 	requestedCount := q.Count
@@ -56,7 +68,6 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 	defer cancel()
 	request := departuregraph.PlanRequest{
-		DestinationRefs:           q.DestinationStop.GetAllStopIDs(),
 		StartDateTime:             q.StartDateTime,
 		Count:                     requestedCount,
 		MaxChanges:                q.MaxChanges,
@@ -65,6 +76,15 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		OriginLocationStopCount:   q.OriginLocationStopCount,
 		MaxExpandedLabels:         q.MaxExpandedLabels,
 		MaxSearchDurationMillis:   int(q.MaxSearchDuration / time.Millisecond),
+		ExcludedJourneyRefs:       append([]string(nil), q.ExcludedJourneyRefs...),
+	}
+	if q.DestinationStop != nil {
+		request.DestinationRefs = q.DestinationStop.GetAllStopIDs()
+	} else if q.DestinationLocation != nil && len(q.DestinationLocation.Coordinates) == 2 {
+		request.DestinationLocation = &departuregraph.PlanLocation{
+			Longitude: q.DestinationLocation.Coordinates[0],
+			Latitude:  q.DestinationLocation.Coordinates[1],
+		}
 	}
 	if q.OriginStop != nil {
 		request.OriginRefs = q.OriginStop.GetAllStopIDs()
@@ -108,14 +128,22 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	if origin == nil {
 		origin = coordinateOriginStop(q.OriginLocation)
 	}
+	destination := q.DestinationStop
+	if destination == nil {
+		destination = coordinateDestinationStop(q.DestinationLocation)
+	}
 	result := &ctdf.JourneyPlanResults{
 		JourneyPlans:          make([]ctdf.JourneyPlan, 0, len(graphResult.Plans)),
 		OriginStop:            *origin,
-		DestinationStop:       *q.DestinationStop,
+		DestinationStop:       *destination,
 		SearchTruncated:       graphResult.SearchTruncated,
 		SearchTruncatedReason: graphResult.SearchTruncatedReason,
+		ExpandedLabels:        graphResult.ExpandedLabels,
+		SearchDurationMillis:  graphResult.SearchDurationMillis,
+		FirstPlanMillis:       graphResult.FirstPlanMillis,
 	}
 	invalidCandidates := false
+	invalidJourneyRefs := map[string]bool{}
 	for _, graphPlan := range graphResult.Plans {
 		plan := ctdf.JourneyPlan{
 			RouteItems:  make([]ctdf.JourneyPlanRouteItem, 0, len(graphPlan.Legs)),
@@ -142,22 +170,27 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 				item.Journey = journeys[leg.JourneyRef]
 				item.JourneyType = ctdf.DepartureBoardRecordTypeScheduled
 				if item.Journey == nil {
+					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
 					break
 				}
-				if item.Journey.RealtimeJourney != nil && (item.Journey.RealtimeJourney.Cancelled || item.Journey.RealtimeJourney.SuppressesBoardAt(q.StartDateTime)) {
+				if item.Journey.RealtimeJourney != nil && (item.Journey.RealtimeJourney.Cancelled || item.Journey.RealtimeJourney.SuppressesBoardAt(request.StartDateTime)) {
+					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
 					break
 				}
 				if _, cancelled := cancelledJourneyIDs[leg.JourneyRef]; cancelled {
+					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
 					break
 				}
 				if !applyRealtimeLegTimes(&item, leg.JourneyOriginStopIndex, leg.JourneyDestinationStopIndex) {
+					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
 					break
 				}
 				if !previousArrival.IsZero() && item.StartTime.Before(previousArrival) {
+					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
 					break
 				}
@@ -192,7 +225,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		result.SearchTruncated = false
 		result.SearchTruncatedReason = ""
 	} else if staleReferences {
-		if len(result.JourneyPlans) == 0 && len(graphResult.Plans) > 0 {
+		if len(result.JourneyPlans) == 0 && len(graphResult.Plans) > 0 && q.RecoveryAttempt >= maximumRealtimePlanRecoveryAttempts {
 			return nil, fmt.Errorf("%w: every candidate plan references timetable journeys which no longer exist", departuregraph.ErrServiceUnavailable)
 		}
 		result.SearchTruncated = true
@@ -200,6 +233,22 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 	} else if invalidCandidates {
 		result.SearchTruncated = true
 		result.SearchTruncatedReason = "post_hydration_filter"
+	}
+	if len(result.JourneyPlans) == 0 && len(invalidJourneyRefs) > 0 && q.RecoveryAttempt < maximumRealtimePlanRecoveryAttempts {
+		retry := q
+		retry.Context = ctx
+		retry.RecoveryAttempt++
+		seen := make(map[string]bool, len(q.ExcludedJourneyRefs)+len(invalidJourneyRefs))
+		retry.ExcludedJourneyRefs = append([]string(nil), q.ExcludedJourneyRefs...)
+		for _, ref := range retry.ExcludedJourneyRefs {
+			seen[ref] = true
+		}
+		for ref := range invalidJourneyRefs {
+			if !seen[ref] {
+				retry.ExcludedJourneyRefs = append(retry.ExcludedJourneyRefs, ref)
+			}
+		}
+		return s.JourneyPlanQuery(retry)
 	}
 	return result, nil
 }
