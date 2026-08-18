@@ -261,22 +261,30 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	if !recovering {
 		run.Tasks[index].PodStatus = PodStatusPending
 	}
-	run.Tasks[index].StartedAt = &now
+	if run.Tasks[index].StartedAt == nil {
+		run.Tasks[index].StartedAt = &now
+	}
 	run.Tasks[index].Error = ""
 	task := run.Tasks[index]
 	_ = r.store.SaveRun(run)
 	runMu.Unlock()
 
-	updatePodStatus := func(status PodStatus) {
+	updatePod := func(observation PodObservation) {
 		runMu.Lock()
 		defer runMu.Unlock()
-		if run.Tasks[index].PodStatus == status {
-			return
+		changed := false
+		if observation.Status != "" && run.Tasks[index].PodStatus != observation.Status {
+			run.Tasks[index].PodStatus = observation.Status
+			changed = true
 		}
-		run.Tasks[index].PodStatus = status
-		_ = r.store.SaveRun(run)
+		if observation.PodName != "" {
+			changed = mergeTaskAttempt(&run.Tasks[index], observation) || changed
+		}
+		if changed {
+			_ = r.store.SaveRun(run)
+		}
 	}
-	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath, recovering, updatePodStatus)
+	exitCode, err := r.executor.RunTask(ctx, run.ID, &task, task.LogPath, recovering, updatePod)
 
 	finished := time.Now().UTC()
 	runMu.Lock()
@@ -299,6 +307,67 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	runMu.Unlock()
 
 	return err != nil || exitCode != 0
+}
+
+func mergeTaskAttempt(task *Task, observation PodObservation) bool {
+	for index := range task.Attempts {
+		if task.Attempts[index].PodName != observation.PodName {
+			continue
+		}
+		return updateTaskAttempt(&task.Attempts[index], observation)
+	}
+
+	attempt := TaskAttempt{
+		Attempt: len(task.Attempts) + 1,
+		PodName: observation.PodName,
+	}
+	updateTaskAttempt(&attempt, observation)
+	task.Attempts = append(task.Attempts, attempt)
+	return true
+}
+
+func updateTaskAttempt(attempt *TaskAttempt, observation PodObservation) bool {
+	changed := false
+	if observation.NodeName != "" && attempt.NodeName != observation.NodeName {
+		attempt.NodeName = observation.NodeName
+		changed = true
+	}
+	if observation.Status != "" && attempt.Status != observation.Status {
+		attempt.Status = observation.Status
+		changed = true
+	}
+	if observation.CreatedAt != nil && !timesEqual(attempt.CreatedAt, observation.CreatedAt) {
+		attempt.CreatedAt = observation.CreatedAt
+		changed = true
+	}
+	if observation.StartedAt != nil && !timesEqual(attempt.StartedAt, observation.StartedAt) {
+		attempt.StartedAt = observation.StartedAt
+		changed = true
+	}
+	if observation.FinishedAt != nil && !timesEqual(attempt.FinishedAt, observation.FinishedAt) {
+		attempt.FinishedAt = observation.FinishedAt
+		changed = true
+	}
+	if observation.ExitCode != nil && (attempt.ExitCode == nil || *attempt.ExitCode != *observation.ExitCode) {
+		attempt.ExitCode = observation.ExitCode
+		changed = true
+	}
+	if attempt.Reason != observation.Reason {
+		attempt.Reason = observation.Reason
+		changed = true
+	}
+	if attempt.Message != observation.Message {
+		attempt.Message = observation.Message
+		changed = true
+	}
+	return changed
+}
+
+func timesEqual(left, right *time.Time) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	return left.Equal(*right)
 }
 
 func (r *Runner) markStageSkipped(run *Run, runMu *sync.Mutex, indexes []int) {

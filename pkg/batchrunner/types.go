@@ -78,20 +78,37 @@ type Run struct {
 }
 
 type Task struct {
-	ID         string     `json:"id" groups:"web-run-detail"`
-	Name       string     `json:"name" groups:"web-run-detail"`
-	Kind       TaskKind   `json:"kind" groups:"web-run-detail"`
-	Size       string     `json:"size,omitempty" groups:"web-run-detail"`
-	DatasetID  string     `json:"datasetId,omitempty"`
-	Args       []string   `json:"args"`
-	Status     TaskStatus `json:"status" groups:"web-run-detail"`
-	PodStatus  PodStatus  `json:"podStatus,omitempty" groups:"web-run-detail"`
-	JobName    string     `json:"jobName,omitempty" groups:"web-run-detail"`
-	LogPath    string     `json:"logPath,omitempty"`
-	StartedAt  *time.Time `json:"startedAt,omitempty"`
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
-	ExitCode   *int       `json:"exitCode,omitempty"`
-	Error      string     `json:"error,omitempty" groups:"web-run-detail"`
+	ID         string        `json:"id" groups:"web-run-detail"`
+	Name       string        `json:"name" groups:"web-run-detail"`
+	Kind       TaskKind      `json:"kind" groups:"web-run-detail"`
+	Size       string        `json:"size,omitempty" groups:"web-run-detail"`
+	DatasetID  string        `json:"datasetId,omitempty"`
+	Args       []string      `json:"args"`
+	Status     TaskStatus    `json:"status" groups:"web-run-detail"`
+	PodStatus  PodStatus     `json:"podStatus,omitempty" groups:"web-run-detail"`
+	JobName    string        `json:"jobName,omitempty" groups:"web-run-detail"`
+	LogPath    string        `json:"logPath,omitempty"`
+	StartedAt  *time.Time    `json:"startedAt,omitempty"`
+	FinishedAt *time.Time    `json:"finishedAt,omitempty"`
+	ExitCode   *int          `json:"exitCode,omitempty"`
+	Error      string        `json:"error,omitempty" groups:"web-run-detail"`
+	Attempts   []TaskAttempt `json:"attempts,omitempty" groups:"web-run-detail"`
+}
+
+// TaskAttempt records one Pod created by a Kubernetes Job. A Job can create
+// multiple Pods when Kubernetes retries it, so this is deliberately separate
+// from the task's current, top-level PodStatus.
+type TaskAttempt struct {
+	Attempt    int        `json:"attempt" groups:"web-run-detail"`
+	PodName    string     `json:"podName" groups:"web-run-detail"`
+	NodeName   string     `json:"nodeName,omitempty" groups:"web-run-detail"`
+	Status     PodStatus  `json:"status" groups:"web-run-detail"`
+	CreatedAt  *time.Time `json:"createdAt,omitempty" groups:"web-run-detail"`
+	StartedAt  *time.Time `json:"startedAt,omitempty" groups:"web-run-detail"`
+	FinishedAt *time.Time `json:"finishedAt,omitempty" groups:"web-run-detail"`
+	ExitCode   *int       `json:"exitCode,omitempty" groups:"web-run-detail"`
+	Reason     string     `json:"reason,omitempty" groups:"web-run-detail"`
+	Message    string     `json:"message,omitempty" groups:"web-run-detail"`
 }
 
 func defaultRunOptions(options RunOptions) RunOptions {

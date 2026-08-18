@@ -7,12 +7,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+const journeyPathUpdateBatchSize = 1000
+
+type serviceJourneyStats struct {
+	Scanned int
+	Updated int
+	Batches int
+}
 
 // ApplyDataset replaces track references previously owned by datasetID and
 // applies the dataset's current route tracks to matching scheduled journeys.
@@ -55,16 +64,14 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, readC
 		}
 	}
 
-	serviceCursor, err := database.GetCollection("services").Find(ctx, bson.M{})
+	services, err := loadServices(ctx)
 	if err != nil {
 		return err
 	}
-	defer serviceCursor.Close(ctx)
-	for serviceCursor.Next(ctx) {
-		var service ctdf.Service
-		if err := serviceCursor.Decode(&service); err != nil {
-			return err
-		}
+	log.Info().Int("services", len(services)).Int("routes", len(routes)).Msg("Loaded journey track enrichment inputs")
+	totalScanned := 0
+	totalUpdated := 0
+	for serviceIndex, service := range services {
 		candidates := append([]Route{}, routesByServiceName[serviceKey(service.TransportType, service.ServiceName)]...)
 		serviceRefs := append([]string{service.PrimaryIdentifier}, service.OtherIdentifiers...)
 		for _, serviceRef := range serviceRefs {
@@ -73,11 +80,53 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, readC
 		if len(candidates) == 0 {
 			continue
 		}
-		if err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, writeCollectionNames); err != nil {
+		startedAt := time.Now()
+		stats, err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, writeCollectionNames)
+		if err != nil {
 			return err
 		}
+		totalScanned += stats.Scanned
+		totalUpdated += stats.Updated
+		log.Info().
+			Int("service", serviceIndex+1).
+			Int("services", len(services)).
+			Str("service_ref", service.PrimaryIdentifier).
+			Int("journeys_scanned", stats.Scanned).
+			Int("journeys_updated", stats.Updated).
+			Int("write_batches", stats.Batches).
+			Dur("elapsed", time.Since(startedAt)).
+			Msg("Applied journey tracks for service")
 	}
-	return serviceCursor.Err()
+	log.Info().Int("services", len(services)).Int("journeys_scanned", totalScanned).Int("journeys_updated", totalUpdated).Msg("Completed journey track enrichment")
+	return nil
+}
+
+// loadServices fully consumes and closes the Mongo cursor before per-service
+// journey processing starts. Individual services can take hours to enrich, so
+// retaining this outer cursor made it expire while it sat idle.
+func loadServices(ctx context.Context) ([]ctdf.Service, error) {
+	cursor, err := database.GetCollection("services").Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	services := []ctdf.Service{}
+	for cursor.Next(ctx) {
+		var service ctdf.Service
+		if err := cursor.Decode(&service); err != nil {
+			cursor.Close(ctx)
+			return nil, err
+		}
+		services = append(services, service)
+	}
+	cursorErr := cursor.Err()
+	closeErr := cursor.Close(ctx)
+	if cursorErr != nil {
+		return nil, cursorErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return services, nil
 }
 
 func appendUniqueRoutes(destination []Route, additions ...Route) []Route {
@@ -180,19 +229,33 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, 
 	return flush()
 }
 
-func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, writeCollectionNames []string) error {
+func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, writeCollectionNames []string) (serviceJourneyStats, error) {
+	stats := serviceJourneyStats{}
 	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
 	cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
 	if err != nil {
-		return err
+		return stats, err
 	}
 	defer cursor.Close(ctx)
 	models := []mongo.WriteModel{}
+	flush := func() error {
+		if len(models) == 0 {
+			return nil
+		}
+		if err := bulkWriteJourneyPaths(ctx, models, writeCollectionNames); err != nil {
+			return err
+		}
+		stats.Batches++
+		models = models[:0]
+		return nil
+	}
+	startedAt := time.Now()
 	for cursor.Next(ctx) {
 		var journey ctdf.Journey
 		if err := cursor.Decode(&journey); err != nil {
-			return err
+			return stats, err
 		}
+		stats.Scanned++
 		journeyStops := JourneyStops(journey.Path)
 		if len(journeyStops) < 2 {
 			continue
@@ -200,19 +263,28 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		journeyCandidates := candidatesByEndpoints[routeEndpointKey(journeyStops[0], journeyStops[len(journeyStops)-1])]
 		changed, err := ApplyBestRoute(ctx, &journey, journeyCandidates)
 		if err != nil {
-			return err
+			return stats, err
 		}
 		if changed {
 			models = append(models, journeyPathUpdate(&journey))
+			stats.Updated++
+			if len(models) == journeyPathUpdateBatchSize {
+				if err := flush(); err != nil {
+					return stats, err
+				}
+			}
+		}
+		if stats.Scanned%100000 == 0 {
+			log.Info().Int("journeys_scanned", stats.Scanned).Int("journeys_updated", stats.Updated).Int("write_batches", stats.Batches).Dur("elapsed", time.Since(startedAt)).Msg("Journey track service progress")
 		}
 	}
 	if err := cursor.Err(); err != nil {
-		return err
+		return stats, err
 	}
-	if len(models) > 0 {
-		err = bulkWriteJourneyPaths(ctx, models, writeCollectionNames)
+	if err := flush(); err != nil {
+		return stats, err
 	}
-	return err
+	return stats, nil
 }
 
 func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, collectionNames []string) error {

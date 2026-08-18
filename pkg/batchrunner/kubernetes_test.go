@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -48,7 +47,10 @@ func TestFindRunningJobPodRequiresRunningPod(t *testing.T) {
 			t.Fatalf("request path = %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"completed-pod"},"status":{"phase":"Succeeded"}}]}`))
+		_, _ = w.Write([]byte(`{"items":[
+			{"metadata":{"name":"completed-pod"},"status":{"phase":"Succeeded"}},
+			{"metadata":{"name":"terminating-pod","deletionTimestamp":"2026-08-18T10:00:00Z"},"status":{"phase":"Running"}}
+		]}`))
 	}))
 	defer server.Close()
 
@@ -62,65 +64,43 @@ func TestFindRunningJobPodRequiresRunningPod(t *testing.T) {
 	}
 }
 
-func TestFindJobPodReportsTerminatingStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"terminating-pod","deletionTimestamp":"2026-07-20T12:00:00Z"},"status":{"phase":"Running"}}]}`))
-	}))
-	defer server.Close()
-
-	client := &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()}
-	podName, status, err := client.findJobPod(context.Background(), "existing-job")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if podName != "terminating-pod" || status != PodStatusTerminating {
-		t.Fatalf("pod = %q, status = %q; want terminating-pod, terminating", podName, status)
+func TestPodReportsTerminatingStatus(t *testing.T) {
+	pod := kubernetesPod{}
+	pod.Metadata.DeletionTimestamp = "2026-07-20T12:00:00Z"
+	pod.Status.Phase = "Running"
+	if status := pod.status(); status != PodStatusTerminating {
+		t.Fatalf("status = %q, want terminating", status)
 	}
 }
 
-func TestPodReadyForLogsWaitsForRunningContainer(t *testing.T) {
-	if podReadyForLogs("pending-pod", PodStatusPending) {
-		t.Fatal("pending pod was considered ready for logs")
-	}
-	if !podReadyForLogs("running-pod", PodStatusRunning) {
-		t.Fatal("running pod was not considered ready for logs")
-	}
-}
-
-func TestStreamPodLogsReconnectsAfterEmptyResponseWithoutDuplicates(t *testing.T) {
-	var requests int
-	var closeDone sync.Once
+func TestStreamJobLogsCapturesEveryPodAttempt(t *testing.T) {
+	var podListRequests int
+	var attemptOneLogRequests int
 	jobDone := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requests++
-		if r.URL.Path != "/api/v1/namespaces/default/pods/test-pod/log" {
-			t.Fatalf("request path = %s", r.URL.Path)
-		}
-		if r.URL.Query().Get("timestamps") != "true" {
-			t.Fatal("log request did not enable Kubernetes timestamps")
-		}
-		switch requests {
-		case 1:
-			// This is the production race: Kubernetes can successfully close
-			// an empty follow request while the container is starting.
-		case 2:
-			_, _ = w.Write([]byte(
-				"2026-07-23T21:02:26.000000001Z one\n" +
-					"2026-07-23T21:02:26.000000002Z two\n",
-			))
-			closeDone.Do(func() { close(jobDone) })
+		switch {
+		case r.URL.Path == "/api/v1/namespaces/default/pods":
+			podListRequests++
+			w.Header().Set("Content-Type", "application/json")
+			if podListRequests == 1 {
+				_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"attempt-one","creationTimestamp":"2026-08-18T10:00:00Z"},"spec":{"nodeName":"node-a"},"status":{"phase":"Failed"}}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"items":[
+				{"metadata":{"name":"attempt-one","creationTimestamp":"2026-08-18T10:00:00Z"},"spec":{"nodeName":"node-a"},"status":{"phase":"Failed"}},
+				{"metadata":{"name":"attempt-two","creationTimestamp":"2026-08-18T10:01:00Z"},"spec":{"nodeName":"node-b"},"status":{"phase":"Succeeded"}}
+			]}`))
+			close(jobDone)
+		case r.URL.Path == "/api/v1/namespaces/default/pods/attempt-one/log":
+			attemptOneLogRequests++
+			if attemptOneLogRequests == 1 {
+				return
+			}
+			_, _ = w.Write([]byte("2026-08-18T10:00:30Z first attempt failed\n"))
+		case r.URL.Path == "/api/v1/namespaces/default/pods/attempt-two/log":
+			_, _ = w.Write([]byte("2026-08-18T10:01:30Z replacement succeeded\n"))
 		default:
-			if r.URL.Query().Get("follow") != "" {
-				t.Fatal("final log catch-up request must not follow")
-			}
-			if !strings.Contains(r.URL.Query().Get("sinceTime"), "2026-07-23T21:02:26.000000003Z") {
-				t.Fatalf("sinceTime = %q", r.URL.Query().Get("sinceTime"))
-			}
-			_, _ = w.Write([]byte(
-				"2026-07-23T21:02:26.000000002Z two\n" +
-					"2026-07-23T21:02:26.000000003Z three\n",
-			))
+			t.Fatalf("unexpected request path %s", r.URL.Path)
 		}
 	}))
 	defer server.Close()
@@ -132,18 +112,118 @@ func TestStreamPodLogsReconnectsAfterEmptyResponseWithoutDuplicates(t *testing.T
 		http:             server.Client(),
 		logRetryInterval: time.Millisecond,
 	}
-	if err := client.streamPodLogs(context.Background(), "test-pod", logPath, jobDone); err != nil {
+	observations := map[string]PodObservation{}
+	if err := client.streamJobLogs(context.Background(), "test-job", logPath, jobDone, func(observation PodObservation) {
+		if observation.PodName != "" {
+			observations[observation.PodName] = observation
+		}
+	}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := string(data), "one\ntwo\nthree\n"; got != want {
-		t.Fatalf("log = %q, want %q", got, want)
+	logText := string(data)
+	for _, expected := range []string{
+		"--- Kubernetes Job attempt: attempt-one ---",
+		"first attempt failed",
+		"--- Kubernetes Job attempt: attempt-two ---",
+		"replacement succeeded",
+	} {
+		if !strings.Contains(logText, expected) {
+			t.Fatalf("log %q does not contain %q", logText, expected)
+		}
 	}
-	if requests != 3 {
-		t.Fatalf("requests = %d, want 3", requests)
+	if observations["attempt-one"].NodeName != "node-a" || observations["attempt-two"].NodeName != "node-b" {
+		t.Fatalf("observations = %#v", observations)
+	}
+}
+
+func TestDoJSONRetriesTransientKubernetesFailures(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests < 3 {
+			http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":{"succeeded":1}}`))
+	}))
+	defer server.Close()
+
+	client := &kubernetesClient{
+		baseURL:             server.URL,
+		http:                server.Client(),
+		apiRetryInterval:    time.Millisecond,
+		apiRetryMaxInterval: 2 * time.Millisecond,
+	}
+	var job kubernetesJob
+	if err := client.doJSON(context.Background(), http.MethodGet, "/job", nil, &job); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 || job.Status.Succeeded != 1 {
+		t.Fatalf("requests = %d, job = %#v", requests, job)
+	}
+}
+
+func TestRecoveringExecutorReconcilesCompletedJob(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/apis/batch/v1/namespaces/default/jobs/completed-job":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":{"conditions":[{"type":"Complete","status":"True"}]}}`))
+		case "/api/v1/namespaces/default/pods":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"items":[{"metadata":{"name":"completed-pod","creationTimestamp":"2026-08-18T10:00:00Z"},"spec":{"nodeName":"node-a"},"status":{"phase":"Succeeded","containerStatuses":[{"name":"main","state":{"terminated":{"exitCode":0,"reason":"Completed","startedAt":"2026-08-18T10:00:01Z","finishedAt":"2026-08-18T10:01:00Z"}}}]}}]}`))
+		case "/api/v1/namespaces/default/pods/completed-pod/log":
+			_, _ = w.Write([]byte("2026-08-18T10:00:30Z completed output\n"))
+		default:
+			t.Fatalf("unexpected recovery request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	executor := &KubernetesExecutor{
+		config: Config{Namespace: "default"},
+		client: &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()},
+	}
+	logPath := filepath.Join(t.TempDir(), "task.log")
+	observations := []PodObservation{}
+	exitCode, err := executor.RunTask(context.Background(), "run", &Task{ID: "task", JobName: "completed-job"}, logPath, true, func(observation PodObservation) {
+		observations = append(observations, observation)
+	})
+	if err != nil || exitCode != 0 {
+		t.Fatalf("exit code = %d, error = %v", exitCode, err)
+	}
+	if len(observations) != 1 || observations[0].PodName != "completed-pod" || observations[0].ExitCode == nil || *observations[0].ExitCode != 0 {
+		t.Fatalf("observations = %#v", observations)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "completed output") {
+		t.Fatalf("log = %q", data)
+	}
+}
+
+func TestJobOutcomeUsesFailedConditionMessage(t *testing.T) {
+	job := &kubernetesJob{}
+	job.Status.Conditions = make([]struct {
+		Type    string `json:"type"`
+		Status  string `json:"status"`
+		Reason  string `json:"reason"`
+		Message string `json:"message"`
+	}, 1)
+	job.Status.Conditions[0].Type = "Failed"
+	job.Status.Conditions[0].Status = "True"
+	job.Status.Conditions[0].Reason = "BackoffLimitExceeded"
+	job.Status.Conditions[0].Message = "pod failed twice"
+	terminal, exitCode, err := jobOutcome("failed-job", job)
+	if !terminal || exitCode != 1 || err == nil || err.Error() != "pod failed twice" {
+		t.Fatalf("terminal = %t, exit code = %d, error = %v", terminal, exitCode, err)
 	}
 }
 

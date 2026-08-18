@@ -11,10 +11,10 @@ type recordingExecutor struct {
 	recovering chan bool
 }
 
-func (e *recordingExecutor) RunTask(_ context.Context, _ string, task *Task, _ string, recovering bool, updatePodStatus func(PodStatus)) (int, error) {
+func (e *recordingExecutor) RunTask(_ context.Context, _ string, task *Task, _ string, recovering bool, updatePod func(PodObservation)) (int, error) {
 	e.tasks <- *task
 	e.recovering <- recovering
-	updatePodStatus(PodStatusRunning)
+	updatePod(PodObservation{PodName: "running-pod", NodeName: "batch-node", Status: PodStatusRunning})
 	return 0, nil
 }
 
@@ -35,10 +35,11 @@ func TestResumeRunsReconnectsPersistedRunningTask(t *testing.T) {
 		CreatedAt: started,
 		StartedAt: &started,
 		Tasks: []Task{{
-			ID:      "link-stops",
-			Kind:    TaskKindLinkStops,
-			Status:  TaskStatusRunning,
-			JobName: "travigo-batch-20260711-120000-000000000-link-stops",
+			ID:        "link-stops",
+			Kind:      TaskKindLinkStops,
+			Status:    TaskStatusRunning,
+			JobName:   "travigo-batch-20260711-120000-000000000-link-stops",
+			StartedAt: &started,
 		}},
 	}
 	if err := store.SaveRun(run); err != nil {
@@ -75,6 +76,12 @@ func TestResumeRunsReconnectsPersistedRunningTask(t *testing.T) {
 			}
 			if resumed.Tasks[0].PodStatus != PodStatusSucceeded {
 				t.Fatalf("recovered task pod status = %q, want succeeded", resumed.Tasks[0].PodStatus)
+			}
+			if !resumed.Tasks[0].StartedAt.Equal(started) {
+				t.Fatalf("recovered task start time = %v, want %v", resumed.Tasks[0].StartedAt, started)
+			}
+			if len(resumed.Tasks[0].Attempts) != 1 || resumed.Tasks[0].Attempts[0].PodName != "running-pod" || resumed.Tasks[0].Attempts[0].NodeName != "batch-node" {
+				t.Fatalf("recovered task attempts = %#v", resumed.Tasks[0].Attempts)
 			}
 			return
 		}

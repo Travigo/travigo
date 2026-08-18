@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,8 +24,20 @@ import (
 )
 
 type TaskExecutor interface {
-	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePodStatus func(PodStatus)) (int, error)
+	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePod func(PodObservation)) (int, error)
 	DeleteJob(ctx context.Context, name string) error
+}
+
+type PodObservation struct {
+	PodName    string
+	NodeName   string
+	Status     PodStatus
+	CreatedAt  *time.Time
+	StartedAt  *time.Time
+	FinishedAt *time.Time
+	ExitCode   *int
+	Reason     string
+	Message    string
 }
 
 type KubernetesExecutor struct {
@@ -44,31 +57,46 @@ func NewKubernetesExecutor(config Config) (*KubernetesExecutor, error) {
 	}, nil
 }
 
-func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePodStatus func(PodStatus)) (int, error) {
+func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePod func(PodObservation)) (int, error) {
 	jobName := task.JobName
 	if jobName == "" {
 		jobName = jobNameForTask(runID, task.ID)
 	}
 	task.JobName = jobName
-	if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
-		return 1, err
-	}
-	defer func() {
-		_ = e.client.deletePodDisruptionBudget(context.Background(), jobName)
-	}()
 
-	var podName string
-	var err error
 	if recovering {
-		podName, err = e.client.findRunningJobPod(ctx, jobName, updatePodStatus)
-	} else {
-		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
+		job, err := e.client.getJob(ctx, jobName)
+		if err != nil {
 			return 1, err
 		}
-		podName, err = e.client.waitForJobPod(ctx, jobName, updatePodStatus)
+		if job == nil {
+			return 1, fmt.Errorf("cannot resume job %s: job does not exist", jobName)
+		}
+		if terminal, exitCode, outcomeErr := jobOutcome(jobName, job); terminal {
+			e.client.captureFinishedJobLogs(ctx, jobName, logPath, updatePod)
+			return exitCode, outcomeErr
+		}
+		// Active recovery remains deliberately strict: only a genuinely Running
+		// Pod is safe to reattach. Pending or terminal Pods are reconciled, not
+		// treated as resumable work.
+		if _, err := e.client.findRunningJobPod(ctx, jobName, updatePod); err != nil {
+			return 1, err
+		}
+	} else {
+		if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
+			return 1, err
+		}
+		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
+			e.client.cleanupPodDisruptionBudget(jobName)
+			return 1, err
+		}
+		defer e.client.cleanupPodDisruptionBudget(jobName)
 	}
-	if err != nil {
-		return 1, err
+	if recovering {
+		if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
+			return 1, err
+		}
+		defer e.client.cleanupPodDisruptionBudget(jobName)
 	}
 
 	logContext, cancelLog := context.WithCancel(ctx)
@@ -76,33 +104,42 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 	jobDone := make(chan struct{})
 	logDone := make(chan error, 1)
 	go func() {
-		logDone <- e.client.streamPodLogs(logContext, podName, logPath, jobDone)
+		logDone <- e.client.streamJobLogs(logContext, jobName, logPath, jobDone, updatePod)
 	}()
 
-	exitCode, waitErr := e.client.waitForJobCompletion(ctx, jobName, updatePodStatus)
+	exitCode, waitErr := e.client.waitForJobCompletion(ctx, jobName, updatePod)
 	close(jobDone)
 	select {
 	case logErr := <-logDone:
 		if logErr != nil {
-			log.Warn().Err(logErr).Str("job", jobName).Str("pod", podName).Msg("Pod log stream ended with an error")
+			log.Warn().Err(logErr).Str("job", jobName).Msg("Job log collection ended with an error")
 		}
 	case <-time.After(10 * time.Second):
-		log.Warn().Str("job", jobName).Str("pod", podName).Msg("Timed out waiting for pod log stream to finish")
+		log.Warn().Str("job", jobName).Msg("Timed out waiting for job log collection to finish")
 	}
 	cancelLog()
 
 	if ctx.Err() != nil {
-		reportPodStatus(updatePodStatus, PodStatusTerminating)
-		_ = e.DeleteJob(context.Background(), jobName)
+		reportPodStatus(updatePod, PodStatusTerminating)
+		deleteContext, cancelDelete := context.WithTimeout(context.Background(), 30*time.Second)
+		_ = e.DeleteJob(deleteContext, jobName)
+		cancelDelete()
 		return 1, ctx.Err()
 	}
 
 	if waitErr != nil {
-		reportPodStatus(updatePodStatus, PodStatusFailed)
+		// A read can fail just as the Job reaches a terminal state. Re-read the
+		// authoritative Job before recording an infrastructure error.
+		if job, reconcileErr := e.client.getJob(ctx, jobName); reconcileErr == nil && job != nil {
+			if terminal, reconciledExitCode, outcomeErr := jobOutcome(jobName, job); terminal {
+				return reconciledExitCode, outcomeErr
+			}
+		}
+		reportPodStatus(updatePod, PodStatusFailed)
 		return exitCode, waitErr
 	}
 
-	reportPodStatus(updatePodStatus, PodStatusSucceeded)
+	reportPodStatus(updatePod, PodStatusSucceeded)
 	return exitCode, nil
 }
 
@@ -132,7 +169,9 @@ type kubernetesClient struct {
 	token     string
 	http      *http.Client
 
-	logRetryInterval time.Duration
+	logRetryInterval    time.Duration
+	apiRetryInterval    time.Duration
+	apiRetryMaxInterval time.Duration
 }
 
 func newKubernetesClient(namespace string) (*kubernetesClient, error) {
@@ -157,6 +196,7 @@ func newKubernetesClient(namespace string) (*kubernetesClient, error) {
 		baseURL:   "https://" + host + ":" + port,
 		token:     strings.TrimSpace(string(token)),
 		http: &http.Client{
+			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
 			},
@@ -251,64 +291,29 @@ func (c *kubernetesClient) getJob(ctx context.Context, jobName string) (*kuberne
 	return &job, nil
 }
 
-func (c *kubernetesClient) waitForJobPod(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (string, error) {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		podName, status, err := c.findJobPod(ctx, jobName)
-		if err != nil {
-			return "", err
-		}
-		reportPodStatus(updatePodStatus, status)
-		// A Pod object exists while it is still unscheduled or its container is
-		// waiting to start. Starting a follow request at that point can produce
-		// a successful but empty response and lose the live stream.
-		if podReadyForLogs(podName, status) {
-			return podName, nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-ticker.C:
-		}
-	}
-}
-
-func podReadyForLogs(podName string, status PodStatus) bool {
-	return podName != "" && status != PodStatusPending
-}
-
-func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (int, error) {
+func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName string, updatePod func(PodObservation)) (int, error) {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	for {
-		_, status, err := c.findJobPod(ctx, jobName)
+		pods, err := c.listJobPods(ctx, jobName)
 		if err != nil {
 			return 1, err
 		}
-		reportPodStatus(updatePodStatus, status)
+		sortPods(pods.Items)
+		for _, pod := range pods.Items {
+			reportPod(updatePod, pod.observation())
+		}
 
-		var job kubernetesJob
-		if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", c.namespace, jobName), nil, &job); err != nil {
+		job, err := c.getJob(ctx, jobName)
+		if err != nil {
 			return 1, err
 		}
-
-		if job.Status.Succeeded > 0 {
-			return 0, nil
+		if job == nil {
+			return 1, fmt.Errorf("job %s disappeared before completion", jobName)
 		}
-		for _, condition := range job.Status.Conditions {
-			if condition.Type == "Failed" && condition.Status == "True" {
-				if condition.Message != "" {
-					return 1, errors.New(condition.Message)
-				}
-				return 1, fmt.Errorf("job %s failed", jobName)
-			}
-			if condition.Type == "Complete" && condition.Status == "True" {
-				return 0, nil
-			}
+		if terminal, exitCode, outcomeErr := jobOutcome(jobName, job); terminal {
+			return exitCode, outcomeErr
 		}
 
 		select {
@@ -319,29 +324,21 @@ func (c *kubernetesClient) waitForJobCompletion(ctx context.Context, jobName str
 	}
 }
 
-func (c *kubernetesClient) findJobPod(ctx context.Context, jobName string) (string, PodStatus, error) {
-	pods, err := c.listJobPods(ctx, jobName)
-	if err != nil {
-		return "", "", err
-	}
-	if len(pods.Items) == 0 {
-		return "", PodStatusPending, nil
-	}
-
-	pod := pods.Items[0]
-	return pod.Metadata.Name, pod.status(), nil
-}
-
-func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string, updatePodStatus func(PodStatus)) (string, error) {
+func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string, updatePod func(PodObservation)) (string, error) {
 	pods, err := c.listJobPods(ctx, jobName)
 	if err != nil {
 		return "", err
 	}
+	sortPods(pods.Items)
+	runningPod := ""
 	for _, pod := range pods.Items {
-		reportPodStatus(updatePodStatus, pod.status())
-		if pod.Status.Phase == "Running" {
-			return pod.Metadata.Name, nil
+		reportPod(updatePod, pod.observation())
+		if pod.Status.Phase == "Running" && pod.Metadata.DeletionTimestamp == "" {
+			runningPod = pod.Metadata.Name
 		}
+	}
+	if runningPod != "" {
+		return runningPod, nil
 	}
 	if len(pods.Items) == 0 {
 		return "", fmt.Errorf("cannot resume job %s: no running pod exists", jobName)
@@ -349,9 +346,13 @@ func (c *kubernetesClient) findRunningJobPod(ctx context.Context, jobName string
 	return "", fmt.Errorf("cannot resume job %s: pod is not running", jobName)
 }
 
-func reportPodStatus(updatePodStatus func(PodStatus), status PodStatus) {
-	if updatePodStatus != nil && status != "" {
-		updatePodStatus(status)
+func reportPodStatus(updatePod func(PodObservation), status PodStatus) {
+	reportPod(updatePod, PodObservation{Status: status})
+}
+
+func reportPod(updatePod func(PodObservation), observation PodObservation) {
+	if updatePod != nil && (observation.PodName != "" || observation.Status != "") {
+		updatePod(observation)
 	}
 }
 
@@ -368,24 +369,42 @@ func (c *kubernetesClient) listJobPods(ctx context.Context, jobName string) (*ku
 	return &pods, nil
 }
 
-func (c *kubernetesClient) streamPodLogs(ctx context.Context, podName string, logPath string, jobDone <-chan struct{}) error {
-	var lastTimestamp time.Time
+func (c *kubernetesClient) streamJobLogs(ctx context.Context, jobName string, logPath string, jobDone <-chan struct{}, updatePod func(PodObservation)) error {
+	lastTimestampByPod := map[string]time.Time{}
+	seenPods := map[string]struct{}{}
 	for {
-		nextTimestamp, err := c.copyPodLogs(ctx, podName, logPath, true, lastTimestamp)
-		if nextTimestamp.After(lastTimestamp) {
-			lastTimestamp = nextTimestamp
+		pods, err := c.listJobPods(ctx, jobName)
+		if err == nil {
+			sortPods(pods.Items)
+			for _, pod := range pods.Items {
+				reportPod(updatePod, pod.observation())
+				if _, seen := seenPods[pod.Metadata.Name]; !seen {
+					if headerErr := appendPodAttemptHeader(logPath, pod.Metadata.Name); headerErr != nil {
+						return headerErr
+					}
+					seenPods[pod.Metadata.Name] = struct{}{}
+				}
+				if pod.status() == PodStatusPending {
+					continue
+				}
+				nextTimestamp, logErr := c.copyPodLogs(ctx, pod.Metadata.Name, logPath, false, lastTimestampByPod[pod.Metadata.Name])
+				if nextTimestamp.After(lastTimestampByPod[pod.Metadata.Name]) {
+					lastTimestampByPod[pod.Metadata.Name] = nextTimestamp
+				}
+				if logErr != nil && ctx.Err() == nil {
+					log.Warn().Err(logErr).Str("job", jobName).Str("pod", pod.Metadata.Name).Msg("Retrying pod log collection")
+				}
+			}
+		} else if ctx.Err() == nil {
+			log.Warn().Err(err).Str("job", jobName).Msg("Retrying job pod discovery for log collection")
 		}
-		if ctx.Err() != nil {
-			return nil
-		}
+
 		select {
+		case <-ctx.Done():
+			return nil
 		case <-jobDone:
-			_, finalErr := c.copyPodLogs(ctx, podName, logPath, false, lastTimestamp)
-			return finalErr
+			return err
 		default:
-		}
-		if err != nil {
-			log.Warn().Err(err).Str("pod", podName).Msg("Retrying pod log stream")
 		}
 
 		retryInterval := c.logRetryInterval
@@ -399,11 +418,66 @@ func (c *kubernetesClient) streamPodLogs(ctx context.Context, podName string, lo
 			return nil
 		case <-jobDone:
 			timer.Stop()
-			_, finalErr := c.copyPodLogs(ctx, podName, logPath, false, lastTimestamp)
-			return finalErr
+			// Run one final non-following pass so logs written immediately before
+			// Job completion are not lost.
+			pods, finalErr := c.listJobPods(ctx, jobName)
+			if finalErr != nil {
+				return finalErr
+			}
+			sortPods(pods.Items)
+			for _, pod := range pods.Items {
+				reportPod(updatePod, pod.observation())
+				if _, seen := seenPods[pod.Metadata.Name]; !seen {
+					if headerErr := appendPodAttemptHeader(logPath, pod.Metadata.Name); headerErr != nil {
+						return headerErr
+					}
+				}
+				if pod.status() == PodStatusPending {
+					continue
+				}
+				if _, logErr := c.copyPodLogs(ctx, pod.Metadata.Name, logPath, false, lastTimestampByPod[pod.Metadata.Name]); logErr != nil {
+					return logErr
+				}
+			}
+			return nil
 		case <-timer.C:
 		}
 	}
+}
+
+func (c *kubernetesClient) captureFinishedJobLogs(ctx context.Context, jobName string, logPath string, updatePod func(PodObservation)) {
+	jobDone := make(chan struct{})
+	close(jobDone)
+	if err := c.streamJobLogs(ctx, jobName, logPath, jobDone, updatePod); err != nil {
+		log.Warn().Err(err).Str("job", jobName).Msg("Could not capture logs while reconciling finished Job")
+	}
+}
+
+func appendPodAttemptHeader(logPath string, podName string) error {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	header := fmt.Sprintf("--- Kubernetes Job attempt: %s ---", podName)
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		if scanner.Text() == header {
+			return nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(file, "\n%s\n", header)
+	return err
 }
 
 func (c *kubernetesClient) copyPodLogs(ctx context.Context, podName string, logPath string, follow bool, since time.Time) (time.Time, error) {
@@ -473,40 +547,88 @@ func (c *kubernetesClient) deletePodDisruptionBudget(ctx context.Context, name s
 	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
 }
 
+func (c *kubernetesClient) cleanupPodDisruptionBudget(name string) {
+	cleanupContext, cancelCleanup := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelCleanup()
+	if err := c.deletePodDisruptionBudget(cleanupContext, name); err != nil && !isKubernetesStatus(err, http.StatusNotFound) {
+		log.Warn().Err(err).Str("job", name).Msg("Could not delete Job PodDisruptionBudget")
+	}
+}
+
 func (c *kubernetesClient) doJSON(ctx context.Context, method string, path string, body any, out any) error {
-	var reader io.Reader
+	var bodyData []byte
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		reader = bytes.NewReader(data)
+		bodyData = data
 	}
 
-	req, err := c.newRequest(ctx, method, path, reader)
-	if err != nil {
-		return err
+	retryInterval := c.apiRetryInterval
+	if retryInterval <= 0 {
+		retryInterval = 500 * time.Millisecond
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return &kubernetesAPIError{statusCode: resp.StatusCode, message: fmt.Sprintf("kubernetes request failed: %s %s: %s: %s", method, path, resp.Status, string(data))}
+	maxRetryInterval := c.apiRetryMaxInterval
+	if maxRetryInterval <= 0 {
+		maxRetryInterval = 10 * time.Second
 	}
 
-	if out == nil {
-		return nil
-	}
+	for {
+		var reader io.Reader
+		if bodyData != nil {
+			reader = bytes.NewReader(bodyData)
+		}
+		req, requestBuildErr := c.newRequest(ctx, method, path, reader)
+		if requestBuildErr != nil {
+			return requestBuildErr
+		}
+		if body != nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
 
-	return json.NewDecoder(resp.Body).Decode(out)
+		resp, requestErr := c.http.Do(req)
+		if requestErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if out == nil {
+				resp.Body.Close()
+				return nil
+			}
+			decodeErr := json.NewDecoder(resp.Body).Decode(out)
+			resp.Body.Close()
+			return decodeErr
+		}
+
+		var err error
+		retryable := requestErr != nil
+		if requestErr != nil {
+			err = requestErr
+		} else {
+			data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			resp.Body.Close()
+			err = &kubernetesAPIError{statusCode: resp.StatusCode, message: fmt.Sprintf("kubernetes request failed: %s %s: %s: %s", method, path, resp.Status, string(data))}
+			retryable = resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
+		}
+		if !retryable {
+			return err
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		log.Warn().Err(err).Str("method", method).Str("path", path).Dur("retryIn", retryInterval).Msg("Retrying Kubernetes API request")
+		timer := time.NewTimer(retryInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+		if retryInterval < maxRetryInterval {
+			retryInterval *= 2
+			if retryInterval > maxRetryInterval {
+				retryInterval = maxRetryInterval
+			}
+		}
+	}
 }
 
 type kubernetesAPIError struct {
@@ -521,6 +643,30 @@ func (e *kubernetesAPIError) Error() string {
 func isKubernetesStatus(err error, statusCode int) bool {
 	var apiErr *kubernetesAPIError
 	return errors.As(err, &apiErr) && apiErr.statusCode == statusCode
+}
+
+func jobOutcome(jobName string, job *kubernetesJob) (bool, int, error) {
+	if job.Status.Succeeded > 0 {
+		return true, 0, nil
+	}
+	for _, condition := range job.Status.Conditions {
+		if condition.Status != "True" {
+			continue
+		}
+		switch condition.Type {
+		case "Complete":
+			return true, 0, nil
+		case "Failed":
+			if condition.Message != "" {
+				return true, 1, errors.New(condition.Message)
+			}
+			if condition.Reason != "" {
+				return true, 1, fmt.Errorf("job %s failed: %s", jobName, condition.Reason)
+			}
+			return true, 1, fmt.Errorf("job %s failed", jobName)
+		}
+	}
+	return false, 0, nil
 }
 
 func (c *kubernetesClient) newRequest(ctx context.Context, method string, path string, body io.Reader) (*http.Request, error) {
@@ -642,10 +788,31 @@ type kubernetesPodList struct {
 type kubernetesPod struct {
 	Metadata struct {
 		Name              string `json:"name"`
+		CreationTimestamp string `json:"creationTimestamp"`
 		DeletionTimestamp string `json:"deletionTimestamp"`
 	} `json:"metadata"`
+	Spec struct {
+		NodeName string `json:"nodeName"`
+	} `json:"spec"`
 	Status struct {
-		Phase string `json:"phase"`
+		Phase             string `json:"phase"`
+		StartTime         string `json:"startTime"`
+		ContainerStatuses []struct {
+			Name  string `json:"name"`
+			State struct {
+				Waiting *struct {
+					Reason  string `json:"reason"`
+					Message string `json:"message"`
+				} `json:"waiting"`
+				Terminated *struct {
+					ExitCode   int    `json:"exitCode"`
+					Reason     string `json:"reason"`
+					Message    string `json:"message"`
+					StartedAt  string `json:"startedAt"`
+					FinishedAt string `json:"finishedAt"`
+				} `json:"terminated"`
+			} `json:"state"`
+		} `json:"containerStatuses"`
 	} `json:"status"`
 }
 
@@ -657,4 +824,55 @@ func (p kubernetesPod) status() PodStatus {
 		return PodStatusPending
 	}
 	return PodStatus(strings.ToLower(p.Status.Phase))
+}
+
+func (p kubernetesPod) observation() PodObservation {
+	observation := PodObservation{
+		PodName:   p.Metadata.Name,
+		NodeName:  p.Spec.NodeName,
+		Status:    p.status(),
+		CreatedAt: parseKubernetesTime(p.Metadata.CreationTimestamp),
+		StartedAt: parseKubernetesTime(p.Status.StartTime),
+	}
+	for _, container := range p.Status.ContainerStatuses {
+		if container.Name != "main" {
+			continue
+		}
+		if container.State.Terminated != nil {
+			terminated := container.State.Terminated
+			exitCode := terminated.ExitCode
+			observation.ExitCode = &exitCode
+			observation.Reason = terminated.Reason
+			observation.Message = terminated.Message
+			if startedAt := parseKubernetesTime(terminated.StartedAt); startedAt != nil {
+				observation.StartedAt = startedAt
+			}
+			observation.FinishedAt = parseKubernetesTime(terminated.FinishedAt)
+		} else if container.State.Waiting != nil {
+			observation.Reason = container.State.Waiting.Reason
+			observation.Message = container.State.Waiting.Message
+		}
+		break
+	}
+	return observation
+}
+
+func parseKubernetesTime(value string) *time.Time {
+	if value == "" {
+		return nil
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return nil
+	}
+	return &parsed
+}
+
+func sortPods(pods []kubernetesPod) {
+	sort.SliceStable(pods, func(left, right int) bool {
+		if pods[left].Metadata.CreationTimestamp == pods[right].Metadata.CreationTimestamp {
+			return pods[left].Metadata.Name < pods[right].Metadata.Name
+		}
+		return pods[left].Metadata.CreationTimestamp < pods[right].Metadata.CreationTimestamp
+	})
 }
