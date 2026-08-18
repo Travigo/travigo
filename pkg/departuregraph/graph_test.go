@@ -484,6 +484,50 @@ func TestSnapshotStatsTrackWritesAndRestore(t *testing.T) {
 	}
 }
 
+func TestUnchangedCompleteRestoredGraphSkipsCheckpoint(t *testing.T) {
+	serviceDate := time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
+	graph := New(nil, Config{Enabled: true, SnapshotPath: path})
+	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{
+		{PrimaryIdentifier: "origin"}, {PrimaryIdentifier: "destination"},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey", Path: []*ctdf.JourneyPathItem{{
+		OriginStopRef: "origin", DestinationStopRef: "destination",
+		OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
+	}}})
+	data.completeScan([]time.Time{serviceDate})
+	if err := graph.Save(); err != nil {
+		t.Fatalf("save graph: %v", err)
+	}
+
+	restored := New(nil, Config{Enabled: true, SnapshotPath: path})
+	if err := restored.restoreTracked(path); err != nil {
+		t.Fatalf("restore graph: %v", err)
+	}
+	if len(restored.current.Load().JourneyPatterns) == 0 || restored.current.Load().PatternDepartureBuckets == nil {
+		t.Fatal("restored snapshot did not rebuild the compact pattern departure index")
+	}
+	if err := restored.Save(); err != nil {
+		t.Fatalf("save unchanged restored graph: %v", err)
+	}
+	stats := restored.Stats().Snapshot
+	if stats.SuccessfulWrites != 0 || stats.FailedWrites != 0 {
+		t.Fatalf("unchanged restored graph wrote another checkpoint: %#v", stats)
+	}
+
+	restored.snapshotRevision.Add(1)
+	if err := restored.Save(); err != nil {
+		t.Fatalf("save changed restored graph: %v", err)
+	}
+	stats = restored.Stats().Snapshot
+	if stats.SuccessfulWrites != 1 || stats.FailedWrites != 0 {
+		t.Fatalf("changed restored graph did not write a checkpoint: %#v", stats)
+	}
+}
+
 func TestIncompleteCheckpointDoesNotReplaceCompleteSnapshot(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
 	graph := New(&fakeLoader{}, Config{Enabled: true, SnapshotPath: path})

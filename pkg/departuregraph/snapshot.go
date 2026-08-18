@@ -33,6 +33,7 @@ type snapshotFile struct {
 	ArrivalPatterns        []uint64
 	StaticPatterns         []staticPatternRecord
 	StaticPatternStops     []uint32
+	JourneyPatterns        []uint32
 	StaticRoutingReady     bool
 	Journeys               []journeyRecord
 	Paths                  []pathRecord
@@ -62,6 +63,11 @@ func (g *Graph) saveTracked(path string, data *graphData) error {
 	g.snapshotMu.Lock()
 	defer g.snapshotMu.Unlock()
 	complete := data != nil && data.snapshotComplete()
+	revision := g.snapshotRevision.Load()
+	if complete && g.completeSnapshot.Load() && revision == g.snapshotSaved.Load() {
+		log.Debug().Str("path", path).Msg("Departure graph checkpoint skipped because graph is unchanged")
+		return nil
+	}
 	if !complete && g.completeSnapshot.Load() {
 		log.Info().Str("path", path).Msg("Departure graph incomplete checkpoint skipped to preserve complete snapshot")
 		return nil
@@ -75,6 +81,7 @@ func (g *Graph) saveTracked(path string, data *graphData) error {
 	g.metrics.snapshot.finishWrite(started, size, err)
 	if err == nil && complete {
 		g.completeSnapshot.Store(true)
+		g.snapshotSaved.Store(revision)
 	}
 	return err
 }
@@ -114,7 +121,8 @@ func (g *Graph) save(path string, data *graphData) error {
 		}
 	}()
 
-	buffered := bufio.NewWriterSize(temporary, 1024*1024)
+	checkpointWriter := newSnapshotCheckpointWriter(temporary)
+	buffered := bufio.NewWriterSize(checkpointWriter, 1024*1024)
 	compressor, err := zstd.NewWriter(buffered, zstd.WithEncoderLevel(zstd.SpeedFastest))
 	if err != nil {
 		_ = temporary.Close()
@@ -141,6 +149,7 @@ func (g *Graph) save(path string, data *graphData) error {
 		ArrivalPatterns:        data.ArrivalPatterns,
 		StaticPatterns:         data.StaticPatterns,
 		StaticPatternStops:     data.StaticPatternStops,
+		JourneyPatterns:        data.JourneyPatterns,
 		StaticRoutingReady:     data.StaticRoutingReady,
 		Journeys:               data.Journeys,
 		Paths:                  data.Paths,
@@ -165,7 +174,7 @@ func (g *Graph) save(path string, data *graphData) error {
 		err = buffered.Flush()
 	}
 	if err == nil {
-		err = temporary.Sync()
+		err = checkpointWriter.Finalize()
 	}
 	if closeErr := temporary.Close(); err == nil {
 		err = closeErr
@@ -236,6 +245,7 @@ func (g *Graph) restore(path string) error {
 		ArrivalPatterns:        snapshot.ArrivalPatterns,
 		StaticPatterns:         snapshot.StaticPatterns,
 		StaticPatternStops:     snapshot.StaticPatternStops,
+		JourneyPatterns:        snapshot.JourneyPatterns,
 		StaticRoutingReady:     snapshot.StaticRoutingReady,
 		Journeys:               snapshot.Journeys,
 		Paths:                  snapshot.Paths,
@@ -344,8 +354,12 @@ func (g *Graph) restore(path string) error {
 	}
 	restored.buildStopIndexByStringIDLocked()
 	restored.rebuildIncomingJourneyStateStopsLocked()
-	if len(restored.CompleteDays) > 0 && (!restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalPatternOffsets) != len(restored.Stops)+1 || len(restored.JourneyPatterns) != len(restored.Journeys) || restored.PatternDepartures == nil) {
-		restored.buildStaticRoutingIndexesLocked()
+	if len(restored.CompleteDays) > 0 {
+		if !restored.StaticRoutingReady || len(restored.ReverseTransferOffsets) != len(restored.Stops)+1 || len(restored.ArrivalPatternOffsets) != len(restored.Stops)+1 || len(restored.JourneyPatterns) != len(restored.Journeys) {
+			restored.buildStaticRoutingIndexesLocked()
+		} else if restored.PatternDepartureBuckets == nil {
+			restored.buildPatternDepartureIndexesLocked()
+		}
 	}
 	for key := range restored.CompleteStops {
 		if value := restored.stringValue(key.StopRef); value != "" {

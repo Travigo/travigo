@@ -32,8 +32,9 @@ func (d *graphData) buildStaticRoutingIndexesLocked() {
 	d.StaticPatterns = nil
 	d.StaticPatternStops = nil
 	d.JourneyPatterns = nil
-	d.DeparturePatterns = nil
-	d.PatternDepartures = nil
+	d.PatternDepartureBuckets = nil
+	d.PatternDepartureGroups = nil
+	d.PatternDepartureIndexes = nil
 	d.corridorMu.Lock()
 	d.corridors = nil
 	d.corridorClock = 0
@@ -149,9 +150,18 @@ func (d *graphData) buildStaticPatternsLocked() {
 }
 
 func (d *graphData) buildPatternDepartureIndexesLocked() {
-	d.DeparturePatterns = make(map[bucketKey][]uint32, len(d.Departures))
-	d.PatternDepartures = make(map[patternDepartureKey][]departureEntry, len(d.Departures))
+	d.PatternDepartureBuckets = make(map[bucketKey]patternDepartureBucket, len(d.Departures))
+	d.PatternDepartureGroups = make([]patternDepartureGroup, 0, len(d.Departures))
+	totalDepartures := 0
+	for _, departures := range d.Departures {
+		totalDepartures += len(departures)
+	}
+	d.PatternDepartureIndexes = make([]uint32, 0, totalDepartures)
 	for bucket, departures := range d.Departures {
+		groupByPattern := make(map[uint32]int)
+		patterns := make([]uint32, 0, 8)
+		counts := make([]uint32, 0, 8)
+		validDepartures := 0
 		for _, departure := range departures {
 			journey := departure.journey()
 			if int(journey) >= len(d.JourneyPatterns) {
@@ -161,12 +171,45 @@ func (d *graphData) buildPatternDepartureIndexesLocked() {
 			if pattern == math.MaxUint32 {
 				continue
 			}
-			key := patternDepartureKey{Day: bucket.Day, StopRef: bucket.StopRef, Pattern: pattern}
-			if _, exists := d.PatternDepartures[key]; !exists {
-				d.DeparturePatterns[bucket] = append(d.DeparturePatterns[bucket], pattern)
+			group, exists := groupByPattern[pattern]
+			if !exists {
+				group = len(patterns)
+				groupByPattern[pattern] = group
+				patterns = append(patterns, pattern)
+				counts = append(counts, 0)
 			}
-			d.PatternDepartures[key] = append(d.PatternDepartures[key], departure)
+			counts[group]++
+			validDepartures++
 		}
+		if len(patterns) == 0 {
+			continue
+		}
+		bucketRecord := patternDepartureBucket{GroupStart: uint32(len(d.PatternDepartureGroups)), GroupCount: uint32(len(patterns))}
+		indexStart := uint32(len(d.PatternDepartureIndexes))
+		for index, pattern := range patterns {
+			d.PatternDepartureGroups = append(d.PatternDepartureGroups, patternDepartureGroup{
+				Pattern: pattern, IndexStart: indexStart, IndexCount: counts[index],
+			})
+			groupByPattern[pattern] = index
+			indexStart += counts[index]
+		}
+		d.PatternDepartureIndexes = append(d.PatternDepartureIndexes, make([]uint32, validDepartures)...)
+		cursors := make([]uint32, len(patterns))
+		for departureIndex, departure := range departures {
+			journey := departure.journey()
+			if int(journey) >= len(d.JourneyPatterns) {
+				continue
+			}
+			pattern := d.JourneyPatterns[journey]
+			group, exists := groupByPattern[pattern]
+			if !exists || pattern == math.MaxUint32 {
+				continue
+			}
+			record := d.PatternDepartureGroups[int(bucketRecord.GroupStart)+group]
+			d.PatternDepartureIndexes[record.IndexStart+cursors[group]] = uint32(departureIndex)
+			cursors[group]++
+		}
+		d.PatternDepartureBuckets[bucket] = bucketRecord
 	}
 }
 

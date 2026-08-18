@@ -118,16 +118,17 @@ type planLabel struct {
 }
 
 type planQueue struct {
-	labels            []*planLabel
-	data              *graphData
-	destinations      []PlanLocation
-	heuristicSeconds  []uint32
-	corridor          []uint8
-	destinationStops  map[uint32]bool
-	excludedJourneys  map[string]bool
-	maxVehicleLegs    int
-	maxLabelsPerState int
-	destinationLabels int
+	labels              []*planLabel
+	data                *graphData
+	destinations        []PlanLocation
+	heuristicSeconds    []uint32
+	corridor            []uint8
+	destinationStops    map[uint32]bool
+	destinationPatterns []bool
+	excludedJourneys    map[string]bool
+	maxVehicleLegs      int
+	maxLabelsPerState   int
+	destinationLabels   int
 }
 
 func (q planQueue) Len() int { return len(q.labels) }
@@ -207,7 +208,7 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	data := g.current.Load()
 	data.mu.RLock()
 	defer data.mu.RUnlock()
-	if !data.TopologyReady || !data.StaticRoutingReady || len(data.Stops) == 0 || len(data.TransferOffsets) != len(data.Stops)+1 || len(data.JourneyPatterns) != len(data.Journeys) || data.PatternDepartures == nil {
+	if !data.TopologyReady || !data.StaticRoutingReady || len(data.Stops) == 0 || len(data.TransferOffsets) != len(data.Stops)+1 || len(data.JourneyPatterns) != len(data.Journeys) || data.PatternDepartureBuckets == nil {
 		return PlanResponse{}, ErrGraphNotReady
 	}
 	config := normalizePlanConfig(request)
@@ -232,112 +233,67 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 		return PlanResponse{Plans: []Plan{}}, nil
 	}
 
-	queue := newPlanQueue(data, destinationNodes, request.DestinationLocation)
-	queue.corridor = data.planCorridor(destinationNodes, config.maxVehicleLegs)
-	queue.maxVehicleLegs = config.maxVehicleLegs
-	queue.maxLabelsPerState = config.maxLabelsPerState
-	queue.destinationLabels = config.count
-	queue.excludedJourneys = make(map[string]bool, len(request.ExcludedJourneyRefs))
-	for _, ref := range request.ExcludedJourneyRefs {
-		queue.excludedJourneys[ref] = true
-	}
-	heap.Init(queue)
-	best := map[planState][]planArrival{}
-	originRef := "coordinate-origin"
-	if len(request.OriginRefs) > 0 {
-		originRef = request.OriginRefs[0]
-		for node := range data.resolveStopSet(request.OriginRefs) {
-			pushPlanLabel(queue, best, &planLabel{stop: node, arrival: request.StartDateTime})
-		}
-	} else if request.OriginLocation != nil {
-		nearbyStops := data.nearbyStops(*request.OriginLocation, config.maxTransferDistance, config.originStops)
-		seenNearby := make(map[uint32]bool, len(nearbyStops))
-		for _, nearby := range nearbyStops {
-			seenNearby[nearby.stop] = true
-		}
-		for destination := range destinationNodes {
-			stop := data.Stops[destination]
-			if seenNearby[destination] || !stop.HasLocation {
-				continue
-			}
-			distance := distanceMetres(request.OriginLocation.Longitude, request.OriginLocation.Latitude, float64(stop.Longitude), float64(stop.Latitude))
-			if distance <= float64(config.maxTransferDistance) {
-				nearbyStops = append(nearbyStops, nearbyStop{stop: destination, distance: distance})
-			}
-		}
-		for _, nearby := range nearbyStops {
-			duration := int(math.Ceil(nearby.distance / planWalkSpeedMetresPerSecond))
-			arrival := request.StartDateTime.Add(time.Duration(duration) * time.Second)
-			pushPlanLabel(queue, best, &planLabel{
-				stop:    nearby.stop,
-				arrival: arrival,
-				walked:  true,
-				route: appendPlanLeg(nil, PlanLeg{
-					Type:                 ctdf.JourneyPlanRouteItemTypeTransfer,
-					TransferType:         ctdf.StopTransferTypeNearbyWalk,
-					OriginStopRef:        originRef,
-					DestinationStopRef:   data.stringValue(data.Stops[nearby.stop].PrimaryRef),
-					StartTime:            request.StartDateTime,
-					ArrivalTime:          arrival,
-					DistanceMetres:       int(math.Ceil(nearby.distance)),
-					WalkDurationSeconds:  duration,
-					TotalDurationSeconds: duration,
-				}),
-			})
-		}
-	}
-
 	response := PlanResponse{Plans: []Plan{}}
 	resultKeys := map[string]bool{}
 	expanded := 0
 	searchEnd := request.StartDateTime.Add(config.maxDuration)
-	for queue.Len() > 0 && len(response.Plans) < config.count && expanded < config.maxExpandedLabels && time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			return PlanResponse{}, ctx.Err()
-		default:
-		}
-		current := heap.Pop(queue).(*planLabel)
-		if !currentPlanLabel(queue, best, current) {
-			continue
-		}
-		expanded++
-		if destinationNodes[current.stop] && (current.route != nil || request.DestinationLocation != nil) {
-			if egress, exists := destinationWalks[current.stop]; exists && egress.distance > 0 {
-				duration := int(math.Ceil(egress.distance / planWalkSpeedMetresPerSecond))
-				arrival := current.arrival.Add(time.Duration(duration) * time.Second)
-				current = &planLabel{stop: current.stop, arrival: arrival, vehicleLegs: current.vehicleLegs, walked: true, route: appendPlanLeg(current.route, PlanLeg{
-					Type: ctdf.JourneyPlanRouteItemTypeTransfer, TransferType: ctdf.StopTransferTypeNearbyWalk,
-					OriginStopRef: data.stringValue(data.Stops[current.stop].PrimaryRef), DestinationStopRef: destinationRef,
-					StartTime: current.arrival, ArrivalTime: arrival, DistanceMetres: int(math.Ceil(egress.distance)),
-					WalkDurationSeconds: duration, TotalDurationSeconds: duration,
-				})}
+	sharedQueue := newPlanQueue(data, destinationNodes, request.DestinationLocation)
+	for vehicleLimit := 1; vehicleLimit <= config.maxVehicleLegs && len(response.Plans) < config.count; vehicleLimit++ {
+		roundConfig := config
+		roundConfig.maxVehicleLegs = vehicleLimit
+		queue, best := data.newPlanRound(request, roundConfig, sharedQueue)
+		for queue.Len() > 0 && len(response.Plans) < config.count && expanded < config.maxExpandedLabels && time.Now().Before(deadline) {
+			select {
+			case <-ctx.Done():
+				return PlanResponse{}, ctx.Err()
+			default:
 			}
-			plan := materializePlan(current)
-			key := planKey(plan)
-			if !resultKeys[key] {
-				resultKeys[key] = true
-				response.Plans = append(response.Plans, plan)
-				if len(response.Plans) == 1 {
-					response.FirstPlanMillis = time.Since(started).Milliseconds()
+			current := heap.Pop(queue).(*planLabel)
+			if !currentPlanLabel(queue, best, current) {
+				continue
+			}
+			expanded++
+			if destinationNodes[current.stop] && (current.route != nil || request.DestinationLocation != nil) {
+				if egress, exists := destinationWalks[current.stop]; exists && egress.distance > 0 {
+					duration := int(math.Ceil(egress.distance / planWalkSpeedMetresPerSecond))
+					arrival := current.arrival.Add(time.Duration(duration) * time.Second)
+					current = &planLabel{stop: current.stop, arrival: arrival, vehicleLegs: current.vehicleLegs, walked: true, route: appendPlanLeg(current.route, PlanLeg{
+						Type: ctdf.JourneyPlanRouteItemTypeTransfer, TransferType: ctdf.StopTransferTypeNearbyWalk,
+						OriginStopRef: data.stringValue(data.Stops[current.stop].PrimaryRef), DestinationStopRef: destinationRef,
+						StartTime: current.arrival, ArrivalTime: arrival, DistanceMetres: int(math.Ceil(egress.distance)),
+						WalkDurationSeconds: duration, TotalDurationSeconds: duration,
+					})}
 				}
+				plan := materializePlan(current)
+				key := planKey(plan)
+				if !resultKeys[key] {
+					resultKeys[key] = true
+					response.Plans = append(response.Plans, plan)
+					if len(response.Plans) == 1 {
+						response.FirstPlanMillis = time.Since(started).Milliseconds()
+					}
+				}
+				continue
 			}
-			continue
+			if current.arrival.After(searchEnd) {
+				continue
+			}
+			data.expandPlanTransfers(queue, best, roundConfig, current, searchEnd)
+			if current.vehicleLegs < roundConfig.maxVehicleLegs {
+				data.expandPlanJourneys(queue, best, roundConfig, current, searchEnd)
+			}
 		}
-		if current.arrival.After(searchEnd) {
-			continue
-		}
-		data.expandPlanTransfers(queue, best, config, current, searchEnd)
-		if current.vehicleLegs < config.maxVehicleLegs {
-			data.expandPlanJourneys(queue, best, config, current, searchEnd)
-		}
-	}
-	if len(response.Plans) < config.count && queue.Len() > 0 {
-		response.SearchTruncated = true
-		if expanded >= config.maxExpandedLabels {
-			response.SearchTruncatedReason = "expanded_label_budget"
-		} else if !time.Now().Before(deadline) {
-			response.SearchTruncatedReason = "time_budget"
+		if len(response.Plans) < config.count && queue.Len() > 0 {
+			if expanded >= config.maxExpandedLabels {
+				response.SearchTruncated = true
+				response.SearchTruncatedReason = "expanded_label_budget"
+				break
+			}
+			if !time.Now().Before(deadline) {
+				response.SearchTruncated = true
+				response.SearchTruncatedReason = "time_budget"
+				break
+			}
 		}
 	}
 	sort.Slice(response.Plans, func(i, j int) bool {
@@ -358,8 +314,76 @@ func (g *Graph) Plan(ctx context.Context, request PlanRequest) (PlanResponse, er
 	return response, nil
 }
 
+func (d *graphData) newPlanRound(request PlanRequest, config planConfig, shared *planQueue) (*planQueue, map[planState][]planArrival) {
+	queue := &planQueue{
+		data: shared.data, destinations: shared.destinations, heuristicSeconds: shared.heuristicSeconds,
+		destinationStops: shared.destinationStops, destinationPatterns: shared.destinationPatterns,
+	}
+	queue.corridor = d.planCorridor(shared.destinationStops, config.maxVehicleLegs)
+	queue.maxVehicleLegs = config.maxVehicleLegs
+	queue.maxLabelsPerState = config.maxLabelsPerState
+	queue.destinationLabels = config.count
+	queue.excludedJourneys = make(map[string]bool, len(request.ExcludedJourneyRefs))
+	for _, ref := range request.ExcludedJourneyRefs {
+		queue.excludedJourneys[ref] = true
+	}
+	heap.Init(queue)
+	best := map[planState][]planArrival{}
+	originRef := "coordinate-origin"
+	if len(request.OriginRefs) > 0 {
+		originRef = request.OriginRefs[0]
+		for node := range d.resolveStopSet(request.OriginRefs) {
+			pushPlanLabel(queue, best, &planLabel{stop: node, arrival: request.StartDateTime})
+		}
+		return queue, best
+	}
+	if request.OriginLocation == nil {
+		return queue, best
+	}
+	nearbyStops := d.nearbyStops(*request.OriginLocation, config.maxTransferDistance, config.originStops)
+	seenNearby := make(map[uint32]bool, len(nearbyStops))
+	for _, nearby := range nearbyStops {
+		seenNearby[nearby.stop] = true
+	}
+	for destination := range shared.destinationStops {
+		stop := d.Stops[destination]
+		if seenNearby[destination] || !stop.HasLocation {
+			continue
+		}
+		distance := distanceMetres(request.OriginLocation.Longitude, request.OriginLocation.Latitude, float64(stop.Longitude), float64(stop.Latitude))
+		if distance <= float64(config.maxTransferDistance) {
+			nearbyStops = append(nearbyStops, nearbyStop{stop: destination, distance: distance})
+		}
+	}
+	for _, nearby := range nearbyStops {
+		duration := int(math.Ceil(nearby.distance / planWalkSpeedMetresPerSecond))
+		arrival := request.StartDateTime.Add(time.Duration(duration) * time.Second)
+		pushPlanLabel(queue, best, &planLabel{
+			stop: nearby.stop, arrival: arrival, walked: true,
+			route: appendPlanLeg(nil, PlanLeg{
+				Type: ctdf.JourneyPlanRouteItemTypeTransfer, TransferType: ctdf.StopTransferTypeNearbyWalk,
+				OriginStopRef: originRef, DestinationStopRef: d.stringValue(d.Stops[nearby.stop].PrimaryRef),
+				StartTime: request.StartDateTime, ArrivalTime: arrival, DistanceMetres: int(math.Ceil(nearby.distance)),
+				WalkDurationSeconds: duration, TotalDurationSeconds: duration,
+			}),
+		})
+	}
+	return queue, best
+}
+
 func newPlanQueue(data *graphData, destinationNodes map[uint32]bool, destinationLocation ...*PlanLocation) *planQueue {
-	queue := &planQueue{data: data, heuristicSeconds: make([]uint32, len(data.Stops)), destinationStops: destinationNodes}
+	queue := &planQueue{data: data, heuristicSeconds: make([]uint32, len(data.Stops)), destinationStops: destinationNodes, destinationPatterns: make([]bool, len(data.StaticPatterns))}
+	for destination := range destinationNodes {
+		if int(destination) >= len(data.ArrivalPatternOffsets)-1 {
+			continue
+		}
+		for index := data.ArrivalPatternOffsets[destination]; index < data.ArrivalPatternOffsets[destination+1]; index++ {
+			pattern := uint32(data.ArrivalPatterns[index] >> 32)
+			if int(pattern) < len(queue.destinationPatterns) {
+				queue.destinationPatterns[pattern] = true
+			}
+		}
+	}
 	if len(destinationLocation) > 0 && destinationLocation[0] != nil {
 		queue.destinations = append(queue.destinations, *destinationLocation[0])
 		return queue
@@ -559,12 +583,27 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]pl
 		aliasStart, aliasEnd := d.StopAliasOffsets[current.stop], d.StopAliasOffsets[current.stop+1]
 		for _, alias := range d.StopAliases[aliasStart:aliasEnd] {
 			bucket := bucketKey{Day: day, StopRef: alias}
+			departures := d.Departures[bucket]
+			patternBucket, exists := d.PatternDepartureBuckets[bucket]
+			if !exists {
+				continue
+			}
 			threshold := int32(current.arrival.Sub(serviceDate) / time.Second)
-			for _, pattern := range d.DeparturePatterns[bucket] {
-				entries := d.PatternDepartures[patternDepartureKey{Day: day, StopRef: alias, Pattern: pattern}]
-				start := sort.Search(len(entries), func(index int) bool { return entries[index].departureSeconds() >= threshold })
+			groups := d.PatternDepartureGroups[patternBucket.GroupStart : patternBucket.GroupStart+patternBucket.GroupCount]
+			for _, group := range groups {
+				indexes := d.PatternDepartureIndexes[group.IndexStart : group.IndexStart+group.IndexCount]
+				start := sort.Search(len(indexes), func(index int) bool {
+					return departures[indexes[index]].departureSeconds() >= threshold
+				})
 				retained := 0
-				for _, entry := range entries[start:] {
+				retentionLimit := 1
+				if int(group.Pattern) < len(queue.destinationPatterns) && queue.destinationPatterns[group.Pattern] {
+					// Requested alternatives only widen patterns which can finish the
+					// journey directly. Intermediate expansion remains count-independent.
+					retentionLimit = max(1, config.count)
+				}
+				for _, departureIndex := range indexes[start:] {
+					entry := departures[departureIndex]
 					candidateDeparture := serviceDate.Add(time.Duration(entry.departureSeconds()) * time.Second)
 					if candidateDeparture.After(searchEnd) {
 						break
@@ -582,7 +621,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]pl
 						journeys[key] = entry
 					}
 					retained++
-					if retained >= max(1, config.count) {
+					if retained >= retentionLimit {
 						break
 					}
 				}

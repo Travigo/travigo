@@ -40,14 +40,18 @@ type bucketKey struct {
 	StopRef stringID
 }
 
-// patternDepartureKey groups boardable journey occurrences by their static
-// stop pattern. Planner expansion can then binary-search the next trip on each
-// route pattern instead of rescanning every later departure at a stop for
-// every label it expands.
-type patternDepartureKey struct {
-	Day     dayKey
-	StopRef stringID
-	Pattern uint32
+// patternDepartureBucket points into compact global group and entry-index
+// arrays. The original departure entries remain stored only once in
+// graphData.Departures.
+type patternDepartureBucket struct {
+	GroupStart uint32
+	GroupCount uint32
+}
+
+type patternDepartureGroup struct {
+	Pattern    uint32
+	IndexStart uint32
+	IndexCount uint32
 }
 
 // departureEntry packs the journey, boarding path and departure time into one
@@ -124,42 +128,43 @@ type staticPatternRecord struct {
 type graphData struct {
 	mu sync.RWMutex
 
-	Strings                []string
-	StringIDs              map[string]stringID
-	StopIDs                map[string]stringID
-	StopIdentifiers        []stopIdentifierRecord
-	StopIndexByStringID    []uint32
-	Stops                  []stopRecord
-	StopAliasOffsets       []uint32
-	StopAliases            []stringID
-	StopGrid               map[spatialCell][]uint32
-	TransferOffsets        []uint32
-	Transfers              []transferRecord
-	TransferRestrictions   []transferRestriction
-	TopologyReady          bool
-	ReverseTransferOffsets []uint32
-	ReverseTransferOrigins []uint32
-	ArrivalPatternOffsets  []uint32
-	ArrivalPatterns        []uint64
-	StaticPatterns         []staticPatternRecord
-	StaticPatternStops     []uint32
-	JourneyPatterns        []uint32
-	DeparturePatterns      map[bucketKey][]uint32
-	PatternDepartures      map[patternDepartureKey][]departureEntry
-	StaticRoutingReady     bool
-	Journeys               []journeyRecord
-	Paths                  []pathRecord
-	Replacements           []stringID
-	JourneyIDs             map[journeyKey]journeyID
-	JourneyDays            map[journeyDayKey]bool
-	DayJourneys            map[dayKey][]journeyID
-	Departures             map[bucketKey][]departureEntry
-	CompleteStops          map[bucketKey]bool
-	CompleteDays           map[dayKey]bool
-	ScanDays               []dayKey
-	ScanCursor             string
-	ScanProcessed          int64
-	ScanActive             int64
+	Strings                 []string
+	StringIDs               map[string]stringID
+	StopIDs                 map[string]stringID
+	StopIdentifiers         []stopIdentifierRecord
+	StopIndexByStringID     []uint32
+	Stops                   []stopRecord
+	StopAliasOffsets        []uint32
+	StopAliases             []stringID
+	StopGrid                map[spatialCell][]uint32
+	TransferOffsets         []uint32
+	Transfers               []transferRecord
+	TransferRestrictions    []transferRestriction
+	TopologyReady           bool
+	ReverseTransferOffsets  []uint32
+	ReverseTransferOrigins  []uint32
+	ArrivalPatternOffsets   []uint32
+	ArrivalPatterns         []uint64
+	StaticPatterns          []staticPatternRecord
+	StaticPatternStops      []uint32
+	JourneyPatterns         []uint32
+	PatternDepartureBuckets map[bucketKey]patternDepartureBucket
+	PatternDepartureGroups  []patternDepartureGroup
+	PatternDepartureIndexes []uint32
+	StaticRoutingReady      bool
+	Journeys                []journeyRecord
+	Paths                   []pathRecord
+	Replacements            []stringID
+	JourneyIDs              map[journeyKey]journeyID
+	JourneyDays             map[journeyDayKey]bool
+	DayJourneys             map[dayKey][]journeyID
+	Departures              map[bucketKey][]departureEntry
+	CompleteStops           map[bucketKey]bool
+	CompleteDays            map[dayKey]bool
+	ScanDays                []dayKey
+	ScanCursor              string
+	ScanProcessed           int64
+	ScanActive              int64
 
 	IncomingJourneyStateStops []bool
 
@@ -265,6 +270,8 @@ type Graph struct {
 
 	snapshotMu          sync.Mutex
 	completeSnapshot    atomic.Bool
+	snapshotRevision    atomic.Uint64
+	snapshotSaved       atomic.Uint64
 	fillQueueMu         sync.Mutex
 	fillQueue           []*pendingStopFill
 	fillWorkerRunning   bool
@@ -525,6 +532,7 @@ func (g *Graph) applyPendingStopFill(pending *pendingStopFill) {
 		active.addJourneys(pending.day, pending.journeys[start:end])
 	}
 	active.markStopComplete(pending.day, pending.canonical)
+	g.snapshotRevision.Add(1)
 	log.Debug().
 		Str("stop", pending.canonical).
 		Str("service_date", dayKeyDate(pending.day, time.UTC).Format(ctdf.YearMonthDayFormat)).
@@ -533,6 +541,7 @@ func (g *Graph) applyPendingStopFill(pending *pendingStopFill) {
 }
 
 func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
+	g.snapshotRevision.Add(1)
 	dates := rollingDates(now, g.config.DaysBehind, g.config.DaysAhead)
 	next := g.current.Load()
 	configured, matching, cursor, processed, active := next.scanState(dates)
