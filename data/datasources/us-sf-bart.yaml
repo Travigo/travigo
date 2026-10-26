@@ -1,0 +1,29 @@
+identifier: us-sf-bart
+region: us
+provider:
+  name: BART
+  website: "https://bart.gov"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://www.bart.gov/dev/schedules/google_transit.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime
+  format: gtfs-realtime
+  source: "http://api.bart.gov/gtfsrt/tripupdate.aspx"
+  linkeddataset: us-sf-bart-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-sa-realtime
+  format: gtfs-realtime
+  source: "http://api.bart.gov/gtfsrt/alerts.aspx"
+  linkeddataset: us-sf-bart-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true

@@ -1,0 +1,166 @@
+identifier: us-nyc-mta
+region: us
+provider:
+  name: MTA
+  website: "https://www.mta.info"
+datasets:
+# Schedules
+- identifier: subway-gtfs-schedule
+  format: gtfs-schedule
+  source: "http://web.mta.info/developers/data/nyct/subway/google_transit.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: lirr-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: mnr-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfsmnr.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-bronx-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_bx.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-brooklyn-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_b.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-manhattan-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_m.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-queens-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_q.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-staten-island-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_si.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-mta-company-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfs_busco.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Realtime
+- identifier: subway-ace-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-ace"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-bdfm-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-bdfm"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-g-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-g"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-jz-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-jz"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-nqrw-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-nqrw"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-l-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-l"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-1234567s-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: subway-si-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/nyct%2Fgtfs-si"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: lirr-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr"
+  linkeddataset: us-nyc-mta-lirr-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: mnr-gtfs-realtime
+  format: gtfs-realtime
+  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr"
+  linkeddataset: us-nyc-mta-mnr-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-sa-realtime
+  format: gtfs-realtime
+  source: "https://api.nationaltransport.ie/gtfsr/v2/gtfsr"
+  linkeddataset: us-nyc-mta-subway-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
