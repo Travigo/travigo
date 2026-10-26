@@ -44,6 +44,12 @@ func RegisterCLI() *cli.Command {
 
 					deleteLegacyStopIndexes()
 
+					// Performance Review [Set N] [PR092] [P1] (indexing): End-of-run wall time is not the
+					// source generation actually consumed. An import finishing during this
+					// run can fall before time.Now and then be skipped on the next run even
+					// though its data was never indexed. Checkpoint each verified index's
+					// captured dependency versions only after successful bulk publication;
+					// queue closure/logged errors must not authorize cleanup or advancement.
 					if err := datasetversion.Upsert(c.Context, ctdf.DatasetVersion{
 						Dataset:      datasetversion.StopsIndexerDataset,
 						LastModified: time.Now(),

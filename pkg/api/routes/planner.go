@@ -172,6 +172,10 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	}
 
 	if c.Query("view") == "web" {
+		// Performance Review [Set C] [PR002] [P2]: Per-item GetReferences can repeat service/operator
+		// queries, and missing stops are fetched serially. Collect unique references
+		// across all plans, fetch each collection in bulk, and attach results from
+		// request-local maps to preserve the earlier batched journey hydration gains.
 		stops := map[string]*ctdf.Stop{
 			journeyPlans.OriginStop.PrimaryIdentifier:      &journeyPlans.OriginStop,
 			journeyPlans.DestinationStop.PrimaryIdentifier: &journeyPlans.DestinationStop,

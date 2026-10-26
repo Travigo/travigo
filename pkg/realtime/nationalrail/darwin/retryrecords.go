@@ -25,6 +25,13 @@ func RetryRecords() {
 
 		for _, retryRecord := range retryRecords {
 			// TODO: Delete retry records using the inserted retry record shape, not otheridentifiers.nationalrailrid.
+			// Performance Review [Set L] [PR104] [P1] (realtime): Inserts store record.rid, so this
+			// delete does not consume successful retries; they replay every 90s until
+			// the two-hour TTL, repeating lookups/writes and possibly restoring an old
+			// formation. Retain _id, deduplicate by run/source version, and page due
+			// retries with bounded backoff. Delete that exact record only after the
+			// allocation write succeeds; deleting before UpdateRealtimeJourneys would
+			// lose it on failure once the selector is corrected. Fence stale versions.
 			searchQuery := bson.M{"otheridentifiers.nationalrailrid": retryRecord.Record.RID}
 
 			realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "nationalrailrid", retryRecord.Record.RID)

@@ -82,6 +82,11 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	if len(stopRefs) == 0 {
 		return nil, nil
 	}
+	// Performance Review [Set K] [PR081] [P2] (boards): Cold fills decode every matching timetable
+	// journey at this stop, regardless of service date, before MatchDate filters them in
+	// Go; the Mongo board fallback has the same shape. Add a conservative date prefilter
+	// or a published stop/day lookup while retaining MatchDate as the final authority.
+	// Compare rows examined/decoded at busy stops and bound projection/query batches.
 	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, bson.M{
 		"path.originstopref": bson.M{"$in": stopRefs},
 	}, departureGraphFindOptions())
@@ -142,6 +147,12 @@ func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, a
 // service date; MatchDate remains the final authority for conditions,
 // secondary matches and exclusions after decoding.
 func journeyServiceDateFilter(serviceDates []time.Time) bson.M {
+	// Performance Review [Set K] [PR082] [P2] (indexing): "Indexable" here is not an installed index:
+	// createJourneysIndexes defines no availability.match index, and every DateRange
+	// passes regardless of its bounds. Check explain for the filter plus _id sort on
+	// representative data before assuming a rolling-day scan is selective. Consider
+	// scalar service bounds/a date index that can be maintained by the publisher,
+	// balancing read savings against import writes and multikey index restrictions.
 	if len(serviceDates) == 0 {
 		return bson.M{"_id": bson.M{"$exists": false}}
 	}

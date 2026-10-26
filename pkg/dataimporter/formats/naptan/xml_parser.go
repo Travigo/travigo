@@ -9,6 +9,11 @@ import (
 )
 
 func (n *NaPTAN) ParseFile(reader io.Reader) error {
+	// Performance Review [Set O] [PR046] [P2] (batch): Token-based decoding still retains the whole
+	// national stop/area object graph until Import finishes; database batch sizes
+	// do not bound that memory. Stream or spool ordinary stops while retaining only
+	// the area/platform relationships needed for station assembly, resolving forward
+	// references explicitly. Measure peak heap across parse, conversion and writes.
 	n.StopPoints = make([]*StopPoint, 0, 450000)
 	n.StopAreas = make([]*StopArea, 0, 100000)
 
@@ -16,6 +21,11 @@ func (n *NaPTAN) ParseFile(reader io.Reader) error {
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
+		// Performance Review [Set H] [PR047] [P1] (batch): nil tokens can accompany XML errors, so
+		// truncation reaches success; XML without a NaPTAN root also bypasses Validate.
+		// Require the expected complete document and clean EOF, returning token/element
+		// errors instead of exiting. Keep cleanup disabled for incomplete snapshots
+		// so missing tail records cannot erase the previous national stop inventory.
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break

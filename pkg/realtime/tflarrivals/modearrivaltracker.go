@@ -87,6 +87,12 @@ func (l *ModeArrivalTracker) Run(getRoutes bool) {
 }
 
 func (l *ModeArrivalTracker) GetLatestArrivals() []ArrivalPrediction {
+	// Performance Review [Set D] [PR132] [P1] (realtime): This poll has no request deadline/body
+	// limit. HTTP status and body read/decode errors are ignored; transport errors exit
+	// the process. A stalled fetch can hold the bus fallback refresh lock, and a bus
+	// 503/error body can replace good arrivals with a fresh empty cache. Use a bounded,
+	// validated downloader shared with line/disruption polling, capped backoff and a
+	// last-good snapshot with an age limit. Cache successful empty feeds, not failures.
 	requestURL := modeArrivalsURL(l.Mode.ModeID, TfLAppKey)
 	req, _ := http.NewRequest("GET", requestURL, nil)
 	req.Header["user-agent"] = []string{"curl/7.54.1"} // TfL is protected by cloudflare and it gets angry when no user agent is set
@@ -228,6 +234,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		return nil
 	}
 
+	// Performance Review [Set J] [PR133] [P2] (realtime): FindByIdentifier also fetches location,
+	// description, rail allocation and loading, although TfL only needs its update
+	// state. SaveRealtimeJourney reads the previous details again for event diffs.
+	// Batch-prefetch the required state across groups and use a narrow update read;
+	// preserve any existing location and an immutable previous snapshot for events.
 	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
 	if realtimeJourney == nil {
@@ -262,6 +273,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add new predictions to the realtime journey
+	// Performance Review [Set A] [PR134] [P2] (realtime): Both regexes are rebuilt per journey and
+	// LoadLocation runs per prediction, including repeated stops in the same poll.
+	// Compile the platform/destination expressions once and cache validated time
+	// zones by name when loading stop metadata. Handle invalid zones before In(),
+	// and measure allocation/CPU savings across a complete mode poll.
 	platformMatchRegex, _ := regexp.Compile(`(\w+) (?:- )?Platform (\d+)`)
 	previousStops := realtimeJourney.Stops
 	currentStops := make([]*ctdf.RealtimeJourneyStops, 0, len(predictions))
@@ -302,6 +318,12 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	// with existing calls instead of archiving every ETA as a new stop.
 	realtimeJourneyStops := reconcileTFLRealtimeStops(previousStops, currentStops, line.StopOccurrenceLimits)
 	realtimeJourney.Stops = make(map[string]*ctdf.RealtimeJourneyStops, len(realtimeJourneyStops))
+	// Performance Review [Set G] [PR135] [P1] (realtime): These indices describe the observed calls,
+	// but the selected imported route below may contain an unobserved prefix. With
+	// route A-B-C-D and only B/C predictions, this stores B@0/C@1 while the path asks
+	// for B@1/C@2; estimates are missed and NextStopRef stays empty on a new journey.
+	// Assign occurrence indices against the selected full route before storing them,
+	// retaining repeated calls/history; cover partial first polls and route changes.
 	for index, stop := range realtimeJourneyStops {
 		stop.JourneyStopIndex = index
 		realtimeJourney.SetRealtimeStop(stop)
@@ -330,6 +352,12 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	realtimeJourney.VehicleLocationDescription = lastPrediction.CurrentLocation
 
 	// Identify the route the vehicle is on
+	// Performance Review [Set J] [PR136] [P2] (realtime): After direction filtering, each journey/
+	// poll resolves candidate routes' stops, linearly searches predictions for each stop,
+	// then resolves the selected route again to build its path. Pre-resolve canonical
+	// stop sequences, occurrence indices and immutable leg metadata when tracks load.
+	// Retain direction filtering, narrow by destination where reliable, and use membership
+	// sets plus ordered comparison. Invalidate with route/stop data and preserve loops.
 	var potentialOrderLineRouteMatches []OrderedLineRoute
 	for _, route := range line.OrderedLineRoutes {
 		if route.Direction != "" && predictions[0].Direction != "" && !strings.EqualFold(route.Direction, predictions[0].Direction) {
@@ -605,6 +633,12 @@ func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
 	var stop *ctdf.Stop
 	stopCollection.FindOne(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stop)
 
+	// Performance Review [Set A] [PR137] [P2] (realtime): The normal primary-ID success returns
+	// without populating stopTflStopCache; only the alternate lookup paths cache.
+	// Consequently the same known stop can hit MongoDB for every prediction and
+	// route comparison. Cache every successful resolution, coalesce concurrent
+	// misses, and version/invalidate with imported stops. A short negative cache
+	// should represent confirmed absence, never a database timeout/error.
 	if stop != nil {
 		return stop
 	}

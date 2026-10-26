@@ -93,6 +93,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 
 		} else {
+			// Performance Review [Set L] [PR032] [P2] (tracker): TripUpdate-only observations, and
+			// vehicles without a timestamp, use import wall time; TripUpdate/header timestamps
+			// are ignored. Unchanged polls can therefore pass the tracker's stale-update gate
+			// and repeat predictions, writes and event comparisons. Prefer a valid source
+			// timestamp or content version, preserving separate vehicle/prediction freshness.
+			// Keep heartbeat/TTL renewal separate so deduplication does not expire a live run.
 			recordedAtTime = time.Now()
 		}
 		if tripUpdate != nil {
@@ -268,6 +274,11 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				}
 
 				if vehiclePosition.CongestionLevel != nil {
+					// Performance Review [Set B] [PR033] [P2] (realtime): These two diagnostic branches
+					// synchronously insert the entire vehicle record on every poll, twice
+					// when both fields exist, even if unchanged. Sample or deduplicate
+					// diagnostics by source version, combine payloads, batch writes with
+					// bounded buffering, and set explicit retention for datadump.
 					// pretty.Println(vehiclePosition.CongestionLevel)
 					collection := database.GetCollection("datadump")
 					collection.InsertOne(context.Background(), bson.M{
@@ -319,6 +330,11 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 			locationEventJson, _ := json.Marshal(locationEvent)
 
+			// Performance Review [Set M] [PR034] [P1] (realtime): Each submitted vehicle update uses
+			// a separate Redis publish whose error is discarded; service-alert publish errors
+			// above are also ignored. Buffer byte/count-bounded batches for variadic PublishBytes,
+			// propagate failures to the importer, and count only confirmed submissions. Retry
+			// idempotently by source identity/version so partial publication is safe.
 			r.queue.PublishBytes(locationEventJson)
 
 		} else {
@@ -348,6 +364,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 }
 
 func checkQueueSize() {
+	// Performance Review [Set M] [PR035] [P2] (realtime): Throttling starts only after the entire
+	// feed has been queued, allowing concurrent importers to overshoot together;
+	// recursion also retains another frame every 30-49s of sustained backlog.
+	// Use iterative, cancellable admission checks between bounded publish batches
+	// (also in SIRI-VM), handle stats errors, and monitor queued bytes/oldest event age.
+	// Bound retained feed data as well as queued work while waiting for capacity.
 	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
 	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
 

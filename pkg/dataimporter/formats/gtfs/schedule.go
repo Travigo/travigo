@@ -157,6 +157,12 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	// safely requires changing how Import holds open the archive and how importObject
 	// obtains its reader, which risks altering behaviour/ordering and leaking handles.
 	// TODO HACK as we end up with 2 copies of the file
+	// Performance Review [Set D] [PR036] [P1] (batch): The Copy results below are unchecked; a ZIP
+	// checksum/read failure can leave truncated CSV that later stages accept. The
+	// ZIP/temp archive handles are not closed, and only tables actually consumed by
+	// importObject are removed, leaving unsupported entries/error-path files behind.
+	// Own all extraction artifacts in one scoped directory, check copies/closes,
+	// validate required tables, and clean every artifact on success or failure.
 	tmpZipFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-gtfs-zip-")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create temporary file")
@@ -284,6 +290,11 @@ func materializeShapeTrack(points []compactShapePoint) []ctdf.Location {
 // a string, slice header and coordinate allocation. Full CTDF tracks are only
 // materialised briefly when written or used for a new stop pattern.
 func (g *Schedule) loadShapeTracks() (map[string][]compactShapePoint, error) {
+	// Performance Review [Set O] [PR037] [P2] (batch): Compact coordinates help, but this still
+	// retains every shape before trips/operator exclusions are known, temporarily
+	// alongside sequenced points. Load accepted trip metadata first, retain only
+	// referenced shapes, and consider a shape-ID spool for feeds beyond the memory
+	// budget. Account for trips without stop_times so their shapes are also released.
 	shapeTracks := map[string][]compactShapePoint{}
 	if _, exists := g.fileMap["shapes.txt"]; !exists {
 		log.Warn().Msg("GTFS feed does not contain shapes.txt")
@@ -321,6 +332,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	log.Info().Msg("Converting & Importing as CTDF into MongoDB")
 
 	//// Translations ////
+	// Performance Review [Set H] [PR038] [P1] (batch): Most importObject calls below discard errors
+	// (agency/stops/calendars/routes/trips as well as translations). A malformed
+	// present table can leave only a prefix imported while Import returns success,
+	// enabling cleanup of valid previous rows and publication of the new hash.
+	// Distinguish absent optional tables from parse/read failures, propagate required
+	// failures, and cancel/drain any started writers before returning an error.
 	g.translationIndex = map[string]string{}
 	importObject[Translation](g, "translations.txt", "translations", false, func(t Translation) (any, string) {
 		g.translationIndex[t.TableName+"\x00"+t.FieldName+"\x00"+t.Language+"\x00"+t.FieldValue] = t.Translation
@@ -438,6 +455,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 
 	//// Shapes ////
+	// Performance Review [Set F] [PR039] [P2] (batch): Shape loading/writes, trip retention and the
+	// stop_times external sort run even when Journeys is disabled; only the final
+	// journey write is gated. Build a dependency plan from SupportedObjects before
+	// parsing, so operator/service-only imports skip unused geometry and stop times.
+	// Preserve tables genuinely needed by requested outputs and gate track writes too.
 	shapeTracks, err := g.loadShapeTracks()
 	if err != nil {
 		return datasets.DataImportReport{}, err
@@ -454,6 +476,12 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	pathPatternCacheMisses := 0
 
 	//// Transfers ////
+	// Performance Review [Set H] [PR040] [P1] (batch): Transfers are upserted but the manager never
+	// cleans stop_transfers for this dataset. Removed rules, including rules from a
+	// later feed with no transfers.txt, survive and are all loaded by the planner.
+	// Reconcile this table with the same validated full-feed generation, distinguish
+	// optional-table absence from parsing failure, and retire obsolete rules only
+	// after the new snapshot succeeds. This also bounds planner input growth.
 	if _, exists := g.fileMap["transfers.txt"]; exists {
 		if err := importObject[Transfer](g, "transfers.txt", "stop_transfers", true, func(t Transfer) (any, string) {
 			fromStopRef := gtfsStopReference(dataset.Identifier, t.FromStopID)
@@ -578,6 +606,11 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			})
 		}
 		// Calendar dates availability
+		// Performance Review [Set F] [PR041] [P2] (batch): The date-range string is cached above,
+		// but every trip still parses all calendar_dates exceptions and rebuilds
+		// identical availability rules for its ServiceID. Cache a validated immutable
+		// calendar template per service and copy only when journey-specific changes
+		// are needed; preserve exception precedence and frequency-clone independence.
 		for _, calendarDate := range g.calendarDateMapping[t.ServiceID] {
 			date, _ := time.Parse("20060102", calendarDate.Date)
 			rule := ctdf.AvailabilityRule{
@@ -952,6 +985,12 @@ func parseExactTimes(value string) (int8, error) {
 }
 
 func expandJourneyForFrequencies(journey *ctdf.Journey, windows []frequencyWindow) []*ctdf.Journey {
+	// Performance Review [Set O] [PR042] [P2] (batch): All frequency occurrences and cloned paths
+	// are materialised before the bounded writer sees the first one. Retained memory
+	// scales with occurrence count times path length. Yield occurrences incrementally
+	// into the writer and validate a per-template expansion budget; preserve stable
+	// start-time IDs, >24h times and non-overlapping window semantics. Measure peak heap
+	// with dense frequency windows as well as ordinary scheduled trips.
 	if journey == nil {
 		return nil
 	}

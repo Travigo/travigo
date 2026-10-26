@@ -30,6 +30,11 @@ func Connect(required bool) error {
 	tp := http.DefaultTransport.(*http.Transport).Clone()
 	tp.TLSClientConfig.InsecureSkipVerify = true
 
+	// Performance Review [Set D] [PR087] [P2] (indexing): This mutable backoff is shared by every
+	// request/worker, but Reset and NextBackOff are not concurrency-safe. Concurrent
+	// 429/5xx retries race and alter each other's delays. Derive a capped jittered
+	// delay from the attempt number or use request-local state, and test concurrent
+	// retry responses with the race detector rather than serial success responses.
 	retryBackoff := backoff.NewExponentialBackOff()
 
 	es, err := elasticsearch.NewClient(elasticsearch.Config{
@@ -52,6 +57,10 @@ func Connect(required bool) error {
 		return err
 	}
 
+	// Performance Review [Set D] [PR088] [P2] (indexing): Keep and close the Info response, checking
+	// its status as well as the transport error. Discarding an unread body loses
+	// connection reuse and can let authentication/service errors appear as a usable
+	// client. Apply a bounded startup request context to avoid hanging an indexing run.
 	_, err = es.Info()
 	if err != nil {
 		return err
@@ -81,6 +90,12 @@ func IndexRequestWithID(indexName string, documentID string, document io.ReadSee
 		return
 	}
 
+	// Performance Review [Set N] [PR089] [P1] (indexing): Add errors and item failures never reach
+	// the caller; WaitUntilQueueEmpty also ignores Close errors and NumFailed. A
+	// rejected document therefore still permits the CLI to delete legacy indexes and
+	// mark the run successful. Return enqueue/flush errors, track per-index outcomes
+	// and require verified success before publication/checkpointing; pass the job
+	// context through queueing and flushing so unavailable ES cannot hang shutdown.
 	bulkIndexer.Add(
 		context.Background(),
 		esutil.BulkIndexerItem{

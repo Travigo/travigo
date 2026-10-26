@@ -77,6 +77,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			},
 		}
 	}
+	// Performance Review [Set G] [PR018] [P1] (boards): Only today's and tomorrow's service dates
+	// are loaded. At 01:00, yesterday's 25:30 departure is absent even though the
+	// time conversion preserves values beyond 24 hours. Include the preceding service
+	// dates needed by the feed's bounded overflow/delay horizon, retaining each date
+	// through availability, realtime matching and occurrence deduplication.
 	journeysToday, journeysTodayFromGraph := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
 
 	log.Debug().
@@ -94,6 +99,12 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 	currentTime = time.Now()
 	departureBoardToday := ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
+	// Performance Review [Set K] [PR019] [P1]: Missing realtime data makes a valid scheduled-only
+	// board repeat timetable loading, realtime lookup, and generation. The tomorrow
+	// branch below does the same when realtime is normally unavailable. Base fallback
+	// on graph freshness/completeness or insufficient candidates instead, preserving
+	// a bounded lookback for delayed departures and cancellation handling. Measure
+	// fallback frequency and board latency before changing this behaviour.
 	if journeysTodayFromGraph && !hasRealtimeBoardEntry(departureBoardToday) {
 		log.Warn().
 			Str("stop", q.Stop.PrimaryIdentifier).
@@ -171,6 +182,11 @@ func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath strin
 
 func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) ([]*ctdf.Journey, bool) {
 	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
+		// Performance Review [Set E] [PR020] [P2] (boards): This fresh Background context permits
+		// 30 seconds on the graph, followed by untimed Mongo/Redis fallback and
+		// enrichment after the caller has stopped waiting. Thread one request budget
+		// through the query and all stages, reserving time for fallback instead of
+		// granting each dependency an independent full timeout.
 		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		journeys, err := s.DepartureGraph.JourneysForStopWindow(
@@ -208,6 +224,11 @@ func hasRealtimeBoardEntry(entries []*ctdf.DepartureBoard) bool {
 }
 
 func departureGraphCandidateLimit(count int) int {
+	// Performance Review [Set K] [PR021] [P2] (boards): A fixed 8x overfetch is not a completeness
+	// guarantee after deduplication, activity/replacement filtering and realtime
+	// reordering. One surviving live entry prevents fallback even if later candidates
+	// could fill today's board. Return exhaustion/cursor information and fetch bounded
+	// further windows until enough usable entries exist or the day is exhausted.
 	limit := count * departureGraphCandidateMultiplier
 	if limit < departureGraphMinimumCandidates {
 		limit = departureGraphMinimumCandidates
@@ -344,6 +365,11 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 
 	cacheItemPath := fmt.Sprintf("%s/%s", baseCacheItemPath, dateTime.Format("2006-01-02"))
 
+	// Performance Review [Set K] [PR022] [P2]: Concurrent misses for this stop/date independently
+	// query MongoDB, decode schedules, check availability, and compress the result.
+	// Coalesce loads by cache key; consider a short cross-instance lease if needed.
+	// Share only immutable timetable data, since board generation attaches realtime
+	// state per request, and invalidate/version entries when the timetable changes.
 	journeys, err := cachedresults.Get[[]*ctdf.Journey](s.CachedResults, cacheItemPath)
 
 	if err == nil {
@@ -361,6 +387,11 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 
 	// This projection excludes values we dont care about - the main ones being path.*
 	// Reduces memory usage and execution time
+	// Performance Review [Set G] [PR023] [P1] (boards): destinationactivity is required to exclude
+	// pickup-only calls from arrival boards; projecting it away makes them eligible.
+	// Also retain the small ReplacementBus flag through projection AND cache encoding
+	// so Mongo/cache boards agree with graph boards about BUS platforms. Project a
+	// minimal board schema without discarding fields that affect visible behaviour.
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
@@ -391,6 +422,10 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 
 	decodedJourneys := 0
 	dateMatchedJourneys := 0
+	// Performance Review [Set G] [PR024] [P1] (boards): A decode error currently continues into a
+	// possibly nil Availability, and cursor.Err is never checked before caching for
+	// 18 hours. Return load failures rather than publishing a partial/empty success;
+	// only write the cache after complete iteration and successful encoding.
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)

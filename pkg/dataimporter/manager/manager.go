@@ -145,6 +145,12 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		existingEtag = existingDatasetVersion.ETag
 	}
 
+	// Performance Review [Set H] [PR063] [P1] (batch): The second-resolution timestamp is also the
+	// generation marker used by cleanup. Overlapping imports of one dataset can
+	// delete each other's rows, while runs starting in the same second are not
+	// distinguishable. Before parallelising datasets/retries, enforce per-dataset
+	// ownership and a unique fenced generation; publish only after every batch is
+	// complete, then retire the previous generation without touching an active run.
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: string(dataset.Format),
 		ProviderName:   dataset.Provider.Name,
@@ -201,6 +207,11 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	// Calculate the hash of the file
+	// Performance Review [Set D] [PR064] [P2] (batch): A downloaded file is written to disk, read
+	// fully again for SHA-256, then reopened for parsing; GTFS adds another archive
+	// copy. Hash remote bytes during the checked download and reuse a seekable file
+	// for parsing. Keep conditional HTTP requests and the local-file hash path, and
+	// reject read errors instead of treating a partial digest as a valid version.
 	f, err := os.Open(source)
 	defer f.Close()
 
@@ -242,6 +253,12 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		}
 		defer archive.Close()
 
+		// Performance Review [Set D] [PR065] [P2] (batch): Every archive member is opened before
+		// the first is parsed, and deferred closes retain all decompression readers
+		// until the whole bundle finishes. Iterate supported, non-directory members
+		// one at a time and close immediately after import, with per-entry/total
+		// expanded-byte limits. Keep one run marker across members and only clean up
+		// after the complete bundle succeeds; do not publish each file independently.
 		for i, zipFile := range archive.File {
 			zipFileOpen, err := zipFile.Open()
 			if err != nil {
@@ -306,6 +323,12 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	// Update dataset version
+	// Performance Review [Set H] [PR066] [P1] (batch): Cleanup errors are discarded, and both the
+	// version upsert and report insert errors below are overwritten/ignored before
+	// returning nil. A failed cleanup can therefore be recorded as a completed hash
+	// and skipped next time. Propagate every phase's outcome; persist resumable phase
+	// state or a validated generation so retrying finalisation does not require a
+	// full reimport or expose a partially written dataset as complete.
 	if dataset.ImportDestination != datasets.ImportDestinationRealtimeQueue {
 		datasetVersion := ctdf.DatasetVersion{
 			Dataset:      dataset.Identifier,
@@ -459,6 +482,11 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		}
 	}
 
+	// Performance Review [Set D] [PR067] [P2] (batch): There is no download deadline, cancellation
+	// or byte limit. A slow body can pin a scheduled SIRI/GTFS worker indefinitely
+	// and grow its temporary file. Use a shared configured client with dataset-aware
+	// transfer budgets, idle/progress limits and capped retry/backoff; retain the
+	// existing status/ETag validation and measure download time separately from import.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 
@@ -487,10 +515,22 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 		return false, nil, "", fmt.Errorf("save downloaded file: %w", err)
 	}
 
+	// Performance Review [Set D] [PR068] [P2] (batch): Ownership of this open descriptor is returned
+	// to ImportDataset, which removes its pathname but never closes it; that caller
+	// also leaves its separate parsing os.Open handle unclosed. Repeated SIRI/GTFS
+	// polls depend on GC finalizers for release and can retain unlinked file storage.
+	// Define explicit ownership/Close on all success and error paths, or return a
+	// closed temporary pathname and let a single scoped reader own the import.
 	return true, tmpFile, resp.Header.Get("Etag"), nil
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {
+	// Performance Review [Set O] [PR069] [P2] (batch): This runs once per supported collection for
+	// every changed dataset. Declared journeys_raw indexes cover this predicate,
+	// but stops_raw and journey_tracks lack a datasource cleanup index, so repeated
+	// dataset imports can scan unrelated rows. Check actual indexes/explain plans;
+	// add equality-prefix indexes for format/dataset plus generation where justified,
+	// or retire staged generations in bounded batches. Measure deletion write cost.
 	collection := database.GetCollection(collectionName)
 
 	query := bson.M{

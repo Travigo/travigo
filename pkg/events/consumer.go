@@ -49,6 +49,11 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 
 		log.Debug().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
 
+		// Performance Review [Set Q] [PR090] [P2]: Every event evaluates every subscription of its
+		// type, multiplying event volume by subscriber count. Add explicit journey,
+		// service, or stop targeting metadata and index candidates before evaluating
+		// expressions. Keep a fallback group for general expressions that cannot be
+		// narrowed safely; measure candidate counts and consumer lag at scale.
 		var subscriptions []ctdf.UserNotificationSubscription
 		if c.Subscriptions != nil {
 			subscriptions = c.Subscriptions.ForEventType(event.Type)

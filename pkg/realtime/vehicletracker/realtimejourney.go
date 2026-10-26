@@ -111,6 +111,12 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		// Calculate all the estimated stop arrival & departure times. A vehicle
 		// cannot leave a timed stop before its scheduled departure, so its delay
 		// can be absorbed by scheduled dwell time before calculating later calls.
+		// Performance Review [Set A] [PR153] [P2] (tracker): The unchanged-offset check is inside
+		// range, after estimateFutureStops has already built the entire result slice.
+		// Unchanged updates still pay its per-remaining-call allocation and calculation cost.
+		// Decide whether predictions need rebuilding before calling the estimator; account
+		// for changed leg, timetable or missing estimates as well as offset. Continue
+		// refreshing location/liveness and detecting stop transitions.
 		for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, closestDistanceJourneyPathIndex, offset) {
 			// Don't update the database if theres no actual change
 			if (offset.Seconds() == realtimeJourney.Offset.Seconds()) && !newRealtimeJourney {
@@ -120,6 +126,11 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 	} else {
 		nextOccurrence := map[string]int{}
+		// Performance Review [Set A] [PR154] [P2] (tracker): Each stop update scans Journey.Path from
+		// the beginning in journeyStopOccurrenceIndex, giving quadratic work for a full-trip
+		// update. Cache stopRef -> ordered occurrence indices with the static journey, or
+		// resolve in one ordered pass. Preserve repeated stops and the final call, and measure
+		// short and long trips with both partial and complete update batches.
 		for _, stopUpdate := range vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates {
 			journeyStopIndex := journeyStopOccurrenceIndex(realtimeJourney.Journey, stopUpdate.StopID, nextOccurrence[stopUpdate.StopID])
 			if journeyStopIndex < 0 {
@@ -232,6 +243,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 	}
 
+	// Performance Review [Set L] [PR155] [P1] (tracker): Save errors are discarded here, as are
+	// location/history write failures above; this caller also discards FindForUpdate's
+	// read error and treats the result as a missing record. Consume acknowledges even
+	// reported update errors after identification has advanced its timestamp. Propagate
+	// transient failures, distinguish missing data from read failure, and acknowledge only
+	// a committed update or intentional discard. Design bounded, idempotent retries with
+	// the commit watermark so replay is neither rejected as stale nor allowed to duplicate
+	// notification events under load.
 	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	return nil

@@ -34,6 +34,13 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		serviceDate = event.RecordedAt
 	}
 
+	// Performance Review [Set J] [PR152] [P2] (tracker): Availability is projected but never decoded
+	// into row below, so cold inactive candidates hydrate journey/stops/tracks/service
+	// before rejection. Decode and filter lightweight date/time/direction metadata
+	// first, then batch-load or coalesce hydration for eligible candidates. The
+	// unsorted limit of 100 currently applies before eligibility; rank/bound eligible
+	// candidates without hiding the valid trip. Reuse already-resolved SIRI services
+	// instead of repeating operator/service discovery after normal matching fails.
 	cursor, err := database.GetCollection("journeys").Find(context.Background(), bson.M{"serviceref": bson.M{"$in": serviceIDs}}, options.Find().SetProjection(bson.M{"primaryidentifier": 1, "availability": 1}).SetLimit(maxLocationCandidates))
 	if err != nil {
 		return ""

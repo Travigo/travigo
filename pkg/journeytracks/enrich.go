@@ -48,6 +48,12 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, readC
 	if err != nil {
 		return err
 	}
+	// Performance Review [Set O] [PR099] [P2] (batch): Refresh clears every owned path reference,
+	// writes those paths, then reads and writes matching journeys again to restore
+	// tracks, even where geometry is unchanged. Compute the replacement diff in one
+	// pass, clearing only obsolete references while preserving other datasets' tracks.
+	// Stage/fence publication so failure after clearing cannot leave live journeys
+	// without usable tracks; measure paths rewritten versus paths actually changed.
 	if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, readCollectionName, writeCollectionNames); err != nil {
 		return err
 	}
@@ -297,6 +303,12 @@ func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, colle
 }
 
 func indexRoutesByEndpoints(routes []Route) map[string][]Route {
+	// Performance Review [Set O] [PR100] [P2] (batch): This enumerates every ordered stop pair
+	// and alias combination, then deduplicates route entries per pair. Work and possible
+	// index size grow quadratically in route length and with the product of alias counts.
+	// Index routes by individual canonical stops and intersect endpoint candidates, or
+	// build/cache only endpoint pairs requested by journeys. Preserve ordered subsequence
+	// and repeated-stop matching downstream.
 	index := map[string][]Route{}
 	seen := map[string]map[string]struct{}{}
 	for _, route := range routes {
@@ -386,6 +398,11 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 }
 
 func storeCombinedTrack(ctx context.Context, route Route, start, end int) (string, error) {
+	// Performance Review [Set F] [PR101] [P2] (batch): Journeys needing the same express segment
+	// each concatenate its geometry and synchronously upsert the same track again.
+	// Deduplicate by route generation/start/end within the enrichment run and batch unique
+	// tracks; persist them successfully before publishing journey refs. Bound the cache
+	// and include geometry/version changes so reuse cannot retain a previous route shape.
 	combined := []ctdf.Location{}
 	for legIndex := start; legIndex < end; legIndex++ {
 		leg, ok := route.Legs[legIndex]

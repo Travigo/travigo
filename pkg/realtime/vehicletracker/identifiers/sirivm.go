@@ -61,6 +61,11 @@ func (i *SiriVM) getServices() []string {
 	})
 	operatorRefs := append([]string{i.Operator.PrimaryIdentifier}, i.Operator.OtherIdentifiers...)
 	operatorRefs = uniqueNonEmptyStrings(operatorRefs)
+	// Performance Review [Set J] [PR145] [P2]: Identification misses load every operator service
+	// and filter names in Go. Use an indexed normalised service name with operator,
+	// or bounded operator/name caching with timetable-aware invalidation. Preserve
+	// operator aliases and numeric-suffix matching; measure cold starts and bursts
+	// of new journeys rather than assuming every GPS update takes this path.
 	cursor, err := servicesCollection.Find(context.Background(), bson.M{"operatorref": bson.M{"$in": operatorRefs}}, opts)
 
 	if err != nil {
@@ -203,6 +208,12 @@ func (i *SiriVM) IdentifyJourney() (string, error) {
 }
 
 func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCondition bool) (*ctdf.Journey, error) {
+	// Performance Review [Set J] [PR146] [P2] (tracker): Deduplication hashes every path and formats
+	// three timestamps per leg before direction/time narrowing. Ambiguous results
+	// recurse and hash the candidate set again without availability. Cache both
+	// fingerprints by timetable version, or carry precomputed identification hashes
+	// with lightweight candidates. Any reordering of filters must preserve duplicate
+	// representative selection and the existing direction/time fallback semantics.
 	journeys = ctdf.FilterIdenticalJourneys(journeys, includeAvailabilityCondition)
 	if direction := i.IdentifyingInformation["DirectionRef"]; direction != "" {
 		directional := make([]*ctdf.Journey, 0, len(journeys))

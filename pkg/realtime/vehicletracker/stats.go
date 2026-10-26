@@ -29,6 +29,12 @@ func NewStatsHandler(connection rmq.Connection) *StatsServerHandler {
 	return &StatsServerHandler{redisConnection: connection}
 }
 func (handler *StatsServerHandler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// Performance Review [Set B] [PR156] [P2] (tracker): Queue counts alone cannot distinguish slow
+	// identification, cache misses, geometry, persistence, telemetry, or Ack retries.
+	// Add bounded-cardinality stage latency, cache-hit/eviction, Redis-command, and
+	// received-to-committed event-age metrics, plus consumer progress. Dependency
+	// health can remain green while workers are stalled; profile representative feed
+	// replays before tuning consumer counts, batch size, or cache limits.
 	// get redis queue stats
 	layout := request.FormValue("layout")
 	refresh := request.FormValue("refresh")

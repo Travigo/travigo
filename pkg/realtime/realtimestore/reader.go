@@ -74,6 +74,11 @@ func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[str
 	}
 
 	mappingStart := time.Now()
+	// Performance Review [Set K] [PR124] [P2] (boards): Board fallback and block estimation can
+	// supply a whole day's journeys. Both mapping MGET and detail MGET below are
+	// unbounded, unlike the chunked TfL reader, so one poll can retain a large Redis
+	// reply plus every decoded stop map. Chunk the lookup under a shared request
+	// budget and select board-relevant candidates/fields before retaining full details.
 	mappingValues, err := redis_client.Client.MGet(ctx, mappingKeys...).Result()
 	mappingDuration := time.Since(mappingStart)
 	if err != nil {
@@ -230,6 +235,11 @@ func FindTFLDepartureBoardJourneysBounded(ctx context.Context, stopIDs []string,
 				Max: maxScore,
 			}
 			if perStopLimit > 0 {
+				// Performance Review [Set G] [PR125] [P2] (boards): The limit is applied before detail
+				// hydration/freshness filtering. Future-scored members whose detail keys
+				// expired consume every slot and can hide later live journeys. Refill
+				// bounded pages after discarding stale members, with race-safe cleanup
+				// and a total scan budget across aliases; distinguish exhausted results.
 				rangeQuery.Count = perStopLimit
 			}
 			rangeCommands = append(rangeCommands, pipe.ZRangeByScore(ctx, key, rangeQuery))
@@ -335,6 +345,11 @@ func findActiveWithinBoundsForIDs(ctx context.Context, bounds realtimeJourneyBou
 			locationKeys = append(locationKeys, realtimeJourneyLocationKey(realtimeJourneyID))
 		}
 
+		// Performance Review [Set Q] [PR126] [P2]: These batched map reads still fetch and decode
+		// complete stored runtime records, including paths and predictions, for a small
+		// map response. Consider a compact summary with identity, display metadata, position,
+		// bearing and freshness. Bound or paginate large viewports, retaining active/stale
+		// filtering, and measure payload size and allocations for dense areas.
 		var detailCommand, locationCommand *redis.SliceCmd
 		_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			detailCommand = pipe.MGet(ctx, detailKeys...)
@@ -717,6 +732,12 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 // does not use, while retaining the location overlays that must be preserved by
 // the following full realtime-journey write.
 func FindForUpdate(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
+	// Performance Review [Set L] [PR127] [P2]: Details and both location overlays are read serially;
+	// SaveRealtimeJourney then reads/decodes the previous details again for events.
+	// Pipeline independent reads and retain an immutable previous snapshot through
+	// the update. Preserve event-diff correctness with per-journey ordering/version
+	// checks rather than reusing an already-mutated object. Measure Redis commands
+	// and processing latency per vehicle update.
 	realtimeJourney, err := findStoredByIdentifier(ctx, identifier, false)
 	if err != nil {
 		return nil, err

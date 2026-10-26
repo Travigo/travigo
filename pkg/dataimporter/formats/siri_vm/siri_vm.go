@@ -158,6 +158,11 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 	// newline whereas json.Marshal does not. Downstream consumers parse these bytes, so
 	// byte-identical output cannot be guaranteed without trimming/extra handling; deferred to
 	// avoid any risk of altering the published payload.
+	// Performance Review [Set M] [PR052] [P1] (realtime): Publish errors are ignored and true still
+	// increments the submitted count. Return a retryable failure on a failed enqueue;
+	// batch publication in Import by bounded count/bytes to reduce Redis round trips.
+	// Advance source-version deduplication only after successful enqueue and retain
+	// per-journey ordering, so retrying a partially published feed remains safe.
 	queue.PublishBytes(locationEventJson)
 
 	return true
@@ -185,6 +190,11 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
+		// Performance Review [Set L] [PR053] [P1] (realtime): A decoder error may have tok == nil,
+		// so truncated responses reach the success report despite an incomplete feed.
+		// Check non-EOF errors first and return DecodeElement failures instead of
+		// exiting. Track partial publication explicitly and retry idempotently with
+		// a bounded policy; otherwise interrupted downloads silently lose the tail.
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break

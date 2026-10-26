@@ -15,6 +15,12 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
+		// Performance Review [Set L] [PR107] [P1] (realtime): Decoder errors can return a nil token,
+		// so this condition treats truncated XML/gzip input as successful partial
+		// data. Check non-EOF errors first and return them, including DecodeElement
+		// errors, instead of exiting the process. Do not apply/ack a partial frame;
+		// bounded frame size and classified retry/quarantine avoid a corrupt feed
+		// causing silent loss or repeated process restarts during catch-up.
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break

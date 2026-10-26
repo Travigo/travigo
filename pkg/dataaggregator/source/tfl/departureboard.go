@@ -97,6 +97,12 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if realtimePerStopLimit > tflRealtimeBoardMaximumPerStop {
 		realtimePerStopLimit = tflRealtimeBoardMaximumPerStop
 	}
+	// Performance Review [Set G] [PR025] [P1] (boards): This window and the later cutoff use now,
+	// ignoring q.StartDateTime, while scheduled backfill uses the requested datetime.
+	// Future/historical boards can therefore be filled with today's live arrivals.
+	// Gate realtime to the requested window/run date and validate its horizon before
+	// fetching; keep Redis expiry cleanup tied to actual time, not a future query's
+	// lower bound, because the reader currently removes everything before from.
 	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneysBounded(
 		context.Background(),
 		allStopIDS,

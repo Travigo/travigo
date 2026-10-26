@@ -42,6 +42,11 @@ func getJourney(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
+		// Performance Review [Set C] [PR001] [P2]: realtime_only still hydrates the outer static
+		// Journey before returning a separately fetched RealtimeJourney. Skip unused outer
+		// enrichment for that branch while preserving nested journey fields/tracks required
+		// by the selected realtime response view and existing missing-journey behaviour.
+		// Full responses could also batch unique stops instead of fetching them per leg.
 		journey.GetReferences()
 		journey.GetDeepReferences()
 

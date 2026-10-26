@@ -41,6 +41,12 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 	}
 
 	realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", identifier.StartDate, identifier.TrainUID)
+	// Performance Review [Set J] [PR110] [P2] (realtime): This read fetches the full runtime path,
+	// location, description, allocation and loading, including rail enrichment,
+	// before replacing Trains. Use a narrow existence/mapping/allocation read that
+	// preserves needed formation metadata and the allocation TTL; batch independent
+	// reads. Distinguish Redis failures from absence so outages do not trigger the
+	// static MongoDB reconstruction path for every incoming consist.
 	realtimeJourney, _ := realtimestore.FindByIdentifier(ctx, realtimeJourneyID)
 	realtimeJourneyCreated := false
 

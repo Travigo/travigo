@@ -39,6 +39,11 @@ type VehicleJourney struct {
 }
 
 func (v *VehicleJourney) GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(ID string) *VehicleJourneyTimingLink {
+	// Performance Review [Set F] [PR061] [P2] (batch): This linear scan runs for every pattern link
+	// of every departure, producing quadratic work when both link lists are long.
+	// Build a per-journey override index once, preserving the current first-match
+	// rule for duplicate references; return stable read-only entries rather than
+	// repeatedly copying a range value into an escaping pointer.
 	for _, vehicleJourneyTimingLink := range v.VehicleJourneyTimingLinks {
 		if vehicleJourneyTimingLink.JourneyPatternTimingLinkRef == ID {
 			return &vehicleJourneyTimingLink

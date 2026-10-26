@@ -74,6 +74,11 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	stationStopGroupsMutex := sync.Mutex{}
 
 	if len(naptanDoc.StopAreas) > 0 {
+		// Performance Review [Set O] [PR044] [P2] (batch): Both area and stop loops launch a worker
+		// for every 5,000-record batch at once. As the feed grows, all converted
+		// models can remain resident beside parsed XML and compete for MongoDB
+		// connections. Use a fixed worker pool with a byte/count-bounded writer,
+		// apply backpressure to conversion, and budget station assembly separately.
 		batchSize := defaultStopGroupBatchSize
 		numBatches := (len(naptanDoc.StopAreas) + batchSize - 1) / batchSize
 		processingGroup := sync.WaitGroup{}
@@ -118,6 +123,12 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 				atomic.AddUint64(&stopGroupsOperationInsert, localOperationInsert)
 				if len(stopGroupOperations) > 0 {
+					// Performance Review [Set H] [PR045] [P1] (batch): All three bulk-write phases log
+					// failures and still report success, with counts incremented before
+					// acknowledgement. The manager can then delete unchanged old rows
+					// for failed batches and record the new hash. Collect worker errors,
+					// cancel/drain safely, and gate cleanup/publication on confirmed writes;
+					// handle partial unordered-batch success without duplicating retries.
 					if _, err := stopGroupsCollection.BulkWrite(context.Background(), stopGroupOperations, bulkOpts); err != nil {
 						log.Error().Err(err).Msg("Failed to bulk write StopGroups")
 					}

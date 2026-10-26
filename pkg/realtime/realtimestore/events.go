@@ -46,6 +46,12 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 		return
 	}
 
+	// Performance Review [Set A] [PR121] [P1] (tracker): rmq v5.2.0 OpenQueue does not reuse handles:
+	// it issues SADD and appends a new queue to connection.openQueues on every call.
+	// Calling it for each event publication retains another handle for the same name,
+	// so long-running tracker processes accumulate memory with state-change volume.
+	// Open/inject one events queue per connection at startup and reuse it safely;
+	// reset it on reconnect and verify a sustained run keeps retained handles bounded.
 	eventQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
 	if err != nil {
 		log.Error().Err(err).Str("id", current.PrimaryIdentifier).Msg("Failed to open events queue")
@@ -53,6 +59,13 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 	}
 
 	payloads := make([][]byte, 0, len(events))
+	// Performance Review [Set Q] [PR122] [P2] (tracker): Each event embeds the full current journey;
+	// tracker snapshots include hydrated geometry and stops, bypassing the compact
+	// Redis storage representation. Several changes in one update serialize that
+	// same graph repeatedly and enlarge queue storage/downstream decoding. Define a
+	// versioned compact event snapshot with notification/filter fields, or reference
+	// an immutable versioned snapshot. A pointer to mutable latest state would lose
+	// event-time meaning, and existing subscription expressions need compatibility.
 	for _, event := range events {
 		eventBytes, err := json.Marshal(event)
 		if err != nil {
@@ -220,6 +233,13 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 	}
 	maximumDelay := time.Duration(0)
 	delayedStop := ""
+	// Performance Review [Set A] [PR123] [P2] (tracker): Each path call uses RealtimeStop, whose
+	// missing-key fallback scans the entire Stops map. Partial predictions therefore
+	// make both previous/current delay scans approach quadratic work even when all
+	// stored keys are canonical. Normalise legacy occurrences once on read and index
+	// missing lookups cheaply; preserve repeated-stop compatibility rather than simply
+	// dropping the fallback. Consider reusing an unchanged delay summary and measure
+	// long routes with partially populated stop maps.
 	for pathIndex, path := range realtimeJourney.Journey.Path {
 		if path == nil {
 			continue

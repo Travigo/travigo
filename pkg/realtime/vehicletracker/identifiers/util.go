@@ -42,6 +42,12 @@ func findPrimaryIdentifiers(collection *mongo.Collection, query bson.M, limit in
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
 	var journeys []*ctdf.Journey
 
+	// Performance Review [Set J] [PR147] [P2] (tracker): SIRI identification can execute this query
+	// for trip IDs, block IDs, and endpoints during one miss. The exclusion projection
+	// removes per-leg tracks but still permits whole-journey Track and unrelated rich
+	// fields. Use an explicit lightweight identification projection/model, retaining
+	// every field needed by availability, functional hashing, direction, endpoints,
+	// and time narrowing. Measure decoded bytes/candidate counts for each fallback.
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "otheridentifiers", Value: 0},

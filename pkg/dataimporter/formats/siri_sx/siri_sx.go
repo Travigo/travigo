@@ -45,6 +45,11 @@ func (s *SiriSX) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
+		// Performance Review [Set L] [PR049] [P1] (realtime): As in the other streaming XML feeds,
+		// nil tokens can accompany parse errors, so truncation is reported as a
+		// successful import. Return non-EOF/DecodeElement errors, retain the partial
+		// enqueue outcome, and use bounded idempotent retries instead of treating
+		// an interrupted snapshot as complete or restarting the whole process.
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break
@@ -136,6 +141,13 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 	title := situationElement.Summary
 	description := situationElement.Description
 
+	// Performance Review [Set L] [PR050] [P1] (batch): Batch snapshots can contain distinct
+	// situations with identical text/type/validity but different affected lines or
+	// stops. This content-derived ID ignores ParticipantRef/SituationNumber and
+	// targets, so downstream upserts overwrite one alert with another. Prefer stable
+	// provider situation identity and version for deduplication; use a canonical
+	// target-aware fallback only when absent, preserving updates/withdrawals rather
+	// than merging unrelated alerts merely to reduce queue/database work.
 	localIDhash := siriSXServiceAlertHash(alertType, title, description)
 
 	updateEvent := vehicletracker.VehicleUpdateEvent{
@@ -162,6 +174,11 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		log.Error().Err(marshalErr).Str("localID", updateEvent.LocalID).Msg("Failed to marshal SIRI-SX update event, skipping")
 		return false
 	}
+	// Performance Review [Set M] [PR051] [P1] (realtime): A failed publish still returns true, so
+	// the importer reports alerts submitted during Redis failure. Propagate enqueue
+	// errors and batch bounded groups in Import. A successfully-published version
+	// cache can also suppress unchanged snapshots before repeated downstream matching;
+	// include affected stops/services and validity changes, and never cache failures.
 	queue.PublishBytes(updateEventJson)
 
 	return true

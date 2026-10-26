@@ -45,6 +45,12 @@ type TrustMovement struct {
 }
 
 func (m *TrustMovement) Process(stompClient *StompClient) {
+	// Performance Review [Set L] [PR112] [P1] (realtime): ActualTimestamp is ignored and receipt
+	// time becomes both observed arrival/departure time and freshness. Catch-up
+	// therefore makes old movements appear current and can regress next-stop state.
+	// Parse source event time, retain ingest time separately, and deduplicate/order
+	// per run and call while honoring CorrectionInd. Use planned-call identity to
+	// distinguish repeat visits before dropping apparently stale/replayed updates.
 	now := time.Now()
 
 	realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "TrainID", m.TrainID)
@@ -56,6 +62,12 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
+	// Performance Review [Set J] [PR113] [P2] (realtime): After resolving Redis state, each movement
+	// with a scheduled-journey reference reads the full MongoDB Journey, although the
+	// stored runtime path already has stop references. Use that compact path where
+	// sufficient, or cache immutable static paths/occurrence indices by timetable version.
+	// Refresh on VSTP changes and fetch only missing fields; measure static reads per
+	// accepted movement. Synthetic journeys already skip this static read.
 	realtimestore.LoadStaticJourney(context.Background(), realtimeJourney)
 
 	if realtimeJourney.Journey == nil {
@@ -143,6 +155,12 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	}
 
 	// Create update
+	// Performance Review [Set L] [PR114] [P1] (realtime): This replaces the complete shared run
+	// snapshot after a separate read. Concurrent Darwin status/schedule writes can
+	// be erased by this older NROD copy, including platform/cancellation changes.
+	// Define field ownership and use atomic patches or compare-and-swap with merge
+	// retries across processors/processes; a local worker mutex is insufficient.
+	// Return write errors and derive events from the successfully committed state.
 	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
 
 	log.Debug().

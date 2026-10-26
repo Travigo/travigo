@@ -150,6 +150,12 @@ func subscriptionsForCommute(ctx context.Context, commute ctdf.UserCommute, now 
 		log.Warn().Err(firstError(arrivalErr, returnErr)).Str("commute", commute.PrimaryIdentifier).Msg("Skipping commute with invalid clock time")
 		return nil
 	}
+	// Performance Review [Set Q] [PR091] [P2]: Each subscription reload replans both directions for
+	// every active commute; arrive-by planning can invoke several graph searches.
+	// Cache legs by commute, service date, and timetable version, refreshing changed
+	// or relevant upcoming commutes and revalidating disruption-sensitive data.
+	// Use a bounded background work budget and keep the previous usable subscription
+	// snapshot during refresh; measure planner load as saved commutes grow.
 	queries := []query.JourneyPlan{
 		{Context: ctx, OriginStop: origin, DestinationStop: destination, Count: 1, StartDateTime: arrivalBy.Add(-12 * time.Hour), ArrivalByDateTime: arrivalBy, MaxChanges: 3, MaxJourneyDuration: 12 * time.Hour, MaxTransferDistanceMetres: 1000, MaxExpandedLabels: 200000, MaxSearchDuration: 10 * time.Second},
 		{Context: ctx, OriginStop: destination, DestinationStop: origin, Count: 1, StartDateTime: returnDeparture, MaxChanges: 3, MaxJourneyDuration: 12 * time.Hour, MaxTransferDistanceMetres: 1000, MaxExpandedLabels: 200000, MaxSearchDuration: 10 * time.Second},

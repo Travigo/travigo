@@ -24,6 +24,11 @@ func (transXChange *TransXChange) ParseFile(reader io.Reader) error {
 
 	for {
 		tok, err := d.Token()
+		// Performance Review [Set H] [PR062] [P1] (batch): A nil token can carry a decoding error,
+		// so truncated XML is accepted as a successful partial document. A document
+		// with no TransXChange root also bypasses Validate entirely. Require the expected
+		// complete root and clean EOF, return all parse errors, and prevent dataset cleanup/
+		// version publication on partial input. Cover missing roots and truncated documents.
 		if tok == nil || err == io.EOF {
 			// EOF means we're done.
 			break

@@ -63,6 +63,13 @@ func (s *StompClient) StartTrainMovementSubscription(conn *stomp.Conn) {
 				log.Fatal().Str("queue", queueName).Err(err).Msg("STOMP error")
 			}
 
+			// Performance Review [Set M] [PR115] [P1] (realtime): Frames run without an in-flight
+			// limit under AckAuto. A later movement can beat its activation, find no
+			// TrainID mapping and be lost; slow storage also grows concurrent work.
+			// Use bounded workers ordered per train run, a bounded retry for missing
+			// activations, and acknowledgement after durable success. Apply the same
+			// backpressure to VSTP below, ordered by UID/date for create/delete events;
+			// return processing errors so overload is retried rather than discarded.
 			go s.ParseTrainMovementMessages(msg.Body)
 		}
 	}
@@ -137,6 +144,11 @@ func (s *StompClient) ParseVSTPMessages(messagesBytes []byte) {
 
 	vstpMessage.Process(s)
 
+	// Performance Review [Set B] [PR116] [P2] (realtime): Every VSTP message also synchronously
+	// inserts both its raw payload and parsed representation as diagnostic data.
+	// Measure this write/byte volume separately from timetable persistence; sample
+	// or batch diagnostics with bounded buffering and explicit retention. A slow
+	// diagnostic sink must not keep an unbounded set of processing goroutines alive.
 	collection := database.GetCollection("datadump")
 	collection.InsertOne(context.Background(), bson.M{
 		"type":             "vstp",

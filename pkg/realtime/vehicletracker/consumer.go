@@ -109,6 +109,13 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 
 	serviceAlertOperations := make([]mongo.WriteModel, 0, len(payloads))
 
+	// Performance Review [Set M] [PR140] [P2] (tracker): A consumer handles up to 200 deliveries
+	// serially, including identification, cold-cache hydration, Redis, and telemetry.
+	// There is no total per-event work budget: Background contexts and expensive
+	// fallback searches can delay the whole batch. Propagate bounded contexts through
+	// those stages, distinguish timeouts from genuine no-match results, and consider
+	// bounded work lanes keyed by journey before increasing prefetch or concurrency.
+	// Measure event age and slow-stage time, not just deliveries per batch.
 	for _, payload := range payloads {
 		var vehicleUpdateEvent *VehicleUpdateEvent
 		if err := json.Unmarshal([]byte(payload), &vehicleUpdateEvent); err != nil || vehicleUpdateEvent == nil {
@@ -174,6 +181,12 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 		}
 	}
 
+	// Performance Review [Set M] [PR141] [P2] (tracker): rmq v5.2.0 Deliveries.Ack loops serially
+	// over deliveries, issuing one LREM each. A 200-item batch needs 200 initial Redis
+	// calls, plus retries for dependency errors; Ack stops retrying on success,
+	// ErrorNotFound or consuming shutdown. The consumer cannot process its next batch
+	// while acknowledgement stalls. Profile this separately and evaluate batching with
+	// per-delivery outcomes and unchanged retry semantics.
 	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
 		for _, err := range ackErrors {
 			log.Fatal().Err(err).Msg("Failed to consume realtime event")
@@ -246,6 +259,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 	operatorRef := identifyingInformation["OperatorRef"]
 
+	// Performance Review [Set L] [PR142] [P1] (tracker): This Lua check orders admission, not commits.
+	// Two workers can accept older then newer observations but save them in reverse
+	// order; different LocalIDs can also resolve to the same journey. SaveRealtimeJourney
+	// has no source-version check to reject the older snapshot. Before adding parallelism,
+	// serialize by canonical journey/run or use a commit version check spanning state,
+	// location, history and emitted events. Keep independent location/prediction streams
+	// distinct where their timestamps differ.
 	journeyID, mappingFound, err := touchExistingIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, vehicleUpdateEvent.RecordedAt)
 	if err != nil {
 		log.Warn().Err(err).Str("local_id", vehicleUpdateEvent.LocalID).Msg("Failed to read realtime identification mapping")
@@ -303,6 +323,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 				return locationJourneyID
 			}
 
+			// Performance Review [Set J] [PR143] [P2] (tracker): The same 90-minute negative cache covers
+			// missing timetable data, ambiguous matches, and dependency failures returned
+			// by identification; subsequent observations skip identification entirely.
+			// Separate transient failures from confirmed no-match results, using short,
+			// jittered retry windows and timetable-version invalidation for the latter.
+			// Coalesce retries so recovery does not create a database stampede, and avoid
+			// trading lower query counts for vehicles disappearing after brief failures.
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
 			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
 
@@ -422,6 +449,12 @@ func realtimeIdentificationMappingKey(localID string) string {
 }
 
 func (consumer *BatchConsumer) recordSiriIdentificationOutcome(event *VehicleUpdateEvent, information map[string]string, success bool, outcome string) {
+	// Performance Review [Set B] [PR144] [P2] (tracker): Even cached, stale, and suppressed SIRI
+	// observations marshal an Elasticsearch document here. IndexRequest uses a bulk
+	// indexer, but Add blocks when its queues fill and receives Background context,
+	// so diagnostic backpressure can stop vehicle processing. Prefer counters plus
+	// bounded sampling for routine outcomes, skip disabled telemetry before encoding,
+	// and give diagnostic enqueueing its own bounded/drop policy with loss metrics.
 	if event == nil || event.SourceType != "siri-vm" {
 		return
 	}

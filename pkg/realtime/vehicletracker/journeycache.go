@@ -11,6 +11,12 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// Performance Review [Set J] [PR148] [P2] (tracker): This limit is per consumer: five independent
+// caches per process can retain the same journeys, stops, services, and geometry,
+// with no affinity routing to keep updates on a warm cache. Share immutable static
+// records within a process, coalesce concurrent misses, and cache reusable tracks
+// by TrackRef. Bound retained bytes as well as entry count, and invalidate/version
+// timetable data; keep mutable realtime state outside the shared cache.
 const trackedJourneyCacheMaxEntries = 1000
 
 type cachedTrackedJourney struct {
@@ -36,6 +42,12 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 		return nil, err
 	}
 
+	// Performance Review [Set J] [PR149] [P2] (tracker): Every cold journey hydrates full destination
+	// stop documents, tracks, and service data, including GTFS updates containing only
+	// stop times and no position. Split lightweight schedule/occurrence metadata from
+	// geometry, loading geometry only when matching actually needs it. For matching,
+	// project stop identifiers/aliases and location rather than retaining whole stop
+	// documents. Keep separately enriched API/event views compatible with consumers.
 	if err := hydrateDestinationStops(journey); err != nil {
 		log.Warn().Err(err).Str("journey", journeyID).Msg("Failed to hydrate journey destination stops")
 	}
@@ -154,6 +166,11 @@ func (consumer *BatchConsumer) loadLocation(name string) *time.Location {
 }
 
 func (consumer *BatchConsumer) pruneJourneyCacheLocked() {
+	// Performance Review [Set A] [PR150] [P2] (tracker): Once full, inserting a new journey copies
+	// and sorts 1,001 cache entries under the write lock to evict one, making each
+	// eviction O(N log N) with an O(N) temporary allocation. Use an O(1) LRU or bounded
+	// clock eviction structure and a monotonic access sequence instead of source
+	// observation time. Measure churn, retained bytes and hit rate before raising capacity.
 	if len(consumer.journeyCache) <= trackedJourneyCacheMaxEntries {
 		return
 	}

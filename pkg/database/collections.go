@@ -150,6 +150,11 @@ func createOSMStopIndexes() {
 
 func createStopsIndexes() {
 	// Stops
+	// Performance Review [Set N] [PR026] [P2] (indexing): indexStopsFromMongo scans by
+	// datasource.datasetid, but the declared stop indexes do not support that filter.
+	// Check explain on a full rebuild and consider a dataset/active index together
+	// with filtering inactive stops in Mongo and projecting only search/enrichment
+	// fields; otherwise each dataset can trigger another full stop collection scan.
 	stopsCollection := GetCollection("stops")
 	stopsIndex := []mongo.IndexModel{
 		{

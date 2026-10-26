@@ -129,6 +129,12 @@ func (g *Graph) save(path string, data *graphData) error {
 		return err
 	}
 
+	// Performance Review [Set P] [PR085] [P2] (indexing): The graph read lock spans gob encoding,
+	// compression and writes of the entire snapshot. A waiting fill/build writer then
+	// also blocks new readers on the RWMutex, so checkpoint I/O can stall boards and
+	// planning. Measure lock wait during saves; checkpoint immutable chunks or a
+	// bounded consistent view without copying the whole graph or holding this lock
+	// across slow storage operations.
 	data.mu.RLock()
 	err = gob.NewEncoder(compressor).Encode(snapshotFile{
 		Version:                snapshotVersion,
@@ -226,6 +232,11 @@ func (g *Graph) restore(path string) error {
 	}
 	legacyDepartures := snapshot.Boardings == nil
 
+	// Performance Review [Set P] [PR086] [P2] (indexing): Complete current-format snapshots recreate
+	// and populate the full StringIDs/JourneyIDs maps only to release them at the end.
+	// Those temporary maps raise startup peak memory alongside decoded graph arrays.
+	// Build them only for migration/resumed construction paths that need them, and
+	// measure cold-start peak RSS as well as the much smaller post-seal heap.
 	restored := &graphData{
 		Strings:                snapshot.Strings,
 		StringIDs:              make(map[string]stringID, len(snapshot.Strings)),

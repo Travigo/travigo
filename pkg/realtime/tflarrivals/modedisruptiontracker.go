@@ -96,6 +96,11 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 
 		var serviceAlert *ctdf.ServiceAlert
 
+		// Performance Review [Set L] [PR138] [P2] (realtime): Each poll looks up each incoming alert
+		// before its bulk upsert; GetLineStatuses repeats this pattern. Use explicit
+		// $setOnInsert fields for creation metadata and $set for mutable fields to remove
+		// these serial reads. Preserve snapshot-seen markers/expiry when suppressing
+		// unchanged content, then clean up only after all writes succeed.
 		serviceAlertsCollection.FindOne(context.Background(), searchQuery).Decode(&serviceAlert)
 
 		alertText := strings.ReplaceAll(tflDisruption.Description, "\\n", "")
@@ -349,6 +354,12 @@ func (d *ModeDisruptionTracker) cleanupOldServiceAlerts(datasource *ctdf.DataSou
 
 	// Remove any tfl service alerts that wasnt updated in this run
 	// This means its dropped off all the stop arrivals (most likely as its finished)
+	// Performance Review [Set L] [PR139] [P2] (realtime): DataSourceReference stores providername,
+	// not provider, so this selector misses current-format alerts and leaves stale
+	// rows for later expiry/read filtering. Correct the stored-field selector, but
+	// also gate cleanup on a validated complete HTTP snapshot: both callers ignore
+	// status/decode errors, so fixing only the selector could delete valid alerts
+	// on a failed poll. Check DeleteMany errors before dereferencing its result.
 	deleteQuery := bson.M{
 		"datasource.provider":  datasource.ProviderName,
 		"datasource.datasetid": datasource.DatasetID,

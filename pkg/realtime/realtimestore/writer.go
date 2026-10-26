@@ -220,6 +220,11 @@ func IndexTFLDepartureBoardJourney(ctx context.Context, realtimeJourney *ctdf.Re
 		currentStopIDs = append(currentStopIDs, stopRef)
 	}
 
+	// Performance Review [Set K] [PR129] [P2]: Each refresh removes/recreates all memberships and
+	// repeats sorted-set cleanup per journey. ZADD already updates existing scores:
+	// remove only departed memberships, update current scores, and consolidate stale
+	// cleanup per stop/polling cycle. Preserve expiry and earliest-arrival handling
+	// for repeated stops; measure Redis command volume at busy stations.
 	_, err = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		for _, stopID := range previousStopIDs {
 			pipe.ZRem(ctx, tflDepartureBoardStopKey(stopID), realtimeJourney.PrimaryIdentifier)
@@ -290,6 +295,12 @@ func updateLocation(ctx context.Context, identifier string, location ctdf.Locati
 }
 
 func realtimeJourneyTTL(ctx context.Context, identifier string) time.Duration {
+	// Performance Review [Set J] [PR130] [P2] (tracker): A location-only update GETs the entire
+	// realtime journey and scans its JSON just to read TimeoutDurationMinutes before
+	// writing a small location record. Keep expiration policy in compact metadata or
+	// pass/cache it from identification so GPS-only writes do not scale with route
+	// length. Preserve the distinction between the configured duration and remaining
+	// TTL; substituting PTTL would change the current location-renewal semantics.
 	result := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier))
 	if result.Err() != nil {
 		return defaultRealtimeJourneyTTL

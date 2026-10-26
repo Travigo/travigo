@@ -401,6 +401,12 @@ func newPlanQueue(data *graphData, destinationNodes map[uint32]bool, destination
 }
 
 func normalizePlanConfig(request PlanRequest) planConfig {
+	// Performance Review [Set E] [PR083] [P1]: Most public cost controls have defaults but no upper
+	// bounds: transfer radius, stop count, changes, labels, and search duration.
+	// Clamp these and apply one cancellation/deadline budget to nearby-stop discovery,
+	// corridor construction, expansion, and round setup; the current checks only
+	// bound the inner search loop. Also bound concurrent searches so expensive
+	// requests cannot monopolise the graph service. Profile worst-case inputs.
 	config := planConfig{count: request.Count, maxVehicleLegs: request.MaxChanges + 1, maxDuration: time.Duration(request.MaxJourneyDurationSeconds) * time.Second, maxTransferDistance: request.MaxTransferDistanceMetres, originStops: request.OriginLocationStopCount, maxExpandedLabels: request.MaxExpandedLabels, maxSearchDuration: time.Duration(request.MaxSearchDurationMillis) * time.Millisecond}
 	if config.count <= 0 {
 		config.count = defaultPlanCount

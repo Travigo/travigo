@@ -233,6 +233,11 @@ func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardT
 	if firstPathItem == nil {
 		return fallback
 	}
+	// Performance Review [Set C] [PR009] [P2] (boards): Arrival candidates perform a Mongo lookup
+	// for their origin before the final board limit; cancelled-terminal departures
+	// below also hydrate stops here. Many journeys share the same stop, but each
+	// decoded path repeats that read. Collect display references and batch-resolve
+	// them once for the selected entries, including service name overrides.
 	firstPathItem.GetOriginStop()
 	if firstPathItem.OriginStop != nil && firstPathItem.OriginStop.PrimaryName != "" {
 		return firstPathItem.OriginStop.PrimaryName
@@ -322,6 +327,12 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	generationStart := time.Now()
 	inputJourneyCount := len(journeys)
 
+	// Performance Review [Set G] [PR010] [P1] (boards): Deduplication chooses the first timetable
+	// hash before realtime/cancellation lookup. Two equivalent journeys with distinct
+	// IDs lose the second one's live update or cancellation if only that ID is mapped.
+	// Select a deterministic representative after resolving run-specific realtime
+	// identity; also preserve differences in pickup/setdown permissions and platforms,
+	// which GenerateFunctionalHash currently omits.
 	journeys = FilterIdenticalJourneys(journeys, true)
 	uniqueJourneyCount := len(journeys)
 	if realtimeLookup == nil {
@@ -343,6 +354,11 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	for _, stopRef := range stopRefs {
 		stopRefsSet[stopRef] = struct{}{}
 	}
+	// Performance Review [Set K] [PR011] [P2] (boards): Every board generation creates its own
+	// pool of up to GOMAXPROCS workers and updates shared atomic counters per candidate.
+	// Benchmark sequential/chunked generation for short paths and a shared concurrency
+	// budget under simultaneous polling; per-request worker limits do not bound total
+	// database reads or CPU work, and all candidates are retained until Wait completes.
 	p := pool.NewWithResults[*DepartureBoard]()
 	maxGoroutines := runtime.GOMAXPROCS(0)
 	if len(journeys) < maxGoroutines {
@@ -366,6 +382,11 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 
 			if journey.Availability.MatchDate(dateTime) {
 				availabilityMatchedCount.Add(1)
+				// Performance Review [Set G] [PR012] [P1] (boards): Both path loops select the first
+				// matching stop, even when a later visit is the next usable call. A board
+				// at 10:30 drops a looping journey calling here at 10:00 and 11:00.
+				// Carry the selected stop occurrence through cutoff, activity, realtime
+				// matching and deduplication instead of returning for the whole journey.
 				// TODO(medium-risk): This 4-hour-cutoff loop and the detail-extraction
 				// loop below both scan journey.Path and break on the first stopRef match. They could
 				// be merged into a single pass, but the realtime-journey assignment currently sits
@@ -387,6 +408,11 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					}
 				}
 
+				// Performance Review [Set G] [PR013] [P1] (boards): Lookup is keyed only by journey ID,
+				// and JourneyRunDate is not checked here. Tomorrow/historical boards can
+				// inherit today's cancellation or absolute predicted times, dropping or
+				// mislabelling recurring services. Match the operating service date
+				// before applying realtime, including block estimates and overnight runs.
 				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.SuppressFromDepartures || prefetchedRealtimeJourney.IsActive()) {
 					journey.RealtimeJourney = prefetchedRealtimeJourney
 					prefetchedRealtimeAppliedCount.Add(1)
@@ -562,6 +588,11 @@ func applyBlockEstimates(entries []*DepartureBoard, dateTime time.Time, doEstima
 
 		candidates = append(candidates, blockEstimateCandidate{entry: entry, blockKey: blockKey})
 		journeyByBlock[blockKey] = entry.Journey
+		// Performance Review [Set G] [PR014] [P2] (boards): Imported service clocks use year 0,
+		// which is before the missing map entry's zero Time (year 1). This comparison
+		// therefore never initializes their maximum, so the query's upper bound
+		// admits the entire block, including later trips. Initialize using map presence
+		// before comparing, and cover both ordinary and beyond-midnight service clocks.
 		if entry.Journey.DepartureTime.After(maxDepartureByBlock[blockKey]) {
 			maxDepartureByBlock[blockKey] = entry.Journey.DepartureTime
 		}
@@ -571,6 +602,11 @@ func applyBlockEstimates(entries []*DepartureBoard, dateTime time.Time, doEstima
 		return stats
 	}
 
+	// Performance Review [Set K] [PR015] [P2] (boards): The batched query fetches block members
+	// without checking service-day availability. Each board candidate then copies/scans
+	// its predecessor list and Redis loads all unique IDs selected for lookup.
+	// Reuse a dataset/version/date-scoped block index, select eligible predecessors in
+	// order with a bounded search, and verify their run dates before carrying delays.
 	blockClauses := make([]bson.M, 0, len(journeyByBlock))
 	for blockKey, journey := range journeyByBlock {
 		clause := bson.M{

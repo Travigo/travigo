@@ -359,6 +359,12 @@ func (v *VSTPMessage) processCreate() {
 		}
 
 		// Convert this to ctdf
+		// Performance Review [Set L] [PR117] [P1] (realtime): Concurrent VSTP frames call the CIF
+		// converter, whose package-global stopTIPLOCCache/missingStopTIPLOCCache are
+		// ordinary maps read and written without synchronization. Concurrent cold
+		// resolutions can race or panic. Give conversion a shared immutable/versioned
+		// stop snapshot or synchronize/coalesce cache fills before adding concurrency;
+		// a new CommonInterfaceFormat value does not isolate those package globals.
 		cifDoc := cif.CommonInterfaceFormat{}
 		journey := cifDoc.CreateJourneyFromTraindef(journeyID, trainDefinitionSet)
 		journey.DataSource = &ctdf.DataSourceReference{
@@ -370,6 +376,11 @@ func (v *VSTPMessage) processCreate() {
 		}
 		journey.Expiry = endDate.Add(48 * time.Hour)
 
+		// Performance Review [Set I] [PR118] [P1] (realtime): Invalidation precedes the bulk write
+		// below. A board request can refill its cache from the old timetable during
+		// that gap and retain it for the full TTL. Collect old/new affected stops and
+		// invalidate after successful publication to both collections, using a version
+		// fence to prevent an in-flight old reader refilling the new cache generation.
 		cacheBustJourney(journey)
 
 		// Insert into DB

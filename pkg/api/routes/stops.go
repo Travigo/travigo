@@ -264,6 +264,10 @@ func getStopArrivals(c *fiber.Ctx) error {
 func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	requestStart := time.Now()
 	stopIdentifier := c.Params("identifier")
+	// Performance Review [Set E] [PR003] [P1] (boards): Parsing alone accepts negative and arbitrarily
+	// large counts. A negative value panics at departureBoard[:count], while a large
+	// value expands candidate reads and enrichment. Validate a positive bounded count
+	// before any stop lookup, using the same contract for arrivals and departures.
 	count, err := strconv.Atoi(c.Query("count", "25"))
 	startDateTimeString := c.Query("datetime")
 	isLLM := strings.ToLower(c.Query("isllm"))
@@ -289,6 +293,11 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 		})
 	}
 
+	// Performance Review [Set G] [PR004] [P1] (boards): Explicit RFC3339 inputs keep the caller's
+	// offset, but downstream calendar matching and service clocks use its date/zone.
+	// Equivalent instants in UTC and the stop's zone can therefore select different
+	// services/times. Resolve a valid stop timezone once and normalize both input
+	// paths to it; handle invalid zone names before calling Time.In.
 	var startDateTime time.Time
 	if startDateTimeString == "" {
 		stopTimezone, _ := time.LoadLocation(stop.Timezone)
@@ -315,6 +324,10 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 		Type:          boardType,
 	})
 	departureLookupDuration := time.Since(departureLookupStart)
+	// Performance Review [Set G] [PR005] [P1] (boards): The lookup error is ignored and later
+	// overwritten by marshaling, so an unavailable source appears as an HTTP 200
+	// empty board. Propagate a useful failure before sorting/enriching, preserving
+	// any explicit degraded-source policy instead of silently reporting no service.
 	beforeSortCount := len(departureBoard)
 
 	// Sort departures by DepartureBoard time
@@ -383,6 +396,11 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 }
 
 func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
+	// Performance Review [Set C] [PR006] [P2] (boards): Missing displays cause serial FindOne calls
+	// per distinct destination and service; nil results are looked up repeatedly.
+	// Batch the final board's stop references and reuse the service hydration below,
+	// with explicit negative entries in the request cache. Keep projections narrow
+	// and preserve alias/platform matching and service-specific display overrides.
 	destinationFallbacks := 0
 	destinationServiceOverridesApplied := 0
 	destinationStopsByRef := map[string]*ctdf.Stop{}
@@ -618,6 +636,10 @@ func loadServicesByReferences(refs map[string]struct{}) map[string]*ctdf.Service
 		return servicesByID
 	}
 
+	// Performance Review [Set C] [PR007] [P2] (boards): This final-board batch reads complete service
+	// documents, including routes, although the response needs only display fields.
+	// Project fields required by transforms and the selected response view; avoid
+	// decoding large route arrays again for every short board poll.
 	cursor, err := database.GetCollection("services").Find(context.Background(), bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
@@ -726,6 +748,11 @@ func searchStops(c *fiber.Ctx) error {
 		return nil
 	}
 
+	// Performance Review [Set D] [PR008] [P2] (indexing): Close the response body and check HTTP,
+	// read and decode errors before treating this as search results. hits.total.value
+	// is numeric, but the struct below declares string and ignores the decode error;
+	// ES failures and partial decodes can consequently look like successful empties.
+	// Use a request deadline and omit pretty formatting on this hot JSON path.
 	responseBytes, _ := io.ReadAll(res.Body)
 
 	var responseStruct struct {

@@ -30,6 +30,12 @@ type DateRange struct {
 
 // This is a bit hacky and doesn't seem like the best way of doing it but it works
 func (operatingProfile *OperatingProfile) ToCTDF(servicedOrganisations []*ServicedOrganisation) (*ctdf.Availability, error) {
+	// Performance Review [Set F] [PR054] [P1] (batch): Import workers call this on shared service/
+	// journey-pattern profiles, but the receiver slices are reset and appended without
+	// synchronization. Concurrent calls race while reparsing the same XML and rebuilding
+	// the organisation map for every departure. Parse each profile into immutable rules
+	// before dispatch, use one organisation index, and copy availability before adding
+	// per-journey conditions. Keep service/pattern/journey override precedence intact.
 	ctdfAvailability := ctdf.Availability{}
 
 	// build a single OrganisationCode -> *ServicedOrganisation lookup map

@@ -442,6 +442,11 @@ func (g *Graph) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, serv
 		return filterJourneyWindow(pending.(*pendingStopFill).journeys, stopRefs, serviceDate, notBefore, limit), nil
 	}
 
+	// Performance Review [Set E] [PR071] [P2] (indexing): Coalesced callers synchronously wait on
+	// Do even after their own context expires, while the first caller's context owns
+	// the shared database load. Separate a bounded fill lifetime from each waiter's
+	// cancellation (for example DoChan plus select), so one cancelled request neither
+	// fails healthy followers nor leaves cancelled followers occupying handlers.
 	value, err, _ := g.fills.Do(fillKey, func() (any, error) {
 		active := g.current.Load()
 		if active.stopComplete(day, canonical) {
@@ -554,6 +559,11 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	if !configured || !matching {
 		next.setScanProgress(dates, cursor, processed, active)
 	}
+	// Performance Review [Set I] [PR072] [P1] (indexing): TopologyReady never becomes false after
+	// a successful load/restore. Stop aliases, coordinates and transfer changes from
+	// later imports therefore never refresh, even as journey days advance. Track
+	// stop/transfer dataset generations separately and republish their dependent
+	// routing indexes consistently when those inputs change.
 	if !next.topologyReady() {
 		if topologyLoader, ok := g.loader.(TopologyLoader); ok {
 			if err := next.loadTopology(ctx, topologyLoader); err != nil {
@@ -561,6 +571,12 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 			}
 		}
 	}
+	// Performance Review [Set I] [PR073] [P1] (indexing): A successful refresh only scans dates not
+	// already in CompleteDays. Updating/removing/adding timetables for an existing
+	// complete date has no effect; a same-day rebuild can report success with no
+	// refreshed journeys. Scope completeness and scan cursors to the published
+	// timetable generation, and replace affected day indexes when that generation
+	// changes instead of treating completion as permanent freshness.
 	missingDates := next.missingRollingDates(dates)
 	g.metrics.build.begin(processed, active)
 	defer func() { g.metrics.build.finish(err) }()
@@ -716,6 +732,12 @@ func (d *graphData) completeRollingScan(dates []time.Time) {
 			delete(d.CompleteDays, day)
 		}
 	}
+	// Performance Review [Set P] [PR074] [P1]: Compaction, bucket sorting, and routing-index rebuilds
+	// all run under the graph-wide write lock, blocking boards and route searches;
+	// long searches can also delay maintenance. Investigate incremental rebuilding
+	// or publishing prepared immutable sections under a short lock. Bound additional
+	// memory rather than duplicating the whole graph, and profile lock waiting and
+	// request tail latency during rolling completion.
 	d.compactRollingDaysLocked(keepDays)
 	d.sortDepartureBucketsLocked()
 	d.ScanDays = nil
@@ -742,6 +764,12 @@ func (d *graphData) sortDepartureBucketsLocked() {
 }
 
 func (d *graphData) compactRollingDaysLocked(keepDays map[dayKey]bool) {
+	// Performance Review [Set P] [PR075] [P2] (indexing): Expired days remove journey/path records,
+	// but Strings and StopIDs are never swept, and reslicing retains high-water array
+	// capacities. Unique timetable IDs/displays accumulate across rolling imports and
+	// remain in snapshots even after their journeys expire. Plan bounded generation/
+	// string compaction with reference remapping, and measure retained bytes and
+	// snapshot growth rather than only live journey counts.
 	if len(d.Journeys) == 0 || len(d.DayJourneys) == 0 {
 		for key := range d.Departures {
 			if !keepDays[key.Day] {
@@ -752,6 +780,11 @@ func (d *graphData) compactRollingDaysLocked(keepDays map[dayKey]bool) {
 	}
 
 	active := make([]bool, len(d.Journeys))
+	// Performance Review [Set I] [PR076] [P1] (indexing): JourneyDays is not pruned/remapped with
+	// DayJourneys and the journey-ID remap below. An off-window lazy fill can leave
+	// a membership for an evicted numeric ID; reloading that date and reusing the ID
+	// makes addJourneyLocked skip indexing a valid journey. Rebuild/prune both
+	// membership structures consistently and cover off-window fill/compact/refill.
 	for day, journeys := range d.DayJourneys {
 		if !keepDays[day] {
 			delete(d.DayJourneys, day)
@@ -973,6 +1006,11 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 	primaryID := d.intern(journey.PrimaryIdentifier)
 	key := journeyKey{PrimaryID: primaryID}
 	id, exists := d.JourneyIDs[key]
+	// Performance Review [Set I] [PR077] [P1] (indexing): Reusing an ID also reuses its old path and
+	// metadata indefinitely. A timetable update under the same ID is ignored even
+	// when indexing a newly added rolling day, while older days keep the ID alive.
+	// Version journey records by published dataset generation/content, retain the
+	// correct record for each day, and retire superseded records during compaction.
 	if !exists {
 		record := journeyRecord{
 			PrimaryID:          primaryID,
@@ -1111,6 +1149,11 @@ func (d *graphData) materializeStopWindow(day dayKey, stopRefs []string, notBefo
 			})
 		}
 	}
+	// Performance Review [Set K] [PR078] [P2]: This collects and sorts the whole remaining day
+	// before applying limit. Merge completed-day buckets in departure order and
+	// stop after enough distinct journeys, preserving the current tie ordering.
+	// Keep a full-scan path for incomplete/unsorted days and unlimited requests;
+	// measure candidate counts and latency at busy hubs.
 	sort.Slice(candidates, func(i, j int) bool {
 		if candidates[i].departureSeconds == candidates[j].departureSeconds {
 			return candidates[i].id < candidates[j].id
@@ -1120,6 +1163,12 @@ func (d *graphData) materializeStopWindow(day dayKey, stopRefs []string, notBefo
 	if limit > 0 && len(candidates) > limit {
 		candidates = candidates[:limit]
 	}
+	// Performance Review [Set K] [PR079] [P2]: Board candidates materialise every path leg, cross
+	// the service boundary as JSON, then have their paths scanned and hashed again.
+	// Consider compact departure results with stop occurrence, times, platform,
+	// destination, identifiers, and replacement metadata; enrich final entries after
+	// realtime filtering. Preserve overnight/repeated stops, cancellations, and
+	// duplicate suppression while measuring response bytes and allocations.
 	journeys := make([]*ctdf.Journey, 0, len(candidates))
 	for _, candidate := range candidates {
 		journeys = append(journeys, d.materializeJourney(candidate.id))
@@ -1155,6 +1204,11 @@ func filterJourneyWindow(journeys []*ctdf.Journey, stopRefs []string, serviceDat
 			if _, exists := requested[path.OriginStopRef]; !exists {
 				continue
 			}
+			// Performance Review [Set G] [PR080] [P2] (boards): Cold-fill filtering counts setdown-only
+			// calls toward limit, unlike the stored departure index. With limit=1 an
+			// earlier setdown call displaces the next boardable journey, so cold and
+			// warm requests differ. Apply the same activity/occurrence eligibility
+			// before truncation in both paths and test their result parity.
 			departureSeconds := serviceSeconds(path.OriginDepartureTime)
 			if hasThreshold && departureSeconds < threshold {
 				continue

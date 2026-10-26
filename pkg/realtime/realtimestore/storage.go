@@ -143,6 +143,12 @@ func storedJourneyFromCTDF(journey *ctdf.Journey, realtimeJourneyID string) *sto
 		return nil
 	}
 
+	// Performance Review [Set Q] [PR128] [P2]: Each full SaveRealtimeJourney copies/serialises
+	// the scheduled path even when only estimates or position changed; readers decode it
+	// again. Location-only updates already have a separate overlay write. Consider a
+	// versioned static-journey reference plus a smaller mutable record backed by static
+	// caches. Synthetic journeys still need their dynamic route; preserve timetable
+	// revisions, expiry and event comparisons. Profile payload bytes and allocations.
 	stored := &storedJourney{
 		PrimaryIdentifier:   journey.PrimaryIdentifier,
 		ServiceRef:          journey.ServiceRef,

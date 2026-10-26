@@ -314,6 +314,12 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	log.Info().Msg("Converting & Importing CTDF Journeys into Mongo")
 
 	// A little cheat for handling frequent services by just duplicating the VehicleJourney record for each frequent run
+	// Performance Review [Set H] [PR055] [P1] (batch): Parse errors are ignored and the loop assumes
+	// interval.Shift always advances. A zero/invalid interval with end >= departure
+	// can append copies forever; valid dense windows also retain all deep copies
+	// before conversion starts. Validate times and strictly positive progress, bound
+	// occurrences, and stream generated departures through a bounded converter while
+	// retaining the intended end-time inclusion and deterministic journey identifiers.
 	for _, txcJourney := range doc.VehicleJourneys {
 		if txcJourney.Frequency != nil && txcJourney.Frequency.Interval != nil {
 			departureTime, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
@@ -356,6 +362,12 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	var journeyOperationInsert uint64
 	var journeyOperationUpdate uint64
 
+	// Performance Review [Set O] [PR056] [P2] (batch): CPU-count partitioning bounds goroutines,
+	// but aggregate worker BSON buffers can grow with the whole document. NumCPU ignores
+	// --max-cpus/GOMAXPROCS; empty input produces floating-point NaN before conversion
+	// to numBatches. Handle empty input, then use configurable workers and count/byte-
+	// bounded write batches with shared cancellation/error propagation. Measure peak
+	// heap and MongoDB pressure before increasing workers, preserving same-key order.
 	maxBatchSize := int(math.Ceil(float64(len(doc.VehicleJourneys)) / float64(runtime.NumCPU())))
 	numBatches := int(math.Ceil(float64(len(doc.VehicleJourneys)) / float64(maxBatchSize)))
 
@@ -454,6 +466,12 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					continue
 				}
 
+				// Performance Review [Set F] [PR057] [P2] (batch): Every departure rebuilds the route
+				// section/link index and reparses shared link durations while constructing
+				// its path. Precompute immutable templates per referenced route/pattern,
+				// including parsed base timings and track refs, then apply journey-specific
+				// overrides to fresh path items. Preserve duplicate-link precedence and
+				// keep mutable times/activities out of shared worker state.
 				routeLinkReferences := make(map[string]*RouteLink)
 				for _, routeSection := range routeSections {
 					for i := range routeSection.RouteLinks {
@@ -707,6 +725,12 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					stopOperations = append(stopOperations, insertModel)
 					localOperationInsert += 1
 				} else if existingCtdfJourney.ModificationDateTime.Before(ctdfJourney.ModificationDateTime) || existingCtdfJourney.ModificationDateTime.Year() == 0 || existingCtdfJourney.DataSource.Timestamp != ctdfJourney.DataSource.Timestamp {
+					// Performance Review [Set O] [PR058] [P2] (batch): A new run timestamp forces full BSON
+					// replacement for reimported journeys with an older generation even when their
+					// source content is unchanged; services use the same condition. A changed bundle
+					// therefore rewrites unchanged members too. Track content/version separately from
+					// last-seen generation, updating only the marker for unchanged records; preserve
+					// cleanup membership and deterministic handling of duplicate files.
 					updateModel := mongo.NewReplaceOneModel()
 					updateModel.SetFilter(bson.M{"primaryidentifier": ctdfJourney.PrimaryIdentifier})
 					updateModel.SetReplacement(bsonRep)
@@ -745,6 +769,11 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 }
 
 func transXChangeTrackIdentifier(datasetID string, routeLinkID string) string {
+	// Performance Review [Set H] [PR059] [P1] (batch): Bundle members share datasetID, but can reuse
+	// a local route-link ID for different geometry. Two files with RL1 then upsert
+	// the same key, redirecting earlier journeys to the later file's track. Scope
+	// identifiers to a stable document/route identity or validated geometry hash;
+	// deduplicate only equivalent tracks and preserve shared-reference cleanup.
 	hash := sha256.Sum256([]byte(routeLinkID))
 	return fmt.Sprintf("%s-journey-track-%x", datasetID, hash)
 }
@@ -823,6 +852,12 @@ func transXChangeOperatorRef(operatorLocalMapping map[string]string, operatorRef
 }
 
 func loadExistingTransXChangeRecords[T ctdf.Service | ctdf.Journey](ctx context.Context, collection *mongo.Collection, identifiers []string) (map[string]*T, error) {
+	// Performance Review [Set F] [PR060] [P2] (batch): This loads full existing journeys, including
+	// paths/availability, although callers only compare ID, modification time and
+	// datasource timestamp. It also sends all identifiers in one $in and retains
+	// every decoded record alongside expanded input/new BSON. Project comparison
+	// metadata, chunk identifier queries, and process bounded groups; consider atomic
+	// upserts with version checks instead of a separate existence read where possible.
 	uniqueIdentifiers := map[string]struct{}{}
 	for _, identifier := range identifiers {
 		if identifier != "" {

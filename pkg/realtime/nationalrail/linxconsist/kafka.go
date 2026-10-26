@@ -43,6 +43,11 @@ func (k *KafkaClient) Run(ctx context.Context) error {
 		Str("group", k.GroupID).
 		Msg("Started LINX passenger train consist Kafka consumer")
 
+	// Performance Review [Set M] [PR108] [P2] (realtime): CommitInterval defaults to zero, so each
+	// successful message waits for a synchronous broker commit before the next is
+	// processed. Measure commit latency and consumer lag; batch bounded groups of
+	// successful offsets or use controlled interval commits, preserving per-run
+	// ordering and never advancing a partition past an unresolved failed message.
 	for {
 		message, err := reader.FetchMessage(ctx)
 		if err != nil {
@@ -54,6 +59,12 @@ func (k *KafkaClient) Run(ctx context.Context) error {
 		}
 
 		toc := kafkaHeader(message.Headers, "toc")
+		// Performance Review [Set L] [PR109] [P1] (realtime): Processing errors still fall through
+		// to CommitMessages; a successful commit after a transient Redis/Mongo failure skips
+		// that allocation update on restart. Separate retryable dependency errors from invalid
+		// input, use bounded retries/durable quarantine, and commit only the resolved
+		// contiguous prefix of each partition. More workers or batched commits must not let
+		// a later success acknowledge an earlier failed allocation.
 		if err := ProcessMessage(ctx, message.Value, toc); err != nil {
 			log.Error().
 				Err(err).

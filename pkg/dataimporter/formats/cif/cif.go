@@ -56,6 +56,12 @@ type Association struct {
 }
 
 func (c *CommonInterfaceFormat) ParseFile(reader io.Reader) error {
+	// Performance Review [Set O] [PR027] [P2]: This retains the compressed archive in memory;
+	// conversion later holds all parsed train definitions alongside generated
+	// journeys. Database batching does not bound those allocations. Use a temporary
+	// ReaderAt-backed file for ZIP access, then spool/group by train UID for bounded
+	// conversion while preserving overlays and cancellations across records.
+	// Measure peak heap and garbage-collection time on a full timetable import.
 	// TODO this uses a load of ram :(
 	body, err := io.ReadAll(reader)
 	if err != nil {
@@ -231,6 +237,12 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 			journey.ModificationDateTime = time.Now()
 			journey.DataSource = datasource
 
+			// Performance Review [Set O] [PR028] [P2] (batch): Every refresh inserts another complete
+			// journey and relies on later generation cleanup to remove old copies;
+			// journeys_raw's primaryidentifier index is not unique. Partial retries
+			// can accumulate duplicates and repeat index writes before cleanup. Compare
+			// idempotent keyed upserts with isolated generation staging, preserving
+			// overlays/track references and publishing only a fully validated run.
 			insertModel := mongo.NewInsertOneModel()
 
 			bsonRep, _ := bson.Marshal(journey)

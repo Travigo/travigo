@@ -38,6 +38,12 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 	retryRecordsCollection := database.GetCollection("retry_records")
 
 	// Parse Train Statuses
+	// Performance Review [Set L] [PR102] [P2] (realtime): Status, schedule, formation and loading
+	// sections independently fetch the same run, and several rewrite the full
+	// snapshot. Group work by canonical run within a frame, batch mapping/detail
+	// reads, and apply updates in their existing semantic order before publishing
+	// the final state/event diff. Keep allocation/loading TTLs separate and combine
+	// this with cross-writer version checks, rather than caching mutable snapshots.
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", trainStatus.SSD, trainStatus.UID)
 		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
@@ -268,6 +274,11 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				continue
 			}
 
+			// Performance Review [Set B] [PR103] [P2] (realtime): An info event with many fields is
+			// emitted for every resolved passenger call, even when cancellation is unchanged.
+			// Large schedule snapshots multiply logging/serialization and sink I/O.
+			// Prefer one summary per train plus changed-state events; sample or debug
+			// individual calls and reuse the existing-stop lookup in that diagnostic.
 			log.Info().
 				Str("realtimejourneyid", realtimeJourneyID).
 				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).

@@ -125,6 +125,12 @@ func (s *Server) handleDepartures(w http.ResponseWriter, r *http.Request) {
 		writeGraphError(w, http.StatusBadRequest, "serviceDate must use YYYY-MM-DD")
 		return
 	}
+	// Performance Review [Set E] [PR084] [P2] (indexing): Zero means unlimited materialization, and
+	// arbitrary service dates enter the persistent lazy-fill graph. Even an empty
+	// off-window fill can rebuild the full construction maps under the write lock;
+	// distinct dates retain buckets until a successful rolling compaction. Give HTTP
+	// requests a finite default and an allowed date window, or use a separately
+	// bounded ephemeral cache for dates outside the resident graph.
 	if request.Limit < 0 || request.Limit > 20000 {
 		writeGraphError(w, http.StatusBadRequest, "limit must be between 0 and 20000")
 		return

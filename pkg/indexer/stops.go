@@ -51,10 +51,21 @@ func IndexStops() error {
 		}
 
 		indexName := stopDatasetIndexName(dataset.Identifier)
+		// Performance Review [Set N] [PR093] [P1] (indexing): These documents embed services/branding
+		// derived from journey, service and transform data, but this skip decision
+		// watches only the stop dataset. Timetable/operator changes can leave search
+		// stale indefinitely. Record the consumed dependency generations per index
+		// and rebuild affected stops when any of those inputs changes.
 		if !firstRun && !sourceVersion.LastModified.After(lastIndexerVersion.LastModified) && indexExists(indexName) {
 			continue
 		}
 
+		// Performance Review [Set N] [PR094] [P1] (indexing): Deleting the serving index exposes an
+		// empty/partial replacement while asynchronous bulk writes are in flight.
+		// Build a versioned index, verify all reads/writes and refresh completion,
+		// then atomically switch a serving alias. Search must use that alias rather
+		// than the current wildcard, and overlapping builders need publication guards
+		// before retiring the previous successful index.
 		deleteIndex(indexName)
 		createStopIndex(indexName)
 		indexStopsFromMongo(indexName, dataset.Identifier)
@@ -68,6 +79,11 @@ func stopDatasetIndexName(dataset string) string {
 }
 
 func indexExists(indexName string) bool {
+	// Performance Review [Set D] [PR095] [P2] (indexing): Exists/Delete/Create responses all need
+	// their bodies closed, including non-success statuses. Create currently prints
+	// its body without checking IsError, so a rejected mapping can be followed by
+	// bulk writes into an unintended/default index. Return checked operation errors
+	// to IndexStops and release HTTP resources before proceeding to the next dataset.
 	resp, err := elastic_client.Client.Indices.Exists([]string{indexName})
 	if err != nil {
 		log.Error().Err(err).Str("index", indexName).Msg("Failed to check stop index")
@@ -112,6 +128,11 @@ func deleteLegacyStopIndexes() {
 }
 
 func createStopIndex(indexName string) {
+	// Performance Review [Set N] [PR096] [P2] (indexing): searchStops queries
+	// OtherIdentifiers.search_as_you_type, but this mapping creates only text and
+	// keyword fields there; identifier-prefix searches cannot use the requested
+	// field. Align mapping and query, rebuild existing indexes, and verify both name
+	// and identifier lookup against the actual mapping before publishing it.
 	mapping := `{
 		"settings": {
 			"number_of_shards": 1,
@@ -275,11 +296,21 @@ func indexStopsFromMongo(indexName string, datasetID string) {
 
 		var services []*ctdf.Service
 		var basicServices []*basicService
+		// Performance Review [Set N] [PR097] [P1] (indexing): Enrichment errors are discarded, yet
+		// this stop is indexed with no services and counted as complete. Cursor/decode
+		// failures likewise do not fail IndexStops. Return/aggregate failures
+		// and verify expected document counts before publishing or advancing progress;
+		// otherwise a transient dependency outage persists in the serving index.
 		services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
 
 		// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
+		// Performance Review [Set N] [PR098] [P2] (indexing): Sending to this small warm-up queue
+		// blocks the Mongo cursor and all subsequent index production when boards are
+		// slow. Count=1 still runs full board/realtime/estimate work and can trigger
+		// graph-to-Mongo fallback. Decouple optional warming from successful index
+		// publication and warm only versioned static cache entries with a time budget.
 		if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
 			railWarmRequested.Add(1)
 			railWarmJobs <- stop

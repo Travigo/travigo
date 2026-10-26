@@ -17,6 +17,11 @@ import (
 func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, error) {
 	var services []*ctdf.Service
 	// Load from cache
+	// Performance Review [Set I] [PR016] [P1] (indexing): This 24-hour cache (including empty
+	// results) has no journey/service/alias generation. A stop-index rebuild can
+	// permanently publish yesterday's service list from it, even after the cache
+	// later expires. Use generation-scoped entries or a fresh import snapshot when
+	// enriching indexes, and invalidate TfL-source selection when dependencies change.
 	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
 	services, err := cachedresults.Get[[]*ctdf.Service](s.CachedResults, cacheItemPath)
 	if err == nil {
@@ -36,6 +41,11 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		},
 	}
 
+	// Performance Review [Set N] [PR017] [P2] (indexing): A cold stop-index build performs this
+	// multikey journey Distinct and service query serially for every active stop,
+	// revisiting the same journey/service documents many times. Produce a deduplicated
+	// stop-to-service relation once per published timetable generation, then consume
+	// it in bounded batches during indexing; preserve aliases and terminal-only calls.
 	serviceRefs, err := journeysCollection.Distinct(context.Background(), "serviceref", filter)
 
 	if err != nil {

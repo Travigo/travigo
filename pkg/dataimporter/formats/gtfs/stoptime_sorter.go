@@ -46,6 +46,11 @@ func (groups *sortedStopTimeGroups) Close() {
 }
 
 func (groups *sortedStopTimeGroups) Process(process func(string, []StopTime) error) error {
+	// Performance Review [Set O] [PR043] [P2] (batch): Sorting uses bounded 25,000-row chunks, but
+	// merging opens every chunk simultaneously, retaining a file/buffer per chunk.
+	// Large feeds can exceed descriptor limits despite the row-memory bound. Use
+	// multi-pass merging with capped fan-in and byte-sized chunk budgets, and keep
+	// stable trip/sequence ordering plus cleanup on every failed intermediate pass.
 	readers := make([]*stopTimeChunkReader, 0, len(groups.chunkFiles))
 	defer func() {
 		for _, reader := range readers {

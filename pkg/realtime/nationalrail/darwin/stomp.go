@@ -65,6 +65,13 @@ func (s *StompClient) Run() {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
 
+			// Performance Review [Set M] [PR105] [P1] (realtime): AckAuto plus one goroutine per frame
+			// gives no backpressure when storage slows, and frames for the same run
+			// race read/modify/write updates (including RetryRecords). Use bounded
+			// dispatch ordered by canonical train run, dependency deadlines, and
+			// acknowledge only successful processing or durable handoff. Preserve
+			// source corrections/replay semantics and measure oldest pending age;
+			// a worker limit alone does not prevent same-run updates overwriting.
 			go pushPortData.UpdateRealtimeJourneys()
 		}
 	}

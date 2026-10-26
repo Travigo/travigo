@@ -238,6 +238,12 @@ func (d *graphData) planCorridor(destinations map[uint32]bool, maxVehicleLegs in
 		return nil
 	}
 	var key corridorKey
+	// Performance Review [Set P] [PR070] [P2]: Including the leg limit in the key rebuilds destination
+	// reachability across rounds; multiple nearby destination stops bypass caching,
+	// and concurrent misses duplicate builds. Compute minimum rides once up to the
+	// request's largest limit and reuse for smaller rounds. Consider bounded caching
+	// by canonical destination set and coalescing identical builds, measuring both
+	// memory use and cold-search latency.
 	cacheable := len(destinations) == 1
 	if cacheable {
 		for destination := range destinations {

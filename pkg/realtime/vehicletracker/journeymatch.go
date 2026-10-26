@@ -92,6 +92,12 @@ func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Lo
 }
 
 func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, float64) {
+	// Performance Review [Set J] [PR151] [P2]: Each stop projection scans the whole track and
+	// recalculates its length, giving stops-times-track-points work on this fallback.
+	// Cache cumulative segment lengths and stop progress when loading geometry;
+	// search near the previous position with a full-search fallback. The updater
+	// also matches again for history, so reuse the first suitable match. Benchmark
+	// long routes and loops to preserve matching behaviour.
 	previous := 0.0
 	for index, path := range journey.Path {
 		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil {

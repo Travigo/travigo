@@ -124,6 +124,12 @@ type BasicLocation struct {
 }
 
 func (c *CommonInterfaceFormat) ParseMCA(reader io.Reader) {
+	// Performance Review [Set H] [PR029] [P1] (batch): Fixed-width slices assume complete records,
+	// and scanner.Err is never checked (ParseMSN has the same pattern). A short row
+	// can panic; an I/O/token-limit failure silently imports a prefix because this
+	// API returns no error. Validate record widths/order and completion, propagate
+	// scanner/read errors to ParseFile, and prevent cleanup/hash publication until
+	// the timetable is complete rather than repeatedly rebuilding after a crash.
 	holdingTrainDef := false
 	var currentTrainDef *TrainDefinitionSet
 

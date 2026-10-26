@@ -189,6 +189,12 @@ func (c *BusBatchConsumer) Consume(batch rmq.Deliveries) {
 				CreationDateTime: time.Now(),
 			}
 
+			// Performance Review [Set M] [PR131] [P2] (realtime): Every successfully identified observation
+			// inserts another line/trip pair; the four-hour TTL limits age, not duplicate volume.
+			// Each bus poll loads that whole window and only then deduplicates it in Go.
+			// Batch-upsert uniquely keyed active pairs with a refreshed last-seen time, project
+			// only filter fields, and bound refresh frequency. Propagate write failures before
+			// acknowledging deliveries so load does not lose pairs.
 			tflTrackerCollection.InsertOne(context.Background(), tflTracker)
 		} else {
 			log.Info().Interface("event", event).Err(err).Msg("Failed to identify")
