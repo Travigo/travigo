@@ -218,15 +218,15 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 			},
 		},
 	}
-	if task.Size != "small" {
-		podSpec["nodeSelector"] = map[string]string{"workload": "batch-import"}
-		podSpec["tolerations"] = []map[string]string{{
-			"key":      "workload",
-			"operator": "Equal",
-			"value":    "batch-import",
-			"effect":   "NoSchedule",
-		}}
-	}
+	// if task.Size != "small" {
+	// 	podSpec["nodeSelector"] = map[string]string{"workload": "batch-import"}
+	// 	podSpec["tolerations"] = []map[string]string{{
+	// 		"key":      "workload",
+	// 		"operator": "Equal",
+	// 		"value":    "batch-import",
+	// 		"effect":   "NoSchedule",
+	// 	}}
+	// }
 
 	body := map[string]any{
 		"apiVersion": "batch/v1",

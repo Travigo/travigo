@@ -69,7 +69,6 @@ departureGraph:
     mountPath: /var/lib/travigo/departure-graph
     fileName: snapshot.gob.zst
     accessMode: ReadWriteOnce
-    storageClassName: ebs-gp3
     size: 20Gi
 
 imagePullSecrets: []
