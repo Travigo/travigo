@@ -14,15 +14,16 @@ datasets:
     services: true
     journeys: true
     operators: true
-- identifier: lirr-gtfs-schedule
-  format: gtfs-schedule
-  source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip"
-  datasetsize: medium
-  supportedobjects:
-    stops: true
-    services: true
-    journeys: true
-    operators: true
+# TODO DISABLED: due to failure to parse the stop arrival times
+# - identifier: lirr-gtfs-schedule
+#   format: gtfs-schedule
+#   source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip"
+#   datasetsize: medium
+#   supportedobjects:
+#     stops: true
+#     services: true
+#     journeys: true
+#     operators: true
 - identifier: mnr-gtfs-schedule
   format: gtfs-schedule
   source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfsmnr.zip"
@@ -143,13 +144,13 @@ datasets:
   importdestination: realtime-queue
   supportedobjects:
     realtimejourneys: true
-- identifier: lirr-gtfs-realtime
-  format: gtfs-realtime
-  source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr"
-  linkeddataset: us-nyc-mta-lirr-gtfs-schedule
-  importdestination: realtime-queue
-  supportedobjects:
-    realtimejourneys: true
+# - identifier: lirr-gtfs-realtime
+#   format: gtfs-realtime
+#   source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/lirr%2Fgtfs-lirr"
+#   linkeddataset: us-nyc-mta-lirr-gtfs-schedule
+#   importdestination: realtime-queue
+#   supportedobjects:
+#     realtimejourneys: true
 - identifier: mnr-gtfs-realtime
   format: gtfs-realtime
   source: "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/mnr%2Fgtfs-mnr"
