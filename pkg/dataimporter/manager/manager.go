@@ -526,11 +526,11 @@ func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, s
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {
 	// Performance Review [Set O] [PR069] [P2] (batch): This runs once per supported collection for
-	// every changed dataset. Declared journeys_raw indexes cover this predicate,
-	// but stops_raw and journey_tracks lack a datasource cleanup index, so repeated
-	// dataset imports can scan unrelated rows. Check actual indexes/explain plans;
-	// add equality-prefix indexes for format/dataset plus generation where justified,
-	// or retire staged generations in bounded batches. Measure deletion write cost.
+	// every changed dataset. Declared journeys_raw and journey_tracks indexes cover this predicate,
+	// but stops_raw lacks a datasource cleanup index, so repeated stop imports can scan unrelated
+	// rows. Check actual indexes/explain plans; add an equality-prefix index for format/dataset plus
+	// generation where justified, or retire staged generations in bounded batches. Measure deletion
+	// write cost.
 	collection := database.GetCollection(collectionName)
 
 	query := bson.M{
