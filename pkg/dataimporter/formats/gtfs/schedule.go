@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -39,6 +40,13 @@ type Schedule struct {
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
 	translationIndex map[string]string
+}
+
+func validGTFSCoordinates(longitude, latitude float64) bool {
+	return !math.IsNaN(longitude) && !math.IsInf(longitude, 0) &&
+		!math.IsNaN(latitude) && !math.IsInf(latitude, 0) &&
+		longitude >= -180 && longitude <= 180 &&
+		latitude >= -90 && latitude <= 90
 }
 
 type frequencyWindow struct {
@@ -248,7 +256,13 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 
 		if toProcess && parsedObject != nil && parsedObjectIdentifier != "" {
 			// Insert
-			bsonRep, _ := bson.Marshal(bson.M{"$set": parsedObject})
+			update := bson.M{"$set": parsedObject}
+			if stop, ok := parsedObject.(*ctdf.Stop); ok && stop.Location == nil {
+				// Location is tagged omitempty, so a nil value in $set would leave a
+				// previous invalid location on an existing raw stop. Explicitly clear it.
+				update["$unset"] = bson.M{"location": ""}
+			}
+			bsonRep, _ := bson.Marshal(update)
 			updateModel := mongo.NewUpdateOneModel()
 			updateModel.SetFilter(bson.M{"primaryidentifier": parsedObjectIdentifier})
 			updateModel.SetUpdate(bsonRep)
@@ -399,18 +413,26 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			LocationType:         s.Type,
 			PlatformCode:         s.PlatformCode,
 			WheelchairBoarding:   s.Wheelchair,
-			Location: &ctdf.Location{
+			Active:               true,
+			Timezone:             timezone,
+		}
+		if validGTFSCoordinates(s.Longitude, s.Latitude) {
+			ctdfStop.Location = &ctdf.Location{
 				Type:        "Point",
 				Coordinates: []float64{s.Longitude, s.Latitude},
-			},
-			Active:   true,
-			Timezone: timezone,
+			}
+			g.stopLocations[s.ID] = *ctdfStop.Location
+		} else {
+			log.Warn().
+				Str("dataset", dataset.Identifier).
+				Str("stop_id", s.ID).
+				Float64("longitude", s.Longitude).
+				Float64("latitude", s.Latitude).
+				Msg("Skipping invalid GTFS stop coordinates")
 		}
 		if s.Parent != "" {
 			ctdfStop.Associations = append(ctdfStop.Associations, &ctdf.Association{Type: "stop_group", AssociatedIdentifier: fmt.Sprintf("%s-stopgroup-%s", dataset.Identifier, s.Parent)})
 		}
-		g.stopLocations[s.ID] = *ctdfStop.Location
-
 		return ctdfStop, stopID
 	})
 
