@@ -647,6 +647,18 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 		}
 
+		// Get the agency so we can lookup timezone
+		// If its not set we'll just assume the first agency is the one we want to use
+		var agency *Agency
+		if route, exists := g.routeMap[t.RouteID]; exists {
+			if a, exists := agenciesMap[route.AgencyID]; exists {
+				agency = a
+			}
+		}
+		if agency == nil && len(g.Agencies) > 0 {
+			agency = &g.Agencies[0]
+		}
+
 		// Put it all together again
 		journey := &ctdf.Journey{
 			PrimaryIdentifier: journeyID,
@@ -665,7 +677,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			WheelchairAccessible: t.WheelchairAccessible,
 			BikesAllowed:         t.BikesAllowed,
 			DestinationDisplay:   g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
-			DepartureTimezone:    agenciesMap[g.routeMap[t.RouteID].AgencyID].Timezone,
+			DepartureTimezone:    agency.Timezone,
 			Availability:         availability,
 			Path:                 []*ctdf.JourneyPathItem{},
 		}
