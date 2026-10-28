@@ -135,7 +135,7 @@ func writeSortedStopTimeChunks(sourcePath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err = decoder.DecodeHeader(line); err != nil {
+	if err = decodeGTFSHeader(decoder, line); err != nil {
 		return nil, err
 	}
 

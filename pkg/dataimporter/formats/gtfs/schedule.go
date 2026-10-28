@@ -235,7 +235,7 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 	if err != nil {
 		return err
 	}
-	if _, err = decoder.DecodeHeader(line); err != nil {
+	if err = decodeGTFSHeader(decoder, line); err != nil {
 		return err
 	}
 
