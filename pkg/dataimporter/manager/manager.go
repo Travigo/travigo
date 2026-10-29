@@ -373,7 +373,9 @@ func shouldSkipFreshDataset(dataset *datasets.DataSet, version *ctdf.DatasetVers
 
 func applyJourneyTracks(dataset *datasets.DataSet, datasource *ctdf.DataSourceReference, cleanup bool) error {
 	var err error
-	if dataset.Format == datasets.DataSetFormatOSMRailTracks {
+	if dataset.Format == datasets.DataSetFormatTfLRouteTracks {
+		err = journeytracks.ApplyDatasetForOperator(context.Background(), datasource.DatasetID, datasource.Timestamp, tfltracks.TfLOperatorRef)
+	} else if dataset.Format == datasets.DataSetFormatOSMRailTracks {
 		err = journeytracks.ApplyDatasetToCollection(context.Background(), datasource.DatasetID, datasource.Timestamp, database.JourneysRawCollectionName)
 	} else {
 		err = journeytracks.ApplyDataset(context.Background(), datasource.DatasetID, datasource.Timestamp)

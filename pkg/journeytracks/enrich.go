@@ -27,7 +27,16 @@ type serviceJourneyStats struct {
 // applies the dataset's current route tracks to matching scheduled journeys.
 // Existing geometry from any other dataset remains authoritative.
 func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error {
-	return applyDataset(ctx, datasetID, timestamp, database.JourneysCollectionName, []string{
+	return applyDataset(ctx, datasetID, timestamp, "", database.JourneysCollectionName, []string{
+		database.JourneysCollectionName,
+		database.JourneysRawCollectionName,
+	})
+}
+
+// ApplyDatasetForOperator applies a dataset's route tracks only to services
+// operated by operatorRef.
+func ApplyDatasetForOperator(ctx context.Context, datasetID string, timestamp string, operatorRef string) error {
+	return applyDataset(ctx, datasetID, timestamp, operatorRef, database.JourneysCollectionName, []string{
 		database.JourneysCollectionName,
 		database.JourneysRawCollectionName,
 	})
@@ -36,10 +45,10 @@ func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error
 // ApplyDatasetToCollection applies route tracks within one journey collection.
 // It is used by enrichment stages that run before that collection is published.
 func ApplyDatasetToCollection(ctx context.Context, datasetID string, timestamp string, collectionName string) error {
-	return applyDataset(ctx, datasetID, timestamp, collectionName, []string{collectionName})
+	return applyDataset(ctx, datasetID, timestamp, "", collectionName, []string{collectionName})
 }
 
-func applyDataset(ctx context.Context, datasetID string, timestamp string, readCollectionName string, writeCollectionNames []string) error {
+func applyDataset(ctx context.Context, datasetID string, timestamp string, operatorRef string, readCollectionName string, writeCollectionNames []string) error {
 	routes, err := Load(ctx, Filter{DatasetID: datasetID, Timestamp: timestamp})
 	if err != nil {
 		return err
@@ -70,7 +79,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, readC
 		}
 	}
 
-	services, err := loadServices(ctx)
+	services, err := loadServices(ctx, operatorRef)
 	if err != nil {
 		return err
 	}
@@ -110,8 +119,12 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, readC
 // loadServices fully consumes and closes the Mongo cursor before per-service
 // journey processing starts. Individual services can take hours to enrich, so
 // retaining this outer cursor made it expire while it sat idle.
-func loadServices(ctx context.Context) ([]ctdf.Service, error) {
-	cursor, err := database.GetCollection("services").Find(ctx, bson.M{})
+func loadServices(ctx context.Context, operatorRef string) ([]ctdf.Service, error) {
+	filter := bson.M{}
+	if operatorRef != "" {
+		filter["operatorref"] = operatorRef
+	}
+	cursor, err := database.GetCollection("services").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

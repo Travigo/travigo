@@ -328,6 +328,9 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},
 		},
 		{
+			Keys: bson.D{{Key: "operatorref", Value: 1}},
+		},
+		{
 			Options: &options.IndexOptions{
 				Name: &serviceNameOperatorRefIndexName,
 			},

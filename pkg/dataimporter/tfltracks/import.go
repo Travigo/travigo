@@ -26,6 +26,9 @@ import (
 
 var DefaultModes = []string{"tube", "dlr", "tram", "river-bus", "cable-car", "overground", "elizabeth-line", "national-rail", "bus"}
 
+// TfLOperatorRef identifies TfL-operated scheduled services.
+const TfLOperatorRef = "gb-noc-TFLO"
+
 type Format struct{}
 
 func (*Format) ParseFile(io.Reader) error { return nil }
