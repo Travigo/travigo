@@ -15,11 +15,12 @@ datasets:
       api_key: TRAVIGO_TFL_API_KEY
   linkeddataset: gb-dft-bods-gtfs-schedule-*
   importdestination: specific-runner
-- identifier: route-tracks
-  format: gb-tfl-route-tracks
-  datasetsize: enrichment
-  refreshinterval: 168h
-  supportedobjects:
-    journeytracks: true
-  customconfig:
-    modes: tube,dlr,tram,river-bus,cable-car,bus
+# TODO DISABLED: due to it seeminlgly tryin to apply the route tracks to non-tfl journeys
+# - identifier: route-tracks
+#   format: gb-tfl-route-tracks
+#   datasetsize: enrichment
+#   refreshinterval: 168h
+#   supportedobjects:
+#     journeytracks: true
+#   customconfig:
+#     modes: tube,dlr,tram,river-bus,cable-car,bus
