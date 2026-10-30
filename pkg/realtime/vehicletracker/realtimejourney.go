@@ -126,17 +126,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 	} else {
 		nextOccurrence := map[string]int{}
-		// Performance Review [Set A] [PR154] [P2] (tracker): Each stop update scans Journey.Path from
-		// the beginning in journeyStopOccurrenceIndex, giving quadratic work for a full-trip
-		// update. Cache stopRef -> ordered occurrence indices with the static journey, or
-		// resolve in one ordered pass. Preserve repeated stops and the final call, and measure
-		// short and long trips with both partial and complete update batches.
 		for _, stopUpdate := range vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates {
-			journeyStopIndex := journeyStopOccurrenceIndex(realtimeJourney.Journey, stopUpdate.StopID, nextOccurrence[stopUpdate.StopID])
-			if journeyStopIndex < 0 {
+			occurrences := cachedJourney.StopOccurrences[stopUpdate.StopID]
+			occurrence := nextOccurrence[stopUpdate.StopID]
+			if occurrence >= len(occurrences) {
 				continue
 			}
-			nextOccurrence[stopUpdate.StopID]++
+			journeyStopIndex := occurrences[occurrence]
+			nextOccurrence[stopUpdate.StopID] = occurrence + 1
 			arrivalTime := stopUpdate.ArrivalTime
 			departureTime := stopUpdate.DepartureTime
 			var scheduledArrivalTime, scheduledDepartureTime time.Time

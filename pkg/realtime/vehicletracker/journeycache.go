@@ -20,8 +20,9 @@ import (
 const trackedJourneyCacheMaxEntries = 1000
 
 type cachedTrackedJourney struct {
-	Journey  *ctdf.Journey
-	LastUsed time.Time
+	Journey         *ctdf.Journey
+	StopOccurrences map[string][]int
+	LastUsed        time.Time
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
@@ -56,8 +57,9 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	journey.GetService()
 
 	cachedJourney = &cachedTrackedJourney{
-		Journey:  journey,
-		LastUsed: now,
+		Journey:         journey,
+		StopOccurrences: journeyStopOccurrences(journey),
+		LastUsed:        now,
 	}
 
 	consumer.journeyCacheMu.Lock()
@@ -69,6 +71,18 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	consumer.journeyCacheMu.Unlock()
 
 	return cachedJourney, nil
+}
+
+func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
+	occurrences := make(map[string][]int, len(journey.Path)+1)
+	for index, path := range journey.Path {
+		occurrences[path.OriginStopRef] = append(occurrences[path.OriginStopRef], index)
+	}
+	if len(journey.Path) > 0 {
+		lastPath := journey.Path[len(journey.Path)-1]
+		occurrences[lastPath.DestinationStopRef] = append(occurrences[lastPath.DestinationStopRef], len(journey.Path))
+	}
+	return occurrences
 }
 
 func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {

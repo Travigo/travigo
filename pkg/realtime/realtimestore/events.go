@@ -41,18 +41,11 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 		return
 	}
 
-	if redis_client.QueueConnection == nil {
+	eventQueue, err := redis_client.GetEventsQueue()
+	if errors.Is(err, redis_client.ErrQueueConnectionNotInitialized) {
 		log.Warn().Str("id", current.PrimaryIdentifier).Int("events", len(events)).Msg("Skipping realtime journey events because queue connection is not initialized")
 		return
 	}
-
-	// Performance Review [Set A] [PR121] [P1] (tracker): rmq v5.2.0 OpenQueue does not reuse handles:
-	// it issues SADD and appends a new queue to connection.openQueues on every call.
-	// Calling it for each event publication retains another handle for the same name,
-	// so long-running tracker processes accumulate memory with state-change volume.
-	// Open/inject one events queue per connection at startup and reuse it safely;
-	// reset it on reconnect and verify a sustained run keeps retained handles bounded.
-	eventQueue, err := redis_client.QueueConnection.OpenQueue("events-queue")
 	if err != nil {
 		log.Error().Err(err).Str("id", current.PrimaryIdentifier).Msg("Failed to open events queue")
 		return

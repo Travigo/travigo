@@ -2,15 +2,22 @@ package redis_client
 
 import (
 	"context"
-	"github.com/adjust/rmq/v5"
+	"errors"
 	"strconv"
+	"sync"
 
+	"github.com/adjust/rmq/v5"
 	"github.com/redis/go-redis/v9"
 	"github.com/travigo/travigo/pkg/util"
 )
 
 var Client *redis.Client
 var QueueConnection rmq.Connection
+
+var eventsQueueMu sync.Mutex
+var eventsQueue rmq.Queue
+
+var ErrQueueConnectionNotInitialized = errors.New("queue connection is not initialized")
 
 const defaultConnectionAddress = "localhost:6379"
 const defaultConnectionPassword = ""
@@ -58,11 +65,38 @@ func Connect() error {
 		return err
 	}
 
-	QueueConnection, err = rmq.OpenConnectionWithRedisClient("travigo", Client, nil)
+	queueConnection, err := rmq.OpenConnectionWithRedisClient("travigo", Client, nil)
 
 	if err != nil {
 		return err
 	}
 
+	eventsQueueMu.Lock()
+	QueueConnection = queueConnection
+	eventsQueue = nil
+	eventsQueueMu.Unlock()
+
 	return nil
+}
+
+// GetEventsQueue lazily opens the events queue once for the current connection.
+func GetEventsQueue() (rmq.Queue, error) {
+	eventsQueueMu.Lock()
+	defer eventsQueueMu.Unlock()
+
+	if QueueConnection == nil {
+		return nil, ErrQueueConnectionNotInitialized
+	}
+
+	if eventsQueue != nil {
+		return eventsQueue, nil
+	}
+
+	queue, err := QueueConnection.OpenQueue("events-queue")
+	if err != nil {
+		return nil, err
+	}
+
+	eventsQueue = queue
+	return eventsQueue, nil
 }

@@ -52,15 +52,15 @@ These are local changes to repeated work, mostly without a storage or API migrat
 
 **Completion checks:** Compare allocations and CPU per update on short, long and looping routes, including partial stop maps and unchanged offsets. Verify next-stop transitions, missing estimates and timetable changes still rebuild predictions. Sustained event publication must retain a bounded number of queue handles; cache eviction must remain bounded.
 
-| ID | Finding | Affected comment |
-| --- | --- | --- |
-| PR121 | Reuse events queue handles | [realtime/realtimestore/events.go:49](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/realtimestore/events.go:49) |
-| PR123 | Avoid repeated fallback scans in delay summaries | [realtime/realtimestore/events.go:236](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/realtimestore/events.go:236) |
-| PR134 | Reuse TfL expressions and validated time zones | [realtime/tflarrivals/modearrivaltracker.go:276](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/tflarrivals/modearrivaltracker.go:276) |
-| PR137 | Populate the successful TfL primary-stop cache | [realtime/tflarrivals/modearrivaltracker.go:636](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/tflarrivals/modearrivaltracker.go:636) |
-| PR150 | Replace sorting-based cache eviction | [realtime/vehicletracker/journeycache.go:169](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/journeycache.go:169) |
-| PR153 | Decide whether predictions need rebuilding before allocation | [realtime/vehicletracker/realtimejourney.go:114](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/realtimejourney.go:114) |
-| PR154 | Resolve stop-update occurrences without repeated path scans | [realtime/vehicletracker/realtimejourney.go:129](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/realtimejourney.go:129) |
+| Status | ID | Finding | Affected comment |
+| --- | --- | --- | ---- | 
+| Patched | PR121 | Reuse events queue handles | [realtime/realtimestore/events.go:49](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/realtimestore/events.go:49) |
+| | PR123 | Avoid repeated fallback scans in delay summaries | [realtime/realtimestore/events.go:236](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/realtimestore/events.go:236) |
+| | PR134 | Reuse TfL expressions and validated time zones | [realtime/tflarrivals/modearrivaltracker.go:276](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/tflarrivals/modearrivaltracker.go:276) |
+| | PR137 | Populate the successful TfL primary-stop cache | [realtime/tflarrivals/modearrivaltracker.go:636](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/tflarrivals/modearrivaltracker.go:636) |
+| | PR150 | Replace sorting-based cache eviction | [realtime/vehicletracker/journeycache.go:169](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/journeycache.go:169) |
+||  PR153 | Decide whether predictions need rebuilding before allocation | [realtime/vehicletracker/realtimejourney.go:114](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/realtimejourney.go:114) |
+| Patched | PR154 | Resolve stop-update occurrences without repeated path scans | [realtime/vehicletracker/realtimejourney.go:129](/Users/aaronclaydon/projects/travigo/travigo/pkg/realtime/vehicletracker/realtimejourney.go:129) |
 
 <a id="set-b"></a>
 
