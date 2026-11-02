@@ -57,13 +57,13 @@ departureGraph:
     runAsGroup: 1000
   service:
     port: 8080
-  goMemoryLimit: 5GiB
+  goMemoryLimit: 12GiB
   resources:
     requests:
       cpu: 500m
       memory: 10Gi
     limits:
-      memory: 12Gi
+      memory: 22Gi
   persistence:
     enabled: true
     mountPath: /var/lib/travigo/departure-graph
