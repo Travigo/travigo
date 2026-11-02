@@ -17,11 +17,9 @@ import (
 	redisstore "github.com/eko/gocache/store/redis/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"go.mongodb.org/mongo-driver/bson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -273,30 +271,31 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					locationEvent.VehicleLocationUpdate.Occupancy.ActualValues = false
 				}
 
-				if vehiclePosition.CongestionLevel != nil {
-					// Performance Review [Set B] [PR033] [P2] (realtime): These two diagnostic branches
-					// synchronously insert the entire vehicle record on every poll, twice
-					// when both fields exist, even if unchanged. Sample or deduplicate
-					// diagnostics by source version, combine payloads, batch writes with
-					// bounded buffering, and set explicit retention for datadump.
-					// pretty.Println(vehiclePosition.CongestionLevel)
-					collection := database.GetCollection("datadump")
-					collection.InsertOne(context.Background(), bson.M{
-						"type":             "gtfsrt-congestionlevel",
-						"creationdatetime": time.Now(),
-						"document":         vehiclePosition,
-					})
-				}
+				// Diagnostic dumps disabled; restore only with bounded recording (PR033).
+				// if vehiclePosition.CongestionLevel != nil {
+				// Performance Review [Set B] [PR033] [P2] (realtime): These two diagnostic branches
+				// synchronously insert the entire vehicle record on every poll, twice
+				// when both fields exist, even if unchanged. Sample or deduplicate
+				// diagnostics by source version, combine payloads, batch writes with
+				// bounded buffering, and set explicit retention for datadump.
+				// pretty.Println(vehiclePosition.CongestionLevel)
+				// 	collection := database.GetCollection("datadump")
+				// 	collection.InsertOne(context.Background(), bson.M{
+				// 		"type":             "gtfsrt-congestionlevel",
+				// 		"creationdatetime": time.Now(),
+				// 		"document":         vehiclePosition,
+				// 	})
+				// }
 
-				if len(vehiclePosition.MultiCarriageDetails) > 0 {
-					// pretty.Println(vehiclePosition.MultiCarriageDetails)
-					collection := database.GetCollection("datadump")
-					collection.InsertOne(context.Background(), bson.M{
-						"type":             "gtfsrt-multicarriagedetails",
-						"creationdatetime": time.Now(),
-						"document":         vehiclePosition,
-					})
-				}
+				// if len(vehiclePosition.MultiCarriageDetails) > 0 {
+				// pretty.Println(vehiclePosition.MultiCarriageDetails)
+				// 	collection := database.GetCollection("datadump")
+				// 	collection.InsertOne(context.Background(), bson.M{
+				// 		"type":             "gtfsrt-multicarriagedetails",
+				// 		"creationdatetime": time.Now(),
+				// 		"document":         vehiclePosition,
+				// 	})
+				// }
 
 				locationEvent.VehicleLocationUpdate.Location = ctdf.Location{
 					Type: "Point",

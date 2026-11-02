@@ -43,13 +43,19 @@ type identificationRateESResponse struct {
 	Aggregations struct {
 		Operators struct {
 			Buckets []struct {
-				Key      string
-				DocCount int `json:"doc_count"`
-				Success  struct {
+				Key           string
+				DocCount      int `json:"doc_count"`
+				WeightedCount struct {
+					Value float64 `json:"value"`
+				} `json:"weighted_count"`
+				Success struct {
 					Buckets []struct {
-						Key         int
-						DocCount    int    `json:"doc_count"`
-						KeyAsString string `json:"key_as_string"`
+						Key           int
+						DocCount      int    `json:"doc_count"`
+						KeyAsString   string `json:"key_as_string"`
+						WeightedCount struct {
+							Value float64 `json:"value"`
+						} `json:"weighted_count"`
 					}
 				}
 			}
@@ -103,10 +109,12 @@ func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}, op
 					"size":  10000,
 				},
 				"aggs": map[string]interface{}{
+					"weighted_count": identificationWeightAggregation(),
 					"success": map[string]interface{}{
 						"terms": map[string]interface{}{
 							"field": "Success",
 						},
+						"aggs": map[string]interface{}{"weighted_count": identificationWeightAggregation()},
 					},
 				},
 			},
@@ -126,6 +134,7 @@ func getIdentificationRateStatsESQuery(timestampRange map[string]interface{}, op
 		log.Fatal().Err(err).Msg("Failed to query index")
 	}
 
+	defer res.Body.Close()
 	responseBytes, _ := io.ReadAll(res.Body)
 	var responseStruct identificationRateESResponse
 	json.Unmarshal(responseBytes, &responseStruct)
@@ -146,28 +155,28 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStatsR
 		"lt":  "now/d",
 	}, operatorsList)
 
-	totalIdentifies := 0
-	totalIdentifySuccess := 0
+	totalIdentifies := 0.0
+	totalIdentifySuccess := 0.0
 
 	for _, operator := range lastDayQuery.Aggregations.Operators.Buckets {
 		if rateStats.Operators[operator.Key] == nil {
 			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
-		successCount := 0
+		successCount := 0.0
 
 		for _, subAggBucket := range operator.Success.Buckets {
 			if subAggBucket.KeyAsString == "true" {
-				successCount = subAggBucket.DocCount
+				successCount = subAggBucket.WeightedCount.Value
 			}
 		}
 
-		rateStats.Operators[operator.Key].LastDayRate = float64(successCount) / float64(operator.DocCount)
+		rateStats.Operators[operator.Key].LastDayRate = identificationRate(successCount, operator.WeightedCount.Value)
 
-		totalIdentifies += operator.DocCount
+		totalIdentifies += operator.WeightedCount.Value
 		totalIdentifySuccess += successCount
 	}
-	rateStats.TotalRate.LastDayRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
+	rateStats.TotalRate.LastDayRate = identificationRate(totalIdentifySuccess, totalIdentifies)
 
 	// Populate for 7 day stats
 	sevenDayQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
@@ -183,20 +192,20 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStatsR
 			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
-		successCount := 0
+		successCount := 0.0
 
 		for _, subAggBucket := range operator.Success.Buckets {
 			if subAggBucket.KeyAsString == "true" {
-				successCount = subAggBucket.DocCount
+				successCount = subAggBucket.WeightedCount.Value
 			}
 		}
 
-		rateStats.Operators[operator.Key].LastWeekRate = float64(successCount) / float64(operator.DocCount)
+		rateStats.Operators[operator.Key].LastWeekRate = identificationRate(successCount, operator.WeightedCount.Value)
 
-		totalIdentifies += operator.DocCount
+		totalIdentifies += operator.WeightedCount.Value
 		totalIdentifySuccess += successCount
 	}
-	rateStats.TotalRate.LastWeekRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
+	rateStats.TotalRate.LastWeekRate = identificationRate(totalIdentifySuccess, totalIdentifies)
 
 	// Populate for 31 day stats
 	lastMonthQuery := getIdentificationRateStatsESQuery(map[string]interface{}{
@@ -212,20 +221,20 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStatsR
 			rateStats.Operators[operator.Key] = &IdentificationRateStats{}
 		}
 
-		successCount := 0
+		successCount := 0.0
 
 		for _, subAggBucket := range operator.Success.Buckets {
 			if subAggBucket.KeyAsString == "true" {
-				successCount = subAggBucket.DocCount
+				successCount = subAggBucket.WeightedCount.Value
 			}
 		}
 
-		rateStats.Operators[operator.Key].LastMonthRate = float64(successCount) / float64(operator.DocCount)
+		rateStats.Operators[operator.Key].LastMonthRate = identificationRate(successCount, operator.WeightedCount.Value)
 
-		totalIdentifies += operator.DocCount
+		totalIdentifies += operator.WeightedCount.Value
 		totalIdentifySuccess += successCount
 	}
-	rateStats.TotalRate.LastMonthRate = float64(totalIdentifySuccess) / float64(totalIdentifies)
+	rateStats.TotalRate.LastMonthRate = identificationRate(totalIdentifySuccess, totalIdentifies)
 
 	for _, operator := range rateStats.Operators {
 		operator.CalculateRating()
@@ -233,4 +242,14 @@ func GetIdentificationRateStats(operatorsList []string) IdentificationRateStatsR
 	rateStats.TotalRate.CalculateRating()
 
 	return rateStats
+}
+
+func identificationWeightAggregation() map[string]interface{} {
+	return map[string]interface{}{"sum": map[string]interface{}{"field": "SamplingWeight", "missing": 1}}
+}
+func identificationRate(success, total float64) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return success / total
 }

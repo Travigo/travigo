@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 )
 
 func TestMatchJourneyPositionUsesDistanceAlongLeg(t *testing.T) {
@@ -131,5 +132,26 @@ func TestScoreLocationCandidatePrefersForwardProgressOnSameJourney(t *testing.T)
 	}
 	if got := scoreLocationCandidate(100, 0.2, "same", history); got <= 100 {
 		t.Fatalf("backwards same-journey score = %f", got)
+	}
+}
+
+func TestGeometryMetricsCoverBothMatchingPathsWithoutDoubleCounting(t *testing.T) {
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{Track: []ctdf.Location{{Type: "Point", Coordinates: []float64{0, 51}}, {Type: "Point", Coordinates: []float64{0.01, 51}}}}}}
+	vehicle := ctdf.Location{Type: "Point", Coordinates: []float64{0.005, 51}}
+	for _, match := range []func(*ctdf.Journey, ctdf.Location) (journeyPositionMatch, bool){matchJourneyPosition, matchJourneyPositionWithStopFallback} {
+		before := telemetry.Snapshot().Stages["geometry"].Count
+		if _, ok := match(journey, vehicle); !ok {
+			t.Fatal("expected match")
+		}
+		if got := telemetry.Snapshot().Stages["geometry"].Count - before; got != 1 {
+			t.Fatalf("matching counted %d times", got)
+		}
+		before = telemetry.Snapshot().Stages["geometry"].Count
+		if _, ok := match(nil, vehicle); ok {
+			t.Fatal("nil journey matched")
+		}
+		if telemetry.Snapshot().Stages["geometry"].Count-before != 1 {
+			t.Fatal("failed matching not timed")
+		}
 	}
 }

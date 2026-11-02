@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -28,15 +29,19 @@ type cachedTrackedJourney struct {
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.Cache, time.Since(started)) }()
 	consumer.journeyCacheMu.Lock()
 	cachedJourney := consumer.journeyCache[journeyID]
 	if cachedJourney != nil {
+		telemetry.Add(telemetry.CacheHit, 1)
 		consumer.touchJourneyCacheLocked(cachedJourney)
 		consumer.journeyCacheMu.Unlock()
 		return cachedJourney, nil
 	}
 	consumer.journeyCacheMu.Unlock()
 
+	telemetry.Add(telemetry.CacheMiss, 1)
 	journey, err := loadTrackedJourney(journeyID)
 	if err != nil {
 		return nil, err
@@ -214,6 +219,7 @@ func (consumer *BatchConsumer) pruneJourneyCacheLocked() {
 	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries {
 		entry := consumer.journeyCacheTail
 		delete(consumer.journeyCache, entry.journeyID)
+		telemetry.Add(telemetry.CacheEvicted, 1)
 		consumer.journeyCacheTail = entry.previous
 		if entry.previous != nil {
 			entry.previous.next = nil

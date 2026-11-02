@@ -3,8 +3,11 @@ package redis_client
 import (
 	"context"
 	"errors"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
+	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/adjust/rmq/v5"
 	"github.com/redis/go-redis/v9"
@@ -59,6 +62,7 @@ func Connect() error {
 		})
 	}
 
+	Client.AddHook(realtimeMetricsHook{})
 	statusCmd := Client.Ping(context.Background())
 	err := statusCmd.Err()
 	if err != nil {
@@ -99,4 +103,38 @@ func GetEventsQueue() (rmq.Queue, error) {
 
 	eventsQueue = queue
 	return eventsQueue, nil
+}
+
+// Commands include rmq and all other traffic on the shared client; pipelines
+// count their individual commands rather than pretending to be one operation.
+type realtimeMetricsHook struct{}
+
+func (realtimeMetricsHook) DialHook(next redis.DialHook) redis.DialHook {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) { return next(ctx, network, addr) }
+}
+func (realtimeMetricsHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
+	return func(ctx context.Context, cmd redis.Cmder) error {
+		start := time.Now()
+		err := next(ctx, cmd)
+		telemetry.Add(telemetry.RedisCommands, 1)
+		telemetry.Observe(telemetry.Redis, time.Since(start))
+		if err != nil && !errors.Is(err, redis.Nil) {
+			telemetry.Add(telemetry.RedisErrors, 1)
+		}
+		return err
+	}
+}
+func (realtimeMetricsHook) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return func(ctx context.Context, cmds []redis.Cmder) error {
+		start := time.Now()
+		err := next(ctx, cmds)
+		telemetry.Add(telemetry.RedisCommands, int64(len(cmds)))
+		telemetry.Observe(telemetry.Redis, time.Since(start))
+		for _, cmd := range cmds {
+			if cmd.Err() != nil && !errors.Is(cmd.Err(), redis.Nil) {
+				telemetry.Add(telemetry.RedisErrors, 1)
+			}
+		}
+		return err
+	}
 }

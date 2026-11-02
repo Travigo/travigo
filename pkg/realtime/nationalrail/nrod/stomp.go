@@ -1,15 +1,12 @@
 package nrod
 
 import (
-	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/go-stomp/stomp/v3"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type StompClient struct {
@@ -144,16 +141,18 @@ func (s *StompClient) ParseVSTPMessages(messagesBytes []byte) {
 
 	vstpMessage.Process(s)
 
+	// Diagnostic dumps disabled; restore only with bounded recording (PR116).
 	// Performance Review [Set B] [PR116] [P2] (realtime): Every VSTP message also synchronously
 	// inserts both its raw payload and parsed representation as diagnostic data.
 	// Measure this write/byte volume separately from timetable persistence; sample
 	// or batch diagnostics with bounded buffering and explicit retention. A slow
 	// diagnostic sink must not keep an unbounded set of processing goroutines alive.
-	collection := database.GetCollection("datadump")
-	collection.InsertOne(context.Background(), bson.M{
-		"type":             "vstp",
-		"creationdatetime": time.Now(),
-		"document":         string(messagesBytes),
-		"parsed":           vstpMessage.VSTP,
-	})
+	// collection := database.GetCollection("datadump")
+	// collection.InsertOne(context.Background(), bson.M{
+	// 	"type":             "vstp",
+	// 	"creationdatetime": time.Now(),
+	// 	"document":         string(messagesBytes),
+	// 	"parsed":           vstpMessage.VSTP,
+	// })
+
 }

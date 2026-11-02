@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 )
 
 func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
@@ -243,7 +244,14 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	// a committed update or intentional discard. Design bounded, idempotent retries with
 	// the commit watermark so replay is neither rejected as stale nor allowed to duplicate
 	// notification events under load.
-	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	persistenceStarted := time.Now()
+	saveErr := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	telemetry.Observe(telemetry.Persistence, time.Since(persistenceStarted))
+	if saveErr != nil {
+		telemetry.Add(telemetry.UpdateFailed, 1)
+	} else {
+		telemetry.CommittedEvent(vehicleUpdateEvent.RecordedAt)
+	}
 
 	return nil
 }

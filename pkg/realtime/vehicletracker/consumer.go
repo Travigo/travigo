@@ -1,7 +1,6 @@
 package vehicletracker
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +14,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/realtime/diagnostics"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -106,7 +106,11 @@ func NewBatchConsumer(id int) *BatchConsumer {
 }
 
 func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
+	started := time.Now()
+	telemetry.BatchStarted(consumer.id)
+	defer func() { telemetry.Observe(telemetry.Batch, time.Since(started)); telemetry.BatchFinished(consumer.id) }()
 	payloads := batch.Payloads()
+	telemetry.Add(telemetry.Received, int64(len(payloads)))
 
 	serviceAlertOperations := make([]mongo.WriteModel, 0, len(payloads))
 
@@ -123,6 +127,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			// The whole batch is acknowledged below. A malformed payload cannot
 			// become processable through retry, so retaining it in rmq's
 			// non-expiring rejected list only leaks Redis memory.
+			telemetry.Add(telemetry.Malformed, 1)
 			log.Warn().Err(err).Msg("Discarding malformed realtime event")
 			continue
 		}
@@ -134,11 +139,13 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
 					err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
 					if err != nil {
+						telemetry.Add(telemetry.UpdateFailed, 1)
 						log.Error().Err(err).Msg("Failed to update realtime journey")
 					}
 				} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeLocationOnly {
 					err := consumer.updateRealtimeJourneyLocationOnly(identifiedJourneyID, vehicleUpdateEvent)
 					if err != nil {
+						telemetry.Add(telemetry.UpdateFailed, 1)
 						log.Error().Err(err).Msg("Failed to update realtime journey location only")
 					}
 				}
@@ -168,6 +175,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 				serviceAlertOperations = append(serviceAlertOperations, writeModel)
 			}
 		}
+		telemetry.HandledEvent(vehicleUpdateEvent.RecordedAt)
 	}
 
 	if len(serviceAlertOperations) > 0 {
@@ -188,7 +196,10 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 	// ErrorNotFound or consuming shutdown. The consumer cannot process its next batch
 	// while acknowledgement stalls. Profile this separately and evaluate batching with
 	// per-delivery outcomes and unchanged retry semantics.
-	if ackErrors := batch.Ack(); len(ackErrors) > 0 {
+	ackStarted := time.Now()
+	ackErrors := batch.Ack()
+	telemetry.Observe(telemetry.Ack, time.Since(ackStarted))
+	if len(ackErrors) > 0 {
 		for _, err := range ackErrors {
 			log.Fatal().Err(err).Msg("Failed to consume realtime event")
 		}
@@ -254,6 +265,8 @@ func (consumer *BatchConsumer) identifyService(sourceType string, identifyingInf
 }
 
 func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdateEvent, sourceType string, identifyingInformation map[string]string) string {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.Identification, time.Since(started)) }()
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)
@@ -358,21 +371,21 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			}
 
 			// Record the failed identification event
-			elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-				Timestamp: time.Now(),
+			diagnostics.Identification(identifyEventsIndexName, false, func() any {
+				return RealtimeIdentifyFailureElasticEvent{
+					Timestamp: time.Now(),
 
-				Success:    false,
-				FailReason: errorCode,
-				Outcome:    "unmatched",
+					Success:    false,
+					FailReason: errorCode,
+					Outcome:    "unmatched",
 
-				Operator: operatorRef,
-				Service:  identifyingInformation["PublishedLineName"],
-				Trip:     identifyingInformation["TripID"],
+					Operator: operatorRef,
+					Service:  identifyingInformation["PublishedLineName"],
+					Trip:     identifyingInformation["TripID"],
 
-				SourceType: sourceType,
+					SourceType: sourceType,
+				}
 			})
-
-			elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 
 			return ""
 		}
@@ -391,20 +404,20 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		}
 
 		// Record the successful identification event
-		elasticEvent, _ := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-			Timestamp: currentTime,
+		diagnostics.Identification(identifyEventsIndexName, true, func() any {
+			return RealtimeIdentifyFailureElasticEvent{
+				Timestamp: currentTime,
 
-			Success: true,
-			Outcome: "matched",
+				Success: true,
+				Outcome: "matched",
 
-			Operator: operatorRef,
-			Service:  identifyingInformation["PublishedLineName"],
-			Trip:     identifyingInformation["TripID"],
+				Operator: operatorRef,
+				Service:  identifyingInformation["PublishedLineName"],
+				Trip:     identifyingInformation["TripID"],
 
-			SourceType: sourceType,
+				SourceType: sourceType,
+			}
 		})
-
-		elastic_client.IndexRequest(identifyEventsIndexName, bytes.NewReader(elasticEvent))
 	}
 
 	return journeyID
@@ -450,24 +463,18 @@ func realtimeIdentificationMappingKey(localID string) string {
 }
 
 func (consumer *BatchConsumer) recordSiriIdentificationOutcome(event *VehicleUpdateEvent, information map[string]string, success bool, outcome string) {
-	// Performance Review [Set B] [PR144] [P2] (tracker): Even cached, stale, and suppressed SIRI
-	// observations marshal an Elasticsearch document here. IndexRequest uses a bulk
-	// indexer, but Add blocks when its queues fill and receives Background context,
-	// so diagnostic backpressure can stop vehicle processing. Prefer counters plus
-	// bounded sampling for routine outcomes, skip disabled telemetry before encoding,
-	// and give diagnostic enqueueing its own bounded/drop policy with loss metrics.
+
 	if event == nil || event.SourceType != "siri-vm" {
 		return
 	}
 	year, week := event.RecordedAt.ISOWeek()
 	index := fmt.Sprintf("realtime-identify-events-%d-%d", year, week)
-	payload, err := json.Marshal(RealtimeIdentifyFailureElasticEvent{
-		Timestamp: event.RecordedAt, Success: success, Outcome: outcome,
-		Operator: information["OperatorRef"], Service: information["PublishedLineName"], Trip: information["VehicleJourneyRef"], SourceType: event.SourceType,
+	diagnostics.Identification(index, success, func() any {
+		return RealtimeIdentifyFailureElasticEvent{
+			Timestamp: event.RecordedAt, Success: success, Outcome: outcome,
+			Operator: information["OperatorRef"], Service: information["PublishedLineName"], Trip: information["VehicleJourneyRef"], SourceType: event.SourceType,
+		}
 	})
-	if err == nil {
-		elastic_client.IndexRequest(index, bytes.NewReader(payload))
-	}
 }
 
 func touchExistingIdentificationMapping(ctx context.Context, localID string, recordedAt time.Time) (string, bool, error) {

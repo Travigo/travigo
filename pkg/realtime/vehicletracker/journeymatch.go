@@ -2,8 +2,10 @@ package vehicletracker
 
 import (
 	"math"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 )
 
 type journeyPositionMatch struct {
@@ -15,6 +17,11 @@ type journeyPositionMatch struct {
 }
 
 func matchJourneyPosition(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
+	start := time.Now()
+	defer func() { telemetry.Observe(telemetry.Geometry, time.Since(start)) }()
+	return matchJourneyPositionUnmeasured(journey, vehicle)
+}
+func matchJourneyPositionUnmeasured(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
 	if journey == nil || vehicle.Type != "Point" || len(vehicle.Coordinates) < 2 {
 		return journeyPositionMatch{}, false
 	}
@@ -53,7 +60,9 @@ func matchJourneyPosition(journey *ctdf.Journey, vehicle ctdf.Location) (journey
 // matchJourneyPosition only: nearest stops are too weak a signal to identify an
 // otherwise unknown trip.
 func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
-	if match, ok := matchJourneyPosition(journey, vehicle); ok {
+	start := time.Now()
+	defer func() { telemetry.Observe(telemetry.Geometry, time.Since(start)) }()
+	if match, ok := matchJourneyPositionUnmeasured(journey, vehicle); ok {
 		return match, true
 	}
 	if journey == nil || vehicle.Type != "Point" || len(vehicle.Coordinates) < 2 {

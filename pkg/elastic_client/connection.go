@@ -2,6 +2,7 @@ package elastic_client
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -116,4 +117,12 @@ func IndexRequestWithID(indexName string, documentID string, document io.ReadSee
 
 func WaitUntilQueueEmpty() {
 	bulkIndexer.Close(context.Background())
+}
+
+func DiagnosticsEnabled() bool { return Client != nil && bulkIndexer != nil }
+func IndexDiagnostic(ctx context.Context, index string, document io.ReadSeeker, onFailure func()) error {
+	if !DiagnosticsEnabled() {
+		return errors.New("diagnostic indexer disabled")
+	}
+	return bulkIndexer.Add(ctx, esutil.BulkIndexerItem{Index: index, Action: "index", Body: document, OnFailure: func(context.Context, esutil.BulkIndexerItem, esutil.BulkIndexerResponseItem, error) { onFailure() }})
 }

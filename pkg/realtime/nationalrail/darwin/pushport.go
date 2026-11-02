@@ -260,7 +260,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		scheduleCancellations := map[string]darwinScheduleCancellation{}
 		passengerStopIndex := 0
 
-		for scheduleStopIndex, scheduleStop := range schedule.Locations {
+		for _, scheduleStop := range schedule.Locations {
 			if !scheduleStop.isPassengerCall() {
 				continue
 			}
@@ -273,30 +273,6 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				log.Error().Str("tiploc", scheduleStop.Tiploc).Msg("Failed to find stop for schedule update")
 				continue
 			}
-
-			// Performance Review [Set B] [PR103] [P2] (realtime): An info event with many fields is
-			// emitted for every resolved passenger call, even when cancellation is unchanged.
-			// Large schedule snapshots multiply logging/serialization and sink I/O.
-			// Prefer one summary per train plus changed-state events; sample or debug
-			// individual calls and reuse the existing-stop lookup in that diagnostic.
-			log.Info().
-				Str("realtimejourneyid", realtimeJourneyID).
-				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
-				Str("rid", schedule.RID).
-				Str("uid", schedule.UID).
-				Str("ssd", schedule.SSD).
-				Int("schedule_stop_index", scheduleStopIndex).
-				Str("schedule_stop_type", scheduleStop.Type).
-				Str("tiploc", scheduleStop.Tiploc).
-				Str("stop_ref", stop.PrimaryIdentifier).
-				Str("stop_name", stop.PrimaryName).
-				Str("pta", scheduleStop.PublicArrival).
-				Str("ptd", scheduleStop.PublicDeparture).
-				Str("wta", scheduleStop.WorkingArrival).
-				Str("wtd", scheduleStop.WorkingDeparture).
-				Str("cancelled", scheduleStop.Cancelled).
-				Bool("existing_cancelled", realtimeJourney.RealtimeStop(stop.PrimaryIdentifier, journeyStopIndex) != nil && realtimeJourney.RealtimeStop(stop.PrimaryIdentifier, journeyStopIndex).Cancelled).
-				Msg("Darwin schedule stop cancellation state")
 
 			resolvedScheduleStopCount += 1
 			scheduleCancellations[ctdf.RealtimeJourneyStopKey(stop.PrimaryIdentifier, journeyStopIndex)] = darwinScheduleCancellation{stopRef: stop.PrimaryIdentifier, journeyStopIndex: journeyStopIndex, cancelled: scheduleStop.Cancelled == "true"}
@@ -314,6 +290,7 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			continue
 		}
 
+		log.Debug().Str("realtimejourneyid", realtimeJourneyID).Int("resolved_calls", resolvedScheduleStopCount).Int("cancelled_calls", cancelCount).Msg("Darwin schedule cancellation summary")
 		applyDarwinScheduleCancellationState(realtimeJourney, scheduleCancellations)
 
 		if cancelCount > 0 && cancelCount == resolvedScheduleStopCount {
