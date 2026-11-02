@@ -1,0 +1,39 @@
+{{- if and .Values.ingress.enabled .Values.departureGraph.enabled .Values.departureGraph.statsIngress.enabled }}
+{{- $fullName := include "travigo-web-api.fullname" . }}
+{{- $annotations := deepCopy (.Values.ingress.annotations | default dict) }}
+{{- $_ := set $annotations "nginx.ingress.kubernetes.io/rewrite-target" "/v1/stats" }}
+{{- $_ := set $annotations "nginx.ingress.kubernetes.io/use-regex" "true" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-departure-graph-stats
+  labels:
+    {{- include "travigo-web-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: departure-graph
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name | quote }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace | quote }}
+    {{- toYaml $annotations | nindent 4 }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          # Anchor the match so other graph endpoints stay internal.
+          - path: {{ printf "%s/?$" (trimSuffix "/" $.Values.departureGraph.statsIngress.path | regexQuoteMeta) | quote }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $fullName }}-departure-graph
+                port:
+                  number: {{ $.Values.departureGraph.service.port }}
+    {{- end }}
+{{- end }}

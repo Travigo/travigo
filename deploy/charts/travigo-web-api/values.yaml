@@ -57,6 +57,9 @@ departureGraph:
     runAsGroup: 1000
   service:
     port: 8080
+  statsIngress:
+    enabled: true
+    path: /departure-graph/stats
   goMemoryLimit: 12GiB
   resources:
     requests:

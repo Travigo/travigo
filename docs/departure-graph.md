@@ -112,6 +112,15 @@ atomic snapshot creation on a newly provisioned volume.
 
 ## Operational statistics
 
+The web API Helm chart exposes the graph's statistics handler at
+`https://api.travigo.app/departure-graph/stats`, using a dedicated NGINX
+ingress that rewrites only that stats path to `/v1/stats`. It inherits the API
+ingress hosts, class, TLS and CORS configuration and remains accessible while
+the graph is rebuilding. Configure `departureGraph.statsIngress.path` to change
+the public path, or set `departureGraph.statsIngress.enabled=false` to keep it
+internal. This ingress requires Kubernetes 1.19 or newer. Other graph routes
+remain internal.
+
 `GET /v1/stats` returns a live JSON snapshot covering:
 
 - `Requests`: departure-request totals, failures and in-flight requests; the
