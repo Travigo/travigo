@@ -172,33 +172,7 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 	}
 
 	if c.Query("view") == "web" {
-		// Performance Review [Set C] [PR002] [P2]: Per-item GetReferences can repeat service/operator
-		// queries, and missing stops are fetched serially. Collect unique references
-		// across all plans, fetch each collection in bulk, and attach results from
-		// request-local maps to preserve the earlier batched journey hydration gains.
-		stops := map[string]*ctdf.Stop{
-			journeyPlans.OriginStop.PrimaryIdentifier:      &journeyPlans.OriginStop,
-			journeyPlans.DestinationStop.PrimaryIdentifier: &journeyPlans.DestinationStop,
-		}
-		for planIndex := range journeyPlans.JourneyPlans {
-			for itemIndex := range journeyPlans.JourneyPlans[planIndex].RouteItems {
-				item := &journeyPlans.JourneyPlans[planIndex].RouteItems[itemIndex]
-				if item.Journey != nil {
-					item.Journey.GetReferences()
-				}
-				for _, stopRef := range []string{item.OriginStopRef, item.DestinationStopRef} {
-					if stopRef == "" || stops[stopRef] != nil {
-						continue
-					}
-					stop, lookupErr := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: stopRef})
-					if lookupErr == nil {
-						stops[stopRef] = stop
-					}
-				}
-				item.OriginStop = stops[item.OriginStopRef]
-				item.DestinationStop = stops[item.DestinationStopRef]
-			}
-		}
+		hydratePlannerReferences(journeyPlans)
 	}
 
 	reducedJourneyPlans, marshalErr := marshalWithSheriffView(c, journeyPlans, []string{"basic"}, sheriffViews{

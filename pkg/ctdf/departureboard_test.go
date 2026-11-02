@@ -358,3 +358,28 @@ func TestRealtimeJourneySuppressesBoardOnlyOnReplacementDates(t *testing.T) {
 		t.Fatal("unexpected suppression outside listed replacement dates")
 	}
 }
+
+func TestBoardDisplayReferenceDefersMissingStopsWithoutDatabase(t *testing.T) {
+	// No database is configured: selecting references and fallback display text
+	// must not attempt to hydrate any candidate.
+	j := &Journey{Path: []*JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "middle"}, {OriginStopRef: "middle", DestinationStopRef: "terminal"}}}
+	rt := &RealtimeJourney{Journey: j}
+	rt.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 2, Cancelled: true})
+	arrival := BoardDisplayReferenceFor(j, rt, BoardTypeArrival, false)
+	if arrival == nil || arrival.StopRef != "origin" || !arrival.Arrival {
+		t.Fatal("arrival reference lost")
+	}
+	shortened := BoardDisplayReferenceFor(j, rt, BoardTypeDeparture, false)
+	if shortened == nil || shortened.StopRef != "middle" || shortened.Arrival {
+		t.Fatal("shortened reference lost")
+	}
+	if BoardDisplayReferenceFor(j, rt, BoardTypeDeparture, true) != nil {
+		t.Fatal("whole cancellation changed destination")
+	}
+	if got := BoardDestinationDisplayWithRealtime(j, rt, "Terminal", BoardTypeDeparture, false); got != "Terminal" {
+		t.Fatalf("missing shortened stop must preserve fallback: %s", got)
+	}
+	if got := BoardDestinationDisplay(j, "Terminal", BoardTypeArrival); got != "origin" {
+		t.Fatalf("arrival fallback = %s", got)
+	}
+}

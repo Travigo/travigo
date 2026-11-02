@@ -15,6 +15,7 @@ import (
 )
 
 type DepartureBoard struct {
+	DisplayReference   *BoardDisplayReference   `groups:"internal" json:"-" bson:"-"`
 	Journey            *Journey                 `groups:"basic,departures-llm,web-board"`
 	DestinationDisplay string                   `groups:"basic,departures-llm,web-board"`
 	Type               DepartureBoardRecordType `groups:"basic,departures-llm,web-board"`
@@ -223,7 +224,8 @@ func serviceTimeOnDate(dateTime time.Time, serviceTime time.Time) time.Time {
 }
 
 // BoardDestinationDisplay returns the service destination for departures and
-// the journey origin for arrivals.
+// the journey origin for arrivals. It never loads missing stop references;
+// selected API entries resolve those references in one batch.
 func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardType) string {
 	if !boardType.IsArrival() || journey == nil || len(journey.Path) == 0 {
 		return fallback
@@ -233,12 +235,7 @@ func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardT
 	if firstPathItem == nil {
 		return fallback
 	}
-	// Performance Review [Set C] [PR009] [P2] (boards): Arrival candidates perform a Mongo lookup
-	// for their origin before the final board limit; cancelled-terminal departures
-	// below also hydrate stops here. Many journeys share the same stop, but each
-	// decoded path repeats that read. Collect display references and batch-resolve
-	// them once for the selected entries, including service name overrides.
-	firstPathItem.GetOriginStop()
+
 	if firstPathItem.OriginStop != nil && firstPathItem.OriginStop.PrimaryName != "" {
 		return firstPathItem.OriginStop.PrimaryName
 	}
@@ -289,10 +286,8 @@ func BoardDestinationDisplayWithRealtime(journey *Journey, realtimeJourney *Real
 
 		var stop *Stop
 		if journeyStopIndex == 0 {
-			pathItem.GetOriginStop()
 			stop = pathItem.OriginStop
 		} else {
-			pathItem.GetDestinationStop()
 			stop = pathItem.DestinationStop
 		}
 		if stop == nil {
@@ -377,6 +372,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 			var stopPlatform string
 			var stopPlatformType string
 			var destinationDisplay string
+			var displayReference *BoardDisplayReference
 			var delayed bool
 			departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
@@ -482,6 +478,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						delayed = boardEntryIsDelayed(scheduledStopTime, stopTime, departureBoardRecordType == DepartureBoardRecordTypeCancelled)
 
 						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)
+						displayReference = BoardDisplayReferenceFor(journey, journey.RealtimeJourney, boardType, wholeJourneyCancelled)
 						break
 					}
 				}
@@ -501,6 +498,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 					Journey:            journey,
 					Time:               stopTime,
 					DestinationDisplay: destinationDisplay,
+					DisplayReference:   displayReference,
 					Type:               departureBoardRecordType,
 					Delayed:            delayed,
 					Platform:           stopPlatform,
@@ -715,4 +713,58 @@ func applyBlockRealtimeEstimates(candidates []blockEstimateCandidate, blockJourn
 	}
 
 	return stats
+}
+
+// BoardDisplayReference describes optional display hydration after selection.
+// It is request-only metadata and never part of public response views.
+type BoardDisplayReference struct {
+	StopRef string
+	Stop    *Stop
+	Arrival bool
+}
+
+func BoardDisplayReferenceFor(journey *Journey, realtime *RealtimeJourney, kind BoardType, wholeCancelled bool) *BoardDisplayReference {
+	if journey == nil || len(journey.Path) == 0 {
+		return nil
+	}
+	if kind.IsArrival() {
+		p := journey.Path[0]
+		if p == nil {
+			return nil
+		}
+		return &BoardDisplayReference{p.OriginStopRef, p.OriginStop, true}
+	}
+	if wholeCancelled || realtime == nil {
+		return nil
+	}
+	last := journey.Path[len(journey.Path)-1]
+	if last == nil {
+		return nil
+	}
+	terminal := realtime.RealtimeStop(last.DestinationStopRef, len(journey.Path))
+	if terminal == nil || !terminal.Cancelled {
+		return nil
+	}
+	for i := len(journey.Path) - 1; i >= 0; i-- {
+		var ref string
+		var stop *Stop
+		if i == 0 {
+			p := journey.Path[0]
+			if p == nil {
+				continue
+			}
+			ref, stop = p.OriginStopRef, p.OriginStop
+		} else {
+			p := journey.Path[i-1]
+			if p == nil {
+				continue
+			}
+			ref, stop = p.DestinationStopRef, p.DestinationStop
+		}
+		if update := realtime.RealtimeStop(ref, i); update != nil && update.Cancelled {
+			continue
+		}
+		return &BoardDisplayReference{ref, stop, false}
+	}
+	return nil
 }

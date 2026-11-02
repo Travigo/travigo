@@ -396,117 +396,80 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 }
 
 func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
-	// Performance Review [Set C] [PR006] [P2] (boards): Missing displays cause serial FindOne calls
-	// per distinct destination and service; nil results are looked up repeatedly.
-	// Batch the final board's stop references and reuse the service hydration below,
-	// with explicit negative entries in the request cache. Keep projections narrow
-	// and preserve alias/platform matching and service-specific display overrides.
-	destinationFallbacks := 0
-	destinationServiceOverridesApplied := 0
-	destinationStopsByRef := map[string]*ctdf.Stop{}
-	serviceStopNameOverridesByRef := map[string]map[string]string{}
-
+	// Only selected entries reach this point. Share hydrated services with the
+	// transform pass so overrides and display fields use the same request data.
+	hydrateBoardServices(departureBoard)
+	refs := map[string]struct{}{}
 	for _, item := range departureBoard {
-		if item == nil || item.DestinationDisplay != "" || item.Journey == nil {
+		if item == nil || item.Journey == nil {
 			continue
 		}
-
-		if len(item.Journey.Path) == 0 {
-			item.DestinationDisplay = "See Vehicle"
-			destinationFallbacks++
+		if d := item.DisplayReference; d != nil {
+			if d.Stop == nil && d.StopRef != "" {
+				refs[d.StopRef] = struct{}{}
+			}
+		}
+		if item.DestinationDisplay == "" && (item.DisplayReference == nil || !item.DisplayReference.Arrival) && len(item.Journey.Path) > 0 {
+			p := item.Journey.Path[len(item.Journey.Path)-1]
+			if p != nil && p.DestinationStop == nil && p.DestinationStopRef != "" {
+				refs[p.DestinationStopRef] = struct{}{}
+			}
+		}
+	}
+	stops := loadStopsByReferences(refs, bson.M{"_id": 0, "primaryidentifier": 1, "otheridentifiers": 1, "primaryname": 1, "platforms.primaryidentifier": 1})
+	fallbacks, overrides := 0, 0
+	for _, item := range departureBoard {
+		if item == nil || item.Journey == nil {
 			continue
 		}
-
-		destinationFallbacks++
-		lastPathItem := item.Journey.Path[len(item.Journey.Path)-1]
-
-		destinationStop := lastPathItem.DestinationStop
-		if destinationStop == nil {
-			destinationStop = destinationStopsByRef[lastPathItem.DestinationStopRef]
+		names := map[string]string(nil)
+		if item.Journey.Service != nil {
+			names = item.Journey.Service.StopNameOverrides
 		}
-		if destinationStop == nil {
-			destinationStop = findDepartureDestinationStop(lastPathItem.DestinationStopRef)
-			if destinationStop != nil {
-				destinationStopsByRef[lastPathItem.DestinationStopRef] = destinationStop
-				destinationStopsByRef[destinationStop.PrimaryIdentifier] = destinationStop
-				for _, otherIdentifier := range destinationStop.OtherIdentifiers {
-					destinationStopsByRef[otherIdentifier] = destinationStop
+		if d := item.DisplayReference; d != nil {
+			stop := d.Stop
+			if stop == nil {
+				stop = stops[d.StopRef]
+			}
+			if stop != nil {
+				display, applied := resolveStopDisplayName(stop, names)
+				if display != "" {
+					item.DestinationDisplay = display
+					if applied {
+						overrides++
+					}
+					continue
+				}
+			}
+			if d.Arrival {
+				item.DestinationDisplay = d.StopRef
+				continue
+			}
+		}
+		// If a shortened terminal cannot resolve, preserve the prior fallback,
+		// including the ordinary terminal lookup when the scheduled display is empty.
+		if item.DestinationDisplay != "" {
+			continue
+		}
+		fallbacks++
+		var stop *ctdf.Stop
+		if len(item.Journey.Path) > 0 {
+			p := item.Journey.Path[len(item.Journey.Path)-1]
+			if p != nil {
+				stop = p.DestinationStop
+				if stop == nil {
+					stop = stops[p.DestinationStopRef]
 				}
 			}
 		}
-
-		if destinationStop == nil {
-			item.DestinationDisplay = "See Vehicle"
-			continue
+		display, applied := resolveStopDisplayName(stop, names)
+		item.DestinationDisplay = display
+		if applied {
+			overrides++
 		}
 
-		serviceStopNameOverrides := map[string]string(nil)
-		if item.Journey.Service != nil {
-			serviceStopNameOverrides = item.Journey.Service.StopNameOverrides
-		} else if item.Journey.ServiceRef != "" {
-			serviceStopNameOverrides = serviceStopNameOverridesByRef[item.Journey.ServiceRef]
-			if serviceStopNameOverrides == nil {
-				serviceStopNameOverrides = findDepartureServiceStopNameOverrides(item.Journey.ServiceRef)
-				serviceStopNameOverridesByRef[item.Journey.ServiceRef] = serviceStopNameOverrides
-			}
-		}
-
-		destinationDisplay, overrideApplied := resolveStopDisplayName(destinationStop, serviceStopNameOverrides)
-		if overrideApplied {
-			destinationServiceOverridesApplied++
-		}
-		item.DestinationDisplay = destinationDisplay
 	}
-
-	return destinationFallbacks, destinationServiceOverridesApplied
-}
-
-func findDepartureDestinationStop(stopRef string) *ctdf.Stop {
-	if stopRef == "" {
-		return nil
-	}
-
-	stopsCollection := database.GetCollection("stops")
-	var stop *ctdf.Stop
-	opts := options.FindOne().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "primaryidentifier", Value: 1},
-		bson.E{Key: "otheridentifiers", Value: 1},
-		bson.E{Key: "primaryname", Value: 1},
-	})
-	stopsCollection.FindOne(context.Background(), bson.M{
-		"$or": bson.A{
-			bson.M{"primaryidentifier": stopRef},
-			bson.M{"otheridentifiers": stopRef},
-		},
-	}, opts).Decode(&stop)
-
-	return stop
-}
-
-func findDepartureServiceStopNameOverrides(serviceRef string) map[string]string {
-	if serviceRef == "" {
-		return nil
-	}
-
-	servicesCollection := database.GetCollection("services")
-	var service *ctdf.Service
-	opts := options.FindOne().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "stopnameoverrides", Value: 1},
-	})
-	servicesCollection.FindOne(context.Background(), bson.M{
-		"$or": bson.A{
-			bson.M{"primaryidentifier": serviceRef},
-			bson.M{"otheridentifiers": serviceRef},
-		},
-	}, opts).Decode(&service)
-
-	if service == nil {
-		return nil
-	}
-
-	return service.StopNameOverrides
+	return fallbacks, overrides
 }
 
 func resolveStopDisplayName(stop *ctdf.Stop, stopNameOverrides map[string]string) (string, bool) {
@@ -530,7 +493,6 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 	reusedOperators := 0
 	reusedServices := 0
 	operatorRefs := map[string]struct{}{}
-	serviceRefs := map[string]struct{}{}
 
 	for _, item := range departureBoard {
 		if item == nil || item.Journey == nil {
@@ -540,13 +502,11 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 		if item.Journey.Operator == nil && item.Journey.OperatorRef != "" {
 			operatorRefs[item.Journey.OperatorRef] = struct{}{}
 		}
-		if item.Journey.Service == nil && item.Journey.ServiceRef != "" {
-			serviceRefs[item.Journey.ServiceRef] = struct{}{}
-		}
+
 	}
 
 	operatorsByID := loadOperatorsByReferences(operatorRefs)
-	servicesByID := loadServicesByReferences(serviceRefs)
+
 	transformedOperatorPointers := map[*ctdf.Operator]struct{}{}
 	transformedServicePointers := map[*ctdf.Service]struct{}{}
 
@@ -573,13 +533,6 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 			}
 		}
 
-		serviceKey := item.Journey.ServiceRef
-		if serviceKey == "" && item.Journey.Service != nil {
-			serviceKey = item.Journey.Service.PrimaryIdentifier
-		}
-		if item.Journey.Service == nil && serviceKey != "" {
-			item.Journey.Service = servicesByID[serviceKey]
-		}
 		if item.Journey.Service != nil {
 			if _, alreadyTransformed := transformedServicePointers[item.Journey.Service]; alreadyTransformed {
 				reusedServices++
@@ -597,6 +550,9 @@ func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (i
 func loadOperatorsByReferences(refs map[string]struct{}) map[string]*ctdf.Operator {
 	identifiers := departureBoardReferenceIdentifiers(refs)
 	operatorsByID := make(map[string]*ctdf.Operator, len(identifiers))
+	for _, id := range identifiers {
+		operatorsByID[id] = nil
+	}
 	if len(identifiers) == 0 {
 		return operatorsByID
 	}
@@ -630,22 +586,28 @@ func loadOperatorsByReferences(refs map[string]struct{}) map[string]*ctdf.Operat
 }
 
 func loadServicesByReferences(refs map[string]struct{}) map[string]*ctdf.Service {
+	return loadServicesByReferencesWithProjection(refs, bson.M{"_id": 0, "primaryidentifier": 1, "otheridentifiers": 1, "servicename": 1, "operatorref": 1, "brandcolour": 1, "secondarybrandcolour": 1, "brandicon": 1, "branddisplaymode": 1, "transporttype": 1, "stopnameoverrides": 1})
+}
+func loadServicesByReferencesWithProjection(refs map[string]struct{}, projection bson.M) map[string]*ctdf.Service {
 	identifiers := departureBoardReferenceIdentifiers(refs)
 	servicesByID := make(map[string]*ctdf.Service, len(identifiers))
+	for _, id := range identifiers {
+		servicesByID[id] = nil
+	}
+	opts := options.Find()
+	if projection != nil {
+		opts.SetProjection(projection)
+	}
 	if len(identifiers) == 0 {
 		return servicesByID
 	}
 
-	// Performance Review [Set C] [PR007] [P2] (boards): This final-board batch reads complete service
-	// documents, including routes, although the response needs only display fields.
-	// Project fields required by transforms and the selected response view; avoid
-	// decoding large route arrays again for every short board poll.
 	cursor, err := database.GetCollection("services").Find(context.Background(), bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": bson.M{"$in": identifiers}},
 			bson.M{"otheridentifiers": bson.M{"$in": identifiers}},
 		},
-	})
+	}, opts)
 	if err != nil {
 		log.Error().Err(err).Int("references", len(identifiers)).Msg("Failed to batch load departure board services")
 		return servicesByID

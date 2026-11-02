@@ -110,13 +110,22 @@ Repeated reference reads are visible in the request path, and the changes can pr
 
 **Completion checks:** Compare queries and decoded bytes per board/plan, including repeated destinations and absent references. Compare all supported response views, aliases, platform display names, service overrides and nested realtime journey tracks.
 
-| ID | Finding | Affected comment |
-| --- | --- | --- |
-| PR001 | Skip unused outer enrichment for realtime_only | [api/routes/journeys.go:45](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/journeys.go:45) |
-| PR002 | Batch plan reference hydration | [api/routes/planner.go:175](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/planner.go:175) |
-| PR006 | Batch missing board display lookups | [api/routes/stops.go:399](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/stops.go:399) |
-| PR007 | Project board service display fields | [api/routes/stops.go:639](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/stops.go:639) |
-| PR009 | Defer and batch arrival/cancelled-origin hydration | [ctdf/departureboard.go:236](/Users/aaronclaydon/projects/travigo/travigo/pkg/ctdf/departureboard.go:236) |
+| Status | ID | Finding | Affected comment |
+| --- | --- | --- | --- |
+| Implemented | PR001 | Skip unused outer enrichment for realtime_only | [api/routes/journeys.go:45](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/journeys.go:45) |
+| Implemented | PR002 | Batch plan reference hydration | [api/routes/planner.go:175](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/planner.go:175) |
+| Implemented | PR006 | Batch missing board display lookups | [api/routes/stops.go:399](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/stops.go:399) |
+| Implemented | PR007 | Project board service display fields | [api/routes/stops.go:639](/Users/aaronclaydon/projects/travigo/travigo/pkg/api/routes/stops.go:639) |
+| Implemented | PR009 | Defer and batch arrival/cancelled-origin hydration | [ctdf/departureboard.go:236](/Users/aaronclaydon/projects/travigo/travigo/pkg/ctdf/departureboard.go:236) |
+
+Implementation verified 2 November 2026:
+
+- `realtime_only` retains the static journey existence check and nested realtime journey track hydration, but skips unused outer operator/service/stop/track enrichment. Full journey views retain their existing hydration and transforms.
+- Web planner reference enrichment collects unique stop, service and operator references across all returned plans. Stops support primary, alias and platform IDs with the existing primary/alias/platform precedence. Exact endpoint primary IDs are reused directly. Endpoint aliases/platform IDs go through the same batch lookup so they cannot mask a separate exact primary match; resolved references reuse endpoint pointers only after their identity is confirmed. Full planner documents are retained; absent references remain request-local nil entries instead of causing repeated lookups.
+- Final-board service enrichment runs once and is reused for destination overrides and transformations, including misses. Board service projection retains identifiers, service name, operator ref, branding, transport type and stop-name overrides while excluding route arrays and other unused detailed fields. Planner services use the full-document loader. Board stop projections retain names and alias/platform identifiers for overrides.
+- Arrival origins and shortened destinations from cancelled terminal calls are selected without database reads during candidate generation. Both local and TfL sources carry internal display references to the API, which batch-resolves only the selected board entries after sorting/truncation. Metadata is excluded from public JSON and Sheriff views. Whole-journey cancellations, unresolved shortened stops and scheduled fallback displays retain their previous rules; resolved origins/shortened stops honor service overrides.
+
+Validation: `go test -race ./pkg/api/routes ./pkg/ctdf ./pkg/dataaggregator/... ./pkg/departuregraph ./pkg/realtime/realtimestore ./pkg/transforms` passes. MongoDB command mocks demonstrate 30 plans sharing three collection queries and 30 board displays sharing one service query plus one stop query, including repeated missing references. Tests inspect the board service projection, preserve full planner service fields, cover primary/alias/platform matching, endpoint identifier collisions in both directions, endpoint aliases/platforms masking separate primary records, overrides and missing shortened-terminal fallbacks, and check internal metadata is absent in basic/compact/LLM views. Mocked endpoint tests verify realtime-only skips outer reference queries, preserves nested track loading in default/web requests and retains missing-static-journey 404 behavior. Existing Sheriff view, cancellation, planner, graph and transform checks pass. No live MongoDB/API latency replay or production decoded-byte measurement was performed; measured query counts are from controlled command mocks, and the route-array savings are verified through the query projection.
 
 <a id="set-d"></a>
 
