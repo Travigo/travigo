@@ -40,6 +40,31 @@ The graph is deliberately non-blocking:
   zstd-compressed snapshot using a temporary file and atomic rename. A final
   checkpoint is attempted during graceful shutdown.
 
+Snapshot v9 encodes arrays and bucket contents in chunks of at most 4096
+records, avoiding a whole-graph gob buffer. Checkpoints capture array prefixes
+and copy mutable map headers/entries under the graph lock, then encode and
+write outside it. The index-map copies still require memory proportional to
+the number of buckets; the large path and departure arrays are shared.
+Append-only scans and fills continue during checkpoint I/O. Compaction and
+topology replacement wait on a separate maintenance barrier, without holding
+the graph lock while they wait.
+
+Versions 1–8 remain readable and are rewritten as v9 on the next checkpoint.
+Their first restore still uses the legacy whole-value decoder. Complete
+snapshots no longer allocate construction-only string/journey lookup maps.
+An empty or structurally inconsistent restored topology is invalidated and
+reloaded from MongoDB, preserving the restored timetable. Empty stop scans
+fail and retry instead of permanently marking topology ready.
+
+GTFS imports interpolate missing intermediate call times evenly by stop order
+between surrounding timed calls, preserving known times, dwell and offsets
+beyond 24:00. Missing endpoints, malformed times and backwards schedules are
+rejected with bounded sample warnings and an aggregate count. MongoDB reads
+also repair older sparse journeys, and legacy snapshots repair and reindex
+their missing times during restore. An unrepairable legacy snapshot is rejected
+so the service can rebuild from MongoDB. Graph insertion rejects missing or
+out-of-range path times before retaining any part of a journey.
+
 Journey paths are stored once even when a journey operates on several days.
 Service-date membership and the departure index contain integer journey
 references. Transfer adjacency uses compact fixed-width records and offsets;
@@ -57,8 +82,8 @@ This keeps each path record at 28 bytes. After a rolling scan completes, the
 graph also releases its all-string, journey-identity and completed-day build
 maps, retaining a smaller stop-reference lookup for serving requests. Those
 build maps are reconstructed only if the sealed generation later needs a lazy
-fill. Rolling rebuilds start with a fresh generation so completed-day index
-entries cannot be duplicated as the configured date window shifts.
+fill or resumes construction after a restart. Rolling rebuilds append missing
+days and compact the retained generation when the scan completes.
 
 ## Configuration
 
@@ -80,8 +105,8 @@ The web API Helm chart keeps the API as its existing stateless Deployment and
 adds a separate, single-replica graph StatefulSet plus an internal headless
 Service. The graph pod has a restart-stable `ReadWriteOnce` claim, avoiding
 concurrent snapshot writers and duplicate background MongoDB scans. It requests
-6 GiB of memory by default; this should be adjusted using the emitted
-stored-journey, path, and bucket counts after the first production build.
+10 GiB of memory and has a 12 GiB limit by default. Size these using measured
+build, checkpoint and restore peaks; `GOMEMLIMIT` is a soft runtime target.
 The pod runs as UID/GID 1000 and mounts the claim with `fsGroup: 1000`, allowing
 atomic snapshot creation on a newly provisioned volume.
 
@@ -98,7 +123,8 @@ atomic snapshot creation on a newly provisioned volume.
   `StaticRoutingReady` report planner topology; `ArrivalBuckets` remains zero
   for compatibility. `Lookups` adds hit
   and miss counts and hit rate plus lazy-fill counts, failures, in-flight fills
-  and average/maximum fill time.
+  and average/maximum fill time. `RejectedJourneyDays` counts attempted
+  journey-day insertions rejected for invalid path times during this process.
 - `BackgroundBuild`: whether a scan is active, estimated and scanned
   journey counts, count restored from a resumable checkpoint, progress from `0`
   to `1`, scan rate, estimated time remaining, duration, active journey-day
@@ -113,4 +139,6 @@ The endpoint calculates metrics from counters and current runtime state; it does
 not traverse the graph. `GET /livez` reports that the service process is alive
 and is used for startup and liveness probes. `GET /healthz` reports graph
 readiness and returns 503 while topology, timetable, or static routing indexes
-are still being built.
+are still being built. Health and stats never wait for the graph lock: during
+write-lock contention, counters use the latest cached observation and readiness
+is conservatively reported as unavailable.

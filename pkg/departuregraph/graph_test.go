@@ -532,6 +532,9 @@ func TestIncompleteCheckpointDoesNotReplaceCompleteSnapshot(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "departure-graph.gob.zst")
 	graph := New(&fakeLoader{}, Config{Enabled: true, SnapshotPath: path})
 	complete := graph.current.Load()
+	if err := complete.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{{PrimaryIdentifier: "stop"}}}); err != nil {
+		t.Fatal(err)
+	}
 	complete.mu.Lock()
 	complete.TopologyReady = true
 	complete.StaticRoutingReady = true

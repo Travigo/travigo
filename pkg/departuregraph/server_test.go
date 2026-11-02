@@ -157,6 +157,9 @@ func TestLiveEndpointIsIndependentFromGraphReadiness(t *testing.T) {
 	}
 
 	data := graph.current.Load()
+	if err := data.loadTopology(context.Background(), planningTopologyLoader{stops: []*ctdf.Stop{{PrimaryIdentifier: "stop"}}}); err != nil {
+		t.Fatal(err)
+	}
 	data.mu.Lock()
 	data.TopologyReady = true
 	data.StaticRoutingReady = true

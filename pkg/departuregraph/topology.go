@@ -61,11 +61,21 @@ type topologyTransfer struct {
 func (d *graphData) topologyReady() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return d.TopologyReady
+	return d.validTopologyLocked()
+}
+
+func (d *graphData) validTopologyLocked() bool {
+	return d.TopologyReady && len(d.Stops) > 0 && len(d.StopIdentifiers) > 0 &&
+		len(d.TransferOffsets) == len(d.Stops)+1 &&
+		len(d.StopAliasOffsets) == len(d.Stops)+1 &&
+		d.TransferOffsets[len(d.Stops)] == uint32(len(d.Transfers)) &&
+		d.StopAliasOffsets[len(d.Stops)] == uint32(len(d.StopAliases))
 }
 
 func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) error {
 	started := time.Now()
+	d.checkpointMu.Lock()
+	defer d.checkpointMu.Unlock()
 	d.mu.Lock()
 	d.ensureBuildIndexesLocked()
 	d.Stops = nil
@@ -121,6 +131,9 @@ func (d *graphData) loadTopology(ctx context.Context, loader TopologyLoader) err
 		return nil
 	}); err != nil {
 		return fmt.Errorf("load journey graph stops: %w", err)
+	}
+	if len(identifierToStop) == 0 {
+		return fmt.Errorf("load journey graph stops: no valid stops found; topology will be retried")
 	}
 
 	transfers := make([]topologyTransfer, 0, len(d.Stops)*4)

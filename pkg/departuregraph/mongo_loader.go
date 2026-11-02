@@ -102,6 +102,9 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 			return nil, err
 		}
 		if journey.Availability != nil && journey.Availability.MatchDate(serviceDate) {
+			if err := repairMissingJourneyTimes(&journey); err != nil {
+				continue
+			}
 			journeys = append(journeys, &journey)
 		}
 	}
@@ -135,11 +138,25 @@ func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, a
 		if err := cursor.Decode(&record); err != nil {
 			return fmt.Errorf("decode journey for departure graph: %w", err)
 		}
+		// Old GTFS imports stored absent intermediate times as time.Time{}.
+		// Repair those on read too, so recovery does not depend on a reimport.
+		// Unresolvable records still visit the graph for rejection accounting
+		// and to advance the resumable MongoDB cursor.
+		_ = repairMissingJourneyTimes(&record.Journey)
 		if err := visit(&record.Journey, record.ID.Hex()); err != nil {
 			return err
 		}
 	}
 	return cursor.Err()
+}
+
+func repairMissingJourneyTimes(journey *ctdf.Journey) error {
+	for _, path := range journey.Path {
+		if path == nil || path.OriginDepartureTime.IsZero() || path.DestinationArrivalTime.IsZero() {
+			return ctdf.InterpolateMissingJourneyTimes(journey)
+		}
+	}
+	return nil
 }
 
 // journeyServiceDateFilter is a conservative, indexable first pass. It only

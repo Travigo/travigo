@@ -729,6 +729,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	log.Info().Msg("Importing Finished Journeys")
 	journeysQueue := NewDatabaseBatchProcessingQueue(database.JourneysRawCollectionName, 1*time.Second, 1*time.Minute, journeyBatchSize)
 	importedJourneys := 0
+	rejectedJourneys := 0
+	rejectJourney := func(tripID string, err error) error {
+		rejectedJourneys++
+		if rejectedJourneys <= 5 {
+			log.Warn().Err(err).Str("trip", tripID).Msg("Skipping GTFS journey with unresolved times")
+		}
+		return nil
+	}
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
@@ -753,17 +761,17 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			stopTime := stopTimes[index]
 			previousStopTime := stopTimes[index-1]
 
-			originArrivalTime, err := parseGTFSTime(previousStopTime.ArrivalTime)
+			originArrivalTime, err := parseOptionalGTFSTime(previousStopTime.ArrivalTime)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse previousStopTime.ArrivalTime")
+				return rejectJourney(tripID, err)
 			}
-			originDeparturelTime, err := parseGTFSTime(previousStopTime.DepartureTime)
+			originDeparturelTime, err := parseOptionalGTFSTime(previousStopTime.DepartureTime)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse previousStopTime.DepartureTime")
+				return rejectJourney(tripID, err)
 			}
-			destinationArrivalTime, err := parseGTFSTime(stopTime.ArrivalTime)
+			destinationArrivalTime, err := parseOptionalGTFSTime(stopTime.ArrivalTime)
 			if err != nil {
-				log.Error().Err(err).Msg("Failed to parse stopTime.ArrivalTime")
+				return rejectJourney(tripID, err)
 			}
 
 			var originStopRef string
@@ -807,6 +815,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			if index == 1 {
 				journey.DepartureTime = originDeparturelTime
 			}
+		}
+
+		if err := ctdf.InterpolateMissingJourneyTimes(journey); err != nil {
+			return rejectJourney(tripID, err)
 		}
 
 		patternHash := journeyPathPatternHash(trip.ShapeID, stopTimes)
@@ -927,6 +939,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		Int("path_pattern_cache_evictions", pathTrackCache.evictions).
 		Msg("Finished GTFS journey track processing")
 
+	if rejectedJourneys > 0 {
+		log.Warn().Str("dataset", dataset.Identifier).Int("rejected_journeys", rejectedJourneys).Msg("GTFS journeys omitted because their times could not be resolved")
+	}
 	log.Info().Msg("Finished Journeys")
 
 	return datasets.DataImportReport{
@@ -988,6 +1003,13 @@ func convertTransportType(intType int) ctdf.TransportType {
 	} else {
 		return ctdf.TransportTypeUnknown
 	}
+}
+
+func parseOptionalGTFSTime(timestamp string) (time.Time, error) {
+	if strings.TrimSpace(timestamp) == "" {
+		return time.Time{}, nil
+	}
+	return parseGTFSTime(timestamp)
 }
 
 func parseGTFSTime(timestamp string) (time.Time, error) {

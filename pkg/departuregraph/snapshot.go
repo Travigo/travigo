@@ -2,14 +2,16 @@ package departuregraph
 
 import (
 	"bufio"
-	"encoding/gob"
 	"fmt"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type snapshotFile struct {
@@ -129,48 +131,7 @@ func (g *Graph) save(path string, data *graphData) error {
 		return err
 	}
 
-	// Performance Review [Set P] [PR085] [P2] (indexing): The graph read lock spans gob encoding,
-	// compression and writes of the entire snapshot. A waiting fill/build writer then
-	// also blocks new readers on the RWMutex, so checkpoint I/O can stall boards and
-	// planning. Measure lock wait during saves; checkpoint immutable chunks or a
-	// bounded consistent view without copying the whole graph or holding this lock
-	// across slow storage operations.
-	data.mu.RLock()
-	err = gob.NewEncoder(compressor).Encode(snapshotFile{
-		Version:                snapshotVersion,
-		WrittenAt:              time.Now(),
-		Strings:                data.Strings,
-		StopIdentifiers:        data.StopIdentifiers,
-		Stops:                  data.Stops,
-		StopAliasOffsets:       data.StopAliasOffsets,
-		StopAliases:            data.StopAliases,
-		StopGrid:               data.StopGrid,
-		TransferOffsets:        data.TransferOffsets,
-		Transfers:              data.Transfers,
-		TransferRestrictions:   data.TransferRestrictions,
-		TopologyReady:          data.TopologyReady,
-		ReverseTransferOffsets: data.ReverseTransferOffsets,
-		ReverseTransferOrigins: data.ReverseTransferOrigins,
-		ArrivalPatternOffsets:  data.ArrivalPatternOffsets,
-		ArrivalPatterns:        data.ArrivalPatterns,
-		StaticPatterns:         data.StaticPatterns,
-		StaticPatternStops:     data.StaticPatternStops,
-		JourneyPatterns:        data.JourneyPatterns,
-		StaticRoutingReady:     data.StaticRoutingReady,
-		Journeys:               data.Journeys,
-		Paths:                  data.Paths,
-		Replacements:           data.Replacements,
-		JourneyDays:            data.JourneyDays,
-		DayJourneys:            data.DayJourneys,
-		Boardings:              data.Departures,
-		CompleteStops:          data.CompleteStops,
-		CompleteDays:           data.CompleteDays,
-		ScanDays:               data.ScanDays,
-		ScanCursor:             data.ScanCursor,
-		ScanProcessed:          data.ScanProcessed,
-		ScanActive:             data.ScanActive,
-	})
-	data.mu.RUnlock()
+	err = data.writeSnapshot(compressor)
 	if err == nil {
 		err = compressor.Close()
 	} else {
@@ -195,6 +156,52 @@ func (g *Graph) save(path string, data *graphData) error {
 	return nil
 }
 
+// writeSnapshot captures array prefixes and bucket slice headers under the graph
+// lock. Mutable index maps are copied; path and departure arrays are shared.
+// The maintenance barrier keeps those prefixes immutable until encoding finishes.
+// Ordinary append-only fills and scans keep running, and disk I/O holds no mu.
+func (data *graphData) writeSnapshot(w io.Writer) error {
+	data.checkpointMu.RLock()
+	defer data.checkpointMu.RUnlock()
+	data.mu.RLock()
+	snapshot := snapshotFile{
+		Version:                snapshotVersion,
+		WrittenAt:              time.Now(),
+		Strings:                data.Strings,
+		StopIdentifiers:        data.StopIdentifiers,
+		Stops:                  data.Stops,
+		StopAliasOffsets:       data.StopAliasOffsets,
+		StopAliases:            data.StopAliases,
+		StopGrid:               data.StopGrid,
+		TransferOffsets:        data.TransferOffsets,
+		Transfers:              data.Transfers,
+		TransferRestrictions:   data.TransferRestrictions,
+		TopologyReady:          data.TopologyReady,
+		ReverseTransferOffsets: data.ReverseTransferOffsets,
+		ReverseTransferOrigins: data.ReverseTransferOrigins,
+		ArrivalPatternOffsets:  data.ArrivalPatternOffsets,
+		ArrivalPatterns:        data.ArrivalPatterns,
+		StaticPatterns:         data.StaticPatterns,
+		StaticPatternStops:     data.StaticPatternStops,
+		JourneyPatterns:        data.JourneyPatterns,
+		StaticRoutingReady:     data.StaticRoutingReady,
+		Journeys:               data.Journeys,
+		Paths:                  data.Paths,
+		Replacements:           data.Replacements,
+		JourneyDays:            maps.Clone(data.JourneyDays),
+		DayJourneys:            maps.Clone(data.DayJourneys),
+		Boardings:              maps.Clone(data.Departures),
+		CompleteStops:          maps.Clone(data.CompleteStops),
+		CompleteDays:           maps.Clone(data.CompleteDays),
+		ScanDays:               append([]dayKey(nil), data.ScanDays...),
+		ScanCursor:             data.ScanCursor,
+		ScanProcessed:          data.ScanProcessed,
+		ScanActive:             data.ScanActive,
+	}
+	data.mu.RUnlock()
+	return encodeSnapshot(w, snapshot)
+}
+
 func (g *Graph) restore(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
@@ -212,7 +219,7 @@ func (g *Graph) restore(path string) error {
 	defer decoder.Close()
 
 	var snapshot snapshotFile
-	if err := gob.NewDecoder(decoder).Decode(&snapshot); err != nil {
+	if err := decodeSnapshot(decoder, &snapshot); err != nil {
 		return err
 	}
 	if snapshot.Version < 1 || snapshot.Version > snapshotVersion {
@@ -232,14 +239,8 @@ func (g *Graph) restore(path string) error {
 	}
 	legacyDepartures := snapshot.Boardings == nil
 
-	// Performance Review [Set P] [PR086] [P2] (indexing): Complete current-format snapshots recreate
-	// and populate the full StringIDs/JourneyIDs maps only to release them at the end.
-	// Those temporary maps raise startup peak memory alongside decoded graph arrays.
-	// Build them only for migration/resumed construction paths that need them, and
-	// measure cold-start peak RSS as well as the much smaller post-seal heap.
 	restored := &graphData{
 		Strings:                snapshot.Strings,
-		StringIDs:              make(map[string]stringID, len(snapshot.Strings)),
 		StopIDs:                map[string]stringID{"": 0},
 		StopIdentifiers:        snapshot.StopIdentifiers,
 		Stops:                  snapshot.Stops,
@@ -261,7 +262,6 @@ func (g *Graph) restore(path string) error {
 		Journeys:               snapshot.Journeys,
 		Paths:                  snapshot.Paths,
 		Replacements:           snapshot.Replacements,
-		JourneyIDs:             make(map[journeyKey]journeyID, len(snapshot.Journeys)),
 		JourneyDays:            snapshot.JourneyDays,
 		DayJourneys:            snapshot.DayJourneys,
 		Departures:             snapshot.Boardings,
@@ -271,6 +271,13 @@ func (g *Graph) restore(path string) error {
 		ScanCursor:             snapshot.ScanCursor,
 		ScanProcessed:          snapshot.ScanProcessed,
 		ScanActive:             snapshot.ScanActive,
+	}
+	if !restored.validTopologyLocked() {
+		if restored.TopologyReady {
+			log.Warn().Msg("Snapshot topology is empty or inconsistent; reloading stops and transfers")
+		}
+		restored.TopologyReady = false
+		restored.StaticRoutingReady = false
 	}
 	if len(restored.Strings) == 0 {
 		restored.Strings = []string{""}
@@ -348,8 +355,10 @@ func (g *Graph) restore(path string) error {
 	if restored.CompleteDays == nil {
 		restored.CompleteDays = map[dayKey]bool{}
 	}
-	for index, value := range restored.Strings {
-		restored.StringIDs[value] = stringID(index)
+	if snapshot.Version < 9 {
+		if err := restored.repairLegacySnapshotTimes(); err != nil {
+			return err
+		}
 	}
 	for _, path := range restored.Paths {
 		for _, stopID := range []stringID{path.OriginStopRef, path.DestinationStopRef} {
@@ -377,14 +386,17 @@ func (g *Graph) restore(path string) error {
 			restored.StopIDs[value] = key.StopRef
 		}
 	}
-	for index, journey := range restored.Journeys {
-		restored.JourneyIDs[journeyKey{PrimaryID: journey.PrimaryID}] = journeyID(index)
-	}
-	if len(restored.ScanDays) == 0 && len(restored.CompleteDays) > 0 {
+	if len(restored.ScanDays) > 0 || len(restored.CompleteDays) == 0 {
+		restored.ensureBuildIndexesLocked()
+	} else {
 		restored.sealBuildIndexesLocked()
 	}
 
 	g.current.Store(restored)
+	if snapshot.Version < 9 {
+		// Convert a complete legacy checkpoint even when no timetable changes.
+		g.snapshotRevision.Add(1)
+	}
 	if restored.snapshotComplete() {
 		g.completeSnapshot.Store(true)
 	}
@@ -398,5 +410,79 @@ func (g *Graph) restore(path string) error {
 		Int("departure_buckets", stats.DepartureBuckets).
 		Int("arrival_buckets", stats.ArrivalBuckets).
 		Msg("Departure graph snapshot restored")
+	return nil
+}
+
+// Legacy snapshots can contain the 366-day offset produced from time.Time{}.
+// Repair only affected journeys, then replace their boarding entries. An
+// unrepairable checkpoint is rejected so startup can rebuild from MongoDB.
+func (d *graphData) repairLegacySnapshotTimes() error {
+	repaired := map[journeyID]bool{}
+	for index, record := range d.Journeys {
+		_, initialOK := packDepartureEntry(0, 0, record.InitialArrival)
+		_, departureOK := packDepartureEntry(0, 0, record.DepartureSeconds)
+		invalid := !initialOK || !departureOK
+		if uint64(record.PathStart)+uint64(record.PathCount) > uint64(len(d.Paths)) {
+			return fmt.Errorf("invalid snapshot journey path bounds")
+		}
+		for _, path := range d.Paths[record.PathStart : record.PathStart+record.PathCount] {
+			_, departureOK := packDepartureEntry(0, 0, path.OriginDeparture)
+			_, arrivalOK := packDepartureEntry(0, 0, path.DestinationArrival)
+			invalid = invalid || !departureOK || !arrivalOK
+		}
+		if !invalid {
+			continue
+		}
+		journey := d.materializeJourney(journeyID(index))
+		if err := ctdf.InterpolateMissingJourneyTimes(journey); err != nil {
+			return fmt.Errorf("repair snapshot journey %s: %w", journey.PrimaryIdentifier, err)
+		}
+		for offset, path := range journey.Path {
+			stored := &d.Paths[int(record.PathStart)+offset]
+			stored.OriginDeparture = serviceSeconds(path.OriginDepartureTime)
+			stored.DestinationArrival = serviceSeconds(path.DestinationArrivalTime)
+			if _, ok := packDepartureEntry(0, 0, stored.OriginDeparture); !ok {
+				return fmt.Errorf("snapshot journey time remains out of bounds")
+			}
+			if _, ok := packDepartureEntry(0, 0, stored.DestinationArrival); !ok {
+				return fmt.Errorf("snapshot journey time remains out of bounds")
+			}
+		}
+		d.Journeys[index].InitialArrival = serviceSeconds(journey.Path[0].OriginArrivalTime)
+		d.Journeys[index].DepartureSeconds = serviceSeconds(journey.DepartureTime)
+		repaired[journeyID(index)] = true
+	}
+	if len(repaired) == 0 {
+		return nil
+	}
+	for key, entries := range d.Departures {
+		kept := entries[:0]
+		for _, entry := range entries {
+			if !repaired[entry.journey()] {
+				kept = append(kept, entry)
+			}
+		}
+		d.Departures[key] = kept
+	}
+	for day, journeys := range d.DayJourneys {
+		for _, id := range journeys {
+			if !repaired[id] {
+				continue
+			}
+			record := d.Journeys[id]
+			for index := uint32(0); index < record.PathCount; index++ {
+				path := d.Paths[record.PathStart+index]
+				if path.OriginStopRef == 0 || path.OriginActivity == activitySetdown {
+					continue
+				}
+				entry, _ := packDepartureEntry(id, index, path.OriginDeparture)
+				key := bucketKey{Day: day, StopRef: path.OriginStopRef}
+				d.Departures[key] = append(d.Departures[key], entry)
+			}
+		}
+	}
+	d.sortDepartureBucketsLocked()
+	d.StaticRoutingReady = false
+	log.Info().Int("journeys", len(repaired)).Msg("Repaired missing times in legacy departure graph snapshot")
 	return nil
 }

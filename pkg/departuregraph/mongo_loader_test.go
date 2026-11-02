@@ -6,9 +6,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/travigo/travigo/pkg/ctdf"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+func TestMongoJourneyRepairResolvesStoredZeroTimes(t *testing.T) {
+	journey := testJourney()
+	journey.Path[0].DestinationArrivalTime = time.Time{}
+	journey.Path[1].OriginArrivalTime = time.Time{}
+	journey.Path[1].OriginDepartureTime = time.Time{}
+	if err := repairMissingJourneyTimes(journey); err != nil {
+		t.Fatal(err)
+	}
+	if journey.Path[1].OriginDepartureTime.IsZero() || !journey.Path[0].DestinationArrivalTime.Equal(journey.Path[1].OriginDepartureTime) {
+		t.Fatal("stored intermediate zero times were not repaired")
+	}
+	data := newGraphData()
+	data.addJourney(20261102, journey)
+	if len(data.materializeStop(20261102, []string{"stop-b"})) != 1 {
+		t.Fatal("repaired call was not indexed")
+	}
+	if err := repairMissingJourneyTimes(&ctdf.Journey{Path: []*ctdf.JourneyPathItem{{}}}); err == nil {
+		t.Fatal("unresolvable stored journey was accepted")
+	}
+}
 
 func TestMongoJourneyRecordDecodesIdentifierAndProjectedJourney(t *testing.T) {
 	identifier := primitive.NewObjectID()

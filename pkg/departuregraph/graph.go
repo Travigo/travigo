@@ -15,7 +15,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const snapshotVersion = 8
+const snapshotVersion = 9
 
 const (
 	maximumPendingStopFills     = 4096
@@ -127,6 +127,11 @@ type staticPatternRecord struct {
 
 type graphData struct {
 	mu sync.RWMutex
+	// Checkpoints retain immutable array prefixes. Appends can continue, while
+	// compaction and topology replacement wait here before taking mu.
+	checkpointMu        sync.RWMutex
+	lastStats           atomic.Pointer[Stats]
+	rejectedJourneyDays uint64
 
 	Strings                 []string
 	StringIDs               map[string]stringID
@@ -559,7 +564,9 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	if !configured || !matching {
 		next.setScanProgress(dates, cursor, processed, active)
 	}
-	// Performance Review [Set I] [PR072] [P1] (indexing): TopologyReady never becomes false after
+	g.metrics.build.begin(processed, active)
+	defer func() { g.metrics.build.finish(err) }()
+	// Performance Review [Set I] [PR072] [P1] (indexing): Valid topology is reused after
 	// a successful load/restore. Stop aliases, coordinates and transfer changes from
 	// later imports therefore never refresh, even as journey days advance. Track
 	// stop/transfer dataset generations separately and republish their dependent
@@ -578,8 +585,6 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 	// timetable generation, and replace affected day indexes when that generation
 	// changes instead of treating completion as permanent freshness.
 	missingDates := next.missingRollingDates(dates)
-	g.metrics.build.begin(processed, active)
-	defer func() { g.metrics.build.finish(err) }()
 	if counter, ok := g.loader.(JourneyCounter); ok {
 		if total, countErr := counter.JourneyCount(ctx, missingDates); countErr == nil {
 			g.metrics.build.setEstimatedJourneys(total)
@@ -595,8 +600,9 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 		if journey != nil && journey.Availability != nil {
 			for _, serviceDate := range missingDates {
 				if journey.Availability.MatchDate(serviceDate) {
-					next.addJourney(makeDayKey(serviceDate), journey)
-					activeForJourney++
+					if next.addJourney(makeDayKey(serviceDate), journey) {
+						activeForJourney++
+					}
 				}
 			}
 		}
@@ -637,6 +643,9 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 		}
 	}
 	stats := next.stats()
+	if stats.RejectedJourneyDays > 0 {
+		log.Warn().Uint64("rejected_journey_days", stats.RejectedJourneyDays).Msg("Departure graph has rejected journey-days with invalid path times")
+	}
 	log.Info().
 		Int64("scanned_journeys", processed).
 		Int64("scanned_this_run", processedThisRun).
@@ -645,6 +654,7 @@ func (g *Graph) rebuildRolling(ctx context.Context, now time.Time) (err error) {
 		Int("stored_paths", stats.Paths).
 		Int("departure_buckets", stats.DepartureBuckets).
 		Int("arrival_buckets", stats.ArrivalBuckets).
+		Uint64("rejected_journey_days", stats.RejectedJourneyDays).
 		Dur("duration", time.Since(started)).
 		Msg("Departure graph rolling rebuild complete")
 	return nil
@@ -670,7 +680,7 @@ func (d *graphData) hasCompleteDays() bool {
 func (d *graphData) snapshotComplete() bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return d.TopologyReady && d.StaticRoutingReady && len(d.CompleteDays) > 0 && len(d.ScanDays) == 0
+	return d.validTopologyLocked() && d.StaticRoutingReady && len(d.CompleteDays) > 0 && len(d.ScanDays) == 0
 }
 
 func (d *graphData) scanState(dates []time.Time) (configured bool, matching bool, cursor string, processed int64, active int64) {
@@ -719,6 +729,8 @@ func (d *graphData) missingRollingDates(dates []time.Time) []time.Time {
 }
 
 func (d *graphData) completeRollingScan(dates []time.Time) {
+	d.checkpointMu.Lock()
+	defer d.checkpointMu.Unlock()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	keepDays := make(map[dayKey]bool, len(dates))
@@ -875,6 +887,9 @@ func dayKeyDate(value dayKey, location *time.Location) time.Time {
 }
 
 func serviceSeconds(value time.Time) int32 {
+	if value.IsZero() {
+		return -1 << 31
+	}
 	if value.Year() > 1 {
 		return int32(value.Hour()*3600 + value.Minute()*60 + value.Second())
 	}
@@ -992,15 +1007,30 @@ func (d *graphData) addJourneys(day dayKey, journeys []*ctdf.Journey) {
 	}
 }
 
-func (d *graphData) addJourney(day dayKey, journey *ctdf.Journey) {
+func (d *graphData) addJourney(day dayKey, journey *ctdf.Journey) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.addJourneyLocked(day, journey)
+	return d.addJourneyLocked(day, journey)
 }
 
-func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
+func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 	if journey == nil || journey.PrimaryIdentifier == "" || len(journey.Path) == 0 {
-		return
+		return false
+	}
+	// Validate before interning or retaining any part of a corrupt journey.
+	for index, path := range journey.Path {
+		if path == nil || path.OriginDepartureTime.IsZero() || path.DestinationArrivalTime.IsZero() {
+			d.rejectedJourneyDays++
+			return false
+		}
+		if _, ok := packDepartureEntry(0, uint32(index), serviceSeconds(path.OriginDepartureTime)); !ok {
+			d.rejectedJourneyDays++
+			return false
+		}
+		if _, ok := packDepartureEntry(0, 0, serviceSeconds(path.DestinationArrivalTime)); !ok {
+			d.rejectedJourneyDays++
+			return false
+		}
 	}
 	d.ensureBuildIndexesLocked()
 	primaryID := d.intern(journey.PrimaryIdentifier)
@@ -1024,8 +1054,14 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 			ReplacementStart:   uint32(len(d.Replacements)),
 			ReplacementCount:   uint32(len(journey.ReplacesJourneyRefs)),
 		}
+		if journey.DepartureTime.IsZero() {
+			record.DepartureSeconds = serviceSeconds(journey.Path[0].OriginDepartureTime)
+		}
 		if journey.Path[0] != nil {
 			record.InitialArrival = serviceSeconds(journey.Path[0].OriginArrivalTime)
+			if journey.Path[0].OriginArrivalTime.IsZero() {
+				record.InitialArrival = serviceSeconds(journey.Path[0].OriginDepartureTime)
+			}
 		}
 		if journey.DataSource != nil {
 			record.DatasetID = d.intern(journey.DataSource.DatasetID)
@@ -1041,10 +1077,6 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 		}
 
 		for _, path := range journey.Path {
-			if path == nil {
-				d.Paths = append(d.Paths, pathRecord{})
-				continue
-			}
 			d.Paths = append(d.Paths, pathRecord{
 				OriginStopRef:       d.internStop(path.OriginStopRef),
 				DestinationStopRef:  d.internStop(path.DestinationStopRef),
@@ -1064,7 +1096,7 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 
 	activeKey := journeyDayKey{Day: day, Journey: id}
 	if d.JourneyDays[activeKey] {
-		return
+		return true
 	}
 	d.JourneyDays[activeKey] = true
 	d.DayJourneys[day] = append(d.DayJourneys[day], id)
@@ -1075,14 +1107,10 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) {
 			key := bucketKey{Day: day, StopRef: path.OriginStopRef}
 			if entry, ok := packDepartureEntry(id, index, path.OriginDeparture); ok {
 				d.Departures[key] = append(d.Departures[key], entry)
-			} else {
-				// The packed bounds are deliberately generous (65k calls and
-				// roughly six days either side of midnight). Do not silently
-				// create an unrouteable journey if corrupt input exceeds them.
-				log.Warn().Str("journey", journey.PrimaryIdentifier).Uint32("path_index", index).Int32("departure_seconds", path.OriginDeparture).Msg("Journey omitted from departure index because its path or time exceeds packed bounds")
 			}
 		}
 	}
+	return true
 }
 
 func (d *graphData) stopComplete(day dayKey, canonical string) bool {
@@ -1306,23 +1334,24 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 }
 
 type Stats struct {
-	Strings            int
-	Stops              int
-	StopIdentifiers    int
-	TransferEdges      int
-	TopologyReady      bool
-	StaticRideLinks    int
-	StaticRoutingReady bool
-	Journeys           int
-	Paths              int
-	DepartureBuckets   int
-	ArrivalBuckets     int
-	CompleteStops      int
-	CompleteDays       int
-	ServingToday       bool
-	Lookups            LookupStats
-	BackgroundBuild    BuildStats
-	Snapshot           SnapshotStats
+	Strings             int
+	Stops               int
+	StopIdentifiers     int
+	TransferEdges       int
+	TopologyReady       bool
+	StaticRideLinks     int
+	StaticRoutingReady  bool
+	Journeys            int
+	Paths               int
+	DepartureBuckets    int
+	ArrivalBuckets      int
+	CompleteStops       int
+	CompleteDays        int
+	ServingToday        bool
+	RejectedJourneyDays uint64
+	Lookups             LookupStats
+	BackgroundBuild     BuildStats
+	Snapshot            SnapshotStats
 }
 
 func (g *Graph) Stats() Stats {
@@ -1337,24 +1366,36 @@ func (g *Graph) Stats() Stats {
 }
 
 func (d *graphData) stats() Stats {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	return Stats{
-		Strings:            len(d.Strings),
-		Stops:              len(d.Stops),
-		StopIdentifiers:    len(d.StopIdentifiers),
-		TransferEdges:      len(d.Transfers),
-		TopologyReady:      d.TopologyReady,
-		StaticRideLinks:    len(d.ArrivalPatterns),
-		StaticRoutingReady: d.StaticRoutingReady,
-		Journeys:           len(d.Journeys),
-		Paths:              len(d.Paths),
-		DepartureBuckets:   len(d.Departures),
-		ArrivalBuckets:     0,
-		CompleteStops:      len(d.CompleteStops),
-		CompleteDays:       len(d.CompleteDays),
-		ServingToday:       d.CompleteDays[makeDayKey(time.Now())],
+	// Probes and diagnostics must never queue behind maintenance writers.
+	if !d.mu.TryRLock() {
+		if previous := d.lastStats.Load(); previous != nil {
+			stats := *previous
+			stats.StaticRoutingReady = false
+			stats.ServingToday = false
+			return stats
+		}
+		return Stats{}
 	}
+	defer d.mu.RUnlock()
+	stats := Stats{
+		Strings:             len(d.Strings),
+		Stops:               len(d.Stops),
+		StopIdentifiers:     len(d.StopIdentifiers),
+		TransferEdges:       len(d.Transfers),
+		TopologyReady:       d.validTopologyLocked(),
+		StaticRideLinks:     len(d.ArrivalPatterns),
+		StaticRoutingReady:  d.StaticRoutingReady,
+		Journeys:            len(d.Journeys),
+		Paths:               len(d.Paths),
+		DepartureBuckets:    len(d.Departures),
+		ArrivalBuckets:      0,
+		CompleteStops:       len(d.CompleteStops),
+		CompleteDays:        len(d.CompleteDays),
+		ServingToday:        d.CompleteDays[makeDayKey(time.Now())],
+		RejectedJourneyDays: d.rejectedJourneyDays,
+	}
+	d.lastStats.Store(&stats)
+	return stats
 }
 
 func envBool(env map[string]string, key string, fallback bool) bool {

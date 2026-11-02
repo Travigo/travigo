@@ -116,6 +116,20 @@ func TestParseExactTimes(t *testing.T) {
 	}
 }
 
+func TestParseOptionalGTFSTimeKeepsMissingTimesDistinctFromMidnight(t *testing.T) {
+	missing, err := parseOptionalGTFSTime("")
+	if err != nil || !missing.IsZero() {
+		t.Fatalf("missing time: %v %v", missing, err)
+	}
+	midnight, err := parseOptionalGTFSTime("00:00:00")
+	if err != nil || midnight.IsZero() || midnight.Year() != 0 {
+		t.Fatalf("midnight: %v %v", midnight, err)
+	}
+	if _, err := parseOptionalGTFSTime("12:90:00"); err == nil {
+		t.Fatal("invalid time was accepted as missing")
+	}
+}
+
 func parseDuration(value string) time.Duration {
 	parsed, err := parseGTFSTime(value)
 	if err != nil {
