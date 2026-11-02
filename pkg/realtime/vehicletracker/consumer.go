@@ -82,12 +82,13 @@ func startRealtimeConsumer(queue rmq.Queue, id int) {
 }
 
 type BatchConsumer struct {
-	id              int
-	TfLBusQueue     rmq.Queue
-	journeyCacheMu  sync.RWMutex
-	journeyCache    map[string]*cachedTrackedJourney
-	locationCacheMu sync.RWMutex
-	locationCache   map[string]*time.Location
+	id                                 int
+	TfLBusQueue                        rmq.Queue
+	journeyCacheMu                     sync.RWMutex
+	journeyCache                       map[string]*cachedTrackedJourney
+	journeyCacheHead, journeyCacheTail *cachedTrackedJourney
+	locationCacheMu                    sync.RWMutex
+	locationCache                      map[string]*time.Location
 }
 
 func NewBatchConsumer(id int) *BatchConsumer {

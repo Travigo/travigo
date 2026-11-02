@@ -2,7 +2,6 @@ package vehicletracker
 
 import (
 	"context"
-	"sort"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -22,21 +21,21 @@ const trackedJourneyCacheMaxEntries = 1000
 type cachedTrackedJourney struct {
 	Journey         *ctdf.Journey
 	StopOccurrences map[string][]int
+	StopKeys        []string
 	LastUsed        time.Time
+	journeyID       string
+	previous, next  *cachedTrackedJourney
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
-	consumer.journeyCacheMu.RLock()
+	consumer.journeyCacheMu.Lock()
 	cachedJourney := consumer.journeyCache[journeyID]
-	consumer.journeyCacheMu.RUnlock()
-
 	if cachedJourney != nil {
-		consumer.journeyCacheMu.Lock()
-		cachedJourney.LastUsed = now
+		consumer.touchJourneyCacheLocked(cachedJourney)
 		consumer.journeyCacheMu.Unlock()
-
 		return cachedJourney, nil
 	}
+	consumer.journeyCacheMu.Unlock()
 
 	journey, err := loadTrackedJourney(journeyID)
 	if err != nil {
@@ -59,14 +58,22 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	cachedJourney = &cachedTrackedJourney{
 		Journey:         journey,
 		StopOccurrences: journeyStopOccurrences(journey),
+		StopKeys:        journeyDestinationKeys(journey),
 		LastUsed:        now,
+		journeyID:       journeyID,
 	}
 
 	consumer.journeyCacheMu.Lock()
 	if consumer.journeyCache == nil {
 		consumer.journeyCache = map[string]*cachedTrackedJourney{}
 	}
+	if existing := consumer.journeyCache[journeyID]; existing != nil {
+		consumer.touchJourneyCacheLocked(existing)
+		consumer.journeyCacheMu.Unlock()
+		return existing, nil
+	}
 	consumer.journeyCache[journeyID] = cachedJourney
+	consumer.touchJourneyCacheLocked(cachedJourney)
 	consumer.pruneJourneyCacheLocked()
 	consumer.journeyCacheMu.Unlock()
 
@@ -179,35 +186,48 @@ func (consumer *BatchConsumer) loadLocation(name string) *time.Location {
 	return loadedLocation
 }
 
-func (consumer *BatchConsumer) pruneJourneyCacheLocked() {
-	// Performance Review [Set A] [PR150] [P2] (tracker): Once full, inserting a new journey copies
-	// and sorts 1,001 cache entries under the write lock to evict one, making each
-	// eviction O(N log N) with an O(N) temporary allocation. Use an O(1) LRU or bounded
-	// clock eviction structure and a monotonic access sequence instead of source
-	// observation time. Measure churn, retained bytes and hit rate before raising capacity.
-	if len(consumer.journeyCache) <= trackedJourneyCacheMaxEntries {
+// Access order is independent of feed timestamps, which may arrive out of order.
+func (consumer *BatchConsumer) touchJourneyCacheLocked(entry *cachedTrackedJourney) {
+	if consumer.journeyCacheHead == entry {
 		return
 	}
-
-	type cacheEntry struct {
-		journeyID string
-		lastUsed  time.Time
+	if entry.previous != nil {
+		entry.previous.next = entry.next
 	}
-
-	cacheEntries := make([]cacheEntry, 0, len(consumer.journeyCache))
-	for journeyID, cachedJourney := range consumer.journeyCache {
-		cacheEntries = append(cacheEntries, cacheEntry{
-			journeyID: journeyID,
-			lastUsed:  cachedJourney.LastUsed,
-		})
+	if entry.next != nil {
+		entry.next.previous = entry.previous
 	}
-
-	sort.Slice(cacheEntries, func(i int, j int) bool {
-		return cacheEntries[i].lastUsed.Before(cacheEntries[j].lastUsed)
-	})
-
-	excessEntries := len(consumer.journeyCache) - trackedJourneyCacheMaxEntries
-	for index := 0; index < excessEntries; index += 1 {
-		delete(consumer.journeyCache, cacheEntries[index].journeyID)
+	if consumer.journeyCacheTail == entry {
+		consumer.journeyCacheTail = entry.previous
 	}
+	entry.previous = nil
+	entry.next = consumer.journeyCacheHead
+	if entry.next != nil {
+		entry.next.previous = entry
+	} else {
+		consumer.journeyCacheTail = entry
+	}
+	consumer.journeyCacheHead = entry
+}
+
+func (consumer *BatchConsumer) pruneJourneyCacheLocked() {
+	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries {
+		entry := consumer.journeyCacheTail
+		delete(consumer.journeyCache, entry.journeyID)
+		consumer.journeyCacheTail = entry.previous
+		if entry.previous != nil {
+			entry.previous.next = nil
+		} else {
+			consumer.journeyCacheHead = nil
+		}
+		entry.previous, entry.next = nil, nil
+	}
+}
+
+func journeyDestinationKeys(journey *ctdf.Journey) []string {
+	keys := make([]string, len(journey.Path))
+	for i, path := range journey.Path {
+		keys[i] = ctdf.RealtimeJourneyStopKey(path.DestinationStopRef, i+1)
+	}
+	return keys
 }

@@ -43,9 +43,9 @@ func TestPruneJourneyCacheLockedRemovesOldestEntries(t *testing.T) {
 	}
 
 	for index := 0; index < trackedJourneyCacheMaxEntries+2; index += 1 {
-		consumer.journeyCache[strconv.Itoa(index)] = &cachedTrackedJourney{
-			LastUsed: time.Unix(int64(index), 0),
-		}
+		entry := &cachedTrackedJourney{journeyID: strconv.Itoa(index), LastUsed: time.Unix(int64(index), 0)}
+		consumer.journeyCache[entry.journeyID] = entry
+		consumer.touchJourneyCacheLocked(entry)
 	}
 
 	consumer.pruneJourneyCacheLocked()

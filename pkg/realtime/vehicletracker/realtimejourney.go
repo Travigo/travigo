@@ -111,18 +111,10 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		// Calculate all the estimated stop arrival & departure times. A vehicle
 		// cannot leave a timed stop before its scheduled departure, so its delay
 		// can be absorbed by scheduled dwell time before calculating later calls.
-		// Performance Review [Set A] [PR153] [P2] (tracker): The unchanged-offset check is inside
-		// range, after estimateFutureStops has already built the entire result slice.
-		// Unchanged updates still pay its per-remaining-call allocation and calculation cost.
-		// Decide whether predictions need rebuilding before calling the estimator; account
-		// for changed leg, timetable or missing estimates as well as offset. Continue
-		// refreshing location/liveness and detecting stop transitions.
-		for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, closestDistanceJourneyPathIndex, offset) {
-			// Don't update the database if theres no actual change
-			if (offset.Seconds() == realtimeJourney.Offset.Seconds()) && !newRealtimeJourney {
-				break
+		if newRealtimeJourney || realtimeJourney.NextStopIndex != closestDistanceJourneyPathIndex+1 || realtimeJourney.Offset != offset || futureStopsNeedRebuild(realtimeJourney, cachedJourney.StopKeys, closestDistanceJourneyPathIndex, offset) {
+			for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, closestDistanceJourneyPathIndex, offset) {
+				journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
 			}
-			journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
 		}
 	} else {
 		nextOccurrence := map[string]int{}
@@ -231,6 +223,9 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		realtimeJourney.Offset = offset
 	}
 
+	if realtimeJourney.Stops == nil {
+		realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
+	}
 	for key, stopUpdate := range journeyStopUpdates {
 		if key != "" {
 			if realtimeJourney.Stops[key] == nil {
@@ -313,4 +308,27 @@ func absDuration(value time.Duration) time.Duration {
 		return -value
 	}
 	return value
+}
+
+// Compare predictions without allocating a replacement slice. Recomputing the
+// expected times also detects timetable edits and delay absorbed by dwell time.
+func futureStopsNeedRebuild(journey *ctdf.RealtimeJourney, keys []string, start int, offset time.Duration) bool {
+	for i := start; i < len(journey.Journey.Path); i++ {
+		path := journey.Journey.Path[i]
+		arrival := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
+		departure := time.Time{}
+		if i < len(journey.Journey.Path)-1 {
+			scheduled := journey.Journey.Path[i+1].OriginDepartureTime
+			departure = scheduled
+			if arrival.After(departure) {
+				departure = arrival
+			}
+			offset = departure.Sub(scheduled)
+		}
+		stop := journey.Stops[keys[i]]
+		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || !stop.ArrivalTime.Equal(arrival) || !stop.DepartureTime.Equal(departure) {
+			return true
+		}
+	}
+	return false
 }

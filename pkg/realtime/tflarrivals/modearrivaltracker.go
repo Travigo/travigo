@@ -3,6 +3,7 @@ package tflarrivals
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand/v2"
@@ -16,12 +17,14 @@ import (
 
 	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/exp/slices"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ModeArrivalTracker struct {
@@ -36,6 +39,22 @@ type RuntimeJourneyFilter func(string, string) bool
 type RuntimeJourneyFilterProvider func(context.Context) (RuntimeJourneyFilter, error)
 
 const modeArrivalMaxConcurrentJourneys = 32
+
+var platformMatchRegex = regexp.MustCompile(`(\w+) (?:- )?Platform (\d+)`)
+var nameRegex = regexp.MustCompile("(.+) (Underground|DLR) Station")
+var stopTimezones sync.Map
+
+func validatedStopTimezone(name string) *time.Location {
+	if cached, ok := stopTimezones.Load(name); ok {
+		return cached.(*time.Location)
+	}
+	location, err := time.LoadLocation(name)
+	if err != nil {
+		return time.UTC
+	}
+	cached, _ := stopTimezones.LoadOrStore(name, location)
+	return cached.(*time.Location)
+}
 
 func (l *ModeArrivalTracker) Run(getRoutes bool) {
 	// if l.Line.Service == nil {
@@ -273,12 +292,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Add new predictions to the realtime journey
-	// Performance Review [Set A] [PR134] [P2] (realtime): Both regexes are rebuilt per journey and
-	// LoadLocation runs per prediction, including repeated stops in the same poll.
-	// Compile the platform/destination expressions once and cache validated time
-	// zones by name when loading stop metadata. Handle invalid zones before In(),
-	// and measure allocation/CPU savings across a complete mode poll.
-	platformMatchRegex, _ := regexp.Compile(`(\w+) (?:- )?Platform (\d+)`)
+
 	previousStops := realtimeJourney.Stops
 	currentStops := make([]*ctdf.RealtimeJourneyStops, 0, len(predictions))
 	for _, prediction := range predictions {
@@ -292,7 +306,7 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 		scheduledTime, _ := time.Parse(time.RFC3339, prediction.ExpectedArrival)
 
-		stopTimezone, _ := time.LoadLocation(stop.Timezone)
+		stopTimezone := validatedStopTimezone(stop.Timezone)
 		scheduledTime = scheduledTime.In(stopTimezone)
 
 		platform := prediction.PlatformName
@@ -343,7 +357,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	lastPredictionDestination := lastPrediction.DestinationNaptanID
 	if lastPredictionDestination != "" {
-		lastPredictionDestination = getStopFromTfLStop(lastPrediction.DestinationNaptanID).PrimaryIdentifier
+		destination := getStopFromTfLStop(lastPrediction.DestinationNaptanID)
+		lastPredictionDestination = ""
+		if destination != nil {
+			lastPredictionDestination = destination.PrimaryIdentifier
+		}
 	}
 	if lastPredictionStop != lastPredictionDestination && lastPredictionDestination != "" {
 		journeyOrderedNaptanIDs = append(journeyOrderedNaptanIDs, lastPredictionDestination)
@@ -386,7 +404,6 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 	}
 
 	// Update destination display
-	nameRegex := regexp.MustCompile("(.+) (Underground|DLR) Station")
 
 	destinationDisplay := lastPrediction.DestinationName
 	if destinationDisplay == "" && lastPrediction.Towards != "" && lastPrediction.Towards != "Check Front of Train" {
@@ -615,57 +632,85 @@ func sortRealtimeStops(stops []*ctdf.RealtimeJourneyStops) {
 }
 
 // TODO convert to proper cache
+var stopLookupGroup singleflight.Group
+var stopTflStopCacheExpires = map[string]time.Time{}
 var stopTflStopCacheMutex sync.Mutex
-var stopTflStopCache map[string]*ctdf.Stop
+var stopTflStopCache = map[string]*ctdf.Stop{}
 
 func getStopFromTfLStop(tflStopID string) *ctdf.Stop {
-	stopTflStopCacheMutex.Lock()
-	cacheValue := stopTflStopCache[tflStopID]
-	stopTflStopCacheMutex.Unlock()
+	return getStopFromTfLStopWithLookup(tflStopID, lookupTfLStop)
+}
 
-	if cacheValue != nil {
-		return cacheValue
-	}
+func getStopFromTfLStopWithLookup(tflStopID string, lookup func(string) (*ctdf.Stop, error)) *ctdf.Stop {
+	result, _, _ := stopLookupGroup.Do(tflStopID, func() (interface{}, error) {
+		stopTflStopCacheMutex.Lock()
+		cached := stopTflStopCache[tflStopID]
+		fresh := time.Now().Before(stopTflStopCacheExpires[tflStopID])
+		stopTflStopCacheMutex.Unlock()
+		if cached != nil && fresh {
+			return cached, nil
+		}
+		stop, err := lookup(tflStopID)
+		if err != nil {
+			// Keep last-good metadata without renewing its expiry, so the next poll retries.
+			return cached, nil
+		}
+		if stop != nil {
+			stopTflStopCacheMutex.Lock()
+			// Bound staleness after imported stop metadata changes. Do not cache misses.
+			stopTflStopCache[tflStopID] = stop
+			stopTflStopCacheExpires[tflStopID] = time.Now().Add(10 * time.Minute)
+			stopTflStopCacheMutex.Unlock()
+		} else {
+			stopTflStopCacheMutex.Lock()
+			delete(stopTflStopCache, tflStopID)
+			delete(stopTflStopCacheExpires, tflStopID)
+			stopTflStopCacheMutex.Unlock()
+		}
+		return stop, nil
+	})
+	stop, _ := result.(*ctdf.Stop)
+	return stop
+}
 
+func lookupTfLStop(tflStopID string) (*ctdf.Stop, error) {
 	stopGroupCollection := database.GetCollection("stop_groups")
 	stopCollection := database.GetCollection("stops")
 
 	var stop *ctdf.Stop
-	stopCollection.FindOne(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stop)
+	err := stopCollection.FindOne(context.Background(), bson.M{"primaryidentifier": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stop)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
 
-	// Performance Review [Set A] [PR137] [P2] (realtime): The normal primary-ID success returns
-	// without populating stopTflStopCache; only the alternate lookup paths cache.
-	// Consequently the same known stop can hit MongoDB for every prediction and
-	// route comparison. Cache every successful resolution, coalesce concurrent
-	// misses, and version/invalidate with imported stops. A short negative cache
-	// should represent confirmed absence, never a database timeout/error.
 	if stop != nil {
-		return stop
+		return stop, nil
 	}
 
 	var stopGroup *ctdf.StopGroup
-	stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stopGroup)
+	err = stopGroupCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stopGroup)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, err
+	}
 
 	if stopGroup == nil {
 		var stop *ctdf.Stop
-		stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stop)
-
-		if stop == nil {
-			return nil
+		if err := stopCollection.FindOne(context.Background(), bson.M{"otheridentifiers": fmt.Sprintf("gb-atco-%s", tflStopID)}).Decode(&stop); err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				return nil, nil
+			}
+			return nil, err
 		}
 
-		stopTflStopCacheMutex.Lock()
-		stopTflStopCache[tflStopID] = stop
-		stopTflStopCacheMutex.Unlock()
-
-		return stop
+		return stop, nil
 	}
 
-	stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop)
+	if err := stopCollection.FindOne(context.Background(), bson.M{"associations.associatedidentifier": stopGroup.PrimaryIdentifier}).Decode(&stop); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, nil
+		}
+		return nil, err
+	}
 
-	stopTflStopCacheMutex.Lock()
-	stopTflStopCache[tflStopID] = stop
-	stopTflStopCacheMutex.Unlock()
-
-	return stop
+	return stop, nil
 }

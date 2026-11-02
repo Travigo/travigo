@@ -1,10 +1,7 @@
 package tflarrivals
 
 import (
-	"sync"
-
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/util"
 )
 
@@ -27,9 +24,7 @@ func (t TrackerManager) Run(getRoutes bool) {
 	}
 	TfLAppKey = env["TRAVIGO_TFL_API_KEY"]
 
-	// TODO replace with proper cache
-	stopTflStopCacheMutex = sync.Mutex{}
-	stopTflStopCache = map[string]*ctdf.Stop{}
+	// Cache state is initialized at package scope and refreshed on expiry.
 
 	for _, mode := range t.Modes {
 		log.Info().

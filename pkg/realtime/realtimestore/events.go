@@ -226,13 +226,70 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 	}
 	maximumDelay := time.Duration(0)
 	delayedStop := ""
-	// Performance Review [Set A] [PR123] [P2] (tracker): Each path call uses RealtimeStop, whose
-	// missing-key fallback scans the entire Stops map. Partial predictions therefore
-	// make both previous/current delay scans approach quadratic work even when all
-	// stored keys are canonical. Normalise legacy occurrences once on read and index
-	// missing lookups cheaply; preserve repeated-stop compatibility rather than simply
-	// dropping the fallback. Consider reusing an unchanged delay summary and measure
-	// long routes with partially populated stop maps.
+	// Most maps are canonical. Allocate fallback metadata only on a miss.
+	var indexed map[string]*ctdf.RealtimeJourneyStops
+	var first, counts map[string]int
+	lookup := func(ref string, index int) *ctdf.RealtimeJourneyStops {
+		key := ctdf.RealtimeJourneyStopKey(ref, index)
+		if stop := realtimeJourney.Stops[key]; stop != nil {
+			return stop
+		}
+		if indexed == nil {
+			indexed = map[string]*ctdf.RealtimeJourneyStops{}
+			for storedKey, stop := range realtimeJourney.Stops {
+				if stop == nil {
+					continue
+				}
+				canonical := ctdf.RealtimeJourneyStopKey(stop.StopRef, stop.JourneyStopIndex)
+				if storedKey != canonical {
+					indexed[canonical] = stop
+				}
+			}
+		}
+		if stop := indexed[key]; stop != nil {
+			return stop
+		}
+		legacy := realtimeJourney.Stops[ref]
+		if legacy == nil {
+			return nil
+		}
+		if counts == nil {
+			first, counts = map[string]int{}, map[string]int{}
+			add := func(ref string, index int) {
+				if counts[ref] == 0 {
+					first[ref] = index
+				}
+				counts[ref]++
+			}
+			paths := realtimeJourney.Journey.Path
+			if len(paths) > 0 && paths[0] != nil {
+				add(paths[0].OriginStopRef, 0)
+			}
+			for i, path := range paths {
+				if path != nil {
+					add(path.DestinationStopRef, i+1)
+				}
+			}
+		}
+		if counts[ref] <= 1 || first[ref] == index {
+			return legacy
+		}
+		return nil
+	}
+
+	departure := func(ref string, index int) time.Time {
+		if stop := lookup(ref, index); stop != nil {
+			return stop.DepartureTime
+		}
+		return time.Time{}
+	}
+	arrival := func(ref string, index int) time.Time {
+		if stop := lookup(ref, index); stop != nil {
+			return stop.ArrivalTime
+		}
+		return time.Time{}
+	}
+
 	for pathIndex, path := range realtimeJourney.Journey.Path {
 		if path == nil {
 			continue
@@ -243,8 +300,8 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 			scheduled time.Time
 			actual    time.Time
 		}{
-			{stopRef: path.OriginStopRef, stopIndex: pathIndex, scheduled: path.OriginDepartureTime, actual: realtimeStopDepartureTime(realtimeJourney, path.OriginStopRef, pathIndex)},
-			{stopRef: path.DestinationStopRef, stopIndex: pathIndex + 1, scheduled: path.DestinationArrivalTime, actual: realtimeStopArrivalTime(realtimeJourney, path.DestinationStopRef, pathIndex+1)},
+			{stopRef: path.OriginStopRef, stopIndex: pathIndex, scheduled: path.OriginDepartureTime, actual: departure(path.OriginStopRef, pathIndex)},
+			{stopRef: path.DestinationStopRef, stopIndex: pathIndex + 1, scheduled: path.DestinationArrivalTime, actual: arrival(path.DestinationStopRef, pathIndex+1)},
 		} {
 			if candidate.actual.IsZero() || candidate.scheduled.IsZero() {
 				continue
