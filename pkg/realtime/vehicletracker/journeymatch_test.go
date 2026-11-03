@@ -53,6 +53,19 @@ func TestServiceTimeOnDateRetainsServiceDayOffset(t *testing.T) {
 	}
 }
 
+func TestServiceTimeOnDateUsesClockChangeServiceOrigin(t *testing.T) {
+	location, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	date := time.Date(2026, 3, 29, 0, 0, 0, 0, time.UTC)
+	clock := time.Date(0, 1, 1, 8, 0, 0, 0, time.UTC)
+	want := time.Date(2026, 3, 29, 8, 0, 0, 0, location)
+	if got := serviceTimeOnDate(date, clock, location); !got.Equal(want) {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+}
+
 func TestEstimateFutureStopsAbsorbsDelayDuringScheduledDwell(t *testing.T) {
 	base := time.Date(2026, time.July, 21, 10, 0, 0, 0, time.UTC)
 	paths := []*ctdf.JourneyPathItem{

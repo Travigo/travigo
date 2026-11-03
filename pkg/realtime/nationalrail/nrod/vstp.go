@@ -201,7 +201,32 @@ func (v *VSTPMessage) processCancellation() {
 			log.Error().Err(err).Msg("Failed to decode permanent journey for VSTP cancellation")
 			continue
 		}
-		if !journeyRunsDuringVSTPCancellation(&journey, startDate, endDate, v.VSTP.Schedule.DayRuns) {
+		cancelledDates := vstpMatchingServiceDates(&journey, startDate, endDate, v.VSTP.Schedule.DayRuns)
+		if len(cancelledDates) == 0 {
+			continue
+		}
+		// A realtime journey describes one run. Keep the complete set of
+		// cancelled runs in the existing day-instance service alert mechanism.
+		runDate, err := time.Parse(ctdf.YearMonthDayFormat, cancelledDates[0])
+		if err != nil {
+			log.Error().Err(err).Msg("Invalid VSTP cancellation service date")
+			continue
+		}
+		identifiers := make([]string, 0, len(cancelledDates))
+		for _, date := range cancelledDates {
+			identifiers = append(identifiers, fmt.Sprintf("DAYINSTANCEOF:%s:%s", date, journey.PrimaryIdentifier))
+		}
+		alert := ctdf.ServiceAlert{
+			PrimaryIdentifier: fmt.Sprintf("gb-networkrail-vstpcancel-%s:%s:%s", v.VSTP.Schedule.StartDate, v.VSTP.Schedule.EndDate, journey.PrimaryIdentifier),
+			CreationDateTime:  now, ModificationDateTime: now,
+			DataSource: &ctdf.DataSourceReference{OriginalFormat: "JSON-CIF", ProviderName: "Network Rail", ProviderID: "gb-networkrail", DatasetID: "gb-networkrail-vstp"},
+			AlertType:  ctdf.ServiceAlertTypeJourneyCancelled,
+			Text:       "Journey cancelled by rail operator", MatchedIdentifiers: identifiers,
+			ValidFrom: now.Add(-time.Second), ValidUntil: endDate.Add(48 * time.Hour),
+		}
+		_, err = database.GetCollection("service_alerts").UpdateOne(context.Background(), bson.M{"primaryidentifier": alert.PrimaryIdentifier}, bson.M{"$set": alert}, options.Update().SetUpsert(true))
+		if err != nil {
+			log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to save VSTP cancellation alert")
 			continue
 		}
 
@@ -211,7 +236,7 @@ func (v *VSTPMessage) processCancellation() {
 			TimeoutDurationMinutes: timeoutDurationMinutes,
 			ActivelyTracked:        true,
 			Journey:                &journey,
-			JourneyRunDate:         startDate,
+			JourneyRunDate:         runDate,
 			CreationDateTime:       now,
 			ModificationDateTime:   now,
 			Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
@@ -240,10 +265,6 @@ func (v *VSTPMessage) processCancellation() {
 		Str("trainuid", v.VSTP.Schedule.TrainUID).
 		Int("cancelled_journeys", cancelledJourneys).
 		Msg("Applied VSTP cancellation")
-}
-
-func journeyRunsDuringVSTPCancellation(journey *ctdf.Journey, startDate, endDate time.Time, daysRun string) bool {
-	return len(vstpMatchingServiceDates(journey, startDate, endDate, daysRun)) > 0
 }
 
 func vstpMatchingServiceDates(journey *ctdf.Journey, startDate, endDate time.Time, daysRun string) []string {

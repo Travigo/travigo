@@ -2,6 +2,9 @@ package ctdf
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"runtime"
 	"sort"
 	"sync/atomic"
@@ -15,11 +18,13 @@ import (
 )
 
 type DepartureBoard struct {
-	DisplayReference   *BoardDisplayReference   `groups:"internal" json:"-" bson:"-"`
-	Journey            *Journey                 `groups:"basic,departures-llm,web-board"`
-	DestinationDisplay string                   `groups:"basic,departures-llm,web-board"`
-	Type               DepartureBoardRecordType `groups:"basic,departures-llm,web-board"`
-	Delayed            bool                     `groups:"basic,departures-llm,web-board"`
+	OccurrenceIdentifier string                   `groups:"basic,web-board"`
+	ServiceDate          string                   `groups:"basic,web-board"`
+	DisplayReference     *BoardDisplayReference   `groups:"internal" json:"-" bson:"-"`
+	Journey              *Journey                 `groups:"basic,departures-llm,web-board"`
+	DestinationDisplay   string                   `groups:"basic,departures-llm,web-board"`
+	Type                 DepartureBoardRecordType `groups:"basic,departures-llm,web-board"`
+	Delayed              bool                     `groups:"basic,departures-llm,web-board"`
 
 	Platform     string `groups:"basic,departures-llm,web-board"`
 	PlatformType string `groups:"basic,departures-llm,web-board"`
@@ -38,6 +43,13 @@ const (
 
 func (t BoardType) IsArrival() bool {
 	return t == BoardTypeArrival
+}
+
+func boardStopIndexOffset(boardType BoardType) int {
+	if boardType.IsArrival() {
+		return 1
+	}
+	return 0
 }
 
 type DepartureBoardRecordType string
@@ -117,7 +129,10 @@ func DeduplicateBoardEntries(entries []*DepartureBoard) []*DepartureBoard {
 			deduplicated = append(deduplicated, entry)
 			continue
 		}
-		journeyID := entry.Journey.PrimaryIdentifier
+		journeyID := entry.OccurrenceIdentifier
+		if journeyID == "" {
+			journeyID = entry.Journey.PrimaryIdentifier
+		}
 		if _, seen := seenJourneyIDs[journeyID]; seen {
 			continue
 		}
@@ -125,6 +140,15 @@ func DeduplicateBoardEntries(entries []*DepartureBoard) []*DepartureBoard {
 		deduplicated = append(deduplicated, entry)
 	}
 	return deduplicated
+}
+
+func BoardOccurrenceIdentifier(journeyID, serviceDate string, stopIndex int, boardType BoardType) string {
+	if journeyID == "" {
+		return ""
+	}
+	encoded, _ := json.Marshal([]any{journeyID, serviceDate, stopIndex, boardType})
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:])
 }
 
 func boardPathStopRef(path *JourneyPathItem, boardType BoardType) string {
@@ -181,6 +205,19 @@ func boardEntryIsDelayed(scheduledTime, realtimeTime time.Time, cancelled bool) 
 	return !cancelled && realtimeTime.After(scheduledTime)
 }
 
+// Realtime run dates are service-date labels, not instants in the stop zone.
+func boardRealtimeCancelsServiceDate(realtime *RealtimeJourney, serviceDate time.Time) bool {
+	if realtime == nil || !realtime.Cancelled {
+		return false
+	}
+	return boardRealtimeMatchesServiceDate(realtime, serviceDate)
+}
+
+func boardRealtimeMatchesServiceDate(realtime *RealtimeJourney, serviceDate time.Time) bool {
+	return realtime != nil && !realtime.JourneyRunDate.IsZero() &&
+		realtime.JourneyRunDate.Format(YearMonthDayFormat) == serviceDate.Format(YearMonthDayFormat)
+}
+
 // boardRealtimeTimeOnDate resolves the two forms used by realtime producers:
 // date-less clock values (year 0/1) and absolute timestamps. Missing realtime
 // times fall back to the schedule rather than becoming a midnight departure.
@@ -218,7 +255,8 @@ func absoluteDuration(duration time.Duration) time.Duration {
 // serviceTimeOnDate converts a GTFS service-day time into a real date without
 // discarding the service-day overflow represented by times such as 25:30:00.
 func serviceTimeOnDate(dateTime time.Time, serviceTime time.Time) time.Time {
-	serviceDayStart := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, dateTime.Location())
+	// Service clocks use noon minus 12 elapsed hours as their day origin.
+	serviceDayStart := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 12, 0, 0, 0, dateTime.Location()).Add(-12 * time.Hour)
 	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
 	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
 }
@@ -319,6 +357,12 @@ func GenerateDepartureBoardFromJourneys(journeys []*Journey, stopRefs []string, 
 // the same scheduled journeys. The selected path endpoint controls the stop,
 // activity, platform, and scheduled/realtime time used for each record.
 func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup, boardType BoardType) []*DepartureBoard {
+	return GenerateBoardFromJourneysForServiceDate(journeys, stopRefs, dateTime, dateTime, doEstimates, realtimeLookup, boardType)
+}
+
+// GenerateBoardFromJourneysForServiceDate separates the operating date from
+// the requested lower bound, allowing calls after midnight on an earlier run.
+func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []string, dateTime, startTime time.Time, doEstimates bool, realtimeLookup *DepartureBoardRealtimeLookup, boardType BoardType) []*DepartureBoard {
 	generationStart := time.Now()
 	inputJourneyCount := len(journeys)
 
@@ -354,7 +398,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	// Benchmark sequential/chunked generation for short paths and a shared concurrency
 	// budget under simultaneous polling; per-request worker limits do not bound total
 	// database reads or CPU work, and all candidates are retained until Wait completes.
-	p := pool.NewWithResults[*DepartureBoard]()
+	p := pool.NewWithResults[[]*DepartureBoard]()
 	maxGoroutines := runtime.GOMAXPROCS(0)
 	if len(journeys) < maxGoroutines {
 		maxGoroutines = len(journeys)
@@ -365,69 +409,59 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 	p.WithMaxGoroutines(maxGoroutines)
 
 	for _, journey := range journeys {
-		p.Go(func() *DepartureBoard {
-			var stopTime time.Time
-			var scheduledStopTime time.Time
-			var realtimeStopTime time.Time
-			var stopPlatform string
-			var stopPlatformType string
-			var destinationDisplay string
-			var displayReference *BoardDisplayReference
-			var delayed bool
-			departureBoardRecordType := DepartureBoardRecordTypeScheduled
+		p.Go(func() []*DepartureBoard {
+			var occurrences []*DepartureBoard
+			for occurrenceIndex, occurrencePath := range journey.Path {
+				if occurrencePath == nil {
+					continue
+				}
+				if _, ok := stopRefsSet[boardPathStopRef(occurrencePath, boardType)]; !ok {
+					continue
+				}
+				entry := func() *DepartureBoard {
+					var stopTime time.Time
+					var scheduledStopTime time.Time
+					var realtimeStopTime time.Time
+					var stopPlatform string
+					var stopPlatformType string
+					var destinationDisplay string
+					var displayReference *BoardDisplayReference
+					var delayed bool
+					departureBoardRecordType := DepartureBoardRecordTypeScheduled
 
-			if journey.Availability.MatchDate(dateTime) {
-				availabilityMatchedCount.Add(1)
-				// Performance Review [Set G] [PR012] [P1] (boards): Both path loops select the first
-				// matching stop, even when a later visit is the next usable call. A board
-				// at 10:30 drops a looping journey calling here at 10:00 and 11:00.
-				// Carry the selected stop occurrence through cutoff, activity, realtime
-				// matching and deduplication instead of returning for the whole journey.
-				// TODO(medium-risk): This 4-hour-cutoff loop and the detail-extraction
-				// loop below both scan journey.Path and break on the first stopRef match. They could
-				// be merged into a single pass, but the realtime-journey assignment currently sits
-				// between them, and the cutoff loop's early `return nil` must run before any detail
-				// work. Merging would reorder the realtime assignment relative to the cutoff check;
-				// left as two passes to preserve identical behaviour and early-return ordering.
-				// Do not include board entries that are more than four hours old.
-				for _, path := range journey.Path {
-					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
-						journeyTime := boardPathTime(path, boardType)
-						scheduledBoardTime := serviceTimeOnDate(dateTime, journeyTime)
-
-						if dateTime.Sub(scheduledBoardTime) > 4*time.Hour {
+					if journey.Availability.MatchDate(dateTime) {
+						availabilityMatchedCount.Add(1)
+						scheduledStopTime = serviceTimeOnDate(dateTime, boardPathTime(occurrencePath, boardType))
+						if startTime.Sub(scheduledStopTime) > 4*time.Hour {
 							tooOldSkippedCount.Add(1)
 							return nil
 						}
 
-						break
-					}
-				}
+						prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]
+						boardRealtime := journey.RealtimeJourney
+						if prefetchedRealtimeJourney != nil && len(prefetchedRealtimeJourney.SuppressFromDepartureDates) > 0 && prefetchedRealtimeJourney.SuppressesBoardAt(dateTime) {
+							replacementSuppressedCount.Add(1)
+							return nil
+						}
+						if !boardRealtimeMatchesServiceDate(journey.RealtimeJourney, dateTime) {
+							journey.RealtimeJourney = nil
+						}
+						if boardRealtimeMatchesServiceDate(prefetchedRealtimeJourney, dateTime) && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.SuppressFromDepartures || prefetchedRealtimeJourney.IsActive()) {
+							journey.RealtimeJourney = prefetchedRealtimeJourney
+							boardRealtime = prefetchedRealtimeJourney
+							prefetchedRealtimeAppliedCount.Add(1)
+						}
+						if journey.RealtimeJourney != nil && journey.RealtimeJourney.SuppressesBoardAt(dateTime) {
+							replacementSuppressedCount.Add(1)
+							return nil
+						}
 
-				// Performance Review [Set G] [PR013] [P1] (boards): Lookup is keyed only by journey ID,
-				// and JourneyRunDate is not checked here. Tomorrow/historical boards can
-				// inherit today's cancellation or absolute predicted times, dropping or
-				// mislabelling recurring services. Match the operating service date
-				// before applying realtime, including block estimates and overnight runs.
-				if prefetchedRealtimeJourney := realtimeLookup.ByJourneyID[journey.PrimaryIdentifier]; prefetchedRealtimeJourney != nil && (prefetchedRealtimeJourney.Cancelled || prefetchedRealtimeJourney.SuppressFromDepartures || prefetchedRealtimeJourney.IsActive()) {
-					journey.RealtimeJourney = prefetchedRealtimeJourney
-					prefetchedRealtimeAppliedCount.Add(1)
-				}
-				if journey.RealtimeJourney != nil && journey.RealtimeJourney.SuppressesBoardAt(dateTime) {
-					replacementSuppressedCount.Add(1)
-					return nil
-				}
-
-				for pathIndex, path := range journey.Path {
-					if _, ok := stopRefsSet[boardPathStopRef(path, boardType)]; ok {
 						stopMatchedCount.Add(1)
-						refTime := boardPathTime(path, boardType)
-						scheduledStopTime = serviceTimeOnDate(dateTime, refTime)
-						stopPlatform = boardPathPlatform(path, boardType)
+						stopPlatform = boardPathPlatform(occurrencePath, boardType)
 						stopPlatformType = "ESTIMATED"
 
 						// A departure needs pickup permission; an arrival needs setdown permission.
-						if boardPathIsUnavailable(path, boardType) {
+						if boardPathIsUnavailable(occurrencePath, boardType) {
 							activitySkippedCount.Add(1)
 							return nil
 						}
@@ -436,11 +470,8 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 						if journey.RealtimeJourney != nil {
 							var realtimeJourneyStop *RealtimeJourneyStops
 
-							journeyStopIndex := pathIndex
-							if boardType == BoardTypeArrival {
-								journeyStopIndex++
-							}
-							realtimeJourneyStop = boardRealtimeStop(journey.RealtimeJourney, boardPathStopRef(path, boardType), journeyStopIndex, realtimeLookup.StopAliases)
+							journeyStopIndex := occurrenceIndex + boardStopIndexOffset(boardType)
+							realtimeJourneyStop = boardRealtimeStop(journey.RealtimeJourney, boardPathStopRef(occurrencePath, boardType), journeyStopIndex, realtimeLookup.StopAliases)
 
 							if realtimeJourneyStop != nil {
 								realtimeStopMatchedCount.Add(1)
@@ -463,7 +494,9 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							}
 						}
 
-						wholeJourneyCancelled := IsBoardJourneyCancelled(journey, journey.RealtimeJourney, realtimeLookup.CancelledJourneyIDs)
+						wholeJourneyCancelled := boardRealtimeCancelsServiceDate(boardRealtime, dateTime) ||
+							boardRealtimeCancelsServiceDate(prefetchedRealtimeJourney, dateTime) ||
+							IsBoardJourneyCancelled(journey, nil, realtimeLookup.CancelledJourneyIDs)
 						if wholeJourneyCancelled {
 							departureBoardRecordType = DepartureBoardRecordTypeCancelled
 						}
@@ -471,55 +504,58 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 							cancelledCount.Add(1)
 						}
 
-						stopTime = serviceTimeOnDate(dateTime, refTime)
+						stopTime = scheduledStopTime
 						if journey.RealtimeJourney != nil && journey.RealtimeJourney.ActivelyTracked {
 							stopTime = boardRealtimeTimeOnDate(stopTime, realtimeStopTime)
 						}
 						delayed = boardEntryIsDelayed(scheduledStopTime, stopTime, departureBoardRecordType == DepartureBoardRecordTypeCancelled)
 
-						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, path.DestinationDisplay, boardType, wholeJourneyCancelled)
+						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, occurrencePath.DestinationDisplay, boardType, wholeJourneyCancelled)
 						displayReference = BoardDisplayReferenceFor(journey, journey.RealtimeJourney, boardType, wholeJourneyCancelled)
-						break
+
+						if stopTime.Before(startTime) {
+							beforeStartSkippedCount.Add(1)
+							return nil
+						}
+
+						if journey.DetailedRailInformation != nil && journey.DetailedRailInformation.ReplacementBus {
+							stopPlatform = "BUS"
+							stopPlatformType = "ACTUAL"
+							replacementBusCount.Add(1)
+						}
+
+						return &DepartureBoard{
+							OccurrenceIdentifier: BoardOccurrenceIdentifier(journey.PrimaryIdentifier, dateTime.Format(YearMonthDayFormat), occurrenceIndex+boardStopIndexOffset(boardType), boardType),
+							ServiceDate:          dateTime.Format(YearMonthDayFormat),
+							Journey:              journey,
+							Time:                 stopTime,
+							DestinationDisplay:   destinationDisplay,
+							DisplayReference:     displayReference,
+							Type:                 departureBoardRecordType,
+							Delayed:              delayed,
+							Platform:             stopPlatform,
+							PlatformType:         stopPlatformType,
+						}
 					}
-				}
 
-				if stopTime.Before(dateTime) {
-					beforeStartSkippedCount.Add(1)
 					return nil
-				}
-
-				if journey.DetailedRailInformation != nil && journey.DetailedRailInformation.ReplacementBus {
-					stopPlatform = "BUS"
-					stopPlatformType = "ACTUAL"
-					replacementBusCount.Add(1)
-				}
-
-				return &DepartureBoard{
-					Journey:            journey,
-					Time:               stopTime,
-					DestinationDisplay: destinationDisplay,
-					DisplayReference:   displayReference,
-					Type:               departureBoardRecordType,
-					Delayed:            delayed,
-					Platform:           stopPlatform,
-					PlatformType:       stopPlatformType,
+				}()
+				if entry != nil {
+					occurrences = append(occurrences, entry)
 				}
 			}
-
-			return nil
+			return occurrences
 		})
 	}
 
 	departureBoardWithNil := p.Wait()
 	departureBoard := make([]*DepartureBoard, 0, len(departureBoardWithNil))
 
-	for _, i := range departureBoardWithNil {
-		if i != nil {
-			departureBoard = append(departureBoard, i)
-		}
+	for _, entries := range departureBoardWithNil {
+		departureBoard = append(departureBoard, entries...)
 	}
 	departureBoard = DeduplicateBoardEntries(departureBoard)
-	estimateStats := applyBlockEstimates(departureBoard, dateTime, doEstimates, realtimeLookup)
+	estimateStats := applyBlockEstimates(departureBoard, startTime, doEstimates, realtimeLookup)
 
 	log.Debug().
 		Int("input_journeys", inputJourneyCount).
@@ -542,7 +578,7 @@ func GenerateBoardFromJourneys(journeys []*Journey, stopRefs []string, dateTime 
 		Int64("estimate_block_journeys", estimateStats.blockJourneys).
 		Int64("estimate_realtime_matched", estimateStats.realtimeMatched).
 		Int64("estimated_records", estimateStats.estimated).
-		Int("nil_results", len(departureBoardWithNil)-len(departureBoard)).
+		Int("journey_results", len(departureBoardWithNil)).
 		Str("board_type", string(boardType)).
 		Int("generated_entries", len(departureBoard)).
 		Dur("duration", time.Since(generationStart)).
@@ -586,12 +622,7 @@ func applyBlockEstimates(entries []*DepartureBoard, dateTime time.Time, doEstima
 
 		candidates = append(candidates, blockEstimateCandidate{entry: entry, blockKey: blockKey})
 		journeyByBlock[blockKey] = entry.Journey
-		// Performance Review [Set G] [PR014] [P2] (boards): Imported service clocks use year 0,
-		// which is before the missing map entry's zero Time (year 1). This comparison
-		// therefore never initializes their maximum, so the query's upper bound
-		// admits the entire block, including later trips. Initialize using map presence
-		// before comparing, and cover both ordinary and beyond-midnight service clocks.
-		if entry.Journey.DepartureTime.After(maxDepartureByBlock[blockKey]) {
+		if maximum, found := maxDepartureByBlock[blockKey]; !found || entry.Journey.DepartureTime.After(maximum) {
 			maxDepartureByBlock[blockKey] = entry.Journey.DepartureTime
 		}
 	}

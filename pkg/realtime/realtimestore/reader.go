@@ -6,6 +6,7 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -45,6 +46,16 @@ func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.Realtim
 }
 
 func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[string]*ctdf.RealtimeJourney, error) {
+	return findCurrentForJourneyIDs(ctx, journeyIDs, false)
+}
+
+// FindBoardRealtimeForJourneyIDs retains unexpired VSTP cancellations for
+// board compatibility, even when the last feed update is older than four hours.
+func FindBoardRealtimeForJourneyIDs(ctx context.Context, journeyIDs []string) (map[string]*ctdf.RealtimeJourney, error) {
+	return findCurrentForJourneyIDs(ctx, journeyIDs, true)
+}
+
+func findCurrentForJourneyIDs(ctx context.Context, journeyIDs []string, includeVSTPCancellations bool) (map[string]*ctdf.RealtimeJourney, error) {
 	start := time.Now()
 	realtimeJourneysByJourneyID := map[string]*ctdf.RealtimeJourney{}
 	if len(journeyIDs) == 0 {
@@ -150,7 +161,8 @@ func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[str
 			continue
 		}
 
-		if !realtimeJourney.ModificationDateTime.After(realtimeActiveCutoffDate) {
+		vstpCancellation := includeVSTPCancellations && realtimeJourney.Cancelled && strings.HasPrefix(realtimeJourney.PrimaryIdentifier, "gb-nationalrail-vstp-cancellation-") && realtimeJourney.TimeoutDurationMinutes > 0 && time.Now().Before(realtimeJourney.ModificationDateTime.Add(time.Duration(realtimeJourney.TimeoutDurationMinutes)*time.Minute))
+		if !realtimeJourney.ModificationDateTime.After(realtimeActiveCutoffDate) && !vstpCancellation {
 			inactiveRealtimeJourneys++
 			continue
 		}

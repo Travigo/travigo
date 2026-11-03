@@ -49,6 +49,35 @@ func TestClientQueriesGraphService(t *testing.T) {
 	}
 }
 
+func TestClientGraphWindowPreservesClockChangeOrigin(t *testing.T) {
+	location, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serviceDate := time.Date(2026, 10, 25, 0, 0, 0, 0, location)
+	clock := time.Date(0, 1, 1, 1, 30, 0, 0, time.UTC)
+	journey := testJourney()
+	journey.Path = []*ctdf.JourneyPathItem{{OriginStopRef: "stop-a", DestinationStopRef: "stop-b", OriginDepartureTime: clock, DestinationArrivalTime: clock.Add(time.Minute)}}
+	graph := New(&fakeLoader{journeys: []*ctdf.Journey{journey}}, Config{Enabled: true})
+	client := NewClient("http://departure-graph", &http.Client{Transport: handlerTransport{handler: NewServer(graph).Handler()}})
+	for _, test := range []struct {
+		instant string
+		want    int
+	}{
+		{"2026-10-25T00:45:00Z", 1},
+		{"2026-10-25T01:45:00Z", 0},
+	} {
+		instant, err := time.Parse(time.RFC3339, test.instant)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := client.JourneysForStopWindow(context.Background(), &ctdf.Stop{PrimaryIdentifier: "stop-a"}, serviceDate, instant.In(location), 10)
+		if err != nil || len(got) != test.want {
+			t.Fatalf("%s: got %d journeys, err %v; want %d", test.instant, len(got), err, test.want)
+		}
+	}
+}
+
 func TestStatsEndpointReportsRequestsLookupsAndMemory(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}

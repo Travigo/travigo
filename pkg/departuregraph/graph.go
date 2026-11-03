@@ -1274,7 +1274,10 @@ func serviceWindowThreshold(serviceDate time.Time, notBefore time.Time) (int32, 
 		return 0, false
 	}
 	location := notBefore.Location()
-	start := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 0, 0, 0, 0, location)
+	// GTFS service times are measured from local noon minus 12 elapsed hours.
+	// On DST transition days this differs from midnight and keeps this threshold
+	// consistent with the service times used to generate board entries.
+	start := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 12, 0, 0, 0, location).Add(-12 * time.Hour)
 	seconds := int64(notBefore.Sub(start) / time.Second)
 	if seconds < 0 {
 		seconds = 0

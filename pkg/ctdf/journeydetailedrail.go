@@ -15,7 +15,7 @@ type JourneyDetailedRail struct {
 	CateringAvailable   bool   `groups:"detailed,web-journey,web-journey-realtime"`
 	CateringDescription string `groups:"detailed,web-journey,web-journey-realtime"`
 
-	ReplacementBus bool `groups:"detailed,web-journey,web-journey-realtime"`
+	ReplacementBus bool `groups:"detailed,web-journey,web-journey-realtime,departureboard-cache"`
 }
 
 type RailTrain struct {

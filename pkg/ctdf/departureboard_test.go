@@ -5,6 +5,85 @@ import (
 	"time"
 )
 
+func TestBoardRealtimeMatchesServiceDate(t *testing.T) {
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serviceDate := time.Date(2026, 7, 2, 0, 30, 0, 0, london)
+	if !boardRealtimeMatchesServiceDate(&RealtimeJourney{JourneyRunDate: time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)}, serviceDate) {
+		t.Fatal("matching service-date label was rejected")
+	}
+	if boardRealtimeMatchesServiceDate(&RealtimeJourney{JourneyRunDate: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)}, serviceDate) || boardRealtimeMatchesServiceDate(&RealtimeJourney{}, serviceDate) {
+		t.Fatal("different or missing run date was accepted")
+	}
+}
+
+func TestBoardPreservesRepeatedStopOccurrencesAndServiceDate(t *testing.T) {
+	serviceDate := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	clock := func(hours, minutes int) time.Time { return time.Date(0, 1, 1, hours, minutes, 0, 0, time.UTC) }
+	journey := &Journey{
+		PrimaryIdentifier: "loop",
+		Availability:      &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}},
+		Path: []*JourneyPathItem{
+			{OriginStopRef: "stop", OriginDepartureTime: clock(23, 0)},
+			{OriginStopRef: "stop", OriginDepartureTime: clock(25, 30)},
+			{OriginStopRef: "stop", OriginDepartureTime: clock(26, 0)},
+		},
+	}
+	start := serviceDate.Add(24*time.Hour + time.Hour)
+	entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, serviceDate, start, false, nil, BoardTypeDeparture)
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want two later occurrences", len(entries))
+	}
+	if entries[0].OccurrenceIdentifier == "" || entries[0].OccurrenceIdentifier == entries[1].OccurrenceIdentifier {
+		t.Fatal("occurrence IDs are missing or identical")
+	}
+	for _, entry := range entries {
+		if entry.ServiceDate != "2026-11-03" || entry.Time.Before(start) {
+			t.Fatalf("incorrect occurrence: %#v", entry)
+		}
+	}
+}
+
+func TestBoardAppliesServiceDateCancellationAlerts(t *testing.T) {
+	start := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
+	journey := &Journey{PrimaryIdentifier: "train", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Path: []*JourneyPathItem{{OriginStopRef: "stop", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)}}}
+	for offset, want := range []DepartureBoardRecordType{
+		DepartureBoardRecordTypeScheduled,
+		DepartureBoardRecordTypeCancelled,
+		DepartureBoardRecordTypeScheduled,
+		DepartureBoardRecordTypeCancelled,
+		DepartureBoardRecordTypeScheduled,
+	} {
+		date := start.AddDate(0, 0, offset)
+		lookup := &DepartureBoardRealtimeLookup{}
+		if offset == 1 || offset == 3 {
+			lookup.CancelledJourneyIDs = map[string]struct{}{"train": {}}
+		}
+		entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, date, date, false, lookup, BoardTypeDeparture)
+		if len(entries) != 1 || entries[0].Type != want {
+			t.Fatalf("%s: expected one %s entry, got %#v", date.Format(YearMonthDayFormat), want, entries)
+		}
+	}
+}
+
+func TestBoardDoesNotApplyAnotherRunDatesCancellation(t *testing.T) {
+	date := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC)
+	journey := &Journey{PrimaryIdentifier: "journey", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Path: []*JourneyPathItem{{OriginStopRef: "stop", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)}}}
+	update := &RealtimeJourney{JourneyRunDate: date.AddDate(0, 0, -1), Cancelled: true}
+	lookup := &DepartureBoardRealtimeLookup{ByJourneyID: map[string]*RealtimeJourney{"journey": update}}
+	entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, date, date, false, lookup, BoardTypeDeparture)
+	if len(entries) != 1 || entries[0].Type != DepartureBoardRecordTypeScheduled {
+		t.Fatalf("other run cancellation applied: %#v", entries)
+	}
+	update.JourneyRunDate = date
+	entries = GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, date, date, false, lookup, BoardTypeDeparture)
+	if len(entries) != 1 || entries[0].Type != DepartureBoardRecordTypeCancelled {
+		t.Fatalf("matching run cancellation missing: %#v", entries)
+	}
+}
+
 func TestBoardPathSelectorsUseDestinationForArrivals(t *testing.T) {
 	originTime := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 	arrivalTime := originTime.Add(12 * time.Minute)
@@ -128,6 +207,41 @@ func TestServiceTimeOnDatePreservesServiceDayOverflow(t *testing.T) {
 	want := time.Date(2026, 7, 31, 1, 30, 0, 0, time.UTC)
 	if !got.Equal(want) {
 		t.Fatalf("service time on date = %v, want %v", got, want)
+	}
+}
+
+func TestServiceTimeOnDateAcrossClockChanges(t *testing.T) {
+	location, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct{ day, clock, want string }{
+		{"2026-03-29", "08:00", "2026-03-29T08:00:00+01:00"},
+		{"2026-10-25", "08:00", "2026-10-25T08:00:00Z"},
+		{"2026-10-25", "00:30", "2026-10-25T01:30:00+01:00"},
+		{"2026-10-25", "01:30", "2026-10-25T01:30:00Z"},
+	} {
+		date, err := time.ParseInLocation("2006-01-02", test.day, location)
+		if err != nil {
+			t.Fatal(err)
+		}
+		clock, err := time.Parse("15:04", test.clock)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := time.Parse(time.RFC3339, test.want)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := serviceTimeOnDate(date, clock); !got.Equal(want) {
+			t.Errorf("%s %s: got %s, want %s", test.day, test.clock, got, want)
+		}
+	}
+	date := time.Date(2026, 3, 29, 0, 0, 0, 0, location)
+	overflow := time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC).Add(25*time.Hour + 30*time.Minute)
+	want := time.Date(2026, 3, 30, 1, 30, 0, 0, location)
+	if got := serviceTimeOnDate(date, overflow); !got.Equal(want) {
+		t.Errorf("overflow: got %s, want %s", got, want)
 	}
 }
 

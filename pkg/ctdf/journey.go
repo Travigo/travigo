@@ -54,7 +54,7 @@ type Journey struct {
 	RealtimeJourney *RealtimeJourney `groups:"basic,web-board,web-journey,web-planner" bson:"-"`
 
 	// Detailed journey information
-	DetailedRailInformation *JourneyDetailedRail `groups:"detailed,web-journey" bson:",omitempty"`
+	DetailedRailInformation *JourneyDetailedRail `groups:"detailed,web-journey,departureboard-cache" bson:",omitempty"`
 }
 
 func (j *Journey) GetReferences() {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -21,6 +22,7 @@ import (
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -264,19 +266,26 @@ func getStopArrivals(c *fiber.Ctx) error {
 func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	requestStart := time.Now()
 	stopIdentifier := c.Params("identifier")
-	// Performance Review [Set E] [PR003] [P1] (boards): Parsing alone accepts negative and arbitrarily
-	// large counts. A negative value panics at departureBoard[:count], while a large
-	// value expands candidate reads and enrichment. Validate a positive bounded count
-	// before any stop lookup, using the same contract for arrivals and departures.
-	count, err := strconv.Atoi(c.Query("count", "25"))
+	countValue := "25"
+	if c.Context().QueryArgs().Has("count") {
+		countValue = c.Query("count")
+	}
+	count, err := strconv.Atoi(countValue)
 	startDateTimeString := c.Query("datetime")
 	isLLM := strings.ToLower(c.Query("isllm"))
 
-	if err != nil {
-		c.SendStatus(fiber.StatusBadRequest)
-		return c.JSON(fiber.Map{
-			"error": "Parameter count should be an integer",
-		})
+	if err != nil || count < 1 || count > 100 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Parameter count should be an integer between 1 and 100"})
+	}
+	if c.Context().QueryArgs().Has("pagination") || c.Context().QueryArgs().Has("cursor") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Board pagination is not supported"})
+	}
+	var startDateTime time.Time
+	if c.Context().QueryArgs().Has("datetime") {
+		startDateTime, err = time.Parse(time.RFC3339, startDateTimeString)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Parameter datetime should be an RFC3339 datetime"})
+		}
 	}
 
 	stopLookupStart := time.Now()
@@ -287,33 +296,24 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	stopLookupDuration := time.Since(stopLookupStart)
 
 	if err != nil {
-		c.SendStatus(fiber.StatusNotFound)
-		return c.JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
-
-	// Performance Review [Set G] [PR004] [P1] (boards): Explicit RFC3339 inputs keep the caller's
-	// offset, but downstream calendar matching and service clocks use its date/zone.
-	// Equivalent instants in UTC and the stop's zone can therefore select different
-	// services/times. Resolve a valid stop timezone once and normalize both input
-	// paths to it; handle invalid zone names before calling Time.In.
-	var startDateTime time.Time
-	if startDateTimeString == "" {
-		stopTimezone, _ := time.LoadLocation(stop.Timezone)
-
-		startDateTime = time.Now().In(stopTimezone)
-	} else {
-		startDateTime, err = time.Parse(time.RFC3339, startDateTimeString)
-
-		if err != nil {
-			c.SendStatus(fiber.StatusBadRequest)
-			return c.JSON(fiber.Map{
-				"error":    "Parameter datetime should be an RFS3339/ISO8601 datetime",
-				"detailed": err,
-			})
+		status := fiber.StatusBadGateway
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			status = fiber.StatusNotFound
 		}
+		return c.Status(status).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	if stop == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Stop not found"})
+	}
+	stopTimezone, err := time.LoadLocation(stop.Timezone)
+	if err != nil || stop.Timezone == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Stop has an invalid timezone"})
+	}
+	if startDateTimeString == "" {
+		startDateTime = time.Now()
+	}
+	startDateTime = startDateTime.In(stopTimezone)
 
 	departureLookupStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
@@ -324,10 +324,12 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 		Type:          boardType,
 	})
 	departureLookupDuration := time.Since(departureLookupStart)
-	// Performance Review [Set G] [PR005] [P1] (boards): The lookup error is ignored and later
-	// overwritten by marshaling, so an unavailable source appears as an HTTP 200
-	// empty board. Propagate a useful failure before sorting/enriching, preserving
-	// any explicit degraded-source policy instead of silently reporting no service.
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+	if departureBoard == nil {
+		departureBoard = []*ctdf.DepartureBoard{}
+	}
 	beforeSortCount := len(departureBoard)
 
 	// Sort departures by DepartureBoard time

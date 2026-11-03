@@ -276,7 +276,7 @@ func serviceTimeOnDate(serviceDate time.Time, serviceTime time.Time, location *t
 	if location == nil {
 		location = time.Local
 	}
-	serviceDayStart := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 0, 0, 0, 0, location)
+	serviceDayStart := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 12, 0, 0, 0, location).Add(-12 * time.Hour)
 	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
 	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
 }

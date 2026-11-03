@@ -5,11 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/liip/sheriff"
 	"github.com/rs/zerolog/log"
-	iso8601 "github.com/senseyeio/duration"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
@@ -36,13 +36,6 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	queryStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
 
-	// Calculate tomorrows start date time by shifting current date time by 1 day and then setting hours/minutes/seconds to 0
-	nextDayDuration, _ := iso8601.ParseISO8601("P1D")
-	dayAfterDateTime := nextDayDuration.Shift(q.StartDateTime)
-	dayAfterDateTime = time.Date(
-		dayAfterDateTime.Year(), dayAfterDateTime.Month(), dayAfterDateTime.Day(), 0, 0, 0, 0, dayAfterDateTime.Location(),
-	)
-
 	// Contains the stops primary id and all platforms primary ids
 	allStopIDs := q.Stop.GetAllStopIDs()
 
@@ -57,13 +50,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		filterHashString = fmt.Sprintf("%x", filterHash.Sum(nil))
 	}
 
-	currentTime := time.Now()
-
 	boardType := q.Type
 	if boardType == "" {
 		boardType = ctdf.BoardTypeDeparture
 	}
-	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
+	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v2/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
 	stopField := "path.originstopref"
 	if boardType.IsArrival() {
 		stopField = "path.destinationstopref"
@@ -77,92 +68,46 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			},
 		}
 	}
-	// Performance Review [Set G] [PR018] [P1] (boards): Only today's and tomorrow's service dates
-	// are loaded. At 01:00, yesterday's 25:30 departure is absent even though the
-	// time conversion preserves values beyond 24 hours. Include the preceding service
-	// dates needed by the feed's bounded overflow/delay horizon, retaining each date
-	// through availability, realtime matching and occurrence deduplication.
-	journeysToday, journeysTodayFromGraph := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, q.StartDateTime, boardType)
-
-	log.Debug().
-		Str("stop", q.Stop.PrimaryIdentifier).
-		Int("requested_count", q.Count).
-		Int("stop_ids", len(allStopIDs)).
-		Int("journeys", len(journeysToday)).
-		Time("date", q.StartDateTime).
-		Dur("duration", time.Since(currentTime)).
-		Msg("Departure board journeys loaded - today")
-
-	currentTime = time.Now()
-	realtimeLookupToday := s.realtimeLookup(journeysToday, q.StartDateTime, allStopIDs)
-	realtimeLookupTodayDuration := time.Since(currentTime)
-
-	currentTime = time.Now()
-	departureBoardToday := ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
-	// Performance Review [Set K] [PR019] [P1]: Missing realtime data makes a valid scheduled-only
-	// board repeat timetable loading, realtime lookup, and generation. The tomorrow
-	// branch below does the same when realtime is normally unavailable. Base fallback
-	// on graph freshness/completeness or insufficient candidates instead, preserving
-	// a bounded lookback for delayed departures and cancellation handling. Measure
-	// fallback frequency and board latency before changing this behaviour.
-	if journeysTodayFromGraph && !hasRealtimeBoardEntry(departureBoardToday) {
-		log.Warn().
-			Str("stop", q.Stop.PrimaryIdentifier).
-			Msg("Departure graph board produced no realtime entries; falling back to scheduled journey cache")
-		journeysToday = s.getDateJourneys(baseCacheItemPath, journeyQuery, q.StartDateTime)
-		realtimeLookupToday = s.realtimeLookup(journeysToday, q.StartDateTime, allStopIDs)
-		departureBoardToday = ctdf.GenerateBoardFromJourneys(journeysToday, allStopIDs, q.StartDateTime, true, realtimeLookupToday, boardType)
-	}
-	log.Debug().
-		Str("stop", q.Stop.PrimaryIdentifier).
-		Int("journeys", len(journeysToday)).
-		Int("departures", len(departureBoardToday)).
-		Int("prefetched_realtime_journeys", len(realtimeLookupToday.ByJourneyID)).
-		Dur("realtime_lookup_duration", realtimeLookupTodayDuration).
-		Dur("generation_duration", time.Since(currentTime)).
-		Msg("Departure board generation complete - today")
-
-	// If not enough journeys in todays departure board then look into tomorrows
-	if len(departureBoardToday) < q.Count {
-		currentTime = time.Now()
-
-		journeysTomorrow, journeysTomorrowFromGraph := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, dayAfterDateTime, boardType)
-
-		log.Debug().
-			Str("stop", q.Stop.PrimaryIdentifier).
-			Int("requested_count", q.Count).
-			Int("today_departures", len(departureBoardToday)).
-			Int("journeys", len(journeysTomorrow)).
-			Time("date", dayAfterDateTime).
-			Dur("duration", time.Since(currentTime)).
-			Msg("Departure board journeys loaded - tomorrow")
-
-		currentTime = time.Now()
-		realtimeLookupTomorrow := s.realtimeLookup(journeysTomorrow, dayAfterDateTime, allStopIDs)
-		realtimeLookupTomorrowDuration := time.Since(currentTime)
-
-		currentTime = time.Now()
-		departureBoardTomorrow := ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
-		if journeysTomorrowFromGraph && !hasRealtimeBoardEntry(departureBoardTomorrow) {
-			log.Warn().
-				Str("stop", q.Stop.PrimaryIdentifier).
-				Msg("Departure graph tomorrow board produced no realtime entries; falling back to scheduled journey cache")
-			journeysTomorrow = s.getDateJourneys(baseCacheItemPath, journeyQuery, dayAfterDateTime)
-			realtimeLookupTomorrow = s.realtimeLookup(journeysTomorrow, dayAfterDateTime, allStopIDs)
-			departureBoardTomorrow = ctdf.GenerateBoardFromJourneys(journeysTomorrow, allStopIDs, dayAfterDateTime, false, realtimeLookupTomorrow, boardType)
+	// A call after midnight can belong to the previous service day. Search
+	// the previous, selected and following days before sorting the board.
+	// Performance Review [Set G] [PR018] [P1] (boards): Longer service-day
+	// overflow and delays may require additional lookback; establish feed bounds.
+	startOfDay := time.Date(q.StartDateTime.Year(), q.StartDateTime.Month(), q.StartDateTime.Day(), 0, 0, 0, 0, q.StartDateTime.Location())
+	startOfTomorrow := startOfDay.AddDate(0, 0, 1)
+	tomorrowServiceStart := time.Date(startOfTomorrow.Year(), startOfTomorrow.Month(), startOfTomorrow.Day(), 12, 0, 0, 0, startOfTomorrow.Location()).Add(-12 * time.Hour)
+	for _, date := range []time.Time{startOfDay.AddDate(0, 0, -1), q.StartDateTime, startOfDay.AddDate(0, 0, 1)} {
+		if date.Equal(startOfTomorrow) {
+			beforeTomorrow := 0
+			for _, entry := range departureBoard {
+				if entry.Time.Before(tomorrowServiceStart) {
+					beforeTomorrow++
+				}
+			}
+			if beforeTomorrow >= q.Count {
+				break
+			}
 		}
-		log.Debug().
-			Str("stop", q.Stop.PrimaryIdentifier).
-			Int("journeys", len(journeysTomorrow)).
-			Int("departures", len(departureBoardTomorrow)).
-			Int("prefetched_realtime_journeys", len(realtimeLookupTomorrow.ByJourneyID)).
-			Dur("realtime_lookup_duration", realtimeLookupTomorrowDuration).
-			Dur("generation_duration", time.Since(currentTime)).
-			Msg("Departure board generation complete - tomorrow")
-
-		departureBoard = append(departureBoardToday, departureBoardTomorrow...)
-	} else {
-		departureBoard = departureBoardToday
+		journeys, fromGraph, err := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, date, boardType)
+		if err != nil {
+			return nil, err
+		}
+		lookup := s.realtimeLookup(journeys, date, allStopIDs)
+		doEstimates := date.Format(ctdf.YearMonthDayFormat) == time.Now().In(date.Location()).Format(ctdf.YearMonthDayFormat)
+		entries := ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
+		// Performance Review [Set K] [PR019] [P1]: Missing realtime data makes a valid scheduled-only
+		// board repeat timetable loading, realtime lookup, and generation. Base fallback
+		// on graph freshness/completeness or insufficient candidates instead, preserving
+		// delayed departures and cancellation handling. Measure fallback frequency and
+		// board latency before changing this behaviour.
+		if fromGraph && !hasRealtimeBoardEntry(entries) {
+			journeys, err = s.getDateJourneys(baseCacheItemPath, journeyQuery, date)
+			if err != nil {
+				return nil, err
+			}
+			lookup = s.realtimeLookup(journeys, date, allStopIDs)
+			entries = ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
+		}
+		departureBoard = append(departureBoard, entries...)
 	}
 
 	log.Debug().
@@ -176,11 +121,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 }
 
 func (s Source) getBoardJourneys(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) []*ctdf.Journey {
-	journeys, _ := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, serviceDate, boardType)
+	journeys, _, _ := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, serviceDate, boardType)
 	return journeys
 }
 
-func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) ([]*ctdf.Journey, bool) {
+func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItemPath string, journeyQuery bson.M, serviceDate time.Time, boardType ctdf.BoardType) ([]*ctdf.Journey, bool, error) {
 	if s.DepartureGraph != nil && q.Filter == nil && !boardType.IsArrival() {
 		// Performance Review [Set E] [PR020] [P2] (boards): This fresh Background context permits
 		// 30 seconds on the graph, followed by untimed Mongo/Redis fallback and
@@ -189,23 +134,31 @@ func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItem
 		// granting each dependency an independent full timeout.
 		lookupContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+		// Board generation can retain calls scheduled up to four hours before
+		// the requested time when realtime has delayed them.
+		notBefore := serviceDate
+		if !q.StartDateTime.IsZero() {
+			notBefore = q.StartDateTime.Add(-4 * time.Hour)
+		}
+		limit := departureGraphCandidateLimit(q.Count)
 		journeys, err := s.DepartureGraph.JourneysForStopWindow(
 			lookupContext,
 			q.Stop,
 			serviceDate,
-			serviceDate,
-			departureGraphCandidateLimit(q.Count),
+			notBefore,
+			limit,
 		)
-		if err == nil {
-			return journeys, true
+		if err == nil && len(journeys) < limit {
+			return journeys, true, nil
 		}
-		log.Warn().
-			Err(err).
-			Str("stop", q.Stop.PrimaryIdentifier).
-			Time("service_date", serviceDate).
-			Msg("Departure graph lookup failed; falling back to scheduled journey cache")
+		if err != nil {
+			log.Warn().Err(err).Str("stop", q.Stop.PrimaryIdentifier).Time("service_date", serviceDate).Msg("Departure graph lookup failed; falling back to scheduled journey cache")
+		} else {
+			log.Debug().Str("stop", q.Stop.PrimaryIdentifier).Time("service_date", serviceDate).Int("candidates", len(journeys)).Msg("Departure graph candidate limit reached; falling back to scheduled journey cache")
+		}
 	}
-	return s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate), false
+	journeys, err := s.getDateJourneys(baseCacheItemPath, journeyQuery, serviceDate)
+	return journeys, false, err
 }
 
 func hasRealtimeBoardEntry(entries []*ctdf.DepartureBoard) bool {
@@ -249,13 +202,19 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, 
 		journeyIDs = append(journeyIDs, journey.PrimaryIdentifier)
 	}
 
-	realtimeJourneysByJourneyID, err := realtimestore.FindCurrentForJourneyIDs(context.Background(), journeyIDs)
+	realtimeJourneysByJourneyID, err := realtimestore.FindBoardRealtimeForJourneyIDs(context.Background(), journeyIDs)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query realtime journeys")
 	}
 	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, serviceDate, time.Now())
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
+	}
+	if cancelledJourneyIDs == nil {
+		cancelledJourneyIDs = map[string]struct{}{}
+	}
+	if err := addLegacyVSTPCancellations(context.Background(), realtimeJourneysByJourneyID, serviceDate, cancelledJourneyIDs); err != nil {
+		log.Error().Err(err).Msg("Failed to check legacy VSTP cancellations")
 	}
 
 	log.Debug().
@@ -279,9 +238,72 @@ func (s Source) realtimeLookup(journeys []*ctdf.Journey, serviceDate time.Time, 
 			if err != nil {
 				log.Error().Err(err).Msg("Failed to batch query realtime journeys by journey refs")
 			}
+			for id, journey := range realtimeJourneys {
+				if journey == nil || journey.JourneyRunDate.IsZero() || journey.JourneyRunDate.Format(ctdf.YearMonthDayFormat) != serviceDate.Format(ctdf.YearMonthDayFormat) {
+					delete(realtimeJourneys, id)
+				}
+			}
 			return realtimeJourneys
 		},
 	}
+}
+
+// Older VSTP records have only a start and end date, not the weekday mask.
+// Preserve their old range-wide cancellation behaviour until the feed writes
+// an alert with the exact operating dates or the realtime record expires.
+func addLegacyVSTPCancellations(ctx context.Context, realtime map[string]*ctdf.RealtimeJourney, serviceDate time.Time, cancelled map[string]struct{}) error {
+	const realtimePrefix = "gb-nationalrail-vstp-cancellation-"
+	const alertPrefix = "gb-networkrail-vstpcancel-"
+	date := serviceDate.Format(ctdf.YearMonthDayFormat)
+	journeysByAlert := map[string][]string{}
+	for id, update := range realtime {
+		if update == nil || !update.Cancelled {
+			continue
+		}
+		suffix, ok := strings.CutPrefix(update.PrimaryIdentifier, realtimePrefix)
+		if !ok {
+			continue
+		}
+		parts := strings.SplitN(suffix, ":", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		start, startErr := time.Parse(ctdf.YearMonthDayFormat, parts[0])
+		end, endErr := time.Parse(ctdf.YearMonthDayFormat, parts[1])
+		if startErr != nil || endErr != nil || start.After(end) || date < parts[0] || date > parts[1] {
+			continue
+		}
+		alertID := alertPrefix + suffix
+		journeysByAlert[alertID] = append(journeysByAlert[alertID], id)
+	}
+	if len(journeysByAlert) == 0 {
+		return nil
+	}
+	alertIDs := make([]string, 0, len(journeysByAlert))
+	for id := range journeysByAlert {
+		alertIDs = append(alertIDs, id)
+	}
+	cursor, err := database.GetCollection("service_alerts").Find(ctx, bson.M{"primaryidentifier": bson.M{"$in": alertIDs}}, options.Find().SetProjection(bson.M{"_id": 0, "primaryidentifier": 1}))
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var alert struct{ PrimaryIdentifier string }
+		if err := cursor.Decode(&alert); err != nil {
+			return err
+		}
+		delete(journeysByAlert, alert.PrimaryIdentifier)
+	}
+	if err := cursor.Err(); err != nil {
+		return err
+	}
+	for _, ids := range journeysByAlert {
+		for _, id := range ids {
+			cancelled[id] = struct{}{}
+		}
+	}
+	return nil
 }
 
 func findBoardStopAliases(stopRefs []string) map[string][]string {
@@ -359,7 +381,7 @@ func boardStopAliasFallback(stopRefs []string) (map[string][]string, map[string]
 	return aliasesByRef, requestedRefs
 }
 
-func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) []*ctdf.Journey {
+func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, dateTime time.Time) ([]*ctdf.Journey, error) {
 	loadStart := time.Now()
 	journeys := make([]*ctdf.Journey, 0, 50)
 
@@ -379,7 +401,7 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 			Int("journeys", len(journeys)).
 			Dur("duration", time.Since(loadStart)).
 			Msg("Departure board journey cache hit")
-		return journeys
+		return journeys, nil
 	}
 
 	journeysCollection := database.GetCollection("journeys")
@@ -387,11 +409,6 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 
 	// This projection excludes values we dont care about - the main ones being path.*
 	// Reduces memory usage and execution time
-	// Performance Review [Set G] [PR023] [P1] (boards): destinationactivity is required to exclude
-	// pickup-only calls from arrival boards; projecting it away makes them eligible.
-	// Also retain the small ReplacementBus flag through projection AND cache encoding
-	// so Mongo/cache boards agree with graph boards about BUS platforms. Project a
-	// minimal board schema without discarding fields that affect visible behaviour.
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
@@ -399,17 +416,15 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		bson.E{Key: "direction", Value: 0},
 		bson.E{Key: "path.track", Value: 0},
 		bson.E{Key: "path.associations", Value: 0},
-		bson.E{Key: "path.destinationactivity", Value: 0},
 		bson.E{Key: "path.distance", Value: 0},
 		bson.E{Key: "path.originstop", Value: 0},
 		bson.E{Key: "path.destinationstop", Value: 0},
-		bson.E{Key: "detailedrailinformation", Value: 0},
 	})
 
 	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query Journeys")
-		return journeys
+		return nil, fmt.Errorf("query board journeys: %w", err)
 	}
 	defer cursor.Close(context.Background())
 
@@ -422,15 +437,15 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 
 	decodedJourneys := 0
 	dateMatchedJourneys := 0
-	// Performance Review [Set G] [PR024] [P1] (boards): A decode error currently continues into a
-	// possibly nil Availability, and cursor.Err is never checked before caching for
-	// 18 hours. Return load failures rather than publishing a partial/empty success;
-	// only write the cache after complete iteration and successful encoding.
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
 		err := cursor.Decode(&journey)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode journey")
+			return nil, fmt.Errorf("decode board journey: %w", err)
+		}
+		if journey.Availability == nil {
+			log.Warn().Str("journey", journey.PrimaryIdentifier).Msg("Skipping board journey without availability")
+			continue
 		}
 		decodedJourneys++
 
@@ -438,6 +453,9 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 			journeys = append(journeys, &journey)
 			dateMatchedJourneys++
 		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("read board journeys: %w", err)
 	}
 
 	log.Debug().
@@ -449,9 +467,12 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		Msg("Departure board journey database decode complete")
 
 	writeCacheTime := time.Now()
-	reducedJourneys, _ := sheriff.Marshal(&sheriff.Options{
+	reducedJourneys, err := sheriff.Marshal(&sheriff.Options{
 		Groups: []string{"departureboard-cache"},
 	}, journeys)
+	if err != nil {
+		return nil, fmt.Errorf("encode board journeys: %w", err)
+	}
 
 	cachedresults.Set(s.CachedResults, cacheItemPath, reducedJourneys, 18*time.Hour)
 	log.Debug().
@@ -461,5 +482,5 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		Dur("total_duration", time.Since(loadStart)).
 		Msg("Departure board journey cache write complete")
 
-	return journeys
+	return journeys, nil
 }

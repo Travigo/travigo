@@ -60,6 +60,30 @@ func TestSaveRealtimeJourneyPreservesPositiveExpiration(t *testing.T) {
 	}
 }
 
+func TestBoardRealtimeRetainsUnexpiredLegacyVSTPCancellation(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	modified := time.Now().Add(-5 * time.Hour)
+	for _, journey := range []*ctdf.RealtimeJourney{
+		{PrimaryIdentifier: "gb-nationalrail-vstp-cancellation-2026-11-01:2026-11-05:train", Journey: &ctdf.Journey{PrimaryIdentifier: "train"}, Cancelled: true, ModificationDateTime: modified, TimeoutDurationMinutes: 24 * 60},
+		{PrimaryIdentifier: "other", Journey: &ctdf.Journey{PrimaryIdentifier: "other"}, Cancelled: true, ModificationDateTime: modified, TimeoutDurationMinutes: 24 * 60},
+		{PrimaryIdentifier: "gb-nationalrail-vstp-cancellation-2026-11-01:2026-11-05:expired", Journey: &ctdf.Journey{PrimaryIdentifier: "expired"}, Cancelled: true, ModificationDateTime: modified, TimeoutDurationMinutes: 60},
+	} {
+		if err := SaveRealtimeJourney(ctx, journey); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ids := []string{"train", "other", "expired"}
+	standard, err := FindCurrentForJourneyIDs(ctx, ids)
+	if err != nil || len(standard) != 0 {
+		t.Fatalf("ordinary lookup = %#v, %v", standard, err)
+	}
+	board, err := FindBoardRealtimeForJourneyIDs(ctx, ids)
+	if err != nil || len(board) != 1 || board["train"] == nil {
+		t.Fatalf("board lookup = %#v, %v", board, err)
+	}
+}
+
 func TestSaveRealtimeJourneyPreservesOverlayReplacementFields(t *testing.T) {
 	setupMemoryTestRedis(t)
 	ctx := context.Background()

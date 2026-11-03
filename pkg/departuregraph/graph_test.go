@@ -639,3 +639,27 @@ func assertMaterializedJourney(t *testing.T, journey *ctdf.Journey) {
 		t.Fatal("materialized journey should be active for its already-selected service day")
 	}
 }
+
+func TestServiceWindowThresholdAcrossClockChange(t *testing.T) {
+	location, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	date := time.Date(2026, 10, 25, 0, 0, 0, 0, location)
+	for _, test := range []struct {
+		instant string
+		want    int32
+	}{
+		{"2026-10-25T00:30:00Z", 30 * 60},
+		{"2026-10-25T01:30:00Z", 90 * 60},
+	} {
+		instant, err := time.Parse(time.RFC3339, test.instant)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, ok := serviceWindowThreshold(date, instant.In(location))
+		if !ok || got != test.want {
+			t.Errorf("%s: got %d, %t; want %d", test.instant, got, ok, test.want)
+		}
+	}
+}

@@ -1,11 +1,38 @@
 package tfl
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 )
+
+func TestTfLRealtimeRespectsSelectedWindow(t *testing.T) {
+	now := time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC)
+	start := now.AddDate(0, 0, -3)
+	end := start.Add(48 * time.Hour)
+	if tflRealtimeWindowOverlaps(start, end, now) || tflRealtimeTimeInWindow(now.Add(time.Hour), start, end, now) {
+		t.Fatal("current predictions must not appear on a historical board")
+	}
+	start, end = now.Add(-time.Hour), now.Add(time.Hour)
+	if !tflRealtimeWindowOverlaps(start, end, now) || !tflRealtimeTimeInWindow(now, start, end, now) || tflRealtimeTimeInWindow(end, start, end, now) {
+		t.Fatal("realtime prediction window or exclusive end is incorrect")
+	}
+}
+
+func TestTfLCancellationLookupGroupsByOperatingDate(t *testing.T) {
+	date := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
+	journeys := []ctdf.RealtimeJourney{
+		{Journey: &ctdf.Journey{PrimaryIdentifier: "first"}, JourneyRunDate: date},
+		{Journey: &ctdf.Journey{PrimaryIdentifier: "second"}, JourneyRunDate: date.AddDate(0, 0, 1)},
+		{Journey: &ctdf.Journey{PrimaryIdentifier: "unknown"}},
+	}
+	want := map[string][]string{"2026-11-03": {"first"}, "2026-11-04": {"second"}}
+	if got := tflJourneyIDsByServiceDate(journeys); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
 
 func TestFilterScheduledBoardByDirectionUsesIndependentWatermarks(t *testing.T) {
 	baseTime := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)

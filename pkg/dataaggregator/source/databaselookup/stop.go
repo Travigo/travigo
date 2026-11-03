@@ -2,33 +2,30 @@ package databaselookup
 
 import (
 	"context"
-	"errors"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (s Source) StopQuery(stopQuery query.Stop) (*ctdf.Stop, error) {
 	stopsCollection := database.GetCollection("stops")
 	var stop *ctdf.Stop
 
+	queries := []bson.M{stopQuery.ToBson()}
 	if stopQuery.Identifier != "" {
-		stopsCollection.FindOne(context.Background(), bson.M{"primaryidentifier": stopQuery.Identifier}).Decode(&stop)
-		if stop == nil {
-			stopsCollection.FindOne(context.Background(), bson.M{"otheridentifiers": stopQuery.Identifier}).Decode(&stop)
-		}
-		if stop == nil {
-			stopsCollection.FindOne(context.Background(), bson.M{"platforms.primaryidentifier": stopQuery.Identifier}).Decode(&stop)
-		}
-	} else {
-		stopsCollection.FindOne(context.Background(), stopQuery.ToBson()).Decode(&stop)
+		queries = []bson.M{{"primaryidentifier": stopQuery.Identifier}, {"otheridentifiers": stopQuery.Identifier}, {"platforms.primaryidentifier": stopQuery.Identifier}}
 	}
-
-	if stop == nil {
-		return nil, errors.New("could not find a matching Stop")
-	} else {
-		return stop, nil
+	for _, filter := range queries {
+		err := stopsCollection.FindOne(context.Background(), filter).Decode(&stop)
+		if err == nil {
+			return stop, nil
+		}
+		if err != mongo.ErrNoDocuments {
+			return nil, err
+		}
 	}
+	return nil, mongo.ErrNoDocuments
 }

@@ -98,7 +98,11 @@ func (c *Client) journeysForStopWindow(ctx context.Context, stop *ctdf.Stop, ser
 		Limit:          limit,
 	}
 	if !notBefore.IsZero() {
-		graphRequest.NotBefore = notBefore.Format(time.RFC3339Nano)
+		// The wire format retains an offset but not an IANA location. Use the
+		// service day's noon offset so the server can reconstruct the same
+		// noon-minus-12-hours origin across a clock change.
+		_, offset := time.Date(serviceDate.Year(), serviceDate.Month(), serviceDate.Day(), 12, 0, 0, 0, serviceDate.Location()).Zone()
+		graphRequest.NotBefore = notBefore.In(time.FixedZone("", offset)).Format(time.RFC3339Nano)
 	}
 	payload, err := json.Marshal(graphRequest)
 	if err != nil {

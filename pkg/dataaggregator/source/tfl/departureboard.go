@@ -58,9 +58,12 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 
 	isTFLStop := false
 	var services []*ctdf.Service
-	services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
+	services, err := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 		Stop: q.Stop,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	for _, service := range services {
 		if service.OperatorRef == tflOperator.PrimaryIdentifier {
@@ -97,31 +100,30 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if realtimePerStopLimit > tflRealtimeBoardMaximumPerStop {
 		realtimePerStopLimit = tflRealtimeBoardMaximumPerStop
 	}
-	// Performance Review [Set G] [PR025] [P1] (boards): This window and the later cutoff use now,
-	// ignoring q.StartDateTime, while scheduled backfill uses the requested datetime.
-	// Future/historical boards can therefore be filled with today's live arrivals.
-	// Gate realtime to the requested window/run date and validate its horizon before
-	// fetching; keep Redis expiry cleanup tied to actual time, not a future query's
-	// lower bound, because the reader currently removes everything before from.
-	realtimeJourneys, err := realtimestore.FindTFLDepartureBoardJourneysBounded(
-		context.Background(),
-		allStopIDS,
-		now.Add(-30*time.Second),
-		now.Add(tflRealtimeBoardHorizon),
-		int64(realtimePerStopLimit),
-	)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
-	}
-	journeyIDs := make([]string, 0, len(realtimeJourneys))
-	for index := range realtimeJourneys {
-		if realtimeJourneys[index].Journey != nil {
-			journeyIDs = append(journeyIDs, realtimeJourneys[index].Journey.PrimaryIdentifier)
+	// Keep Redis cleanup relative to actual time; bound display separately to
+	// the selected day and the following local calendar day.
+	start := q.StartDateTime.In(stopTimezone)
+	endDay := start.AddDate(0, 0, 2)
+	boardEnd := time.Date(endDay.Year(), endDay.Month(), endDay.Day(), 0, 0, 0, 0, stopTimezone)
+	var realtimeJourneys []ctdf.RealtimeJourney
+	if tflRealtimeWindowOverlaps(start, boardEnd, now) {
+		realtimeJourneys, err = realtimestore.FindTFLDepartureBoardJourneysBounded(
+			context.Background(), allStopIDS, now.Add(-30*time.Second), now.Add(tflRealtimeBoardHorizon), int64(realtimePerStopLimit),
+		)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to query TfL realtime journeys")
 		}
 	}
-	cancelledJourneyIDs, err := ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), journeyIDs, q.StartDateTime, now)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
+	cancelledByDate := map[string]map[string]struct{}{}
+	for date, ids := range tflJourneyIDsByServiceDate(realtimeJourneys) {
+		serviceDate, parseErr := time.ParseInLocation(ctdf.YearMonthDayFormat, date, stopTimezone)
+		if parseErr != nil {
+			continue
+		}
+		cancelledByDate[date], err = ctdf.ActiveJourneyCancellationAlertIDs(context.Background(), ids, serviceDate, now)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to query journey cancellation service alerts")
+		}
 	}
 	servicesByRef := loadTFLBoardServices(services, realtimeJourneys)
 	transforms.Transform(tflOperator, 2)
@@ -153,11 +155,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 			scheduledTime := realtimeJourneyStop.ArrivalTime.In(stopTimezone)
 
 			// Skip over this one if we've already past its arrival time (allow 30 second overlap)
-			if scheduledTime.Before(now.Add(-30 * time.Second)) {
+			if !tflRealtimeTimeInWindow(scheduledTime, start, boardEnd, now) {
 				continue
 			}
 
-			wholeJourneyCancelled := ctdf.IsBoardJourneyCancelled(realtimeJourney.Journey, &realtimeJourney, cancelledJourneyIDs)
+			wholeJourneyCancelled := ctdf.IsBoardJourneyCancelled(realtimeJourney.Journey, &realtimeJourney, cancelledByDate[realtimeJourney.JourneyRunDate.Format(ctdf.YearMonthDayFormat)])
 			departure := &ctdf.DepartureBoard{
 				DestinationDisplay: ctdf.BoardDestinationDisplayWithRealtime(realtimeJourney.Journey, &realtimeJourney, realtimeJourney.Journey.DestinationDisplay, q.Type, wholeJourneyCancelled),
 				DisplayReference:   ctdf.BoardDisplayReferenceFor(realtimeJourney.Journey, &realtimeJourney, q.Type, wholeJourneyCancelled),
@@ -165,6 +167,10 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				Time:               scheduledTime,
 
 				Journey: realtimeJourney.Journey,
+			}
+			if !realtimeJourney.JourneyRunDate.IsZero() {
+				departure.ServiceDate = realtimeJourney.JourneyRunDate.Format(ctdf.YearMonthDayFormat)
+				departure.OccurrenceIdentifier = ctdf.BoardOccurrenceIdentifier(realtimeJourney.Journey.PrimaryIdentifier, departure.ServiceDate, realtimeJourneyStop.JourneyStopIndex, q.Type)
 			}
 			if wholeJourneyCancelled {
 				departure.Type = ctdf.DepartureBoardRecordTypeCancelled
@@ -202,17 +208,37 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	localSource := getBackfillSource()
 	localDepartures, err := localSource.Lookup(q)
 
-	if err == nil {
-		scheduledBackfill := filterScheduledBoardByDirection(
-			localDepartures.([]*ctdf.DepartureBoard),
-			allStopIDS,
-			q.Type,
-			directionWatermarks,
-		)
-		departureBoard = append(departureBoard, scheduledBackfill...)
+	if err != nil {
+		return nil, err
 	}
+	scheduledBackfill := filterScheduledBoardByDirection(
+		localDepartures.([]*ctdf.DepartureBoard),
+		allStopIDS,
+		q.Type,
+		directionWatermarks,
+	)
+	departureBoard = append(departureBoard, scheduledBackfill...)
 
 	return ctdf.DeduplicateBoardEntries(departureBoard), nil
+}
+
+func tflRealtimeWindowOverlaps(start, end, now time.Time) bool {
+	return now.Before(end) && !now.Add(tflRealtimeBoardHorizon).Before(start)
+}
+
+func tflRealtimeTimeInWindow(value, start, end, now time.Time) bool {
+	return !value.Before(now.Add(-30*time.Second)) && !value.Before(start) && value.Before(end)
+}
+
+func tflJourneyIDsByServiceDate(journeys []ctdf.RealtimeJourney) map[string][]string {
+	ids := map[string][]string{}
+	for _, journey := range journeys {
+		if journey.Journey != nil && !journey.JourneyRunDate.IsZero() {
+			date := journey.JourneyRunDate.Format(ctdf.YearMonthDayFormat)
+			ids[date] = append(ids[date], journey.Journey.PrimaryIdentifier)
+		}
+	}
+	return ids
 }
 
 func loadTFLBoardServices(services []*ctdf.Service, realtimeJourneys []ctdf.RealtimeJourney) map[string]*ctdf.Service {
