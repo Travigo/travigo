@@ -18,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
@@ -680,6 +681,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			DepartureTimezone:    agency.Timezone,
 			Availability:         availability,
 			Path:                 []*ctdf.JourneyPathItem{},
+		}
+
+		if dataset.Identifier == nyct.SubwayDataset {
+			if key := nyct.TripID(t.ID); key != "" {
+				// Subway realtime IDs omit the schedule prefix. Retain the path
+				// because origin time, route and direction can collide.
+				journey.OtherIdentifiers["GTFS-TripID"] = key
+			}
 		}
 
 		if t.BlockID != "" {

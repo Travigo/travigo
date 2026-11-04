@@ -18,6 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"google.golang.org/protobuf/proto"
@@ -147,6 +148,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 				identifyingInformation = append(identifyingInformation, map[string]string{
 					"TripID":        tripID,
+					"TripStartDate": trip.GetStartDate(),
 					"TripStartTime": trip.GetStartTime(),
 					"RouteID":       routeID,
 					"StopID":        stopID,
@@ -214,7 +216,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 			timeframe := timeFrameDateTime.Format("2006-01-02")
 
-			localID := fmt.Sprintf("%s-realtime-%s-%s", dataset.Identifier, timeframe, tripID)
+			localID := realtimeTripLocalID(dataset.Identifier, dataset.LinkedDataset, timeframe, tripID)
 			if tripStartTime != "" {
 				localID += "-" + tripStartTime
 			}
@@ -228,6 +230,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 					IdentifyingInformation: map[string]string{
 						"TripID":        tripID,
+						"TripStartDate": trip.GetStartDate(),
 						"TripStartTime": tripStartTime,
 						"RouteID":       trip.GetRouteId(),
 						"LinkedDataset": dataset.LinkedDataset,
@@ -378,4 +381,15 @@ func checkQueueSize() {
 
 		checkQueueSize()
 	}
+}
+
+func realtimeTripLocalID(dataset, linkedDataset, timeframe, tripID string) string {
+	if linkedDataset == nyct.SubwayDataset {
+		if key := nyct.TripID(tripID); key != "" {
+			// Keep paths distinct in the identification cache. Pathless updates
+			// resolve separately and are accepted only when unambiguous.
+			return fmt.Sprintf("%s-realtime-%s-%s", linkedDataset, timeframe, key)
+		}
+	}
+	return fmt.Sprintf("%s-realtime-%s-%s", dataset, timeframe, tripID)
 }

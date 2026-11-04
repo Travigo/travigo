@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -22,6 +23,11 @@ type locationJourneyCandidate struct {
 }
 
 func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateEvent, sourceType string, information map[string]string) string {
+	// NYC explicitly permits realtime trips without a static counterpart. A
+	// nearby train must not be substituted when the trip key cannot be resolved.
+	if sourceType == "GTFS-RT" && information["LinkedDataset"] == nyct.SubwayDataset {
+		return ""
+	}
 	if event == nil || event.VehicleLocationUpdate == nil || event.VehicleLocationUpdate.Location.Type != "Point" {
 		return ""
 	}

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -96,7 +97,6 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 }
 
 func (r *GTFSRT) IdentifyJourney() (string, error) {
-	journeysCollection := database.GetCollection("journeys")
 
 	tripID := r.IdentifyingInformation["TripID"]
 	if tripID == "" {
@@ -108,6 +108,11 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		return "", errors.New("Missing field linkedDataset")
 	}
 
+	if linkedDataset == nyct.SubwayDataset {
+		return nyct.IdentifyJourney(tripID, r.IdentifyingInformation["TripStartDate"])
+	}
+
+	journeysCollection := database.GetCollection("journeys")
 	journeysQuery := bson.M{
 		"otheridentifiers.GTFS-TripID": tripID,
 		"datasource.datasetid":         linkedDataset,

@@ -349,6 +349,8 @@ func createJourneysIndexes() {
 
 	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
 	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
+	// Partial identifier indexes use new names so existing full indexes do not
+	// conflict during creation. Retire the old indexes separately after checking usage.
 	journeyIdentificationServiceTicketMachineJourneycodeIndexName := "JourneyIdentificationServiceTicketMachineJourneyCode"
 	journeyIdentificationServiceBlockNumberIndexName := "JourneyIdentificationServiceBlockNumberJourneyCode"
 	journeyBlockDatasetDepartureIndexName := "JourneyBlockDatasetDeparture"
@@ -387,27 +389,24 @@ func createJourneysIndexes() {
 			},
 		},
 		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceTicketMachineJourneycodeIndexName,
-			},
+			Options: options.Index().SetName(journeyIdentificationServiceTicketMachineJourneycodeIndexName + "Partial").
+				SetPartialFilterExpression(bson.M{"otheridentifiers.TicketMachineJourneyCode": bson.M{"$exists": true}}),
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
 				{Key: "otheridentifiers.TicketMachineJourneyCode", Value: 1},
 			},
 		},
 		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceBlockNumberIndexName,
-			},
+			Options: options.Index().SetName(journeyIdentificationServiceBlockNumberIndexName + "Partial").
+				SetPartialFilterExpression(bson.M{"otheridentifiers.BlockNumber": bson.M{"$exists": true}}),
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
 				{Key: "otheridentifiers.BlockNumber", Value: 1},
 			},
 		},
 		{
-			Options: &options.IndexOptions{
-				Name: &journeyBlockDatasetDepartureIndexName,
-			},
+			Options: options.Index().SetName(journeyBlockDatasetDepartureIndexName + "Partial").
+				SetPartialFilterExpression(bson.M{"otheridentifiers.BlockNumber": bson.M{"$exists": true}}),
 			Keys: bson.D{
 				{Key: "datasource.datasetid", Value: 1},
 				{Key: "otheridentifiers.BlockNumber", Value: 1},
@@ -416,9 +415,13 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bson.D{{Key: "otheridentifiers.TrainUID", Value: 1}},
+			Options: options.Index().SetName("JourneyTrainUIDPartial").
+				SetPartialFilterExpression(bson.M{"otheridentifiers.TrainUID": bson.M{"$exists": true}}),
 		},
 		{
 			Keys: bson.D{{Key: "otheridentifiers.GTFS-TripID", Value: 1}},
+			Options: options.Index().SetName("JourneyGTFSTripIDPartial").
+				SetPartialFilterExpression(bson.M{"otheridentifiers.GTFS-TripID": bson.M{"$exists": true}}),
 		},
 		{
 			Keys:    bson.D{{Key: "expiry", Value: 1}},
