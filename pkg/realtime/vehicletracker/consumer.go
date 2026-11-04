@@ -383,6 +383,8 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 					Service:  identifyingInformation["PublishedLineName"],
 					Trip:     identifyingInformation["TripID"],
 
+					Datasource: fmt.Sprintf("%s-%s", vehicleUpdateEvent.DataSource.ProviderID, vehicleUpdateEvent.DataSource.DatasetID),
+
 					SourceType: sourceType,
 				}
 			})

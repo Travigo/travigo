@@ -16,4 +16,6 @@ type RealtimeIdentifyFailureElasticEvent struct {
 	Trip     string
 
 	SourceType string
+
+	Datasource string
 }
