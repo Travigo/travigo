@@ -2,6 +2,7 @@ package journeytracks
 
 import (
 	"context"
+	"iter"
 	"sort"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -30,6 +31,9 @@ type RouteLeg struct {
 	TrackRef             string                    `bson:"trackref"`
 	Attributes           map[string]string         `bson:"attributes,omitempty"`
 	DataSource           *ctdf.DataSourceReference `bson:"datasource,omitempty"`
+
+	// PassingPaths records the waypoints for each leg of a CIF route variant.
+	PassingPaths [][]string `bson:"passingpaths,omitempty" json:"-"`
 }
 
 type Route struct {
@@ -138,6 +142,26 @@ func MatchStops(journeyStops []string, routeStops [][]string) ([]int, bool) {
 		}
 	}
 	return positions, true
+}
+
+// ContiguousPaths splits a journey at gaps left by unresolved stops.
+func ContiguousPaths(path []*ctdf.JourneyPathItem) iter.Seq[[]*ctdf.JourneyPathItem] {
+	return func(yield func([]*ctdf.JourneyPathItem) bool) {
+		for start := 0; start < len(path); {
+			if path[start] == nil {
+				start++
+				continue
+			}
+			end := start + 1
+			for end < len(path) && path[end] != nil && path[end-1].DestinationStopRef == path[end].OriginStopRef {
+				end++
+			}
+			if !yield(path[start:end]) {
+				return
+			}
+			start = end
+		}
+	}
 }
 
 func JourneyStops(path []*ctdf.JourneyPathItem) []string {

@@ -28,9 +28,10 @@ type Format struct {
 }
 
 type routePattern struct {
-	key         string
-	stopRefs    []string
-	serviceRefs []string
+	key          string
+	stopRefs     []string
+	passingPaths [][]string
+	serviceRefs  []string
 }
 
 type snappedStop struct {
@@ -114,30 +115,24 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 				failureReason = fmt.Sprintf("could not snap %s or %s to rail graph", pattern.stopRefs[index-1], pattern.stopRefs[index])
 				break
 			}
-			cacheKey := [2]int{origin.graphNode, destination.graphNode}
-			cached, exists := trackCache[cacheKey]
-			if !exists {
-				reverseKey := [2]int{destination.graphNode, origin.graphNode}
-				if reverse, reverseExists := trackCache[reverseKey]; reverseExists && reverse.err == nil {
-					cached.locations = reverseTrack(reverse.locations)
-				} else {
-					cached.locations, cached.err = format.graph.route(origin.graphNode, destination.graphNode)
-				}
-				trackCache[cacheKey] = cached
+			var passingPath []string
+			if len(pattern.passingPaths) > 0 {
+				passingPath = pattern.passingPaths[index-1]
 			}
-			if cached.err != nil || len(cached.locations) < 2 {
+			locations, err := format.graph.routeLeg(origin, destination, passingPath, snapped, trackCache)
+			if err != nil || len(locations) < 2 {
 				patternFailed = true
-				if cached.err != nil {
-					failureReason = cached.err.Error()
+				if err != nil {
+					failureReason = err.Error()
 				} else {
 					failureReason = fmt.Sprintf("route %s to %s has fewer than two points", pattern.stopRefs[index-1], pattern.stopRefs[index])
 				}
 				break
 			}
-			trackID := trackIdentifier(pattern.stopRefs[index-1], pattern.stopRefs[index])
+			trackID := trackIdentifier(pattern.stopRefs[index-1], pattern.stopRefs[index], passingPath...)
 			patternTracks = append(patternTracks, ctdf.JourneyTrack{
 				PrimaryIdentifier: trackID,
-				Track:             cached.locations,
+				Track:             locations,
 				DataSource:        source,
 			})
 		}
@@ -164,6 +159,7 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 				ServiceRefs:          pattern.serviceRefs,
 				TransportType:        ctdf.TransportTypeRail,
 				RouteStopRefs:        pattern.stopRefs,
+				PassingPaths:         pattern.passingPaths,
 				RouteStopIdentifiers: stopIdentifiers,
 				LegIndex:             legIndex,
 				OriginStopRefs:       stopIdentifiers[legIndex],
@@ -200,7 +196,7 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 	cursor, err := database.GetCollection(database.JourneysRawCollectionName).Find(
 		ctx,
 		bson.M{"datasource.datasetid": datasetID},
-		options.Find().SetProjection(bson.M{"path.originstopref": 1, "path.destinationstopref": 1, "serviceref": 1}),
+		options.Find().SetProjection(bson.M{"path.originstopref": 1, "path.destinationstopref": 1, "path.passingpath": 1, "serviceref": 1}),
 	)
 	if err != nil {
 		return nil, err
@@ -208,8 +204,9 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 	defer cursor.Close(ctx)
 
 	type patternAccumulator struct {
-		stopRefs    []string
-		serviceRefs map[string]struct{}
+		stopRefs     []string
+		passingPaths [][]string
+		serviceRefs  map[string]struct{}
 	}
 	byKey := map[string]*patternAccumulator{}
 	for cursor.Next(ctx) {
@@ -217,17 +214,28 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 		if err := cursor.Decode(&journey); err != nil {
 			return nil, err
 		}
-		stopRefs := journeytracks.JourneyStops(journey.Path)
-		if len(stopRefs) < 2 || journey.ServiceRef == "" {
+		if journey.ServiceRef == "" {
 			continue
 		}
-		key := routeIdentifier(stopRefs)
-		pattern := byKey[key]
-		if pattern == nil {
-			pattern = &patternAccumulator{stopRefs: stopRefs, serviceRefs: map[string]struct{}{}}
-			byKey[key] = pattern
+		for path := range journeytracks.ContiguousPaths(journey.Path) {
+			stopRefs := journeytracks.JourneyStops(path)
+			var passingPaths [][]string
+			for i, leg := range path {
+				if len(leg.PassingPath) > 0 {
+					if passingPaths == nil {
+						passingPaths = make([][]string, len(path))
+					}
+					passingPaths[i] = leg.PassingPath
+				}
+			}
+			key := routeIdentifier(stopRefs, passingPaths...)
+			pattern := byKey[key]
+			if pattern == nil {
+				pattern = &patternAccumulator{stopRefs: stopRefs, passingPaths: passingPaths, serviceRefs: map[string]struct{}{}}
+				byKey[key] = pattern
+			}
+			pattern.serviceRefs[journey.ServiceRef] = struct{}{}
 		}
-		pattern.serviceRefs[journey.ServiceRef] = struct{}{}
 	}
 	if err := cursor.Err(); err != nil {
 		return nil, err
@@ -246,7 +254,7 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 			serviceRefs = append(serviceRefs, serviceRef)
 		}
 		sort.Strings(serviceRefs)
-		patterns = append(patterns, routePattern{key: key, stopRefs: accumulator.stopRefs, serviceRefs: serviceRefs})
+		patterns = append(patterns, routePattern{key: key, stopRefs: accumulator.stopRefs, passingPaths: accumulator.passingPaths, serviceRefs: serviceRefs})
 	}
 	return patterns, nil
 }
@@ -256,6 +264,11 @@ func loadPatternStops(ctx context.Context, patterns []routePattern) (map[string]
 	for _, pattern := range patterns {
 		for _, stopRef := range pattern.stopRefs {
 			refSet[stopRef] = struct{}{}
+		}
+		for _, passingPath := range pattern.passingPaths {
+			for _, ref := range passingPath {
+				refSet[ref] = struct{}{}
+			}
 		}
 	}
 	refs := make([]string, 0, len(refSet))
@@ -369,14 +382,59 @@ func preserveExistingPattern(ctx context.Context, routeKey string, source *ctdf.
 	return err
 }
 
-func routeIdentifier(stopRefs []string) string {
-	hash := sha256.Sum256([]byte(strings.Join(stopRefs, "\x00")))
+func routeIdentifier(stopRefs []string, passingPaths ...[]string) string {
+	key := strings.Join(stopRefs, "\x00")
+	for _, path := range passingPaths {
+		key += "\x01" + strings.Join(path, "\x00")
+	}
+	hash := sha256.Sum256([]byte(key))
 	return fmt.Sprintf("osm-national-rail:%x", hash[:12])
 }
 
-func trackIdentifier(originStopRef, destinationStopRef string) string {
-	hash := sha256.Sum256([]byte(originStopRef + "\x00" + destinationStopRef))
+func trackIdentifier(originStopRef, destinationStopRef string, passingPath ...string) string {
+	key := originStopRef + "\x00" + destinationStopRef
+	if len(passingPath) > 0 {
+		key += "\x01" + strings.Join(passingPath, "\x00")
+	}
+	hash := sha256.Sum256([]byte(key))
 	return fmt.Sprintf("osm-rail-track:%x", hash[:12])
+}
+
+func (graph *railGraph) routeLeg(origin, destination snappedStop, passingPath []string, snapped map[string]snappedStop, cache map[[2]int]cachedTrack) ([]ctdf.Location, error) {
+	nodes := []int{origin.graphNode}
+	for _, ref := range passingPath {
+		if stop, ok := snapped[ref]; ok {
+			nodes = append(nodes, stop.graphNode)
+		}
+	}
+	nodes = append(nodes, destination.graphNode)
+
+	var locations []ctdf.Location
+	for i := 1; i < len(nodes); i++ {
+		from, to := nodes[i-1], nodes[i]
+		if from == to {
+			continue
+		}
+		key := [2]int{from, to}
+		cached, exists := cache[key]
+		if !exists {
+			if reverse, ok := cache[[2]int{to, from}]; ok && reverse.err == nil {
+				cached.locations = reverseTrack(reverse.locations)
+			} else {
+				cached.locations, cached.err = graph.route(from, to)
+			}
+			cache[key] = cached
+		}
+		if cached.err != nil {
+			return nil, cached.err
+		}
+		if len(locations) == 0 {
+			locations = cached.locations[:len(cached.locations):len(cached.locations)]
+		} else {
+			locations = append(locations, cached.locations[1:]...)
+		}
+	}
+	return locations, nil
 }
 
 func reverseTrack(track []ctdf.Location) []ctdf.Location {

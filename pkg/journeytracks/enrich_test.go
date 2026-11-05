@@ -55,3 +55,49 @@ func TestIndexRoutesByEndpointsIncludesSubsequencesAndAliases(t *testing.T) {
 		t.Fatal("route was indexed in the wrong direction")
 	}
 }
+
+func TestApplyBestRouteMatchesPassingPath(t *testing.T) {
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
+	}}
+	candidate := func(key string, passingPaths [][]string) Route {
+		return Route{
+			Metadata: RouteLeg{
+				RouteKey: key, RouteStopIdentifiers: [][]string{{"a"}, {"b"}}, PassingPaths: passingPaths,
+			},
+			Legs: map[int]ctdf.JourneyTrack{0: {PrimaryIdentifier: key}},
+		}
+	}
+	candidates := []Route{candidate("a-legacy", nil), candidate("b-other", [][]string{{"other"}}), candidate("c-matching", [][]string{{"via"}})}
+	changed, err := ApplyBestRoute(context.Background(), journey, candidates)
+	if err != nil || !changed || journey.Path[0].TrackRef != "c-matching" {
+		t.Fatalf("changed = %t, track = %q, err = %v", changed, journey.Path[0].TrackRef, err)
+	}
+	journey.Path[0].TrackRef = ""
+	journey.Path[0].PassingPath = nil
+	changed, err = ApplyBestRoute(context.Background(), journey, candidates)
+	if err != nil || !changed || journey.Path[0].TrackRef != "a-legacy" {
+		t.Fatalf("legacy journey: changed = %t, track = %q, err = %v", changed, journey.Path[0].TrackRef, err)
+	}
+}
+
+func TestApplyOSMRailRoutesKeepsFallbackAcrossPathGap(t *testing.T) {
+	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}, TrackRef: "old-a-b"},
+		{OriginStopRef: "c", DestinationStopRef: "d", PassingPath: []string{"unroutable"}, TrackRef: "old-c-d"},
+	}}
+	routes := []Route{{
+		Metadata: RouteLeg{
+			RouteKey: "a-b-via", RouteStopIdentifiers: [][]string{{"a"}, {"b"}}, PassingPaths: [][]string{{"via"}},
+		},
+		Legs: map[int]ctdf.JourneyTrack{0: {PrimaryIdentifier: "new-a-b"}},
+	}}
+	owned := map[string]struct{}{"old-a-b": {}, "old-c-d": {}}
+	changed, err := applyOSMRailRoutes(context.Background(), journey, indexRoutesByEndpoints(routes), owned)
+	if err != nil || !changed {
+		t.Fatalf("changed = %t, err = %v", changed, err)
+	}
+	if journey.Path[0].TrackRef != "new-a-b" || journey.Path[1].TrackRef != "old-c-d" {
+		t.Fatalf("track refs = %q, %q", journey.Path[0].TrackRef, journey.Path[1].TrackRef)
+	}
+}

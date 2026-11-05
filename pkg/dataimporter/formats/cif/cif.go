@@ -291,6 +291,7 @@ func preserveExistingJourneyTrackRefs(ctx context.Context, collection *mongo.Col
 		"path.originstopref":      1,
 		"path.destinationstopref": 1,
 		"path.trackref":           1,
+		"path.passingpath":        1,
 	}))
 	if err != nil {
 		return 0, err
@@ -320,13 +321,14 @@ func preserveMatchingJourneyTrackRefs(existing *ctdf.Journey, replacement *ctdf.
 	type legKey struct {
 		origin      string
 		destination string
+		passingPath string
 	}
 	existingRefs := make(map[legKey][]string)
 	for _, path := range existing.Path {
 		if path == nil || path.TrackRef == "" {
 			continue
 		}
-		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef}
+		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef, passingPath: strings.Join(path.PassingPath, "\x00")}
 		existingRefs[key] = append(existingRefs[key], path.TrackRef)
 	}
 
@@ -335,8 +337,13 @@ func preserveMatchingJourneyTrackRefs(existing *ctdf.Journey, replacement *ctdf.
 		if path == nil || path.TrackRef != "" {
 			continue
 		}
-		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef}
+		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef, passingPath: strings.Join(path.PassingPath, "\x00")}
 		refs := existingRefs[key]
+		if len(refs) == 0 && key.passingPath != "" {
+			// On the first import with passing points, keep the old geometry as a fallback.
+			key.passingPath = ""
+			refs = existingRefs[key]
+		}
 		if len(refs) == 0 {
 			continue
 		}
@@ -363,21 +370,18 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		Activity:               trainDef.OriginLocation.Activity,
 	})
 
+	// Keep passing points by the index of the next passenger call.
+	passingPaths := map[int][]string{}
+
 	// Add all the intermediate stops that are actual passenger stations
 	for _, location := range trainDef.IntermediateLocations {
-		// No public arrival time? guess its not a real stop
+		tiploc := normaliseTIPLOC(location.Location)
 		if location.PublicArrivalTime == "0000" {
+			if tiploc != "" {
+				index := len(passengerStops)
+				passingPaths[index] = append(passingPaths[index], "gb-tiploc-"+tiploc)
+			}
 			continue
-		}
-
-		tiploc := strings.TrimSpace(location.Location)
-
-		// Get rid of the suffix from the tiploc
-		// replaced suffixCheck.MatchString(tiploc[7:8]) with a direct byte
-		// comparison. The regex `^[2-9]+$` applied to a single char matches iff that char is
-		// in '2'-'9', so this is semantically identical but avoids per-call regex overhead.
-		if len(tiploc) == 8 && tiploc[7] >= '2' && tiploc[7] <= '9' {
-			tiploc = strings.TrimSpace(tiploc[0:7])
 		}
 
 		passengerStops = append(passengerStops, BasicLocation{
@@ -450,6 +454,7 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		}
 
 		path = append(path, &ctdf.JourneyPathItem{
+			PassingPath:         passingPaths[i],
 			OriginStop:          originStop,
 			OriginStopRef:       originStop.PrimaryIdentifier,
 			OriginArrivalTime:   originArrivalTime,

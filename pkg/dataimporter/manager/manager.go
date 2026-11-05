@@ -318,7 +318,9 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		}
 		if dataset.SupportedObjects.Journeys {
 			cleanupOldRecords(database.JourneysRawCollectionName, datasource)
-			cleanupOldRecords("journey_tracks", datasource)
+			if dataset.Format != datasets.DataSetFormatOSMRailTracks {
+				cleanupOldRecords("journey_tracks", datasource)
+			}
 		}
 	}
 
@@ -376,7 +378,7 @@ func applyJourneyTracks(dataset *datasets.DataSet, datasource *ctdf.DataSourceRe
 	if dataset.Format == datasets.DataSetFormatTfLRouteTracks {
 		err = journeytracks.ApplyDatasetForOperator(context.Background(), datasource.DatasetID, datasource.Timestamp, tfltracks.TfLOperatorRef)
 	} else if dataset.Format == datasets.DataSetFormatOSMRailTracks {
-		err = journeytracks.ApplyDatasetToCollection(context.Background(), datasource.DatasetID, datasource.Timestamp, database.JourneysRawCollectionName)
+		err = journeytracks.ApplyOSMRailDataset(context.Background(), datasource.DatasetID, datasource.Timestamp)
 	} else {
 		err = journeytracks.ApplyDataset(context.Background(), datasource.DatasetID, datasource.Timestamp)
 	}
@@ -385,6 +387,9 @@ func applyJourneyTracks(dataset *datasets.DataSet, datasource *ctdf.DataSourceRe
 	}
 	if cleanup {
 		cleanupOldRecords(journeytracks.RouteCollectionName, datasource)
+		if dataset.Format == datasets.DataSetFormatOSMRailTracks {
+			return journeytracks.CleanupOSMRailTracks(context.Background(), datasource)
+		}
 		cleanupOldRecords("journey_tracks", datasource)
 	}
 	return nil

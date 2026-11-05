@@ -181,6 +181,9 @@ func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition b
 }
 
 type JourneyPathItem struct {
+	// PassingPath holds ordered CIF TIPLOC references between passenger calls.
+	PassingPath []string `bson:"passingpath,omitempty" json:"-"`
+
 	OriginStopRef      string `groups:"basic,departureboard-cache,web-journey"`
 	DestinationStopRef string `groups:"basic,departureboard-cache,web-journey"`
 

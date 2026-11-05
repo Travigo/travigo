@@ -77,3 +77,49 @@ func TestPreserveMatchingJourneyTrackRefsMatchesRepeatedLegsByOccurrence(t *test
 		t.Fatalf("repeated leg refs = %q, %q", replacement.Path[0].TrackRef, replacement.Path[1].TrackRef)
 	}
 }
+
+func TestCreateJourneyStoresPassingPathBetweenCalls(t *testing.T) {
+	previousCache := stopTIPLOCCache
+	t.Cleanup(func() { stopTIPLOCCache = previousCache })
+	stopTIPLOCCache = map[string]*ctdf.Stop{
+		"ORIGIN": {PrimaryIdentifier: "a"},
+		"MID":    {PrimaryIdentifier: "b"},
+		"END":    {PrimaryIdentifier: "c"},
+	}
+	cif := &CommonInterfaceFormat{}
+	journey := cif.CreateJourneyFromTraindef("test", &TrainDefinitionSet{
+		OriginLocation: OriginLocation{Location: "ORIGIN"},
+		IntermediateLocations: []*IntermediateLocation{
+			{Location: "PASSING2", PublicArrivalTime: "0000"},
+			{Location: "OTHER", PublicArrivalTime: "0000"},
+			{Location: "MID", PublicArrivalTime: "1200"},
+			{Location: "PASSING2", PublicArrivalTime: "0000"},
+		},
+		TerminatingLocation: TerminatingLocation{Location: "END"},
+	})
+	if got := journey.GetStopRefs(); !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
+		t.Fatalf("passenger stops = %v", got)
+	}
+	for i, want := range [][]string{{"gb-tiploc-PASSING", "gb-tiploc-OTHER"}, {"gb-tiploc-PASSING"}} {
+		if got := journey.Path[i].PassingPath; !reflect.DeepEqual(got, want) {
+			t.Fatalf("leg %d passing path = %v, want %v", i, got, want)
+		}
+	}
+}
+
+func TestPassingPathBackfillKeepsLegacyTrack(t *testing.T) {
+	existing := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "legacy"},
+		{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"old"}, TrackRef: "old-variant"},
+	}}
+	replacement := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
+		{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"new"}},
+	}}
+	if got := preserveMatchingJourneyTrackRefs(existing, replacement); got != 1 {
+		t.Fatalf("preserved %d track references, want 1", got)
+	}
+	if replacement.Path[0].TrackRef != "legacy" || replacement.Path[1].TrackRef != "" {
+		t.Fatalf("track refs = %q, %q", replacement.Path[0].TrackRef, replacement.Path[1].TrackRef)
+	}
+}

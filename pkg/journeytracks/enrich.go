@@ -3,6 +3,7 @@ package journeytracks
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -27,7 +28,7 @@ type serviceJourneyStats struct {
 // applies the dataset's current route tracks to matching scheduled journeys.
 // Existing geometry from any other dataset remains authoritative.
 func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error {
-	return applyDataset(ctx, datasetID, timestamp, "", database.JourneysCollectionName, []string{
+	return applyDataset(ctx, datasetID, timestamp, "", database.JourneysCollectionName, false, []string{
 		database.JourneysCollectionName,
 		database.JourneysRawCollectionName,
 	})
@@ -36,19 +37,18 @@ func ApplyDataset(ctx context.Context, datasetID string, timestamp string) error
 // ApplyDatasetForOperator applies a dataset's route tracks only to services
 // operated by operatorRef.
 func ApplyDatasetForOperator(ctx context.Context, datasetID string, timestamp string, operatorRef string) error {
-	return applyDataset(ctx, datasetID, timestamp, operatorRef, database.JourneysCollectionName, []string{
+	return applyDataset(ctx, datasetID, timestamp, operatorRef, database.JourneysCollectionName, false, []string{
 		database.JourneysCollectionName,
 		database.JourneysRawCollectionName,
 	})
 }
 
-// ApplyDatasetToCollection applies route tracks within one journey collection.
-// It is used by enrichment stages that run before that collection is published.
-func ApplyDatasetToCollection(ctx context.Context, datasetID string, timestamp string, collectionName string) error {
-	return applyDataset(ctx, datasetID, timestamp, "", collectionName, []string{collectionName})
+// ApplyOSMRailDataset applies tracks to raw journeys, keeping previous tracks as a fallback.
+func ApplyOSMRailDataset(ctx context.Context, datasetID string, timestamp string) error {
+	return applyDataset(ctx, datasetID, timestamp, "", database.JourneysRawCollectionName, true, []string{database.JourneysRawCollectionName})
 }
 
-func applyDataset(ctx context.Context, datasetID string, timestamp string, operatorRef string, readCollectionName string, writeCollectionNames []string) error {
+func applyDataset(ctx context.Context, datasetID string, timestamp string, operatorRef string, readCollectionName string, keepFallback bool, writeCollectionNames []string) error {
 	routes, err := Load(ctx, Filter{DatasetID: datasetID, Timestamp: timestamp})
 	if err != nil {
 		return err
@@ -63,8 +63,11 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 	// pass, clearing only obsolete references while preserving other datasets' tracks.
 	// Stage/fence publication so failure after clearing cannot leave live journeys
 	// without usable tracks; measure paths rewritten versus paths actually changed.
-	if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, readCollectionName, writeCollectionNames); err != nil {
-		return err
+	if !keepFallback {
+		if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, readCollectionName, writeCollectionNames); err != nil {
+			return err
+		}
+		ownedTrackRefs = nil
 	}
 
 	routesByServiceName := map[string][]Route{}
@@ -96,7 +99,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 			continue
 		}
 		startedAt := time.Now()
-		stats, err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, writeCollectionNames)
+		stats, err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, keepFallback, ownedTrackRefs, writeCollectionNames)
 		if err != nil {
 			return err
 		}
@@ -168,7 +171,11 @@ func serviceKey(transportType ctdf.TransportType, serviceName string) string {
 }
 
 func datasetTrackRefs(ctx context.Context, datasetID string) (map[string]struct{}, error) {
-	cursor, err := database.GetCollection("journey_tracks").Find(ctx, bson.M{"datasource.datasetid": datasetID}, options.Find().SetProjection(bson.M{"primaryidentifier": 1}))
+	return loadTrackRefs(ctx, bson.M{"datasource.datasetid": datasetID})
+}
+
+func loadTrackRefs(ctx context.Context, filter bson.M) (map[string]struct{}, error) {
+	cursor, err := database.GetCollection("journey_tracks").Find(ctx, filter, options.Find().SetProjection(bson.M{"primaryidentifier": 1}))
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +255,7 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, 
 	return flush()
 }
 
-func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, writeCollectionNames []string) (serviceJourneyStats, error) {
+func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, keepFallback bool, ownedTrackRefs map[string]struct{}, writeCollectionNames []string) (serviceJourneyStats, error) {
 	stats := serviceJourneyStats{}
 	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
 	cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
@@ -275,12 +282,13 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 			return stats, err
 		}
 		stats.Scanned++
-		journeyStops := JourneyStops(journey.Path)
-		if len(journeyStops) < 2 {
-			continue
+		var changed bool
+		var err error
+		if keepFallback {
+			changed, err = applyOSMRailRoutes(ctx, &journey, candidatesByEndpoints, ownedTrackRefs)
+		} else {
+			changed, err = applyIndexedRoutes(ctx, &journey, candidatesByEndpoints)
 		}
-		journeyCandidates := candidatesByEndpoints[routeEndpointKey(journeyStops[0], journeyStops[len(journeyStops)-1])]
-		changed, err := ApplyBestRoute(ctx, &journey, journeyCandidates)
 		if err != nil {
 			return stats, err
 		}
@@ -304,6 +312,42 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		return stats, err
 	}
 	return stats, nil
+}
+
+func applyIndexedRoutes(ctx context.Context, journey *ctdf.Journey, candidates map[string][]Route) (bool, error) {
+	stops := JourneyStops(journey.Path)
+	if len(stops) < 2 {
+		return false, nil
+	}
+	return ApplyBestRoute(ctx, journey, candidates[routeEndpointKey(stops[0], stops[len(stops)-1])])
+}
+
+func applyOSMRailRoutes(ctx context.Context, journey *ctdf.Journey, candidates map[string][]Route, owned map[string]struct{}) (bool, error) {
+	changed := false
+	for path := range ContiguousPaths(journey.Path) {
+		fallback := map[*ctdf.JourneyPathItem]ctdf.JourneyTrack{}
+		for _, leg := range path {
+			if _, ok := owned[leg.TrackRef]; ok {
+				fallback[leg] = ctdf.JourneyTrack{PrimaryIdentifier: leg.TrackRef, Track: leg.Track}
+				leg.TrackRef = ""
+				leg.Track = nil
+			}
+		}
+		part := *journey
+		part.Path = path
+		updated, err := applyIndexedRoutes(ctx, &part, candidates)
+		for leg, track := range fallback {
+			if leg.TrackRef == "" {
+				leg.TrackRef = track.PrimaryIdentifier
+				leg.Track = track.Track
+			}
+		}
+		if err != nil {
+			return false, err
+		}
+		changed = changed || updated
+	}
+	return changed, nil
 }
 
 func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, collectionNames []string) error {
@@ -365,8 +409,15 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 		positions []int
 	}
 	matches := []routeMatch{}
+	hasPassingPath := slices.ContainsFunc(journey.Path, func(leg *ctdf.JourneyPathItem) bool {
+		return leg != nil && len(leg.PassingPath) > 0
+	})
 	for _, candidate := range candidates {
 		if positions, ok := MatchStops(journeyStops, candidate.Metadata.RouteStopIdentifiers); ok {
+			if (hasPassingPath || len(candidate.Metadata.PassingPaths) > 0) &&
+				!matchesPassingPaths(journey.Path, positions, candidate.Metadata.PassingPaths) {
+				continue
+			}
 			matches = append(matches, routeMatch{route: candidate, positions: positions})
 		}
 	}
@@ -408,6 +459,18 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 		}
 	}
 	return changed, nil
+}
+
+func matchesPassingPaths(path []*ctdf.JourneyPathItem, positions []int, passingPaths [][]string) bool {
+	if len(path)+1 != len(positions) || len(path) != len(passingPaths) {
+		return false
+	}
+	for i, leg := range path {
+		if leg == nil || positions[i] != i || !slices.Equal(leg.PassingPath, passingPaths[i]) {
+			return false
+		}
+	}
+	return positions[len(path)] == len(path)
 }
 
 func storeCombinedTrack(ctx context.Context, route Route, start, end int) (string, error) {

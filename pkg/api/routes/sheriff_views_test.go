@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/liip/sheriff"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func marshalSheriffMap(t *testing.T, groups []string, value interface{}) map[string]interface{} {
@@ -314,5 +316,36 @@ func TestMarshalWithSheriffViewRejectsArbitraryGroups(t *testing.T) {
 	}
 	if response.StatusCode != fiber.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.StatusCode, fiber.StatusBadRequest)
+	}
+}
+
+func TestPassingPathIsStoredButExcludedFromJourneyViews(t *testing.T) {
+	journey := ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"gb-tiploc-hidden"}},
+	}}
+	data, err := bson.Marshal(journey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored ctdf.Journey
+	if err := bson.Unmarshal(data, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if got := stored.Path[0].PassingPath; len(got) != 1 || got[0] != "gb-tiploc-hidden" {
+		t.Fatalf("stored passing path = %v", got)
+	}
+	for _, view := range []string{"detailed", "web-journey", "departureboard-cache"} {
+		result := marshalSheriffMap(t, []string{view}, journey)
+		if _, ok := result["Path"]; !ok {
+			t.Fatalf("%s: passenger path missing", view)
+		}
+		jsonData, err := json.Marshal(result)
+		if err != nil || strings.Contains(string(jsonData), "gb-tiploc-hidden") {
+			t.Fatalf("%s: journey JSON = %s, %v", view, jsonData, err)
+		}
+	}
+	jsonData, err := json.Marshal(journey)
+	if err != nil || strings.Contains(string(jsonData), "gb-tiploc-hidden") {
+		t.Fatalf("plain journey JSON = %s, %v", jsonData, err)
 	}
 }

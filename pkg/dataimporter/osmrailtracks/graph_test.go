@@ -79,3 +79,39 @@ func TestTrackIdentifiersAreDirectional(t *testing.T) {
 		t.Fatal("route identifier is not deterministic")
 	}
 }
+
+func TestRouteLegUsesPassingPoints(t *testing.T) {
+	graph := buildRailGraph([]railWay{
+		{nodeIDs: []int64{1, 2, 3}},
+		{nodeIDs: []int64{1, 4, 3}},
+	}, map[int64]point{
+		1: {lon: -0.10, lat: 51.50},
+		2: {lon: -0.09, lat: 51.50},
+		3: {lon: -0.08, lat: 51.50},
+		4: {lon: -0.09, lat: 51.52},
+	})
+	snap := func(p point) snappedStop {
+		node, _, ok := graph.nearestNode(p, 100)
+		if !ok {
+			t.Fatalf("could not snap %v", p)
+		}
+		return snappedStop{graphNode: node}
+	}
+	origin := snap(point{lon: -0.10, lat: 51.50})
+	destination := snap(point{lon: -0.08, lat: 51.50})
+	snapped := map[string]snappedStop{"via": snap(point{lon: -0.09, lat: 51.52})}
+	cache := map[[2]int]cachedTrack{}
+	fallback, err := graph.routeLeg(origin, destination, []string{"unknown"}, snapped, cache)
+	if err != nil || len(fallback) != 2 {
+		t.Fatalf("direct fallback = %v, %v", fallback, err)
+	}
+	alternate, err := graph.routeLeg(origin, destination, []string{"unknown", "via"}, snapped, cache)
+	if err != nil || len(alternate) != 3 || alternate[1].Coordinates[1] != 51.52 {
+		t.Fatalf("alternate route = %v, %v", alternate, err)
+	}
+	stops := []string{"a", "b"}
+	if routeIdentifier(stops, []string{"unknown"}) == routeIdentifier(stops, []string{"via"}) ||
+		trackIdentifier("a", "b", "unknown") == trackIdentifier("a", "b", "via") {
+		t.Fatal("alternate passing paths share an identifier")
+	}
+}
