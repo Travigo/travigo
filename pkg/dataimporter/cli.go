@@ -63,14 +63,23 @@ func RegisterCLI() *cli.Command {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					if err := database.ConnectAndCreateIndexes(); err != nil {
+					datasetid := c.String("id")
+					dataset, err := manager.GetDataset(datasetid)
+					if err != nil {
+						return err
+					}
+					// Live feed ingestion must not wait for schedule index builds.
+					if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue {
+						if err := database.Connect(); err != nil {
+							return err
+						}
+					} else if err := database.ConnectAndCreateIndexes(); err != nil {
 						return err
 					}
 					if err := redis_client.Connect(); err != nil {
 						log.Fatal().Err(err).Msg("Failed to connect to Redis")
 					}
 
-					datasetid := c.String("id")
 					forceImport := c.Bool("force")
 					skipCleanup := c.Bool("skip-cleanup")
 					memStats := c.Bool("mem-stats")
@@ -102,11 +111,6 @@ func RegisterCLI() *cli.Command {
 						if err != nil {
 							return err
 						}
-					}
-
-					dataset, err := manager.GetDataset(datasetid)
-					if err != nil {
-						return err
 					}
 
 					for {
@@ -148,7 +152,8 @@ func RegisterCLI() *cli.Command {
 				Usage: "Import mutliple realtime datasets",
 				Flags: []cli.Flag{},
 				Action: func(c *cli.Context) error {
-					if err := database.ConnectAndCreateIndexes(); err != nil {
+					// Schedule importers create indexes; live feeds must start immediately.
+					if err := database.Connect(); err != nil {
 						return err
 					}
 					if err := redis_client.Connect(); err != nil {
