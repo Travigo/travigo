@@ -7,6 +7,7 @@ import (
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -88,7 +89,8 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	// or a published stop/day lookup while retaining MatchDate as the final authority.
 	// Compare rows examined/decoded at busy stops and bound projection/query batches.
 	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, bson.M{
-		"path.originstopref": bson.M{"$in": stopRefs},
+		"path.originstopref":   bson.M{"$in": stopRefs},
+		"datasource.datasetid": bson.M{"$ne": railutils.DarwinAmendmentDataset},
 	}, departureGraphFindOptions())
 	if err != nil {
 		return nil, err
@@ -116,6 +118,7 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 
 func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, after string, visit func(*ctdf.Journey, string) error) error {
 	filter := journeyServiceDateFilter(serviceDates)
+	filter["datasource.datasetid"] = bson.M{"$ne": railutils.DarwinAmendmentDataset}
 	if after != "" {
 		objectID, err := primitive.ObjectIDFromHex(after)
 		if err != nil {

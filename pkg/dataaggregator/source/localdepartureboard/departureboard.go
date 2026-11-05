@@ -14,6 +14,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 
 	// "github.com/travigo/travigo/pkg/transforms"
@@ -54,7 +55,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if boardType == "" {
 		boardType = ctdf.BoardTypeDeparture
 	}
-	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v2/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
+	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v3/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
 	stopField := "path.originstopref"
 	if boardType.IsArrival() {
 		stopField = "path.destinationstopref"
@@ -67,6 +68,22 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				q.Filter,
 			},
 		}
+	}
+	staticQuery := bson.M{"$and": bson.A{journeyQuery, bson.M{"datasource.datasetid": bson.M{"$nin": bson.A{railutils.VSTPDataset, railutils.DarwinAmendmentDataset}}}}}
+	dynamicQuery := bson.M{
+		"datasource.datasetid": bson.M{"$in": bson.A{railutils.VSTPDataset, railutils.DarwinAmendmentDataset}},
+		"expiry":               bson.M{"$gt": time.Now()},
+		"$or": bson.A{
+			bson.M{stopField: bson.M{"$in": allStopIDs}},
+			bson.M{"amendmentstoprefs": bson.M{"$in": allStopIDs}},
+		},
+	}
+	if q.Filter != nil {
+		dynamicQuery["$and"] = bson.A{q.Filter}
+	}
+	dynamic, err := loadDynamicJourneys(dynamicQuery)
+	if err != nil {
+		return nil, err
 	}
 	// A call after midnight can belong to the previous service day. Search
 	// the previous, selected and following days before sorting the board.
@@ -87,10 +104,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				break
 			}
 		}
-		journeys, fromGraph, err := s.getBoardJourneysWithSource(q, baseCacheItemPath, journeyQuery, date, boardType)
+		journeys, fromGraph, err := s.getBoardJourneysWithSource(q, baseCacheItemPath, staticQuery, date, boardType)
 		if err != nil {
 			return nil, err
 		}
+		journeys = mergeJourneyAmendments(journeys, dynamic, date)
 		lookup := s.realtimeLookup(journeys, date, allStopIDs)
 		doEstimates := date.Format(ctdf.YearMonthDayFormat) == time.Now().In(date.Location()).Format(ctdf.YearMonthDayFormat)
 		entries := ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
@@ -100,10 +118,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		// delayed departures and cancellation handling. Measure fallback frequency and
 		// board latency before changing this behaviour.
 		if fromGraph && !hasRealtimeBoardEntry(entries) {
-			journeys, err = s.getDateJourneys(baseCacheItemPath, journeyQuery, date)
+			journeys, err = s.getDateJourneys(baseCacheItemPath, staticQuery, date)
 			if err != nil {
 				return nil, err
 			}
+			journeys = mergeJourneyAmendments(journeys, dynamic, date)
 			lookup = s.realtimeLookup(journeys, date, allStopIDs)
 			entries = ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
 		}
@@ -483,4 +502,94 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		Msg("Departure board journey cache write complete")
 
 	return journeys, nil
+}
+
+func loadDynamicJourneys(filter bson.M) ([]*ctdf.Journey, error) {
+	ctx := context.Background()
+	collection := database.GetCollection("journeys")
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("query dynamic journeys: %w", err)
+	}
+	defer cursor.Close(ctx)
+	var journeys []*ctdf.Journey
+	if err := cursor.All(ctx, &journeys); err != nil {
+		return nil, fmt.Errorf("read dynamic journeys: %w", err)
+	}
+	// An in-flight Darwin write can land after a VSTP withdrawal. Require
+	// each amendment's parent to still exist before using the amended route.
+	var parentIDs []string
+	for _, journey := range journeys {
+		if journey.DataSource.DatasetID == railutils.DarwinAmendmentDataset && len(journey.ReplacesJourneyRefs) == 1 {
+			parentIDs = append(parentIDs, journey.ReplacesJourneyRefs[0])
+		}
+	}
+	if len(parentIDs) == 0 {
+		return journeys, nil
+	}
+	parents, err := collection.Distinct(ctx, "primaryidentifier", bson.M{
+		"primaryidentifier": bson.M{"$in": parentIDs},
+		"$or":               bson.A{bson.M{"expiry": bson.M{"$exists": false}}, bson.M{"expiry": bson.M{"$gt": time.Now()}}},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("check journey amendment parents: %w", err)
+	}
+	active := make(map[string]bool, len(parents))
+	for _, parent := range parents {
+		if id, ok := parent.(string); ok {
+			active[id] = true
+		}
+	}
+	valid := journeys[:0]
+	for _, journey := range journeys {
+		if journey.DataSource.DatasetID != railutils.DarwinAmendmentDataset ||
+			(len(journey.ReplacesJourneyRefs) == 1 && active[journey.ReplacesJourneyRefs[0]]) {
+			valid = append(valid, journey)
+		}
+	}
+	return valid, nil
+}
+
+func mergeJourneyAmendments(base, dynamic []*ctdf.Journey, date time.Time) []*ctdf.Journey {
+	// Keep the source so a Darwin amendment to the original train cannot
+	// bring it back when a VSTP overlay replaces it.
+	replaced := map[string]string{}
+	var active []*ctdf.Journey
+	merged := make([]*ctdf.Journey, 0, len(base)+len(dynamic))
+	for _, journey := range dynamic {
+		if journey.Availability == nil || !journey.Availability.MatchDate(date) {
+			continue
+		}
+		active = append(active, journey)
+		for _, id := range journey.ReplacesJourneyRefs {
+			if replaced[id] != railutils.VSTPDataset {
+				replaced[id] = journey.DataSource.DatasetID
+			}
+		}
+	}
+	for _, journey := range base {
+		if journey.DataSource != nil {
+			switch journey.DataSource.DatasetID {
+			case railutils.VSTPDataset, railutils.DarwinAmendmentDataset:
+				continue
+			}
+		}
+		if replaced[journey.PrimaryIdentifier] == "" {
+			merged = append(merged, journey)
+		}
+	}
+	for _, journey := range active {
+		if replaced[journey.PrimaryIdentifier] != "" {
+			continue
+		}
+		copy := *journey
+		if journey.DataSource.DatasetID == railutils.DarwinAmendmentDataset && len(journey.ReplacesJourneyRefs) == 1 {
+			copy.PrimaryIdentifier = journey.ReplacesJourneyRefs[0]
+			if replaced[copy.PrimaryIdentifier] == railutils.VSTPDataset {
+				continue
+			}
+		}
+		merged = append(merged, &copy)
+	}
+	return merged
 }

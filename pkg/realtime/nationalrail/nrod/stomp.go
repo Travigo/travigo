@@ -128,14 +128,17 @@ func (s *StompClient) StartVSTPSubscription(conn *stomp.Conn) {
 				log.Fatal().Str("queue", queueName).Err(msg.Err).Msg("STOMP error")
 			}
 
-			go s.ParseVSTPMessages(msg.Body)
+			s.ParseVSTPMessages(msg.Body)
 		}
 	}
 }
 
 func (s *StompClient) ParseVSTPMessages(messagesBytes []byte) {
 	var vstpMessage VSTPMessage
-	json.Unmarshal(messagesBytes, &vstpMessage)
+	if err := json.Unmarshal(messagesBytes, &vstpMessage); err != nil {
+		log.Error().Err(err).Msg("Failed to decode VSTP message")
+		return
+	}
 
 	// pretty.Println(vstpMessage.VSTP)
 

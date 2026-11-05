@@ -272,6 +272,7 @@ func createOperatorsIndexes() {
 func createJourneysIndexes() {
 	journeysRawCollection := GetCollection(JourneysRawCollectionName)
 	_, err := journeysRawCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
+		{Keys: bson.D{{Key: "expiry", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(1)},
 		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
 		{Keys: bson.D{
 			{Key: "datasource.datasetid", Value: 1},
@@ -366,6 +367,10 @@ func createJourneysIndexes() {
 		},
 		{
 			Keys: bson.D{{Key: "path.destinationstopref", Value: 1}},
+		},
+		{
+			Keys:    bson.D{{Key: "amendmentstoprefs", Value: 1}},
+			Options: options.Index().SetSparse(true),
 		},
 		{
 			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},

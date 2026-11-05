@@ -329,3 +329,7 @@ func realtimeJourneyExpiration(timeoutDurationMinutes int) time.Duration {
 	}
 	return time.Duration(timeoutDurationMinutes) * time.Minute
 }
+
+func DeleteRealtimeJourneyDetails(ctx context.Context, identifier string) error {
+	return redis_client.Client.Del(ctx, realtimeJourneyDetailsKey(identifier)).Err()
+}

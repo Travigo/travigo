@@ -47,6 +47,9 @@ type Journey struct {
 	OriginDisplay       string               `groups:"web-saved,web-notification" bson:"-" json:",omitempty"`
 	ReplacesJourneyRefs []string             `groups:"basic,departureboard-cache" bson:",omitempty"`
 
+	// AmendmentStopRefs includes original calls affected by the amendment.
+	AmendmentStopRefs []string `json:"-" bson:",omitempty"`
+
 	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 
 	Path []*JourneyPathItem `groups:"detailed,departureboard-cache,web-journey" bson:",omitempty"`
@@ -244,3 +247,28 @@ const (
 	JourneyPathItemActivitySetdown = "Setdown"
 	JourneyPathItemActivityPass    = "Pass"
 )
+
+// GetStopRefs returns the stop references along the journey.
+func (j *Journey) GetStopRefs() []string {
+	refs := make([]string, 0, len(j.Path)+1)
+	seen := map[string]bool{}
+	for _, leg := range j.Path {
+		if leg == nil {
+			continue
+		}
+		for _, ref := range []string{leg.OriginStopRef, leg.DestinationStopRef} {
+			if ref != "" && !seen[ref] {
+				refs = append(refs, ref)
+				seen[ref] = true
+			}
+		}
+	}
+	return refs
+}
+
+func (j *Journey) ApplyRouteAmendment(amendment *Journey) {
+	j.Path = amendment.Path
+	j.DepartureTime = amendment.DepartureTime
+	j.DestinationDisplay = amendment.DestinationDisplay
+	j.Track, j.TrackRef, j.TrackDataSource = nil, "", nil
+}

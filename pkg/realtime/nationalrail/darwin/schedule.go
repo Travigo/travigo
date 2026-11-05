@@ -27,6 +27,8 @@ type ScheduleStop struct {
 	PublicArrival  string `xml:"pta,attr"`
 	WorkingArrival string `xml:"wta,attr"`
 
+	Platform string `xml:"plat,attr"`
+
 	Cancelled string `xml:"can,attr"`
 }
 
@@ -98,4 +100,43 @@ func (s ScheduleStop) isPassengerCall() bool {
 	default:
 		return false
 	}
+}
+
+// A partial cancellation can end and restart at the same timed call. Darwin
+// reports the cancelled and live versions separately, but predictions refer
+// to the live call. Genuine repeat visits have separate schedule times.
+func (s Schedule) passengerCalls() []ScheduleStop {
+	calls := make([]ScheduleStop, 0, len(s.Locations))
+	for _, call := range s.Locations {
+		if !call.isPassengerCall() {
+			continue
+		}
+		if len(calls) > 0 {
+			previous := &calls[len(calls)-1]
+			if sameDarwinBoundary(*previous, call) {
+				if previous.Cancelled == "true" {
+					*previous = call
+				}
+				continue
+			}
+		}
+		calls = append(calls, call)
+	}
+	return calls
+}
+
+func sameDarwinBoundary(before, after ScheduleStop) bool {
+	if before.Tiploc != after.Tiploc || (before.Cancelled == "true") == (after.Cancelled == "true") ||
+		(after.Type != "OR" && before.Type != "DT") {
+		return false
+	}
+	beforeTime := scheduleClock(before.PublicDeparture, before.WorkingDeparture)
+	if beforeTime.IsZero() {
+		beforeTime = scheduleClock(before.PublicArrival, before.WorkingArrival)
+	}
+	afterTime := scheduleClock(after.PublicArrival, after.WorkingArrival)
+	if afterTime.IsZero() {
+		afterTime = scheduleClock(after.PublicDeparture, after.WorkingDeparture)
+	}
+	return !beforeTime.IsZero() && beforeTime.Equal(afterTime)
 }

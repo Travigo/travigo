@@ -387,6 +387,15 @@ func applyRealtimeLegTimes(item *ctdf.JourneyPlanRouteItem, boardingIndex, desti
 	if boardingIndex < 0 || destinationIndex < 0 {
 		return false
 	}
+	// The graph indexes the imported path. Darwin indexes predictions
+	// against its amended path, where an inserted call shifts later stops.
+	if live := journey.RealtimeJourney.Journey; live != nil && len(live.Path) > 0 {
+		boardingIndex = remapGraphStopOccurrence(journey.Path, live.Path, boardingIndex, item.OriginStopRef)
+		destinationIndex = remapGraphStopOccurrence(journey.Path, live.Path, destinationIndex, item.DestinationStopRef)
+		if boardingIndex < 0 || destinationIndex <= boardingIndex {
+			return false
+		}
+	}
 	if stop := journey.RealtimeJourney.RealtimeStop(item.OriginStopRef, boardingIndex); stop != nil {
 		if stop.Cancelled {
 			return false
@@ -404,6 +413,35 @@ func applyRealtimeLegTimes(item *ctdf.JourneyPlanRouteItem, boardingIndex, desti
 		}
 	}
 	return !item.ArrivalTime.Before(item.StartTime)
+}
+
+// Match the same visit on both paths when a train calls at a station twice.
+func remapGraphStopOccurrence(scheduled, live []*ctdf.JourneyPathItem, index int, ref string) int {
+	occurrence := 0
+	for i := 0; i < index; i++ {
+		if graphPathStopRef(scheduled, i) == ref {
+			occurrence++
+		}
+	}
+	for i := 0; i <= len(live); i++ {
+		if graphPathStopRef(live, i) == ref {
+			if occurrence == 0 {
+				return i
+			}
+			occurrence--
+		}
+	}
+	return -1
+}
+
+func graphPathStopRef(path []*ctdf.JourneyPathItem, index int) string {
+	if index < len(path) && path[index] != nil {
+		return path[index].OriginStopRef
+	}
+	if index == len(path) && index > 0 && path[index-1] != nil {
+		return path[index-1].DestinationStopRef
+	}
+	return ""
 }
 
 func graphLegStopIndexes(journey *ctdf.Journey, item *ctdf.JourneyPlanRouteItem) (int, int) {

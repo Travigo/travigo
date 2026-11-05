@@ -42,7 +42,14 @@ func FindCurrentForJourney(ctx context.Context, journeyID string) (*ctdf.Realtim
 		return nil, err
 	}
 
-	return FindByIdentifier(ctx, redisJourneyMapping)
+	run, err := FindByIdentifier(ctx, redisJourneyMapping)
+	if err != nil || run == nil {
+		return run, err
+	}
+	if run.Journey == nil || run.Journey.PrimaryIdentifier != journeyID {
+		return nil, nil
+	}
+	return run, nil
 }
 
 func FindCurrentForJourneyIDs(ctx context.Context, journeyIDs []string) (map[string]*ctdf.RealtimeJourney, error) {
@@ -168,7 +175,9 @@ func findCurrentForJourneyIDs(ctx context.Context, journeyIDs []string, includeV
 		}
 
 		for _, journeyID := range journeyIDsByRealtimeJourneyID[realtimeJourneyIDs[i]] {
-			realtimeJourneysByJourneyID[journeyID] = realtimeJourney
+			if realtimeJourney.Journey != nil && realtimeJourney.Journey.PrimaryIdentifier == journeyID {
+				realtimeJourneysByJourneyID[journeyID] = realtimeJourney
+			}
 		}
 	}
 	decodeDuration := time.Since(decodeStart)

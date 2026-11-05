@@ -33,9 +33,148 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		Timestamp:      now.String(),
 	}
 
-	journeysCollection := database.GetCollection("journeys")
 	stopsCollection := database.GetCollection("stops")
 	retryRecordsCollection := database.GetCollection("retry_records")
+
+	// Schedules
+	for _, schedule := range p.Schedules {
+		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
+		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+		if realtimeJourney == nil && schedule.RID != "" {
+			realtimeJourney, _ = realtimestore.FindByMapping(context.Background(), "nationalrailrid", schedule.RID)
+		}
+
+		realtimeJourney, err := reconcileDarwinRun(context.Background(), realtimeJourney, realtimeJourneyID, schedule.UID, schedule.SSD, now, datasource)
+		if err != nil {
+			log.Error().Err(err).Str("uid", schedule.UID).Msg("Failed to resolve Darwin journey")
+			continue
+		}
+		if realtimeJourney == nil {
+			continue
+		}
+
+		realtimeJourney.ModificationDateTime = now
+		if realtimeJourney.OtherIdentifiers == nil {
+			realtimeJourney.OtherIdentifiers = map[string]string{}
+		}
+		if schedule.RID != "" {
+			realtimeJourney.OtherIdentifiers["nationalrailrid"] = schedule.RID
+		}
+
+		cancelCount := 0
+		scheduleCancellations := map[string]darwinScheduleCancellation{}
+		passengerCalls := schedule.passengerCalls()
+		var calls []darwinCall
+
+		for journeyStopIndex, scheduleStop := range passengerCalls {
+			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", scheduleStop.Tiploc))
+
+			if stop == nil {
+				log.Error().Str("tiploc", scheduleStop.Tiploc).Msg("Failed to find stop for schedule update")
+				continue
+			}
+
+			calls = append(calls, darwinCall{
+				stop: stop, arrival: scheduleClock(scheduleStop.PublicArrival, scheduleStop.WorkingArrival),
+				departure: scheduleClock(scheduleStop.PublicDeparture, scheduleStop.WorkingDeparture),
+				activity:  darwinCallActivity(scheduleStop.Activity), platform: scheduleStop.Platform,
+			})
+			scheduleCancellations[ctdf.RealtimeJourneyStopKey(stop.PrimaryIdentifier, journeyStopIndex)] = darwinScheduleCancellation{stopRef: stop.PrimaryIdentifier, journeyStopIndex: journeyStopIndex, cancelled: scheduleStop.Cancelled == "true"}
+			if scheduleStop.Cancelled == "true" {
+				cancelCount += 1
+			}
+		}
+
+		if len(calls) == 0 {
+			log.Error().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+				Str("rid", schedule.RID).
+				Msg("Skipping Darwin schedule update because no schedule stops resolved")
+			continue
+		}
+
+		if len(calls) == len(passengerCalls) {
+			path := buildDarwinPath(calls)
+			if len(path) > 0 && darwinPathChanged(realtimeJourney.Journey.Path, path) {
+				if err := publishDarwinPath(context.Background(), realtimeJourney, path, schedule.SSD); err != nil {
+					log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to publish Darwin route amendment")
+					continue
+				}
+			}
+		}
+
+		log.Debug().Str("realtimejourneyid", realtimeJourneyID).Int("resolved_calls", len(calls)).Int("cancelled_calls", cancelCount).Msg("Darwin schedule cancellation summary")
+		applyDarwinScheduleCancellationState(realtimeJourney, scheduleCancellations)
+
+		if cancelCount > 0 && cancelCount == len(calls) {
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
+
+				DataSource: datasource,
+
+				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
+
+				Text: railutils.CancelledReasons[schedule.CancelReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
+			})
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+
+			realtimeJourney.Cancelled = true
+
+			log.Info().
+				Str("realtimejourneyid", realtimeJourneyID).
+				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+				Msg("Train cancelled")
+		} else if cancelCount > 0 {
+			railutils.CreateServiceAlert(ctdf.ServiceAlert{
+				PrimaryIdentifier:    fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
+				CreationDateTime:     now,
+				ModificationDateTime: now,
+
+				DataSource: datasource,
+
+				AlertType: ctdf.ServiceAlertTypeJourneyPartiallyCancelled,
+
+				Text: railutils.CancelledReasons[schedule.CancelReason],
+
+				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
+
+				ValidFrom:  realtimeJourney.JourneyRunDate,
+				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
+			})
+
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+
+			realtimeJourney.Cancelled = false
+		} else {
+			realtimeJourney.Cancelled = false
+
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
+		}
+
+		// Update database
+		if realtimeJourney.DataSource == nil {
+			realtimeJourney.DataSource = datasource
+		}
+		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
+		if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+			log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to save Darwin schedule realtime state")
+			continue
+		}
+
+		log.Info().
+			Str("realtimejourneyid", realtimeJourneyID).
+			Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
+			Msg("Train schedule updated")
+	}
 
 	// Parse Train Statuses
 	// Performance Review [Set L] [PR102] [P2] (realtime): Status, schedule, formation and loading
@@ -48,48 +187,13 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", trainStatus.SSD, trainStatus.UID)
 		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
 
+		realtimeJourney, err := reconcileDarwinRun(context.Background(), realtimeJourney, realtimeJourneyID, trainStatus.UID, trainStatus.SSD, now, datasource)
+		if err != nil {
+			log.Error().Err(err).Str("uid", trainStatus.UID).Msg("Failed to resolve Darwin journey")
+			continue
+		}
 		if realtimeJourney == nil {
-			// Find the journey for this train
-			var journey *ctdf.Journey
-			cursor, _ := journeysCollection.Find(context.Background(), bson.M{"otheridentifiers.TrainUID": trainStatus.UID})
-
-			journeyDate, _ := time.Parse("2006-01-02", trainStatus.SSD)
-
-			for cursor.Next(context.Background()) {
-				var potentialJourney *ctdf.Journey
-				err := cursor.Decode(&potentialJourney)
-				if err != nil {
-					log.Error().Err(err).Msg("Failed to decode Journey")
-				}
-
-				if potentialJourney.Availability.MatchDate(journeyDate) {
-					journey = potentialJourney
-				}
-			}
-
-			if journey == nil {
-				log.Debug().Str("uid", trainStatus.UID).Msg("Failed to find respective Journey for this train status update")
-				continue
-			}
-
-			journey.GetService()
-
-			// Construct the base realtime journey
-			realtimeJourney = &ctdf.RealtimeJourney{
-				PrimaryIdentifier:      realtimeJourneyID,
-				ActivelyTracked:        true,
-				TimeoutDurationMinutes: 181,
-				CreationDateTime:       now,
-				Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
-
-				DataSource: datasource,
-
-				Journey:        journey,
-				JourneyRunDate: journeyDate,
-				Service:        journey.Service,
-
-				Stops: map[string]*ctdf.RealtimeJourneyStops{},
-			}
+			continue
 		}
 
 		realtimeJourney.ModificationDateTime = now
@@ -109,11 +213,6 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		if realtimeJourney.Stops == nil {
 			realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
 		}
-		if realtimeJourney.Journey == nil {
-			log.Error().Str("realtimejourney", realtimeJourney.PrimaryIdentifier).Msg("Realtime Journey missing Journey")
-			continue
-		}
-
 		stopOccurrences := map[string]int{}
 		for _, location := range trainStatus.Locations {
 			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", location.TPL))
@@ -188,175 +287,6 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		}
 
 		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
-	}
-
-	// Schedules
-	for _, schedule := range p.Schedules {
-		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
-		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
-		if realtimeJourney == nil && schedule.RID != "" {
-			realtimeJourney, _ = realtimestore.FindByMapping(context.Background(), "nationalrailrid", schedule.RID)
-		}
-
-		if realtimeJourney == nil {
-			// Find the journey for this train
-			var journey *ctdf.Journey
-			cursor, _ := journeysCollection.Find(context.Background(), bson.M{"otheridentifiers.TrainUID": schedule.UID})
-
-			journeyDate, _ := time.Parse("2006-01-02", schedule.SSD)
-
-			for cursor.Next(context.Background()) {
-				var potentialJourney *ctdf.Journey
-				err := cursor.Decode(&potentialJourney)
-				if err != nil {
-					log.Error().Err(err).Msg("Failed to decode Journey")
-				}
-
-				if potentialJourney.Availability.MatchDate(journeyDate) {
-					journey = potentialJourney
-				}
-			}
-
-			if journey == nil {
-				log.Debug().Str("uid", schedule.UID).Msg("Failed to find respective Journey for this train schedule update")
-				continue
-			}
-
-			journey.GetService()
-
-			// Construct the base realtime journey
-			realtimeJourney = &ctdf.RealtimeJourney{
-				PrimaryIdentifier:      realtimeJourneyID,
-				ActivelyTracked:        false,
-				TimeoutDurationMinutes: 181,
-				CreationDateTime:       now,
-				Reliability:            ctdf.RealtimeJourneyReliabilityExternalProvided,
-
-				DataSource: datasource,
-
-				Journey:        journey,
-				JourneyRunDate: journeyDate,
-				Service:        journey.Service,
-
-				Stops: map[string]*ctdf.RealtimeJourneyStops{},
-			}
-		}
-
-		if realtimeJourney.Journey == nil {
-			log.Error().Str("id", realtimeJourney.PrimaryIdentifier).Msg("Realtime journey without journey - this should never happen :(")
-			continue
-		}
-
-		realtimeJourney.ModificationDateTime = now
-		if realtimeJourney.OtherIdentifiers == nil {
-			realtimeJourney.OtherIdentifiers = map[string]string{}
-		}
-		if schedule.RID != "" {
-			realtimeJourney.OtherIdentifiers["nationalrailrid"] = schedule.RID
-		}
-
-		cancelCount := 0
-		resolvedScheduleStopCount := 0
-		scheduleCancellations := map[string]darwinScheduleCancellation{}
-		passengerStopIndex := 0
-
-		for _, scheduleStop := range schedule.Locations {
-			if !scheduleStop.isPassengerCall() {
-				continue
-			}
-			journeyStopIndex := passengerStopIndex
-			passengerStopIndex++
-
-			stop := stopCache.Get(fmt.Sprintf("gb-tiploc-%s", scheduleStop.Tiploc))
-
-			if stop == nil {
-				log.Error().Str("tiploc", scheduleStop.Tiploc).Msg("Failed to find stop for schedule update")
-				continue
-			}
-
-			resolvedScheduleStopCount += 1
-			scheduleCancellations[ctdf.RealtimeJourneyStopKey(stop.PrimaryIdentifier, journeyStopIndex)] = darwinScheduleCancellation{stopRef: stop.PrimaryIdentifier, journeyStopIndex: journeyStopIndex, cancelled: scheduleStop.Cancelled == "true"}
-			if scheduleStop.Cancelled == "true" {
-				cancelCount += 1
-			}
-		}
-
-		if resolvedScheduleStopCount == 0 {
-			log.Error().
-				Str("realtimejourneyid", realtimeJourneyID).
-				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
-				Str("rid", schedule.RID).
-				Msg("Skipping Darwin schedule update because no schedule stops resolved")
-			continue
-		}
-
-		log.Debug().Str("realtimejourneyid", realtimeJourneyID).Int("resolved_calls", resolvedScheduleStopCount).Int("cancelled_calls", cancelCount).Msg("Darwin schedule cancellation summary")
-		applyDarwinScheduleCancellationState(realtimeJourney, scheduleCancellations)
-
-		if cancelCount > 0 && cancelCount == resolvedScheduleStopCount {
-			railutils.CreateServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
-				CreationDateTime:     now,
-				ModificationDateTime: now,
-
-				DataSource: datasource,
-
-				AlertType: ctdf.ServiceAlertTypeJourneyCancelled,
-
-				Text: railutils.CancelledReasons[schedule.CancelReason],
-
-				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
-
-				ValidFrom:  realtimeJourney.JourneyRunDate,
-				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
-			})
-			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-
-			realtimeJourney.Cancelled = true
-
-			log.Info().
-				Str("realtimejourneyid", realtimeJourneyID).
-				Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
-				Msg("Train cancelled")
-		} else if cancelCount > 0 {
-			railutils.CreateServiceAlert(ctdf.ServiceAlert{
-				PrimaryIdentifier:    fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier),
-				CreationDateTime:     now,
-				ModificationDateTime: now,
-
-				DataSource: datasource,
-
-				AlertType: ctdf.ServiceAlertTypeJourneyPartiallyCancelled,
-
-				Text: railutils.CancelledReasons[schedule.CancelReason],
-
-				MatchedIdentifiers: []string{fmt.Sprintf("DAYINSTANCEOF:%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier)},
-
-				ValidFrom:  realtimeJourney.JourneyRunDate,
-				ValidUntil: realtimeJourney.JourneyRunDate.Add(48 * time.Hour),
-			})
-
-			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-
-			realtimeJourney.Cancelled = false
-		} else {
-			realtimeJourney.Cancelled = false
-
-			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-			railutils.DeleteServiceAlert(fmt.Sprintf("gb-railpartialcancel-%s:%s", schedule.SSD, realtimeJourney.Journey.PrimaryIdentifier))
-		}
-
-		// Update database
-		if realtimeJourney.DataSource == nil {
-			realtimeJourney.DataSource = datasource
-		}
-		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
-		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
-
-		log.Info().
-			Str("realtimejourneyid", realtimeJourneyID).
-			Str("journeyid", realtimeJourney.Journey.PrimaryIdentifier).
-			Msg("Train schedule updated")
 	}
 
 	// Station Messages

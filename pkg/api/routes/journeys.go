@@ -2,14 +2,19 @@ package routes
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/transforms"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func JourneysRouter(router fiber.Router) {
@@ -42,14 +47,18 @@ func getJourney(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
-		if !realtimeOnly {
-			journey.GetReferences()
-			journey.GetDeepReferences()
-		}
 
 		realtimeJourney, realtimeErr := realtimestore.FindCurrentForJourney(context.Background(), journey.PrimaryIdentifier)
 		if realtimeErr != nil {
 			log.Error().Err(realtimeErr).Str("journey", journey.PrimaryIdentifier).Msg("Failed to query realtime journey")
+		}
+		if date := c.Query("date"); date != "" && journey.OtherIdentifiers["TrainUID"] != "" && realtimeJourney != nil && realtimeJourney.JourneyRunDate.Format(ctdf.YearMonthDayFormat) != date {
+			realtimeJourney = nil
+		}
+		if !realtimeOnly {
+			applyRailAmendment(c, journey, realtimeJourney)
+			journey.GetReferences()
+			journey.GetDeepReferences()
 		}
 		journey.RealtimeJourney = realtimeJourney
 		if realtimeJourney != nil && realtimeJourney.Journey != nil {
@@ -99,5 +108,33 @@ func applyJourneyServiceStopNameOverrides(journey *ctdf.Journey) {
 
 		pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
 		pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+	}
+}
+
+func applyRailAmendment(c *fiber.Ctx, journey *ctdf.Journey, realtime *ctdf.RealtimeJourney) {
+	if journey.OtherIdentifiers["TrainUID"] == "" {
+		return
+	}
+	date := c.Query("date")
+	if date == "" && realtime != nil {
+		date = realtime.JourneyRunDate.Format(ctdf.YearMonthDayFormat)
+	}
+	if date == "" {
+		if loc, err := time.LoadLocation(journey.DepartureTimezone); err == nil {
+			date = time.Now().In(loc).Format(ctdf.YearMonthDayFormat)
+		}
+	}
+	if _, err := time.Parse(ctdf.YearMonthDayFormat, date); err != nil {
+		return
+	}
+	var amendment ctdf.Journey
+	err := database.GetCollection("journeys").FindOne(c.UserContext(), bson.M{
+		"primaryidentifier": railutils.DarwinAmendmentID(journey.PrimaryIdentifier, date),
+		"expiry":            bson.M{"$gt": time.Now()},
+	}).Decode(&amendment)
+	if err == nil {
+		journey.ApplyRouteAmendment(&amendment)
+	} else if err != mongo.ErrNoDocuments {
+		log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to load Darwin route amendment")
 	}
 }
