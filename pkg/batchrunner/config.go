@@ -26,6 +26,9 @@ type Config struct {
 	TrafiklabStaticSecret           string
 	TrafiklabRealtimeSecret         string
 	OdptAPIKeySecret                string
+	TranslinkAPIKeySecret           string
+	WmataAPIKeySecret               string
+	TrimetAppIDSecret               string
 	MongoDBConnectionSecret         string
 	MongoDBDatabase                 string
 	ElasticsearchAddress            string
@@ -55,6 +58,9 @@ func ConfigFromEnv() Config {
 		TrafiklabStaticSecret:           envOrDefault("TRAVIGO_BATCH_TRAFIKLAB_STATIC_SECRET", "travigo-trafiklab-sweden-static"),
 		TrafiklabRealtimeSecret:         envOrDefault("TRAVIGO_BATCH_TRAFIKLAB_REALTIME_SECRET", "travigo-trafiklab-sweden-realtime"),
 		OdptAPIKeySecret:                envOrDefault("TRAVIGO_BATCH_ODPT_API_KEY_SECRET", "travigo-odtp-japan-gtfs"),
+		TranslinkAPIKeySecret:           envOrDefault("TRAVIGO_BATCH_TRANSLINK_API_KEY_SECRET", "travigo-translink-api-key"),
+		WmataAPIKeySecret:               envOrDefault("TRAVIGO_BATCH_WMATA_API_KEY_SECRET", "travigo-wmata-api-key"),
+		TrimetAppIDSecret:               envOrDefault("TRAVIGO_BATCH_TRIMET_APP_ID_SECRET", "travigo-trimet-app-id"),
 		MongoDBConnectionSecret:         envOrDefault("TRAVIGO_BATCH_MONGODB_CONNECTION_SECRET", "travigo-mongodb-admin-travigo"),
 		MongoDBDatabase:                 envOrDefault("TRAVIGO_BATCH_MONGODB_DATABASE", "travigo"),
 		ElasticsearchAddress:            envOrDefault("TRAVIGO_BATCH_ELASTICSEARCH_ADDRESS", "https://primary-es-http.elastic:9200"),

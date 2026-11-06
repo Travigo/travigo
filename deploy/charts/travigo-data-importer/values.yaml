@@ -37,6 +37,15 @@ ch_opentransportdata:
   apiKeySecret: travigo-ch-opentransportdata
   saApiKeySecret: travigo-ch-opentransportdata-sa
 
+translink:
+  apiKeySecret: travigo-translink-api-key
+
+wmata:
+  apiKeySecret: travigo-wmata-api-key
+
+trimet:
+  appIDSecret: travigo-trimet-app-id
+
 nationalRail:
   credentialsSecret: travigo-nationalrail-credentials
   networkRailCredentialsSecret: travigo-networkrail-credentials

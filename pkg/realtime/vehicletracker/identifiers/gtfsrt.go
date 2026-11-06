@@ -3,6 +3,7 @@ package identifiers
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -28,17 +29,17 @@ func (r *GTFSRT) IdentifyStop() (string, error) {
 	}
 
 	formatedStopID := fmt.Sprintf("%s-stop-%s", linkedDataset, stopID)
+	stopIdentifierFilter := any(formatedStopID)
+	if strings.Contains(linkedDataset, "*") {
+		stopIdentifierFilter = bson.M{"$regex": fmt.Sprintf("^%s-stop-%s$", datasetIDPattern(linkedDataset), regexp.QuoteMeta(stopID))}
+	}
 
 	stopsQuery := bson.M{
 		"$or": bson.A{
-			bson.M{"primaryidentifier": formatedStopID},
-			bson.M{"otheridentifiers": formatedStopID},
+			bson.M{"primaryidentifier": stopIdentifierFilter},
+			bson.M{"otheridentifiers": stopIdentifierFilter},
 		},
-		"datasource.datasetid": linkedDataset,
-	}
-
-	if strings.Contains(linkedDataset, "*") {
-		stopsQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+		"datasource.datasetid": datasetIDFilter(linkedDataset),
 	}
 
 	potentialStops, err := findPrimaryIdentifiers(stopsCollection, stopsQuery, 2)
@@ -69,17 +70,17 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 	}
 
 	formatedServiceID := fmt.Sprintf("%s-service-%s", linkedDataset, routeID)
+	serviceIdentifierFilter := any(formatedServiceID)
+	if strings.Contains(linkedDataset, "*") {
+		serviceIdentifierFilter = bson.M{"$regex": fmt.Sprintf("^%s-service-%s$", datasetIDPattern(linkedDataset), regexp.QuoteMeta(routeID))}
+	}
 
 	servicesQuery := bson.M{
 		"$or": bson.A{
-			bson.M{"primaryidentifier": formatedServiceID},
-			bson.M{"otheridentifiers": formatedServiceID},
+			bson.M{"primaryidentifier": serviceIdentifierFilter},
+			bson.M{"otheridentifiers": serviceIdentifierFilter},
 		},
-		"datasource.datasetid": linkedDataset,
-	}
-
-	if strings.Contains(linkedDataset, "*") {
-		servicesQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+		"datasource.datasetid": datasetIDFilter(linkedDataset),
 	}
 
 	potentialServices, err := findPrimaryIdentifiers(servicesCollection, servicesQuery, 2)
@@ -115,11 +116,7 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 	journeysCollection := database.GetCollection("journeys")
 	journeysQuery := bson.M{
 		"otheridentifiers.GTFS-TripID": tripID,
-		"datasource.datasetid":         linkedDataset,
-	}
-
-	if strings.Contains(linkedDataset, "*") {
-		journeysQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}
+		"datasource.datasetid":         datasetIDFilter(linkedDataset),
 	}
 
 	// Frequency-expanded journeys retain the source trip_id but expose their
@@ -157,4 +154,16 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 	} else {
 		return "", errors.New("Could not find referenced trip")
 	}
+}
+
+func datasetIDFilter(linkedDataset string) any {
+	if !strings.Contains(linkedDataset, "*") {
+		return linkedDataset
+	}
+	return bson.M{"$regex": "^" + datasetIDPattern(linkedDataset) + "$"}
+}
+
+func datasetIDPattern(linkedDataset string) string {
+	// Treat '*' in LinkedDataset as a glob while escaping all other regex metacharacters.
+	return strings.ReplaceAll(regexp.QuoteMeta(linkedDataset), `\*`, `.*`)
 }

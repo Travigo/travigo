@@ -97,6 +97,24 @@ spec:
                       name: {{ $.Values.jp_odpt.apiKeySecret }}
                       key: api_key
                       optional: false
+                - name: TRAVIGO_CA_TRANSLINK_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.translink.apiKeySecret }}
+                      key: api_key
+                      optional: true
+                - name: TRAVIGO_WMATA_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.wmata.apiKeySecret }}
+                      key: api_key
+                      optional: true
+                - name: TRAVIGO_TRIMET_APP_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $.Values.trimet.appIDSecret }}
+                      key: app_id
+                      optional: true
                 - name: TRAVIGO_MONGODB_CONNECTION
                   valueFrom:
                     secretKeyRef:

@@ -1,0 +1,45 @@
+identifier: nl-ovapi
+region: nl
+provider:
+  name: OVapi
+  website: "https://gtfs.ovapi.nl/"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://gtfs.ovapi.nl/gtfs-nl.zip"
+  datasetsize: large
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://gtfs.ovapi.nl/nl/tripUpdates.pb"
+  linkeddataset: nl-ovapi-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://gtfs.ovapi.nl/nl/vehiclePositions.pb"
+  linkeddataset: nl-ovapi-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://gtfs.ovapi.nl/nl/alerts.pb"
+  linkeddataset: nl-ovapi-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-realtime-train-updates
+  format: gtfs-realtime
+  source: "https://gtfs.ovapi.nl/nl/trainUpdates.pb"
+  linkeddataset: nl-ovapi-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true

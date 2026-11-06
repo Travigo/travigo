@@ -1,0 +1,1126 @@
+identifier: ca-bc-transit
+region: ca
+provider:
+  name: BC Transit
+  website: "https://www.bctransit.com/"
+datasets:
+- identifier: gtfs-schedule-100-mile-house
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=34"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-100-mile-house
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=34"
+  linkeddataset: ca-bc-transit-gtfs-schedule-100-mile-house
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-100-mile-house
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=34"
+  linkeddataset: ca-bc-transit-gtfs-schedule-100-mile-house
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-100-mile-house
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=34"
+  linkeddataset: ca-bc-transit-gtfs-schedule-100-mile-house
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-ashcroft-cache-creek-clinton
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=38"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-ashcroft-cache-creek-clinton
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=38"
+  linkeddataset: ca-bc-transit-gtfs-schedule-ashcroft-cache-creek-clinton
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-ashcroft-cache-creek-clinton
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=38"
+  linkeddataset: ca-bc-transit-gtfs-schedule-ashcroft-cache-creek-clinton
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-ashcroft-cache-creek-clinton
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=38"
+  linkeddataset: ca-bc-transit-gtfs-schedule-ashcroft-cache-creek-clinton
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-clearwater
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=35"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-clearwater
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=35"
+  linkeddataset: ca-bc-transit-gtfs-schedule-clearwater
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-clearwater
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=35"
+  linkeddataset: ca-bc-transit-gtfs-schedule-clearwater
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-clearwater
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=35"
+  linkeddataset: ca-bc-transit-gtfs-schedule-clearwater
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-east-kootenay-region
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=21"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-east-kootenay-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=21"
+  linkeddataset: ca-bc-transit-gtfs-schedule-east-kootenay-region
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-east-kootenay-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=21"
+  linkeddataset: ca-bc-transit-gtfs-schedule-east-kootenay-region
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-east-kootenay-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=21"
+  linkeddataset: ca-bc-transit-gtfs-schedule-east-kootenay-region
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-fraser-valley-region
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=13"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-fraser-valley-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=13"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fraser-valley-region
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-fraser-valley-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=13"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fraser-valley-region
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-fraser-valley-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=13"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fraser-valley-region
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-hazeltons
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=26"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-hazeltons
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=26"
+  linkeddataset: ca-bc-transit-gtfs-schedule-hazeltons
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-hazeltons
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=26"
+  linkeddataset: ca-bc-transit-gtfs-schedule-hazeltons
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-hazeltons
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=26"
+  linkeddataset: ca-bc-transit-gtfs-schedule-hazeltons
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-merritt
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=37"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-merritt
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=37"
+  linkeddataset: ca-bc-transit-gtfs-schedule-merritt
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-merritt
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=37"
+  linkeddataset: ca-bc-transit-gtfs-schedule-merritt
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-merritt
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=37"
+  linkeddataset: ca-bc-transit-gtfs-schedule-merritt
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-mount-waddington
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=17"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-mount-waddington
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=17"
+  linkeddataset: ca-bc-transit-gtfs-schedule-mount-waddington
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-mount-waddington
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=17"
+  linkeddataset: ca-bc-transit-gtfs-schedule-mount-waddington
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-mount-waddington
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=17"
+  linkeddataset: ca-bc-transit-gtfs-schedule-mount-waddington
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-north-okanagan-region
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=14"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-north-okanagan-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=14"
+  linkeddataset: ca-bc-transit-gtfs-schedule-north-okanagan-region
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-north-okanagan-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=14"
+  linkeddataset: ca-bc-transit-gtfs-schedule-north-okanagan-region
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-north-okanagan-region
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=14"
+  linkeddataset: ca-bc-transit-gtfs-schedule-north-okanagan-region
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-pemberton-valley
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=50"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-pemberton-valley
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=50"
+  linkeddataset: ca-bc-transit-gtfs-schedule-pemberton-valley
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-pemberton-valley
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=50"
+  linkeddataset: ca-bc-transit-gtfs-schedule-pemberton-valley
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-pemberton-valley
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=50"
+  linkeddataset: ca-bc-transit-gtfs-schedule-pemberton-valley
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-port-alberni
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=11"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-port-alberni
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=11"
+  linkeddataset: ca-bc-transit-gtfs-schedule-port-alberni
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-port-alberni
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=11"
+  linkeddataset: ca-bc-transit-gtfs-schedule-port-alberni
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-port-alberni
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=11"
+  linkeddataset: ca-bc-transit-gtfs-schedule-port-alberni
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-powell-river
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=29"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-powell-river
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=29"
+  linkeddataset: ca-bc-transit-gtfs-schedule-powell-river
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-powell-river
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=29"
+  linkeddataset: ca-bc-transit-gtfs-schedule-powell-river
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-powell-river
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=29"
+  linkeddataset: ca-bc-transit-gtfs-schedule-powell-river
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-prince-rupert
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=23"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-prince-rupert
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=23"
+  linkeddataset: ca-bc-transit-gtfs-schedule-prince-rupert
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-prince-rupert
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=23"
+  linkeddataset: ca-bc-transit-gtfs-schedule-prince-rupert
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-prince-rupert
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=23"
+  linkeddataset: ca-bc-transit-gtfs-schedule-prince-rupert
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-quesnel
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=32"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-quesnel
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=32"
+  linkeddataset: ca-bc-transit-gtfs-schedule-quesnel
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-quesnel
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=32"
+  linkeddataset: ca-bc-transit-gtfs-schedule-quesnel
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-quesnel
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=32"
+  linkeddataset: ca-bc-transit-gtfs-schedule-quesnel
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-revelstoke
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=36"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-revelstoke
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=36"
+  linkeddataset: ca-bc-transit-gtfs-schedule-revelstoke
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-revelstoke
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=36"
+  linkeddataset: ca-bc-transit-gtfs-schedule-revelstoke
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-revelstoke
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=36"
+  linkeddataset: ca-bc-transit-gtfs-schedule-revelstoke
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-salt-spring-island
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=39"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-salt-spring-island
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=39"
+  linkeddataset: ca-bc-transit-gtfs-schedule-salt-spring-island
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-salt-spring-island
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=39"
+  linkeddataset: ca-bc-transit-gtfs-schedule-salt-spring-island
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-salt-spring-island
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=39"
+  linkeddataset: ca-bc-transit-gtfs-schedule-salt-spring-island
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-smithers
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=31"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-smithers
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=31"
+  linkeddataset: ca-bc-transit-gtfs-schedule-smithers
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-smithers
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=31"
+  linkeddataset: ca-bc-transit-gtfs-schedule-smithers
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-smithers
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=31"
+  linkeddataset: ca-bc-transit-gtfs-schedule-smithers
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-south-okanagan-similkameen
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=15"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-south-okanagan-similkameen
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=15"
+  linkeddataset: ca-bc-transit-gtfs-schedule-south-okanagan-similkameen
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-south-okanagan-similkameen
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=15"
+  linkeddataset: ca-bc-transit-gtfs-schedule-south-okanagan-similkameen
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-south-okanagan-similkameen
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=15"
+  linkeddataset: ca-bc-transit-gtfs-schedule-south-okanagan-similkameen
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-west-coast
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=51"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-west-coast
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=51"
+  linkeddataset: ca-bc-transit-gtfs-schedule-west-coast
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-west-coast
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=51"
+  linkeddataset: ca-bc-transit-gtfs-schedule-west-coast
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-west-coast
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=51"
+  linkeddataset: ca-bc-transit-gtfs-schedule-west-coast
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-williams-lake
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=33"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-williams-lake
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=33"
+  linkeddataset: ca-bc-transit-gtfs-schedule-williams-lake
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-williams-lake
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=33"
+  linkeddataset: ca-bc-transit-gtfs-schedule-williams-lake
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-williams-lake
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=33"
+  linkeddataset: ca-bc-transit-gtfs-schedule-williams-lake
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-campbellrivertransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=12"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-campbellrivertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=12"
+  linkeddataset: ca-bc-transit-gtfs-schedule-campbellrivertransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-campbellrivertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=12"
+  linkeddataset: ca-bc-transit-gtfs-schedule-campbellrivertransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-campbellrivertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=12"
+  linkeddataset: ca-bc-transit-gtfs-schedule-campbellrivertransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-rdntransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=41"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-rdntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=41"
+  linkeddataset: ca-bc-transit-gtfs-schedule-rdntransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-rdntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=41"
+  linkeddataset: ca-bc-transit-gtfs-schedule-rdntransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-rdntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=41"
+  linkeddataset: ca-bc-transit-gtfs-schedule-rdntransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-comoxvalleytransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=45"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-comoxvalleytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=45"
+  linkeddataset: ca-bc-transit-gtfs-schedule-comoxvalleytransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-comoxvalleytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=45"
+  linkeddataset: ca-bc-transit-gtfs-schedule-comoxvalleytransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-comoxvalleytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=45"
+  linkeddataset: ca-bc-transit-gtfs-schedule-comoxvalleytransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-cowichanvalleyregionaltransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=10"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-cowichanvalleyregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=10"
+  linkeddataset: ca-bc-transit-gtfs-schedule-cowichanvalleyregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-cowichanvalleyregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=10"
+  linkeddataset: ca-bc-transit-gtfs-schedule-cowichanvalleyregionaltransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-cowichanvalleyregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=10"
+  linkeddataset: ca-bc-transit-gtfs-schedule-cowichanvalleyregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-creston
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=16"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-creston
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=16"
+  linkeddataset: ca-bc-transit-gtfs-schedule-creston
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-creston
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=16"
+  linkeddataset: ca-bc-transit-gtfs-schedule-creston
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-creston
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=16"
+  linkeddataset: ca-bc-transit-gtfs-schedule-creston
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-victoriaregionaltransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=48"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-victoriaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=48"
+  linkeddataset: ca-bc-transit-gtfs-schedule-victoriaregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-victoriaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=48"
+  linkeddataset: ca-bc-transit-gtfs-schedule-victoriaregionaltransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-victoriaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=48"
+  linkeddataset: ca-bc-transit-gtfs-schedule-victoriaregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-sunshinecoasttransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=18"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-sunshinecoasttransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=18"
+  linkeddataset: ca-bc-transit-gtfs-schedule-sunshinecoasttransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-sunshinecoasttransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=18"
+  linkeddataset: ca-bc-transit-gtfs-schedule-sunshinecoasttransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-sunshinecoasttransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=18"
+  linkeddataset: ca-bc-transit-gtfs-schedule-sunshinecoasttransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-squamishtransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=43"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-squamishtransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=43"
+  linkeddataset: ca-bc-transit-gtfs-schedule-squamishtransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-squamishtransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=43"
+  linkeddataset: ca-bc-transit-gtfs-schedule-squamishtransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-squamishtransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=43"
+  linkeddataset: ca-bc-transit-gtfs-schedule-squamishtransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-whistlertransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=44"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-whistlertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=44"
+  linkeddataset: ca-bc-transit-gtfs-schedule-whistlertransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-whistlertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=44"
+  linkeddataset: ca-bc-transit-gtfs-schedule-whistlertransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-whistlertransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=44"
+  linkeddataset: ca-bc-transit-gtfs-schedule-whistlertransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-kelownaregionaltransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=47"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-kelownaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=47"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kelownaregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-kelownaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=47"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kelownaregionaltransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-kelownaregionaltransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=47"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kelownaregionaltransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-westkootenaytransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=20"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-westkootenaytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=20"
+  linkeddataset: ca-bc-transit-gtfs-schedule-westkootenaytransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-westkootenaytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=20"
+  linkeddataset: ca-bc-transit-gtfs-schedule-westkootenaytransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-westkootenaytransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=20"
+  linkeddataset: ca-bc-transit-gtfs-schedule-westkootenaytransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-kamloopstransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=46"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-kamloopstransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=46"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kamloopstransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-kamloopstransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=46"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kamloopstransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-kamloopstransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=46"
+  linkeddataset: ca-bc-transit-gtfs-schedule-kamloopstransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-princegeorgetransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=22"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-princegeorgetransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=22"
+  linkeddataset: ca-bc-transit-gtfs-schedule-princegeorgetransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-princegeorgetransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=22"
+  linkeddataset: ca-bc-transit-gtfs-schedule-princegeorgetransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-princegeorgetransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=22"
+  linkeddataset: ca-bc-transit-gtfs-schedule-princegeorgetransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-fortstjohntransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=28"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-fortstjohntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=28"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fortstjohntransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-fortstjohntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=28"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fortstjohntransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-fortstjohntransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=28"
+  linkeddataset: ca-bc-transit-gtfs-schedule-fortstjohntransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: gtfs-schedule-dawsoncreektransitsystem
+  format: gtfs-schedule
+  source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=27"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates-dawsoncreektransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/tripupdates.pb?operatorIds=27"
+  linkeddataset: ca-bc-transit-gtfs-schedule-dawsoncreektransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions-dawsoncreektransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/vehicleupdates.pb?operatorIds=27"
+  linkeddataset: ca-bc-transit-gtfs-schedule-dawsoncreektransitsystem
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts-dawsoncreektransitsystem
+  format: gtfs-realtime
+  source: "https://bct.tmix.se/gtfs-realtime/alerts.pb?operatorIds=27"
+  linkeddataset: ca-bc-transit-gtfs-schedule-dawsoncreektransitsystem
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true

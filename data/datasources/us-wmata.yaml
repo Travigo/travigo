@@ -1,0 +1,94 @@
+identifier: us-wmata
+region: us
+provider:
+  name: Washington Metropolitan Area Transit Authority
+  website: "https://www.wmata.com/"
+datasets:
+- identifier: bus-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://api.wmata.com/gtfs/bus-gtfs-static.zip"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  datasetsize: large
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: rail-gtfs-schedule
+  format: gtfs-schedule
+  source: "https://api.wmata.com/gtfs/rail-gtfs-static.zip"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: bus-gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/bus-gtfsrt-tripupdates.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-bus-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: bus-gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/bus-gtfsrt-vehiclepositions.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-bus-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: bus-gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/bus-gtfsrt-alerts.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-bus-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
+- identifier: rail-gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/rail-gtfsrt-tripupdates.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-rail-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: rail-gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/rail-gtfsrt-vehiclepositions.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-rail-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: rail-gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://api.wmata.com/gtfs/rail-gtfsrt-alerts.pb"
+  sourceauthentication:
+    header:
+      api_key: TRAVIGO_WMATA_API_KEY
+  linkeddataset: us-wmata-rail-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true

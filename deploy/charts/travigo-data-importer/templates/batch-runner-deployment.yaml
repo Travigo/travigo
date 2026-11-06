@@ -86,6 +86,12 @@ spec:
               value: {{ .Values.se_trafiklab.realtimeSecret | quote }}
             - name: TRAVIGO_BATCH_ODPT_API_KEY_SECRET
               value: {{ .Values.jp_odpt.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_TRANSLINK_API_KEY_SECRET
+              value: {{ .Values.translink.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_WMATA_API_KEY_SECRET
+              value: {{ .Values.wmata.apiKeySecret | quote }}
+            - name: TRAVIGO_BATCH_TRIMET_APP_ID_SECRET
+              value: {{ .Values.trimet.appIDSecret | quote }}
             - name: TRAVIGO_BATCH_MONGODB_CONNECTION_SECRET
               value: {{ .Values.database.connectionStringSecret | quote }}
             - name: TRAVIGO_BATCH_MONGODB_DATABASE

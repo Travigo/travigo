@@ -1,0 +1,39 @@
+identifier: au-adelaide-metro
+region: au
+# Atlas lists CC-BY 4.0; attribute the Government of South Australia transport department.
+provider:
+  name: Adelaide Metro
+  website: "https://www.adelaidemetro.com.au/"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://gtfs.adelaidemetro.com.au/v1/static/latest/google_transit.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://gtfs.adelaidemetro.com.au/v1/realtime/trip_updates"
+  linkeddataset: au-adelaide-metro-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://gtfs.adelaidemetro.com.au/v1/realtime/vehicle_positions"
+  linkeddataset: au-adelaide-metro-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://gtfs.adelaidemetro.com.au/v1/realtime/service_alerts"
+  linkeddataset: au-adelaide-metro-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true

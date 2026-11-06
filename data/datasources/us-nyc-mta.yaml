@@ -86,6 +86,29 @@ datasets:
     services: true
     journeys: true
     operators: true
+- identifier: bus-gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://gtfsrt.prod.obanyc.com/tripUpdates"
+  linkeddataset: us-nyc-mta-bus-*-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: bus-gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://gtfsrt.prod.obanyc.com/vehiclePositions"
+  linkeddataset: us-nyc-mta-bus-*-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: bus-gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://gtfsrt.prod.obanyc.com/alerts"
+  linkeddataset: us-nyc-mta-bus-*-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
 # Realtime
 - identifier: subway-ace-gtfs-realtime
   format: gtfs-realtime

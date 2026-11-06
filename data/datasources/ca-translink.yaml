@@ -1,0 +1,48 @@
+identifier: ca-translink
+region: ca
+# TransLink terms require a prominent attribution; review the current terms before redistribution.
+provider:
+  name: TransLink
+  website: "https://www.translink.ca/"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://gtfs-static.translink.ca/gtfs/google_transit.zip"
+  datasetsize: large
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "https://gtfsapi.translink.ca/v3/gtfsposition"
+  sourceauthentication:
+    query:
+      apikey: TRAVIGO_CA_TRANSLINK_API_KEY
+  linkeddataset: ca-translink-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://gtfsapi.translink.ca/v3/gtfsrealtime"
+  sourceauthentication:
+    query:
+      apikey: TRAVIGO_CA_TRANSLINK_API_KEY
+  linkeddataset: ca-translink-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "https://gtfsapi.translink.ca/v3/gtfsalerts"
+  sourceauthentication:
+    query:
+      apikey: TRAVIGO_CA_TRANSLINK_API_KEY
+  linkeddataset: ca-translink-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true

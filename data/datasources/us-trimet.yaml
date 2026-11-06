@@ -1,0 +1,48 @@
+identifier: us-trimet
+region: us
+# Review TriMet's developer terms before redistribution.
+provider:
+  name: TriMet
+  website: "https://trimet.org/"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "http://developer.trimet.org/schedule/gtfs.zip"
+  datasetsize: medium
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "http://developer.trimet.org/ws/V1/TripUpdate"
+  sourceauthentication:
+    query:
+      appID: TRAVIGO_TRIMET_APP_ID
+  linkeddataset: us-trimet-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-vehicle-positions
+  format: gtfs-realtime
+  source: "http://developer.trimet.org/ws/gtfs/VehiclePositions"
+  sourceauthentication:
+    query:
+      appID: TRAVIGO_TRIMET_APP_ID
+  linkeddataset: us-trimet-gtfs-schedule
+  importdestination: realtime-queue
+  customconfig:
+    locationonly: "true"
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-alerts
+  format: gtfs-realtime
+  source: "http://developer.trimet.org/ws/V1/FeedSpecAlerts"
+  sourceauthentication:
+    query:
+      appID: TRAVIGO_TRIMET_APP_ID
+  linkeddataset: us-trimet-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
