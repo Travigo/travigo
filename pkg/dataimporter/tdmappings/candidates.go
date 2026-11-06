@@ -9,16 +9,12 @@ import (
 	"strings"
 
 	networkrailcorpus "github.com/travigo/travigo/pkg/dataimporter/formats/networkrail-corpus"
+	"github.com/travigo/travigo/pkg/railtd"
 	"github.com/urfave/cli/v2"
 )
 
 // Main stations and intermediate calls on the Cambridge to King's Cross pilot.
 const pilotStations = "CBN,CBG,CBS,FXN,SHH,MEL,ROY,ASH,BAL,LCH,HIT,SVG,FPK,KGX"
-
-type smartStep struct {
-	TD, FROMBERTH, TOBERTH, STANOX, STEPTYPE, EVENT string
-	BERTHOFFSET                                     json.RawMessage
-}
 
 func candidatesCommand() *cli.Command {
 	return &cli.Command{
@@ -56,7 +52,7 @@ func candidatesCommand() *cli.Command {
 	}
 }
 
-func readSMART(raw []byte) ([]smartStep, error) {
+func readSMART(raw []byte) ([]railtd.SMARTStep, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("SMART file is empty")
@@ -78,7 +74,7 @@ func readSMART(raw []byte) ([]smartStep, error) {
 		}
 		raw = array
 	}
-	var steps []smartStep
+	var steps []railtd.SMARTStep
 	if err := json.Unmarshal(raw, &steps); err != nil {
 		return nil, fmt.Errorf("decode SMART: %w", err)
 	}
@@ -126,7 +122,11 @@ func writeCandidates(output *csv.Writer, smartRaw, corpusRaw []byte, stationList
 		}
 		stanox := strings.TrimSpace(step.STANOX)
 		for _, location := range locations[stanox] {
-			row := [8]string{area, from, to, stanox, strings.TrimSpace(location.TIPLOC), strings.TrimSpace(location.ThreeAlpha), strings.TrimSpace(step.EVENT), strings.Trim(string(step.BERTHOFFSET), "\"")}
+			offset := ""
+			if step.BERTHOFFSET != nil {
+				offset = fmt.Sprint(step.BERTHOFFSET)
+			}
+			row := [8]string{area, from, to, stanox, strings.TrimSpace(location.TIPLOC), strings.TrimSpace(location.ThreeAlpha), strings.TrimSpace(step.EVENT), offset}
 			if seen[row] {
 				continue
 			}

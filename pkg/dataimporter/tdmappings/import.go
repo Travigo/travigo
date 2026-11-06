@@ -30,15 +30,16 @@ type reviewedMapping struct {
 
 func Command() *cli.Command {
 	return &cli.Command{
-		Name: "td-mappings", Usage: "Validate and import reviewed Network Rail TD mappings",
+		Name: "td-mappings", Usage: "Import Network Rail SMART reporting points",
 		Flags: []cli.Flag{
+			&cli.PathFlag{Name: "smart", Usage: "Use a local SMART snapshot instead of downloading it"},
 			&cli.StringFlag{Name: "reviewed", Usage: "CSV of verified CA steps"},
 			&cli.BoolFlag{Name: "apply", Usage: "Write validated mappings to MongoDB"},
 		},
 		Subcommands: []*cli.Command{candidatesCommand()},
 		Action: func(c *cli.Context) error {
 			if c.String("reviewed") == "" {
-				return fmt.Errorf("--reviewed is required to import mappings")
+				return importSMART(c)
 			}
 			file, err := os.Open(c.String("reviewed"))
 			if err != nil {

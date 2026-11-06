@@ -23,13 +23,18 @@ type StompClient struct {
 func (s *StompClient) Run() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	tracker, err := loadTD(ctx)
-	cancel()
 	if err != nil {
 		log.Error().Err(err).Msg("Cannot load MongoDB TD mappings")
-	} else if len(tracker.mappings) == 0 {
-		log.Info().Msg("No MongoDB TD mappings available")
-	} else {
+		tracker = newTDTracker()
+	}
+	if err := tracker.loadSMART(ctx); err != nil {
+		log.Error().Err(err).Msg("Cannot load MongoDB SMART reporting points")
+	}
+	cancel()
+	if len(tracker.areas) != 0 {
 		s.td = tracker
+	} else {
+		log.Info().Msg("No MongoDB TD mappings available")
 	}
 
 	railutils.LoadLateAndCancelledReasons()

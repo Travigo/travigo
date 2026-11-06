@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -56,6 +57,7 @@ type tdAnchor struct {
 type tdTracker struct {
 	mu         sync.Mutex
 	mappings   map[tdKey]map[tdLeg]tdMapping
+	smart      map[tdKey]smartReportingPoint
 	anchors    map[string]tdAnchor
 	cancelled  map[string]time.Time
 	areas      map[string]bool
@@ -250,9 +252,11 @@ func (t *tdTracker) processFrame(ctx context.Context, data []byte) {
 func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at time.Time) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	transitions := t.mappings[tdKey{event.Area, event.From, event.To}]
+	key := tdKey{event.Area, event.From, event.To}
+	transitions := t.mappings[key]
+	reportingPoint, hasSMART := t.smart[key]
 	berths := t.mappings[tdKey{event.Area, "", event.To}]
-	mapped := kind == "CA_MSG" && (len(transitions) != 0 || len(berths) != 0)
+	mapped := kind == "CA_MSG" && (len(transitions) != 0 || len(berths) != 0 || hasSMART)
 	stats := t.stats[event.Area]
 	if stats == nil {
 		stats = &tdAreaStats{}
@@ -330,6 +334,18 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 			mapping, ok = transitions[legKey]
 			if !ok {
 				mapping, ok = berths[legKey]
+			}
+			if !ok && hasSMART {
+				stopRef := leg.OriginStopRef
+				if reportingPoint.arrival {
+					stopRef = leg.DestinationStopRef
+				}
+				if slices.Contains(reportingPoint.Refs, stopRef) || slices.ContainsFunc(leg.PassingPath, func(ref string) bool {
+					return slices.Contains(reportingPoint.Refs, ref)
+				}) {
+					mapping = tdMapping{From: event.From, Point: reportingPoint.Point, Confidence: "approximate"}
+					ok = true
+				}
 			}
 			if !ok || mapping.Confidence == "" {
 				continue

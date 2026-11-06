@@ -286,6 +286,7 @@ func createJourneysIndexes() {
 	_, err := journeysRawCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{Keys: bson.D{{Key: "expiry", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(1)},
 		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
+		{Keys: bson.D{{Key: "serviceref", Value: 1}}},
 		{Keys: bson.D{
 			{Key: "datasource.datasetid", Value: 1},
 			{Key: "datasource.timestamp", Value: 1},

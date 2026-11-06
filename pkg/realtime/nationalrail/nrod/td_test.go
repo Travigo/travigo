@@ -156,6 +156,41 @@ func TestTDStepsOnlyPositionUniqueRunOnDirectedLeg(t *testing.T) {
 		if other.VehicleLocationObservedAt != nil {
 			mt.Fatal("a backward step for the bound run was assigned to a different run")
 		}
+		snapshot := railtd.SMARTSnapshot{
+			Steps: []railtd.SMARTStep{
+				{TD: "ZZ", FROMBERTH: "0102", TOBERTH: "0104", STANOX: "00123", STEPTYPE: "B", EVENT: "A"},
+				{TD: "ZZ", FROMBERTH: "0102", TOBERTH: "0105", STANOX: "00123", STEPTYPE: "B", EVENT: "A"},
+				{TD: "ZZ", FROMBERTH: "0102", TOBERTH: "0105", STANOX: "00456", STEPTYPE: "B", EVENT: "A"},
+			},
+			Locations: map[string]railtd.SMARTLocation{"00123": {Refs: []string{"b"}, Point: point(0.02)}},
+		}
+		raw, err := bson.Marshal(snapshot)
+		if err != nil {
+			mt.Fatal(err)
+		}
+		var document bson.D
+		if err := bson.Unmarshal(raw, &document); err != nil {
+			mt.Fatal(err)
+		}
+		// The previous rejected step queried only the bound train's track.
+		mt.ClearMockResponses()
+		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+railtd.SMARTCollection, mtest.FirstBatch, document))
+		if err := tracker.loadSMART(ctx); err != nil {
+			mt.Fatal(err)
+		}
+		if len(tracker.smart) != 1 {
+			mt.Fatalf("unexpected resolved SMART steps: %v", tracker.smart)
+		}
+		mt.AddMockResponses(response)
+		frame("0102", "0104", now.Add(4*time.Second))
+		assertPosition("TD", 0.02)
+		positioned, err := realtimestore.FindByIdentifier(ctx, journey.PrimaryIdentifier)
+		if err != nil {
+			mt.Fatal(err)
+		}
+		if positioned.VehicleLocationConfidence != "approximate" {
+			mt.Fatalf("unexpected SMART confidence: %q", positioned.VehicleLocationConfidence)
+		}
 	})
 }
 
