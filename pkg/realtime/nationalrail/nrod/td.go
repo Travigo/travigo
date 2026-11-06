@@ -68,6 +68,7 @@ type tdTracker struct {
 type tdAreaStats struct {
 	seen, mapped, positioned, operational, ambiguous, rejected int
 	maxAge                                                     time.Duration
+	rejectionReasons                                           map[string]int
 }
 
 func newTDTracker() *tdTracker {
@@ -242,7 +243,7 @@ func (t *tdTracker) processFrame(ctx context.Context, data []byte) {
 			log.Info().Str("area", area).Int("seen", stats.seen).Int("mapped", stats.mapped).
 				Int("positioned", stats.positioned).Int("operational", stats.operational).
 				Int("ambiguous", stats.ambiguous).Int("rejected", stats.rejected).
-				Dur("max_position_age", stats.maxAge).Msg("TD observation counts")
+				Dur("max_position_age", stats.maxAge).Interface("rejection_reasons", stats.rejectionReasons).Msg("TD observation counts")
 		}
 		clear(t.stats)
 		t.lastReport = time.Now()
@@ -259,8 +260,18 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 	mapped := kind == "CA_MSG" && (len(transitions) != 0 || len(berths) != 0 || hasSMART)
 	stats := t.stats[event.Area]
 	if stats == nil {
-		stats = &tdAreaStats{}
+		stats = &tdAreaStats{rejectionReasons: map[string]int{}}
 		t.stats[event.Area] = stats
+	}
+	trace := func(outcome, reason, journeyID string) {
+		log.Debug().Str("area", event.Area).Str("headcode", event.Description).Str("from", event.From).Str("to", event.To).
+			Str("type", kind).Time("observed_at", at).Str("journey_id", journeyID).Str("outcome", outcome).Str("reason", reason).
+			Msg("TD step decision")
+	}
+	reject := func(reason, journeyID string) {
+		stats.rejected++
+		stats.rejectionReasons[reason]++
+		trace("rejected", reason, journeyID)
 	}
 	stats.seen++
 	if mapped {
@@ -288,7 +299,16 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 			t.anchors[id] = a
 		}
 	}
-	if kind == "CC_MSG" || !validHeadcode || multipleBindings {
+	if kind == "CC_MSG" {
+		return
+	}
+	if !validHeadcode {
+		reject("invalid_headcode", "")
+		return
+	}
+	if multipleBindings {
+		stats.ambiguous++
+		reject("multiple_berth_bindings", "")
 		return
 	}
 
@@ -296,37 +316,60 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 	var selectedMapping tdMapping
 	var journey *ctdf.RealtimeJourney
 	var position float64
+	var reason, candidateID string
+	noteRejection := func(nextReason, id string) {
+		if reason == "" {
+			reason, candidateID = nextReason, id
+		} else {
+			if reason != nextReason {
+				reason = "multiple_candidate_rejections"
+			}
+			if candidateID != id {
+				candidateID = ""
+			}
+		}
+	}
 	for id, a := range t.anchors {
-		if boundID != "" && id != boundID {
+		if (boundID != "" && id != boundID) || a.headcode != event.Description {
 			continue
 		}
-		if a.leg < 0 || a.headcode != event.Description || !at.After(a.trustAt) ||
-			at.Sub(a.at) > tdTrustWindow || !at.After(a.tdAt) || time.Since(a.at) > tdTrustWindow {
+		if a.leg < 0 || at.Sub(a.at) > tdTrustWindow || time.Since(a.at) > tdTrustWindow {
+			noteRejection("no_recent_trust_departure", id)
+			continue
+		}
+		if !at.After(a.trustAt) || !at.After(a.tdAt) {
+			noteRejection("older_than_last_event", id)
 			continue
 		}
 		continuous := a.area == event.Area && a.berth == event.From
 		if !mapped && !continuous {
+			noteRejection("unmapped_step", id)
 			continue
 		}
 		candidate, err := realtimestore.FindForUpdate(ctx, a.journeyID)
 		if err == redis.Nil {
+			noteRejection("run_missing", id)
 			continue
 		}
 		if err != nil {
+			reject("run_lookup_failed", id)
 			return
 		}
 		if candidate == nil || !candidate.ActivelyTracked || candidate.Cancelled ||
 			candidate.OtherIdentifiers["TrainID"] != a.trainID || !candidate.JourneyRunDate.Equal(a.runDate) {
+			noteRejection("run_inactive_or_changed", id)
 			continue
 		}
 		progress := a.progress
 		var mapping tdMapping
 		if mapped {
 			if candidate.Journey == nil || a.leg >= len(candidate.Journey.Path) {
+				noteRejection("journey_leg_missing", id)
 				continue
 			}
 			leg := candidate.Journey.Path[a.leg]
 			if leg == nil {
+				noteRejection("journey_leg_missing", id)
 				continue
 			}
 			legKey := tdLeg{leg.OriginStopRef, leg.DestinationStopRef}
@@ -348,6 +391,7 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 				}
 			}
 			if !ok || mapping.Confidence == "" {
+				noteRejection("mapping_not_on_journey_leg", id)
 				continue
 			}
 			track := leg.Track
@@ -355,33 +399,48 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 				var record ctdf.JourneyTrack
 				err := database.GetCollection("journey_tracks").FindOne(ctx, bson.M{"primaryidentifier": leg.TrackRef}).Decode(&record)
 				if err != nil {
+					reject("track_lookup_failed", id)
 					return
 				}
 				track = record.Track
 			}
 			progress = railtd.TrackProgress(mapping.Point, track)
+			if progress < 0 {
+				noteRejection("point_off_track_or_track_missing", id)
+				continue
+			}
 			if mapping.From == "" {
 				from, ok := t.mappings[tdKey{event.Area, "", event.From}][legKey]
 				if !ok || from.Confidence == "" {
+					noteRejection("source_berth_unmapped", id)
 					continue
 				}
 				fromProgress := railtd.TrackProgress(from.Point, track)
 				if fromProgress < 0 || progress <= fromProgress {
+					noteRejection("source_berth_off_track_or_wrong_direction", id)
 					continue
 				}
 			}
-			if progress < 0 || (!a.tdAt.IsZero() && progress <= a.progress) {
+			if !a.tdAt.IsZero() && progress <= a.progress {
+				noteRejection("position_did_not_advance", id)
 				continue
 			}
 		}
 		if journey != nil {
 			stats.ambiguous++
+			reject("multiple_matching_runs", "")
 			return
 		}
 		selected, journey, position, selectedMapping = a, candidate, progress, mapping
 	}
 	if journey == nil {
-		stats.rejected++
+		if reason == "" {
+			reason = "no_matching_headcode"
+			if !mapped && boundID == "" {
+				reason = "unmapped_step"
+			}
+		}
+		reject(reason, candidateID)
 		return
 	}
 	if mapped {
@@ -390,17 +449,20 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 		}
 		changed, err := realtimestore.RecordRailObservation(ctx, journey, observation, &selectedMapping.Point)
 		if err != nil {
-			log.Warn().Err(err).Msg("Failed to record TD observation")
+			log.Warn().Err(err).Str("journey_id", selected.journeyID).Msg("Failed to record TD observation")
+			reject("position_write_failed", selected.journeyID)
 			return
 		}
 		if changed {
 			stats.positioned++
 			stats.maxAge = max(stats.maxAge, time.Since(at))
+			trace("positioned", selectedMapping.Confidence, selected.journeyID)
 		} else {
-			stats.rejected++
+			reject("position_not_newer", selected.journeyID)
 		}
 	} else {
 		stats.operational++
+		trace("berth_only", "", selected.journeyID)
 	}
 	if kind == "CB_MSG" {
 		selected.leg = -1

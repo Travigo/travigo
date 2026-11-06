@@ -42,6 +42,8 @@ spec:
             {{- end }}
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
+            - name: TRAVIGO_DEBUG
+              value: "YES"
             - name: TRAVIGO_MONGODB_CONNECTION
               valueFrom:
                 secretKeyRef:

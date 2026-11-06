@@ -24,6 +24,10 @@ A uniquely matched between-berth step can show an **approximate reporting point*
 
 For an optional corridor audit, the `td-mappings candidates` command accepts SMART and CORPUS files and defaults to Cambridge to King's Cross. For a verified override, `td-mappings --reviewed reviewed.csv --apply` takes columns `area,from,to,origin,destination,track_ref,longitude,latitude,confidence,evidence`. The importer validates those rows against the named OSM leg before writing them.
 
+## Diagnose a position that is not updating
+
+The tracker logs `TD observation counts` each minute for each active signalling area, including `rejection_reasons`. With `TRAVIGO_DEBUG=YES`, filter `TD step decision` messages by headcode or journey ID. Those messages show the source and destination berths, event timestamp, and outcome. A journey ID is available when the tracker could identify a single candidate run.
+
 References
 
 - [Network Rail open data feeds](https://www.networkrail.co.uk/who-we-are/transparency-and-ethics/transparency/open-data-feeds/)
