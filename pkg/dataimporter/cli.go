@@ -10,6 +10,7 @@ import (
 
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
+	"github.com/travigo/travigo/pkg/dataimporter/tdmappings"
 
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
@@ -25,6 +26,7 @@ func RegisterCLI() *cli.Command {
 		Name:  "data-importer",
 		Usage: "Download & convert third party datasets into CTDF",
 		Subcommands: []*cli.Command{
+			tdmappings.Command(),
 			{
 				Name:  "dataset",
 				Usage: "Import a dataset",

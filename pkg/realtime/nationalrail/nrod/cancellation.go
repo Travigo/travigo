@@ -1,6 +1,8 @@
 package nrod
 
 import (
+	"time"
+
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,5 +24,13 @@ type TrustCancellation struct {
 }
 
 func (c *TrustCancellation) Process(stompClient *StompClient) {
+	if stompClient.td != nil {
+		now := time.Now()
+		at, valid := railEventTime(c.CancellationTimestamp, now)
+		if !valid {
+			at = now
+		}
+		stompClient.td.invalidateTrain(c.TrainID, at)
+	}
 	log.Debug().Str("trainid", c.TrainID).Str("reason", c.CancellationReasonCode).Msg("Train cancelled")
 }

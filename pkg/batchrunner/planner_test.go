@@ -125,9 +125,9 @@ func TestOSMRailTracksRunsBeforeJourneyPublishing(t *testing.T) {
 	defer os.Chdir(workingDirectory)
 
 	plan := BuildPlan()
-	osmTasks := plan.Groups[journeyEnrichmentGroup]
-	if len(osmTasks) != 1 || osmTasks[0].Identifier != "global-openstreetmap-gb-national-rail-tracks" {
-		t.Fatalf("journey enrichment group = %+v", osmTasks)
+	enrichment := plan.Groups[journeyEnrichmentGroup]
+	if len(enrichment) != 2 || enrichment[0].Identifier != "global-openstreetmap-gb-national-rail-tracks" || enrichment[1].Kind != TaskKindTDMappings {
+		t.Fatalf("journey enrichment group = %+v", enrichment)
 	}
 
 	tasks := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
@@ -136,6 +136,15 @@ func TestOSMRailTracksRunsBeforeJourneyPublishing(t *testing.T) {
 	journeyLinkIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "link-journeys" })
 	if serviceLinkIndex < 0 || osmIndex < 0 || journeyLinkIndex < 0 || !(serviceLinkIndex < osmIndex && osmIndex < journeyLinkIndex) {
 		t.Fatalf("pipeline positions: services=%d osm=%d journeys=%d", serviceLinkIndex, osmIndex, journeyLinkIndex)
+	}
+	berthIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.Kind == TaskKindTDMappings })
+	if berthIndex != osmIndex+1 || tasks[berthIndex+1].Kind != TaskKindLinkJourneys {
+		t.Fatalf("expected berth import between OSM tracks and journey publication, got index %d", berthIndex)
+	}
+	stages := buildStages(tasks)
+	stage := slices.IndexFunc(stages, func(indices []int) bool { return slices.Contains(indices, berthIndex) })
+	if stage < 1 || !slices.Equal(stages[stage], []int{berthIndex}) || !slices.Contains(stages[stage-1], osmIndex) {
+		t.Fatalf("berth import must wait for the OSM stage, got %v", stages)
 	}
 }
 

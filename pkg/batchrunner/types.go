@@ -6,6 +6,7 @@ type TaskKind string
 
 const (
 	TaskKindDataset       TaskKind = "dataset"
+	TaskKindTDMappings    TaskKind = "td-mappings"
 	TaskKindLinkStops     TaskKind = "link-stops"
 	TaskKindLinkTransfers TaskKind = "link-stop-transfers"
 	TaskKindLinkServices  TaskKind = "link-services"

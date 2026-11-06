@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	TDMappingsCollectionName      = "gb_networkrail_td_mappings"
 	JourneysCollectionName        = "journeys"
 	JourneysRawCollectionName     = "journeys_raw"
 	JourneysStagingCollectionName = "journeys_staging"
@@ -25,6 +26,17 @@ func createIndexes() {
 	createDatasetImportReportIndexes()
 	createUserNotificationSubscriptionsIndexes()
 	createUserCommutesIndexes()
+	if err := EnsureTDMappingsIndex(context.Background()); err != nil {
+		log.Error().Err(err).Msg("Creating rail TD mappings index")
+	}
+}
+
+func EnsureTDMappingsIndex(ctx context.Context) error {
+	_, err := GetCollection(TDMappingsCollectionName).Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "area", Value: 1}, {Key: "from", Value: 1}, {Key: "to", Value: 1}, {Key: "origin", Value: 1}, {Key: "destination", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	return err
 }
 
 func createUserCommutesIndexes() {

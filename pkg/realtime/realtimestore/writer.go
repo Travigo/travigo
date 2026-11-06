@@ -14,8 +14,9 @@ import (
 )
 
 type storedVehicleLocation struct {
-	Location ctdf.Location `json:"location"`
-	Bearing  float64       `json:"bearing"`
+	Location ctdf.Location    `json:"location"`
+	Position *RailObservation `json:"position,omitempty"`
+	Bearing  float64          `json:"bearing"`
 }
 
 const (

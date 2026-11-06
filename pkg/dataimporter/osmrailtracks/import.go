@@ -102,10 +102,12 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 	trackDocuments := map[string]ctdf.JourneyTrack{}
 	routeDocuments := []journeytracks.RouteLeg{}
 	failedPatterns := 0
+	preservedPatterns := 0
 	now := time.Now()
 	for _, pattern := range patterns {
 		patternTracks := make([]ctdf.JourneyTrack, 0, len(pattern.stopRefs)-1)
 		patternFailed := false
+		usedDirectFallback := false
 		failureReason := ""
 		for index := 1; index < len(pattern.stopRefs); index++ {
 			origin, originOK := snapped[pattern.stopRefs[index-1]]
@@ -119,7 +121,8 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 			if len(pattern.passingPaths) > 0 {
 				passingPath = pattern.passingPaths[index-1]
 			}
-			locations, err := format.graph.routeLeg(origin, destination, passingPath, snapped, trackCache)
+			locations, fallback, err := format.graph.routeLegWithFallback(origin, destination, passingPath, snapped, trackCache)
+			usedDirectFallback = usedDirectFallback || fallback
 			if err != nil || len(locations) < 2 {
 				patternFailed = true
 				if err != nil {
@@ -130,6 +133,10 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 				break
 			}
 			trackID := trackIdentifier(pattern.stopRefs[index-1], pattern.stopRefs[index], passingPath...)
+			if fallback {
+				// Keep fallback geometry separate from the waypoint-guided track.
+				trackID = trackIdentifier(pattern.stopRefs[index-1], pattern.stopRefs[index])
+			}
 			patternTracks = append(patternTracks, ctdf.JourneyTrack{
 				PrimaryIdentifier: trackID,
 				Track:             locations,
@@ -137,13 +144,21 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 			})
 		}
 
-		if patternFailed {
-			failedPatterns++
-			if err := preserveExistingPattern(ctx, pattern.key, source); err != nil {
+		if patternFailed || usedDirectFallback {
+			preserved, err := preserveExistingPattern(ctx, pattern.key, source)
+			if err != nil {
 				return datasets.DataImportReport{}, fmt.Errorf("preserve OSM rail pattern %s: %w", pattern.key, err)
 			}
-			log.Warn().Str("route_key", pattern.key).Str("reason", failureReason).Strs("stops", pattern.stopRefs).Msg("Skipped OSM rail journey pattern; retained previous tracks when available")
-			continue
+			if preserved {
+				preservedPatterns++
+				continue
+			}
+			if patternFailed {
+				failedPatterns++
+				log.Warn().Str("route_key", pattern.key).Str("reason", failureReason).Strs("stops", pattern.stopRefs).Msg("Skipped unroutable OSM rail journey pattern")
+				continue
+			}
+			log.Warn().Str("route_key", pattern.key).Msg("Used direct routing for an unroutable rail waypoint")
 		}
 
 		stopIdentifiers := make([][]string, len(pattern.stopRefs))
@@ -175,7 +190,7 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 		}
 	}
 
-	if len(routeDocuments) == 0 {
+	if len(routeDocuments) == 0 && preservedPatterns == 0 {
 		return datasets.DataImportReport{}, fmt.Errorf("none of %d National Rail journey patterns could be routed over OSM", len(patterns))
 	}
 	if err := storeTracks(ctx, trackDocuments, now); err != nil {
@@ -187,6 +202,7 @@ func (format *Format) Import(dataset datasets.DataSet, source *ctdf.DataSourceRe
 	log.Info().
 		Int("patterns", len(patterns)-failedPatterns).
 		Int("failed_patterns", failedPatterns).
+		Int("preserved_patterns", preservedPatterns).
 		Int("tracks", len(trackDocuments)).
 		Msg("Imported OpenStreetMap National Rail journey tracks")
 	return datasets.DataImportReport{ImportedJourneyTracks: len(trackDocuments)}, nil
@@ -350,36 +366,36 @@ func storeRouteLegs(ctx context.Context, legs []journeytracks.RouteLeg) error {
 	return flush()
 }
 
-func preserveExistingPattern(ctx context.Context, routeKey string, source *ctdf.DataSourceReference) error {
+func preserveExistingPattern(ctx context.Context, routeKey string, source *ctdf.DataSourceReference) (bool, error) {
 	filter := bson.M{"datasource.datasetid": source.DatasetID, "routekey": routeKey}
 	cursor, err := database.GetCollection(journeytracks.RouteCollectionName).Find(ctx, filter)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer cursor.Close(ctx)
 	trackRefs := []string{}
 	for cursor.Next(ctx) {
 		var leg journeytracks.RouteLeg
 		if err := cursor.Decode(&leg); err != nil {
-			return err
+			return false, err
 		}
 		trackRefs = append(trackRefs, leg.TrackRef)
 	}
 	if err := cursor.Err(); err != nil {
-		return err
+		return false, err
 	}
 	if len(trackRefs) == 0 {
-		return nil
+		return false, nil
 	}
 	if _, err := database.GetCollection(journeytracks.RouteCollectionName).UpdateMany(ctx, filter, bson.M{"$set": bson.M{"datasource.timestamp": source.Timestamp}}); err != nil {
-		return err
+		return false, err
 	}
 	_, err = database.GetCollection("journey_tracks").UpdateMany(
 		ctx,
 		bson.M{"primaryidentifier": bson.M{"$in": trackRefs}},
 		bson.M{"$set": bson.M{"datasource.timestamp": source.Timestamp}},
 	)
-	return err
+	return err == nil, err
 }
 
 func routeIdentifier(stopRefs []string, passingPaths ...[]string) string {
@@ -398,6 +414,20 @@ func trackIdentifier(originStopRef, destinationStopRef string, passingPath ...st
 	}
 	hash := sha256.Sum256([]byte(key))
 	return fmt.Sprintf("osm-rail-track:%x", hash[:12])
+}
+
+func (graph *railGraph) routeLegWithFallback(origin, destination snappedStop, passingPath []string, snapped map[string]snappedStop, cache map[[2]int]cachedTrack) ([]ctdf.Location, bool, error) {
+	for _, ref := range passingPath {
+		if _, ok := snapped[ref]; ok {
+			locations, err := graph.routeLeg(origin, destination, passingPath, snapped, cache)
+			if err == nil && len(locations) >= 2 {
+				return locations, false, nil
+			}
+			break
+		}
+	}
+	locations, err := graph.routeLeg(origin, destination, nil, snapped, cache)
+	return locations, len(passingPath) > 0, err
 }
 
 func (graph *railGraph) routeLeg(origin, destination snappedStop, passingPath []string, snapped map[string]snappedStop, cache map[[2]int]cachedTrack) ([]ctdf.Location, error) {

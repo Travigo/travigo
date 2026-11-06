@@ -91,14 +91,18 @@ func TestWebOSMMapSheriffViewDoesNotExposeRawQueryOrElements(t *testing.T) {
 }
 
 func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomainGraph(t *testing.T) {
+	observedAt := time.Now().UTC()
 	realtime := &ctdf.RealtimeJourney{
-		PrimaryIdentifier: "realtime-1",
-		Journey:           &ctdf.Journey{PrimaryIdentifier: "nested-journey", Path: []*ctdf.JourneyPathItem{{}}},
-		DepartedStop:      &ctdf.Stop{PrimaryIdentifier: "departed"},
-		NextStop:          &ctdf.Stop{PrimaryIdentifier: "next"},
-		ActivelyTracked:   true,
-		NextStopRef:       "stop-2",
-		NextStopIndex:     3,
+		PrimaryIdentifier:         "realtime-1",
+		Journey:                   &ctdf.Journey{PrimaryIdentifier: "nested-journey", Path: []*ctdf.JourneyPathItem{{}}},
+		DepartedStop:              &ctdf.Stop{PrimaryIdentifier: "departed"},
+		NextStop:                  &ctdf.Stop{PrimaryIdentifier: "next"},
+		ActivelyTracked:           true,
+		NextStopRef:               "stop-2",
+		NextStopIndex:             3,
+		VehicleLocationObservedAt: &observedAt,
+		VehicleLocationSource:     "TD",
+		VehicleLocationConfidence: "mapped",
 		Stops: map[string]*ctdf.RealtimeJourneyStops{
 			"stop-2@3": {StopRef: "stop-2", JourneyStopIndex: 3, Stop: &ctdf.Stop{PrimaryIdentifier: "unused-full-stop"}},
 		},
@@ -108,6 +112,7 @@ func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomain
 	result := marshalSheriffMap(t, []string{"web-journey-realtime"}, realtime)
 	requireKeys(t, result, "ActivelyTracked", "NextStopRef", "NextStopIndex", "Stops", "Reliability")
 	forbidKeys(t, result, "PrimaryIdentifier", "Journey", "DepartedStop", "NextStop", "JourneyRunDate", "DataSource")
+	requireKeys(t, result, "VehicleLocationObservedAt", "VehicleLocationSource", "VehicleLocationConfidence")
 	stop := result["Stops"].(map[string]interface{})["stop-2@3"].(map[string]interface{})
 	requireKeys(t, stop, "StopRef", "JourneyStopIndex")
 	forbidKeys(t, stop, "Stop")

@@ -127,7 +127,9 @@ func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *store
 		ReplacedByJourneyRef:       realtimeJourney.ReplacedByJourneyRef,
 	}
 
-	if realtimeJourney.VehicleLocation.Type != "" {
+	// Timestamped rail positions belong to the location overlay. Copying the
+	// coordinates alone would allow an old snapshot to surface without metadata.
+	if realtimeJourney.VehicleLocation.Type != "" && realtimeJourney.VehicleLocationObservedAt == nil {
 		location := realtimeJourney.VehicleLocation
 		stored.VehicleLocation = &location
 	}

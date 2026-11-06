@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -31,8 +32,11 @@ type realtimeJourneyMinimised struct {
 		DestinationDisplay string
 	}
 
-	VehicleLocation ctdf.Location
-	VehicleBearing  float64
+	VehicleLocation           ctdf.Location
+	VehicleBearing            float64
+	VehicleLocationObservedAt *time.Time `json:",omitempty"`
+	VehicleLocationSource     string     `json:",omitempty"`
+	VehicleLocationConfidence string     `json:",omitempty"`
 }
 
 func newRealtimeJourneyMinimised(realtimeJourney *ctdf.RealtimeJourney) realtimeJourneyMinimised {
@@ -43,6 +47,9 @@ func newRealtimeJourneyMinimised(realtimeJourney *ctdf.RealtimeJourney) realtime
 
 	minimised.VehicleLocation = realtimeJourney.VehicleLocation
 	minimised.VehicleBearing = realtimeJourney.VehicleBearing
+	minimised.VehicleLocationObservedAt = realtimeJourney.VehicleLocationObservedAt
+	minimised.VehicleLocationSource = realtimeJourney.VehicleLocationSource
+	minimised.VehicleLocationConfidence = realtimeJourney.VehicleLocationConfidence
 	if realtimeJourney.Journey == nil {
 		return minimised
 	}

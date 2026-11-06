@@ -1,6 +1,7 @@
 package nrod
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -16,9 +17,21 @@ type StompClient struct {
 
 	// Queue     *railutils.BatchProcessingQueue
 	StopCache railutils.StopCache
+	td        *tdTracker
 }
 
 func (s *StompClient) Run() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	tracker, err := loadTD(ctx)
+	cancel()
+	if err != nil {
+		log.Error().Err(err).Msg("Cannot load MongoDB TD mappings")
+	} else if len(tracker.mappings) == 0 {
+		log.Info().Msg("No MongoDB TD mappings available")
+	} else {
+		s.td = tracker
+	}
+
 	railutils.LoadLateAndCancelledReasons()
 
 	s.StopCache = railutils.StopCache{}
@@ -37,6 +50,9 @@ func (s *StompClient) Run() {
 
 	go s.StartTrainMovementSubscription(conn)
 	go s.StartVSTPSubscription(conn)
+	if s.td != nil {
+		go s.startTD(conn)
+	}
 }
 
 func (s *StompClient) StartTrainMovementSubscription(conn *stomp.Conn) {

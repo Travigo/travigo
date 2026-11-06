@@ -26,6 +26,7 @@ type fixedTaskDefinition struct {
 }
 
 var postProcessingTaskDefinitions = []fixedTaskDefinition{
+	{id: "import-td-mappings", name: "Import rail berth mappings", kind: TaskKindTDMappings, args: []string{"data-importer", "td-mappings", "--reviewed", "data/td-mappings/reviewed.csv", "--apply"}, group: journeyEnrichmentGroup},
 	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}, group: postProcessingGroup},
 	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}, group: postProcessingGroup},
 	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}, group: postProcessingGroup},
@@ -69,6 +70,8 @@ func BuildPlan() Plan {
 			return plan.Groups[size][i].Identifier < plan.Groups[size][j].Identifier
 		})
 	}
+	// A fixed task runs after the parallel OSM dataset stage has completed.
+	plan.Groups[journeyEnrichmentGroup] = append(plan.Groups[journeyEnrichmentGroup], buildPostProcessingPlanTasks(journeyEnrichmentGroup)...)
 	plan.Groups[postProcessingGroup] = buildPostProcessingPlanTasks(postProcessingGroup)
 	plan.Groups[journeyPublishingGroup] = buildPostProcessingPlanTasks(journeyPublishingGroup)
 

@@ -397,7 +397,7 @@ func findActiveWithinBoundsForIDs(ctx context.Context, bounds realtimeJourneyBou
 			}
 
 			realtimeJourney, err := decodeStoredRealtimeJourney(ctx, []byte(detailsJSON), false)
-			if err != nil || realtimeJourney == nil || !realtimeJourney.IsActive() {
+			if err != nil || realtimeJourney == nil {
 				staleRealtimeJourneyIDs = append(staleRealtimeJourneyIDs, batchIDs[index])
 				continue
 			}
@@ -405,11 +405,19 @@ func findActiveWithinBoundsForIDs(ctx context.Context, bounds realtimeJourneyBou
 			if locationJSON, ok := redisString(locationValues[index]); ok && locationJSON != "" {
 				var vehicleLocation storedVehicleLocation
 				if err := json.Unmarshal([]byte(locationJSON), &vehicleLocation); err == nil {
-					realtimeJourney.VehicleLocation = vehicleLocation.Location
-					realtimeJourney.VehicleBearing = vehicleLocation.Bearing
+					applyStoredLocation(realtimeJourney, vehicleLocation)
 				}
 			}
 
+			if (realtimeJourney.VehicleLocationObservedAt != nil && (!realtimeJourney.ActivelyTracked || realtimeJourney.Cancelled)) ||
+				!realtimeJourney.IsActive() {
+				staleRealtimeJourneyIDs = append(staleRealtimeJourneyIDs, batchIDs[index])
+				continue
+			}
+
+			if realtimeJourney.VehicleLocationObservedAt != nil && time.Since(*realtimeJourney.VehicleLocationObservedAt) > railPositionMaxAge {
+				continue
+			}
 			if !bounds.contains(realtimeJourney.VehicleLocation) {
 				continue
 			}
@@ -436,10 +444,24 @@ func ApplyLocation(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {
 		return
 	}
 
-	location, bearing, err := GetLocation(ctx, realtimeJourney.PrimaryIdentifier)
+	location, err := getStoredLocation(ctx, realtimeJourney.PrimaryIdentifier)
 	if err == nil {
-		realtimeJourney.VehicleLocation = location
-		realtimeJourney.VehicleBearing = bearing
+		applyStoredLocation(realtimeJourney, location)
+	}
+}
+
+func applyStoredLocation(journey *ctdf.RealtimeJourney, location storedVehicleLocation) {
+	if location.Location.Type != "" {
+		journey.VehicleLocation = location.Location
+		journey.VehicleBearing = location.Bearing
+		journey.VehicleLocationObservedAt = nil
+		journey.VehicleLocationSource = ""
+		journey.VehicleLocationConfidence = ""
+		if location.Position != nil {
+			journey.VehicleLocationObservedAt = &location.Position.ObservedAt
+			journey.VehicleLocationSource = location.Position.Source
+			journey.VehicleLocationConfidence = location.Position.Confidence
+		}
 	}
 }
 
@@ -463,17 +485,18 @@ func GetLocationDescription(ctx context.Context, identifier string) (string, err
 }
 
 func GetLocation(ctx context.Context, identifier string) (ctdf.Location, float64, error) {
-	locationResult := redis_client.Client.Get(ctx, realtimeJourneyLocationKey(identifier))
-	if locationResult.Err() != nil {
-		return ctdf.Location{}, 0, locationResult.Err()
-	}
+	location, err := getStoredLocation(ctx, identifier)
+	return location.Location, location.Bearing, err
+}
 
-	var vehicleLocation storedVehicleLocation
-	if err := json.Unmarshal([]byte(locationResult.Val()), &vehicleLocation); err != nil {
-		return ctdf.Location{}, 0, err
+func getStoredLocation(ctx context.Context, identifier string) (storedVehicleLocation, error) {
+	var location storedVehicleLocation
+	raw, err := redis_client.Client.Get(ctx, realtimeJourneyLocationKey(identifier)).Bytes()
+	if err != nil {
+		return location, err
 	}
-
-	return vehicleLocation.Location, vehicleLocation.Bearing, nil
+	err = json.Unmarshal(raw, &location)
+	return location, err
 }
 
 func ApplyRailDetailed(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) {

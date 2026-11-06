@@ -26,9 +26,12 @@ type RealtimeJourney struct {
 
 	DataSource *DataSourceReference `groups:"internal"`
 
-	VehicleLocation            Location `groups:"basic,web-journey,web-journey-realtime" bson:",omitempty"`
-	VehicleLocationDescription string   `groups:"basic,web-journey,web-journey-realtime"`
-	VehicleBearing             float64  `groups:"basic,web-journey,web-journey-realtime"`
+	VehicleLocation            Location   `groups:"basic,web-journey,web-journey-realtime" bson:",omitempty"`
+	VehicleLocationDescription string     `groups:"basic,web-journey,web-journey-realtime"`
+	VehicleLocationObservedAt  *time.Time `json:",omitempty" groups:"basic,web-journey,web-journey-realtime" bson:"-"`
+	VehicleLocationSource      string     `json:",omitempty" groups:"basic,web-journey,web-journey-realtime" bson:"-"`
+	VehicleLocationConfidence  string     `json:",omitempty" groups:"basic,web-journey,web-journey-realtime" bson:"-"`
+	VehicleBearing             float64    `groups:"basic,web-journey,web-journey-realtime"`
 
 	DepartedStopRef string `groups:"basic"`
 	DepartedStop    *Stop  `groups:"basic" bson:"-"`
@@ -132,7 +135,8 @@ func (r *RealtimeJourney) IsActive() bool {
 	}
 
 	// No proper location then give up and say valid
-	if r.VehicleLocation.Type != "Point" {
+	if r.VehicleLocation.Type != "Point" || len(r.VehicleLocation.Coordinates) < 2 ||
+		lastPathItem.DestinationStop.Location == nil || len(lastPathItem.DestinationStop.Location.Coordinates) < 2 {
 		return true
 	}
 

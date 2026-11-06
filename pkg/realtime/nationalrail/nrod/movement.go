@@ -3,10 +3,12 @@ package nrod
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/railtd"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/util"
 )
@@ -45,20 +47,19 @@ type TrustMovement struct {
 }
 
 func (m *TrustMovement) Process(stompClient *StompClient) {
-	// Performance Review [Set L] [PR112] [P1] (realtime): ActualTimestamp is ignored and receipt
-	// time becomes both observed arrival/departure time and freshness. Catch-up
-	// therefore makes old movements appear current and can regress next-stop state.
-	// Parse source event time, retain ingest time separately, and deduplicate/order
-	// per run and call while honoring CorrectionInd. Use planned-call identity to
-	// distinguish repeat visits before dropping apparently stale/replayed updates.
 	now := time.Now()
+	observedAt, observed := railEventTime(m.ActualTimestamp, now)
+	stopTime := now
+	if observed {
+		stopTime = observedAt
+	}
 
 	realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "TrainID", m.TrainID)
 	if err != nil {
 		log.Error().Err(err).Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Error finding Realtime Journey for train movement")
 		return
 	}
-	if realtimeJourney == nil {
+	if realtimeJourney == nil || realtimeJourney.OtherIdentifiers["TrainID"] != m.TrainID {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
@@ -80,12 +81,16 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 
 	locationStop := stompClient.StopCache.Get(fmt.Sprintf("gb-stanox-%s", m.LocationStanox))
 	if locationStop == nil {
+		if observed {
+			m.recordObservation(stompClient, realtimeJourney, observedAt, nil, -1, nil)
+		}
 		log.Debug().Str("stanox", m.LocationStanox).Msg("Cannot find stop for movement")
 		return
 	}
 
+	legIndex := -1
+	matchedJourneyStop := false
 	if m.EventType == "DEPARTURE" {
-		matchedJourneyStop := false
 
 		for pathIndex, path := range realtimeJourney.Journey.Path {
 			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
@@ -95,6 +100,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				if journeyStop != nil && !journeyStop.DepartureTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 					continue
 				}
+				legIndex = pathIndex
 				realtimeJourney.DepartedStopRef = path.OriginStopRef
 				realtimeJourney.NextStopRef = path.DestinationStopRef
 				realtimeJourney.NextStopIndex = pathIndex + 1
@@ -104,7 +110,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				if journeyStop == nil {
 					journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.OriginStopRef, JourneyStopIndex: pathIndex}
 				}
-				journeyStop.DepartureTime = now
+				journeyStop.DepartureTime = stopTime
 				journeyStop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
 				realtimeJourney.SetRealtimeStop(journeyStop)
 
@@ -118,7 +124,6 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		}
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
 	} else if m.EventType == "ARRIVAL" {
-		matchedJourneyStop := false
 		for pathIndex, path := range realtimeJourney.Journey.Path {
 			journeyStopIndex := pathIndex + 1
 			if path.DestinationStopRef != locationStop.PrimaryIdentifier && !util.ContainsString(locationStop.OtherIdentifiers, path.DestinationStopRef) {
@@ -132,7 +137,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			if journeyStop == nil {
 				journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.DestinationStopRef, JourneyStopIndex: journeyStopIndex}
 			}
-			journeyStop.ArrivalTime = now
+			journeyStop.ArrivalTime = stopTime
 
 			realtimeJourney.SetRealtimeStop(journeyStop)
 			break
@@ -143,12 +148,9 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 			description = fmt.Sprintf("Arrived at %s", locationStop.PrimaryName)
 		}
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
-		if locationStop.Location != nil {
-			realtimeJourney.VehicleLocation = *locationStop.Location
-		}
 
 		// If we've arrived at the end, then it's not actively tracked anymore
-		if locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
+		if len(realtimeJourney.Journey.Path) > 0 && locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
 			realtimeJourney.ActivelyTracked = false
 			realtimeJourney.TimeoutDurationMinutes = 15
 		}
@@ -161,7 +163,26 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	// Define field ownership and use atomic patches or compare-and-swap with merge
 	// retries across processors/processes; a local worker mutex is insufficient.
 	// Return write errors and derive events from the successfully committed state.
-	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+		log.Error().Err(err).Msg("Failed to save TRUST movement")
+		return
+	}
+	if observed {
+		var point *ctdf.Location
+		var operationalStop *ctdf.Stop
+		if !matchedJourneyStop && m.Offroute != "true" && (m.EventType == "ARRIVAL" || m.EventType == "DEPARTURE" || m.EventType == "PASS") {
+			for _, path := range realtimeJourney.Journey.Path {
+				if matchesPassingStop(path, locationStop) {
+					operationalStop = locationStop
+					break
+				}
+			}
+		}
+		if (matchedJourneyStop || operationalStop != nil) && m.Offroute != "true" && railtd.ValidPoint(locationStop.Location) {
+			point = locationStop.Location
+		}
+		m.recordObservation(stompClient, realtimeJourney, observedAt, point, legIndex, operationalStop)
+	}
 
 	log.Debug().
 		Str("trainid", m.TrainID).
@@ -170,4 +191,50 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		Str("stop", locationStop.PrimaryIdentifier).
 		Str("realtimejourney", realtimeJourney.PrimaryIdentifier).
 		Msg("Train movement")
+}
+
+func railEventTime(value string, now time.Time) (time.Time, bool) {
+	ms, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || ms <= 0 {
+		return time.Time{}, false
+	}
+	at := time.UnixMilli(ms).UTC()
+	return at, !at.After(now.Add(time.Minute)) && !at.Before(now.Add(-24*time.Hour))
+}
+
+func matchesPassingStop(leg *ctdf.JourneyPathItem, stop *ctdf.Stop) bool {
+	if leg == nil || stop == nil {
+		return false
+	}
+	for _, ref := range leg.PassingPath {
+		if ref == stop.PrimaryIdentifier || util.ContainsString(stop.OtherIdentifiers, ref) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *TrustMovement) recordObservation(client *StompClient, journey *ctdf.RealtimeJourney, at time.Time, point *ctdf.Location, leg int, operationalStop *ctdf.Stop) {
+	if client.td != nil {
+		if leg >= 0 {
+			origin := journey.Journey.Path[leg].OriginStopRef
+			for i, path := range journey.Journey.Path {
+				if i != leg && path != nil && path.OriginStopRef == origin {
+					leg = -1
+					break
+				}
+			}
+		}
+		if point == nil || m.CorrectionInd == "true" {
+			leg = -1
+		}
+		client.td.trust(journey, m, at, leg, operationalStop)
+	}
+	if point == nil {
+		return
+	}
+	observation := realtimestore.RailObservation{ObservedAt: at, Source: "TRUST", Confidence: "mapped"}
+	if _, err := realtimestore.RecordRailObservation(context.Background(), journey, observation, point); err != nil {
+		log.Warn().Err(err).Msg("Failed to record TRUST observation")
+	}
 }

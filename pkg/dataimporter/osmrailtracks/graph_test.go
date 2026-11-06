@@ -115,3 +115,28 @@ func TestRouteLegUsesPassingPoints(t *testing.T) {
 		t.Fatal("alternate passing paths share an identifier")
 	}
 }
+
+func TestRouteLegFallsBackWhenWaypointIsDisconnected(t *testing.T) {
+	graph := buildRailGraph([]railWay{
+		{nodeIDs: []int64{1, 2}},
+		{nodeIDs: []int64{3, 4}},
+	}, map[int64]point{
+		1: {lon: 0.01, lat: 52},
+		2: {lon: 0.02, lat: 52},
+		3: {lon: 0.01, lat: 52.01},
+		4: {lon: 0.02, lat: 52.01},
+	})
+	snap := func(lon, lat float64) snappedStop {
+		node, _, ok := graph.nearestNode(point{lon: lon, lat: lat}, 100)
+		if !ok {
+			t.Fatal("expected test point to snap")
+		}
+		return snappedStop{graphNode: node}
+	}
+	origin, destination := snap(0.01, 52), snap(0.02, 52)
+	snapped := map[string]snappedStop{"disconnected": snap(0.01, 52.01)}
+	track, fallback, err := graph.routeLegWithFallback(origin, destination, []string{"disconnected"}, snapped, map[[2]int]cachedTrack{})
+	if err != nil || !fallback || len(track) != 2 {
+		t.Fatalf("expected direct track, got %v, fallback=%t, err=%v", track, fallback, err)
+	}
+}
