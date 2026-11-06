@@ -170,7 +170,8 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	if observed {
 		var point *ctdf.Location
 		var operationalStop *ctdf.Stop
-		if !matchedJourneyStop && m.Offroute != "true" && (m.EventType == "ARRIVAL" || m.EventType == "DEPARTURE" || m.EventType == "PASS") {
+		isPositionReport := m.EventType == "ARRIVAL" || m.EventType == "DEPARTURE" || m.EventType == "PASS"
+		if !matchedJourneyStop && m.Offroute != "true" && isPositionReport {
 			for _, path := range realtimeJourney.Journey.Path {
 				if matchesPassingStop(path, locationStop) {
 					operationalStop = locationStop
@@ -178,7 +179,9 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 				}
 			}
 		}
-		if (matchedJourneyStop || operationalStop != nil) && m.Offroute != "true" && railtd.ValidPoint(locationStop.Location) {
+		// TRUST identifies the run and reports the actual location. An express
+		// train can report at a timing point absent from its published path.
+		if isPositionReport && m.Offroute != "true" && railtd.ValidPoint(locationStop.Location) {
 			point = locationStop.Location
 		}
 		m.recordObservation(stompClient, realtimeJourney, observedAt, point, legIndex, operationalStop)

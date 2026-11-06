@@ -28,6 +28,14 @@ For an optional corridor audit, the `td-mappings candidates` command accepts SMA
 
 The tracker logs `TD observation counts` each minute for each active signalling area, including `rejection_reasons`. With `TRAVIGO_DEBUG=YES`, filter `TD step decision` messages by headcode or journey ID. Those messages show the source and destination berths, event timestamp, and outcome. A journey ID is available when the tracker could identify a single candidate run.
 
+## Cambridge South to Foxton pilot
+
+The 6 November 2026 SMART download contains two reporting anchors in Cambridge area `CA`: `0830 → 0120` for Shepreth Branch Junction (STANOX `47250`, offset `+20` seconds) and `0116 → 0114` for Foxton platform 1 (STANOX `47242`, offset `+110` seconds). The live TD feed reports the intervening steps `0120 → 0118` and `0118 → 0116`. Neither is in SMART for this area. The latter pair exists in area `ME` and refers to Gerrards Cross.
+
+The [Cambridge PSB diagram](https://signalmaps.co.uk/#cambridge_psb:2941) places berths `0120`, `0118`, and `0116` beside signals `CA120`, `CA118`, and `CA116`, respectively. In the direction from Shepreth Branch Junction towards Foxton, the diagram shows `CA120` before Hauxton crossing, `CA118` between Hauxton and Harston crossings, and `CA116` between Harston crossing and Foxton. These are schematic relationships. They do not establish the physical trigger for each step.
+
+OpenStreetMap extracts for the corridor contained railway geometry but no signal nodes in the surveyed bounding boxes. For point mappings, obtain a current Cambridge ITD stepping table or the commissioned signalling plan with signal or track circuit positions. The reference needs to reflect the [Stage 2 commissioning south of Cambridge](https://www.networkrail.co.uk/our-work/our-routes/anglia/improving-the-railway-in-anglia/cambridge-resignalling/) over Christmas 2025 and New Year 2026. If the plan gives line and mileage, use [Network Rail track and waymark data](https://findtransportdata.dft.gov.uk/dataset/track%2C-reference-line-and-organisational-boundaries-182fe21f794) to locate the trigger. Keep these steps unmapped as points until that check is possible.
+
 References
 
 - [Network Rail open data feeds](https://www.networkrail.co.uk/who-we-are/transparency-and-ethics/transparency/open-data-feeds/)
