@@ -3,6 +3,40 @@ region: gb
 provider:
   name: National Rail
   website: "https://nationalrail.co.uk"
+overrides:
+  servicebranding:
+    - operators: [gb-toc-LD]  # Lumo
+      transporttypes: [Rail]
+      set:
+        colour: "#1825EE"
+    - operators: [gb-toc-GR]  # LNER
+      transporttypes: [Rail]
+      set:
+        colour: "#ce0e2d"
+    - operators: [gb-toc-TL]  # Thameslink
+      transporttypes: [Rail]
+      set:
+        colour: "#ced0d2"
+        secondarycolour: "#ea3b8b"
+    - operators: [gb-toc-GC]  # Grand Central
+      transporttypes: [Rail]
+      set:
+        colour: "#333132"
+        secondarycolour: "#ea7400"
+    - operators: [gb-toc-GN]  # Great Northern
+      transporttypes: [Rail]
+      set:
+        colour: "#43165c"
+    - operators: [gb-toc-HT]  # Hull Trains
+      transporttypes: [Rail]
+      set:
+        colour: "#14336A"
+    - operators: [gb-toc-ES]  # Eurostar
+      transporttypes: [Rail]
+      set:
+        colour: "#00286A"
+        secondarycolour: "#FCF5D8"
+        icon: "/icons/eurostar.webp"
 datasets:
 - identifier: toc
   format: gb-nationalrailtoc

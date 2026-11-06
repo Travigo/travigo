@@ -3,6 +3,104 @@ region: gb
 provider:
   name: Transport for London
   website: "https://tfl.gov.uk/"
+overrides:
+  servicebranding:
+    - operators: [gb-noc-TFLO]
+      services: ["Bakerloo"]
+      set:
+        colour: "#994f14"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Central"]
+      set:
+        colour: "#d42e12"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Circle"]
+      set:
+        colour: "#f7d117"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["District"]
+      set:
+        colour: "#007336"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Hammersmith & City"]
+      set:
+        colour: "#eb9ca8"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Jubilee"]
+      set:
+        colour: "#8c8f91"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Metropolitan"]
+      set:
+        colour: "#8a004f"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Northern"]
+      set:
+        colour: "#332b24"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Piccadilly"]
+      set:
+        colour: "#2905a1"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Victoria"]
+      set:
+        colour: "#00a3e0"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["Waterloo & City"]
+      set:
+        colour: "#7dd1b8"
+        icon: "/icons/tfl-roundel-underground.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      services: ["DLR"]
+      set:
+        colour: "#00AFAD"
+        icon: "/icons/tfl-roundel-dlr.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      transporttypes: [Bus]
+      set:
+        colour: "#DC241F"
+    - operators: [gb-noc-TFLO]
+      services: ["Tram"]
+      set:
+        colour: "#5FB526"
+        icon: "/icons/tfl-roundel-white.svg"
+        displaymode: "short"
+    - operators: [gb-noc-TFLO]
+      transporttypes: [Ferry]
+      set:
+        colour: "#039BE5"
+    - operators: [gb-toc-LO]
+      transporttypes: [Rail]
+      set:
+        colour: "#FFFFFF"
+        icon: "/icons/tfl-roundel-overground.svg"
+    - operators: [gb-toc-XR]
+      transporttypes: [Rail]
+      set:
+        colour: "#FFFFFF"
+        icon: "/icons/tfl-roundel-elizabeth-line.svg"
 datasets:
 - identifier: tfl-api
   format: tfl-json

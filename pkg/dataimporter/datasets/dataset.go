@@ -29,7 +29,8 @@ type DataSet struct {
 	LinkedDataset string
 
 	// Internal only
-	Queue *rmq.Queue `json:"-"`
+	Queue           *rmq.Queue        `json:"-"`
+	OperatorAliases map[string]string `yaml:"-" json:"-"`
 }
 
 type SourceAuthentication struct {

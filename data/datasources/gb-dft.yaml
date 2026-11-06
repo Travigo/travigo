@@ -3,6 +3,70 @@ region: gb
 provider:
   name: Department for Transport
   website: "https://www.gov.uk/government/organisations/department-for-transport"
+overrides:
+  operatoraliases:
+    - datasets: ["bods-gtfs-schedule-*"]
+      to: gb-noc-TFLO
+      from:
+        - gb-noc-ABLO  # Abellio London
+        - gb-noc-ALBO  # Transport UK (Abellio London)
+        - gb-noc-ABSU  # Transport UK (Abellio London)
+        - gb-noc-BTRI  # Blue Triangle Buses
+        - gb-noc-ALNO  # Arriva London North
+        - gb-noc-ALSO  # Arriva London South
+        - gb-noc-ARVA  # Arriva London South
+        - gb-noc-ALVO  # Arriva London South
+        - gb-noc-AVLO  # Arriva London South
+        - gb-noc-DLBU  # Docklands Buses
+        - gb-noc-ELBG  # East London Bus & Coach Company
+        - gb-noc-LONC  # London Central Bus Company
+        - gb-noc-FAST  # London General Transport
+        - gb-noc-KNCO  # London General Transport
+        - gb-noc-LSOV  # London Sovereign
+        - gb-noc-LUTD  # London Transit
+        - gb-noc-GAHL  # Metrobus
+        - gb-noc-MBGA  # Metrobus
+        - gb-noc-MTLN  # Metroline Travel / Metroline West
+        - gb-noc-SULV  # Sullivan Bus & Coach
+        - gb-noc-LDLR  # DLR
+        - gb-noc-LULD  # Underground
+        - gb-noc-TRAM  # Tram
+        - gb-noc-NWFF  # Woolwich Ferry
+        - gb-noc-NTHC  # Thames Clippers
+        - gb-noc-IFSC  # Cable Car
+  servicebranding:
+    # Stagecoach East default colour, followed by route-specific colours.
+    - operators: [gb-noc-SCCM, gb-noc-SCHU, gb-noc-SCBD, gb-noc-SCPB]
+      set:
+        colour: "#F2A83B"
+    - operators: [gb-noc-SCCM]
+      services: ["A", "B"]
+      set:
+        colour: "#04A387"
+    - operators: [gb-noc-SCCM]
+      services: ["PR1"]
+      set:
+        colour: "#E72D57"
+    - operators: [gb-noc-SCCM]
+      services: ["PR2"]
+      set:
+        colour: "#FF6500"
+    - operators: [gb-noc-SCCM]
+      services: ["PR3"]
+      set:
+        colour: "#4382B3"
+    - operators: [gb-noc-SCCM]
+      services: ["PR4"]
+      set:
+        colour: "#92BF73"
+    - operators: [gb-noc-SCCM]
+      services: ["PR5"]
+      set:
+        colour: "#8547AC"
+    # Whippet
+    - operators: [gb-noc-WHIP]
+      set:
+        colour: "#368BFF"
 datasets:
 - identifier: naptan
   format: gb-naptan

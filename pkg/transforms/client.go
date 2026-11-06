@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 
 	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"gopkg.in/yaml.v3"
 )
 
 var transforms []TransformDefinition
+var serviceBranding []datasets.ServiceBranding
 
 func SetupClient() {
 	err := filepath.Walk("data/transforms/",
@@ -48,5 +50,10 @@ func SetupClient() {
 		})
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to load transforms directory")
+	}
+
+	serviceBranding = nil
+	for _, source := range datasets.LoadDataSources() {
+		serviceBranding = append(serviceBranding, source.Overrides.ServiceBranding...)
 	}
 }

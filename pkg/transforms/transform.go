@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/travigo/travigo/pkg/ctdf"
 )
 
 type TransformDefinition struct {
@@ -197,6 +199,13 @@ func transformValue(inputTypeOf reflect.Type, inputValueOf reflect.Value, depth 
 	for _, transformDef := range transforms {
 		if transformDef.Group == group {
 			transformDef.Transform(inputTypeOf, inputValueOf, depth)
+		}
+	}
+
+	if group == "" && inputTypeOf == reflect.TypeFor[ctdf.Service]() && inputValueOf.CanAddr() && inputValueOf.Addr().CanInterface() {
+		service := inputValueOf.Addr().Interface().(*ctdf.Service)
+		for _, rule := range serviceBranding {
+			rule.Apply(service)
 		}
 	}
 

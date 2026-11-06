@@ -19,7 +19,6 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -547,6 +546,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			return nil, ""
 		}
 
+		if alias := dataset.OperatorAliases[operatorRef]; alias != "" {
+			operatorRef = alias
+		}
+
 		ctdfService := &ctdf.Service{
 			PrimaryIdentifier: serviceID,
 			OtherIdentifiers: []string{
@@ -565,8 +568,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			SecondaryBrandColour: r.TextColour,
 			TransportType:        convertTransportType(r.Type),
 		}
-
-		transforms.Transform(ctdfService, 1, "gb-dft-bods-gtfs-schedule")
 
 		g.ctdfServices[r.ID] = ctdfService
 
@@ -876,19 +877,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				pathTrackCache.Put(patternHash, false)
 			}
 		}
-
-		// TODO fix transforms here
-		// transforms.Transform(journey, 1, "gb-dft-bods-gtfs-schedule")
-		// if util.ContainsString([]string{
-		// 	"gb-noc-LDLR", "gb-noc-LULD", "gb-noc-TRAM", "gb-dft-bods-gtfs-schedule-operator-OPTEMP454",
-		// 	"gb-noc-ABLO", "gb-dft-bods-gtfs-schedule-operator-OP12046", "gb-noc-ALNO", "gb-noc-ALSO", "gb-dft-bods-gtfs-schedule-operator-OPTEMP450", "gb-dft-bods-gtfs-schedule-operator-OP11684",
-		// 	"gb-noc-ELBG", "gb-dft-bods-gtfs-schedule-operator-OPTEMP456", "gb-dft-bods-gtfs-schedule-operator-OP3039", "gb-noc-LSOV", "gb-noc-LUTD", "gb-dft-bods-gtfs-schedule-operator-OP2974",
-		// 	"gb-noc-MTLN", "gb-noc-SULV",
-		// }, journey.OperatorRef) || (journey.OperatorRef == "gb-noc-UNIB" && util.ContainsString([]string{
-		// 	"gb-dft-bods-gtfs-schedule-service-14023", "gb-dft-bods-gtfs-schedule-service-13950", "gb-dft-bods-gtfs-schedule-service-14053", "gb-dft-bods-gtfs-schedule-service-13966", "gb-dft-bods-gtfs-schedule-service-13968", "gb-dft-bods-gtfs-schedule-service-82178",
-		// }, journey.ServiceRef)) {
-		// 	journey.OperatorRef = "gb-noc-TFLO"
-		// }
 
 		if dataset.SupportedObjects.Journeys {
 			// Insert one concrete journey for each frequency iteration. Frequency

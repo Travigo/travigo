@@ -1,58 +1,13 @@
 package manager
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
 
-	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
-	"gopkg.in/yaml.v3"
 )
 
 func GetRegisteredDataSources() []datasets.DataSource {
-	var registeredDatasources []datasets.DataSource
-
-	err := filepath.Walk("data/datasources/",
-		func(path string, fileInfo os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if !fileInfo.IsDir() {
-				log.Debug().Str("path", path).Msg("Loading transforms file")
-
-				extension := filepath.Ext(path)
-
-				if extension != ".yaml" {
-					return nil
-				}
-
-				transformYaml, err := os.ReadFile(path)
-				if err != nil {
-					return err
-				}
-
-				decoder := yaml.NewDecoder(bytes.NewReader(transformYaml))
-
-				for {
-					var datasource datasets.DataSource
-					if decoder.Decode(&datasource) != nil {
-						break
-					}
-
-					registeredDatasources = append(registeredDatasources, datasource)
-				}
-			}
-
-			return nil
-		})
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load datasources directory")
-	}
-
-	return registeredDatasources
+	return datasets.LoadDataSources()
 }
 
 func GetRegisteredDataSets() []datasets.DataSet {
@@ -62,6 +17,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 
 	for _, datasource := range registeredDatasources {
 		for _, dataset := range datasource.Datasets {
+			dataset.OperatorAliases = datasource.Overrides.AliasesFor(dataset.Identifier)
 			dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
 			dataset.DataSourceRef = datasource.Identifier
 			dataset.Provider = datasource.Provider
