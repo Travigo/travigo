@@ -164,8 +164,8 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				validFrom := time.Unix(int64(validFromTimestamp), 0)
 				validTo := time.Unix(int64(validToTimestamp), 0)
 
-				title := *entity.Alert.HeaderText.GetTranslation()[0].Text // TODO assume we only use the 1 translation
-				description := *entity.Alert.DescriptionText.GetTranslation()[0].Text
+				title := firstAlertTranslation(entity.Alert.HeaderText)
+				description := firstAlertTranslation(entity.Alert.DescriptionText)
 
 				hash := sha256.New()
 				hash.Write([]byte(alertType))
@@ -363,6 +363,15 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	checkQueueSize()
 
 	return datasets.DataImportReport{}, nil
+}
+
+func firstAlertTranslation(value *gtfs.TranslatedString) string {
+	for _, translation := range value.GetTranslation() {
+		if text := translation.GetText(); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 func checkQueueSize() {
