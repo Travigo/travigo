@@ -877,7 +877,6 @@ overrides:
       transporttypes: [Bus]
       set:
         description: "Thanet Loop serving Margate, Broadstairs and Ramsgate"
-        website: "https://www.stagecoachbus.com/about/south-east/margate"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-SCEK]
       services: ["UNI1"]
@@ -1455,14 +1454,12 @@ overrides:
       transporttypes: [Bus]
       set:
         description: "Walton on the Hill to Therfield School via Tadworth, Burgh Heath, Epsom Downs, Langley Vale, Epsom Hospital, Ashstead and St Andrew’s School."
-        website: "https://goaheadlondon.com/events-and-hire/school-routes/"
     - datasets: ["gb-dft-bods-gtfs-schedule-london"]
       operators: [gb-noc-LGEN]
       services: ["668"]
       transporttypes: [Bus]
       set:
         description: "North Cheam to St Andrew’s School via Ewell West, Epsom, Epsom Hospital and Ashstead."
-        website: "https://goaheadlondon.com/events-and-hire/school-routes/"
     # County route descriptions are current; the linked PDFs are older, so
     # link to the current council route directory instead of stale timetables.
     - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
@@ -1471,21 +1468,18 @@ overrides:
       transporttypes: [Bus]
       set:
         description: "Netherfield - Oakdale Road - Netherfield"
-        website: "https://www.nottinghamshire.gov.uk/transport/public-transport/nottsbus-connect"
     - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
       operators: [gb-noc-PVRN]
       services: ["774"]
       transporttypes: [Bus]
       set:
         description: "Netherfield - Gedling - Netherfield"
-        website: "https://www.nottinghamshire.gov.uk/transport/public-transport/nottsbus-connect"
     - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
       operators: [gb-noc-PVRN]
       services: ["775"]
       transporttypes: [Bus]
       set:
         description: "Netherfield - Stoke Bardolph - Burton Joyce - Stoke Bardolph - Netherfield"
-        website: "https://www.nottinghamshire.gov.uk/transport/public-transport/nottsbus-connect"
     # No dedicated official timetable page is published for N73. The current
     # TNDS-derived passenger timetable is recorded with provenance in the
     # evidence register; the source operator reference remains unresolved.
@@ -2468,7 +2462,6 @@ overrides:
       transporttypes: [Bus]
       set:
         description: 'Chelmsford - Hatfield Heath - Sheering - Harlow'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/59%2001-26.pdf"
     # Current First Bus Essex Airlink timetable for service X30.
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
@@ -2561,7 +2554,6 @@ overrides:
       transporttypes: [Bus]
       set:
         description: 'Colchester - Harwich via Ardleigh, Manningtree, Mistley, Bradfield, Wix, Great Oakley, Little Oakley and Dovercourt'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/102%20104%2007-26_0.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["170"]
@@ -2593,63 +2585,54 @@ overrides:
       transporttypes: [Bus]
       set:
         description: 'Colchester - Tollesbury via Layer de la Haye and Great Wigborough'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/50%2050A%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["50A"]
       transporttypes: [Bus]
       set:
         description: 'Colchester - Tollesbury via Layer de la Haye and Great Wigborough'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/50%2050A%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["50B"]
       transporttypes: [Bus]
       set:
         description: 'Colchester - Great Wigborough - Little Wigborough circular'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/Shoppers%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["79"]
       transporttypes: [Bus]
       set:
         description: 'Colchester - Smyths Green - Messing - Tiptree circular'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/Shoppers%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["85"]
       transporttypes: [Bus]
       set:
         description: 'Colchester - Layer de la Haye - Copford circular'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/Shoppers%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["47"]
       transporttypes: [Bus]
       set:
         description: 'Broomfield Hospital - Beaulieu Park - Springfield - Chelmsford - Moulsham'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/47%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["73"]
       transporttypes: [Bus]
       set:
         description: 'Chelmsford - Hatfield Peverel - Heybridge - Maldon'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/73%2073A%2073B%2004-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["73B"]
       transporttypes: [Bus]
       set:
         description: 'Chelmsford - Hatfield Peverel - Heybridge - Maldon'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/73%2073A%2073B%2004-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["332"]
       transporttypes: [Bus]
       set:
         description: 'Burnham - Maldon - Danbury - Chelmsford'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/31%20331%20332%20333%20375%2007-26.pdf"
     # Current First Bus Essex Basildon and Chelmsford shuttle route maps, 2026.
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
@@ -2657,28 +2640,24 @@ overrides:
       transporttypes: [Bus]
       set:
         description: 'Hullbridge - Rayleigh - Hadleigh - Benfleet - Canvey Island'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/27%2005-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["28"]
       transporttypes: [Bus]
       set:
         description: 'Southend - Westcliff - Leigh - Hadleigh - Pitsea - Basildon'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/28%2005-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["B3"]
       transporttypes: [Bus]
       set:
         description: 'Basildon Hospital - Whitmore Way - Felmores - Pitsea Tesco'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/B3%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["C1"]
       transporttypes: [Bus]
       set:
         description: 'Galleywood - Chelmsford - Broomfield Hospital'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/C1%2007-26.pdf"
     # Current First Bus Essex Park & Ride and school timetable routes, November 2026.
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
@@ -2711,14 +2690,12 @@ overrides:
       transporttypes: [Bus]
       set:
         description: 'Chelmsford - Ongar - Harlow'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/19A%2007-26.pdf"
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
       services: ["B5"]
       transporttypes: [Bus]
       set:
         description: 'Basildon Bus Station - Festival Leisure Park - Endeavour Drive - Gardiners Lane South'
-        website: "https://www.firstbus.co.uk/sites/default/files/public/maps/B5%2001-26.pdf"
     # Current First Bus Essex timetables verify services 75, 520, 561, 620, 625, 80A, 80C and C6.
     - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
       operators: [gb-noc-FESX]
@@ -3065,7 +3042,6 @@ overrides:
             destination: "South Gosforth"
           - origin: "Sunderland"
             destination: "South Gosforth"
-        website: "https://travelnortheast.uk/ways-to-travel/metro/"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
       operators: ["gb-noc-NXMT"]
       services: ["YEL"]
@@ -3110,8 +3086,6 @@ overrides:
             destination: "South Shields"
           - origin: "Tynemouth"
             destination: "South Shields"
-        website: "https://travelnortheast.uk/ways-to-travel/metro/"
-
     - datasets: ["gb-dft-bods-gtfs-schedule-london"]
       operators: ["gb-noc-TFLO"]
       services: ["Bakerloo"]
@@ -3303,7 +3277,6 @@ overrides:
       services: ["DLR"]
       transporttypes: [Rail]
       set:
-        website: "https://tfl.gov.uk/modes/dlr/"
         routes:
           - origin: "Lewisham DLR Station"
             destination: "Stratford DLR Station"
@@ -4520,7 +4493,6 @@ overrides:
       set:
         servicename: "Blue Route"
         description: "Malin Bridge - Halfway via Sheffield city centre"
-        website: "https://www.travelsouthyorkshire.com/en-GB/supertram/blue-route"
         routes:
           - origin: "Malin Bridge"
             destination: "Halfway"
@@ -4533,7 +4505,6 @@ overrides:
       set:
         servicename: "Purple Route"
         description: "Cathedral - Herdings Park"
-        website: "https://www.travelsouthyorkshire.com/en-GB/supertram/purple-route"
         routes:
           - origin: "Cathedral"
             destination: "Herdings Park"
@@ -4546,7 +4517,6 @@ overrides:
       set:
         servicename: "Tram Train"
         description: "Cathedral - Rotherham Central and Parkgate"
-        website: "https://www.travelsouthyorkshire.com/en-GB/supertram/tram-train-route"
         routes:
           - origin: "Cathedral"
             destination: "Rotherham Central"
@@ -4563,7 +4533,6 @@ overrides:
       set:
         servicename: "Yellow Route"
         description: "Middlewood - Meadowhall via Sheffield city centre"
-        website: "https://www.travelsouthyorkshire.com/en-GB/supertram/yellow-route"
         routes:
           - origin: "Middlewood"
             destination: "Meadowhall"
@@ -4600,7 +4569,6 @@ overrides:
       set:
         servicename: "Inter-terminal shuttle"
         description: "Gatwick North Terminal - South Terminal"
-        website: "https://www.gatwickairport.com/At_the_Airport"
         routes:
           - origin: "North Terminal"
             destination: "South Terminal"
@@ -4631,7 +4599,6 @@ overrides:
       set:
         servicename: "Leadhills and Wanlockhead Railway"
         description: "Leadhills - Glengonnar (heritage railway round trip)"
-        website: "https://leadhillsrailway.co.uk/"
         routes:
           - origin: "Leadhills"
             destination: "Glengonnar"
@@ -4644,7 +4611,6 @@ overrides:
       set:
         servicename: "Glasgow Subway"
         description: "Inner and Outer circles through Glasgow city centre and West End"
-        website: "https://www.spt.co.uk/travel-with-spt/subway/maps-stations/"
         routes:
           - origin: "Govan"
             destination: "Govan"
@@ -4685,7 +4651,6 @@ overrides:
             destination: "Etihad Campus"
           - origin: "Victoria"
             destination: "Piccadilly"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Green Line"]
@@ -4718,7 +4683,6 @@ overrides:
             destination: "Bury"
           - origin: "Victoria"
             destination: "Altrincham"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Navy Line"]
@@ -4743,7 +4707,6 @@ overrides:
             destination: "Manchester Airport"
           - origin: "Victoria"
             destination: "Trafford Bar"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Pink Line"]
@@ -4792,7 +4755,6 @@ overrides:
             destination: "East Didsbury"
           - origin: "Victoria"
             destination: "Rochdale Town Centre"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Purple Line"]
@@ -4821,7 +4783,6 @@ overrides:
             destination: "Trafford Bar"
           - origin: "Trafford Bar"
             destination: "Etihad Campus"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Red Line"]
@@ -4850,7 +4811,6 @@ overrides:
             destination: "Crumpsall"
           - origin: "Trafford Bar"
             destination: "Deansgate-Castlefield"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
       operators: ["gb-noc-METL"]
       services: ["Yellow Line"]
@@ -4891,7 +4851,6 @@ overrides:
             destination: "Deansgate-Castlefield"
           - origin: "Trafford Bar"
             destination: "Piccadilly"
-        website: "https://tfgm.com/ways-to-travel/tram/network-map"
     # Current Stagecoach East Midlands route endpoints derived from exact exported GTFS route IDs.
     - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
       operators: ["gb-noc-SCEM"]
@@ -122879,6 +122838,676 @@ overrides:
       set:
         servicename: "X4 Express"
   servicebranding:
+    # Cambridge Park & Ride route colours from the official network map:
+    # https://cambridgeparkandride.info/downloads/networkmap.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["PR1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E72D57"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["PR2", "PR2F"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FF6500"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["PR3"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4382B3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["PR4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#92BF73"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["PR5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8547AC"
+    # Route-line colours sampled from the official First Bristol network map:
+    # https://www.firstbus.co.uk/sites/default/files/public/maps/Bristol%20Network%20Map.pdf
+    # Flat legend swatches were sampled from a 120 dpi render of the published map.
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["m1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E5007D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["m2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F39200"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["m3", "m3x"]
+      transporttypes: [Bus]
+      set:
+        colour: "#95C11F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["m4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#009FE3"
+    # The official Bristol map also publishes route-line colours for these
+    # First services. Values are sampled from flat legend swatches.
+    # https://www.firstbus.co.uk/sites/default/files/public/maps/Bristol%20Network%20Map.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["1", "2", "2a"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F9B122"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["3", "4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#5C2483"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#312783"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["6", "7"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C64641"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["8"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00673A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["16"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F39200"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["17"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B10055"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["19"]
+      transporttypes: [Bus]
+      set:
+        colour: "#2B5341"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["24"]
+      transporttypes: [Bus]
+      set:
+        colour: "#AFCA0B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["25"]
+      transporttypes: [Bus]
+      set:
+        colour: "#86328A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["36", "X1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E30613"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["37"]
+      transporttypes: [Bus]
+      set:
+        colour: "#878787"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["39", "X39"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00A2AB"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["41", "42", "43"]
+      transporttypes: [Bus]
+      set:
+        colour: "#AF0D21"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["44", "45"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8A1002"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["46", "47x", "48", "48x", "49", "49x"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00A7E0"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["50"]
+      transporttypes: [Bus]
+      set:
+        colour: "#798E0B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["70", "74"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D7007E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["72"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00A870"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["73"]
+      transporttypes: [Bus]
+      set:
+        colour: "#007C37"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["75", "76", "77"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0075BF"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["172", "374", "375", "376", "376a"]
+      transporttypes: [Bus]
+      set:
+        colour: "#06326E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["522"]
+      transporttypes: [Bus]
+      set:
+        colour: "#BA601F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["A1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4A96D2"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["T1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#247190"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["Y1", "Y2", "Y6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFDD00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["U1", "U1N", "U2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8B0D1B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["X4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#BB7CB3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["X6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#006C31"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-FBRI]
+      services: ["X9"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00A7E3"
+    # Supertram route colours sampled from the current official network map:
+    # https://www.travelsouthyorkshire.com/getmedia/9a81eda3-3d5d-4805-8441-1d9f4625a9a7/Supertram-Network-Map-March-2025-%28with-Key%29.pdf
+    # Values are the exact RGB pixels used by each flat route-line swatch.
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYFT]
+      services: ["BLUE"]
+      transporttypes: [Tram]
+      set:
+        colour: "#0D4D84"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYFT]
+      services: ["PURP"]
+      transporttypes: [Tram]
+      set:
+        colour: "#811874"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYFT]
+      services: ["YELL"]
+      transporttypes: [Tram]
+      set:
+        colour: "#FAB215"
+    # Coastliner 700, 701 and N700 share the current official navy brand:
+    # https://www.stagecoachbus.com/promos-and-offers/south/coastliner
+    # https://www.stagecoachbus.com/media-library/images/opcos/south/jh/coastliner-banner-479-x-174.ashx
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCSO]
+      services: ["700", "701", "N700"]
+      transporttypes: [Bus]
+      set:
+        colour: "#163760"
+    # First Greater Glasgow route-line colors sampled from its current map:
+    # https://www.firstbus.co.uk/sites/default/files/public/maps/First-Glasgow-Map-WEB-aug26.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["1", "1A", "1C", "1E", "X4", "201"]
+      transporttypes: [Bus]
+      set:
+        colour: "#782166"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#65B32E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["3"]
+      transporttypes: [Bus]
+      set:
+        colour: "#A96F24"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["4", "4A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#DD7500"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F7AC6F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F7A600"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["6A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EC6608"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["7", "7A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#009641"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["9", "9A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E50071"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["10"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EA5297"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["11", "11A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#2FAEE5"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["18", "18A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#CD1423"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["34"]
+      transporttypes: [Bus]
+      set:
+        colour: "#008F8D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["38", "38A", "38B", "38C", "38E"]
+      transporttypes: [Bus]
+      set:
+        colour: "#68C0B2"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["41"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFDD00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["57", "57A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#164194"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["60", "60A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#A1DAF8"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["61"]
+      transporttypes: [Bus]
+      set:
+        colour: "#6DC4E5"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["75"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F7E74D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["77"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0069B4"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["87", "88"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C3005D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["89", "89A", "89B"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C61A27"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["128"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D17B6E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["141"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4694B3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["240"]
+      transporttypes: [Bus]
+      set:
+        colour: "#009FE3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["267"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D39C0A"
+    # Current Airport Express 500 dark teal, aligned with its current livery
+    # and the route swatch on the August 2026 First Glasgow map.
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["500"]
+      transporttypes: [Bus]
+      set:
+        colour: "#1B525D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-FGLA]
+      services: ["X3", "X11", "X25", "X25A", "X43", "X44", "X85", "X87"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B7A46F"
+    # First Norwich route-line colors sampled from its August 2026 network map:
+    # https://www.firstbus.co.uk/sites/default/files/public/maps/Norwich_Network_Map_WEB_08-26%20%281%29.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["11", "11A", "12"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F599B1"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["14", "15", "16"]
+      transporttypes: [Bus]
+      set:
+        colour: "#03953F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["20", "21"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F15A29"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["23", "23A", "24", "24A", "24B"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ED1D24"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["25", "26", "26A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#009FDB"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["28", "29", "X29"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFE600"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["36", "36A", "36B", "37", "38", "38A", "38B"]
+      transporttypes: [Bus]
+      set:
+        colour: "#812990"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["40", "40A", "41", "41A", "X41"]
+      transporttypes: [Bus]
+      set:
+        colour: "#475461"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-FECS]
+      services: ["30"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4F5881"
+    # East Yorkshire Anlaby and Beverley route-line swatches, sampled from
+    # the current official maps linked from the operator's route pages.
+    # https://images-eyms.passenger-website.com/downloads/Anlaby%20Road%20map%20v3.pdf
+    # https://images-eyms.passenger-website.com/downloads/Beverley%20Road%20Map%20v2.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["51"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00ADEF"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["52"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8D198F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["53", "41"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EC008C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["54", "43"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F68712"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["55"]
+      transporttypes: [Bus]
+      set:
+        colour: "#5D1217"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["56", "X46", "X47"]
+      transporttypes: [Bus]
+      set:
+        colour: "#BF1B2C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["57"]
+      transporttypes: [Bus]
+      set:
+        colour: "#BF935B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["58"]
+      transporttypes: [Bus]
+      set:
+        colour: "#1D6434"
+    # Stagecoach Hull route colors sampled from its current September 2026 map:
+    # https://tiscon-maps-stagecoachbus.s3.amazonaws.com/RouteMaps/East%20Midlands/Hull%20Map%20September%202026.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["1", "1A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F25C19"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#22823D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["13"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FBC707"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["14"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EC008C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["15"]
+      transporttypes: [Bus]
+      set:
+        colour: "#859B2A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["16"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8677C3"
+    # Stagecoach Dundee route colors sampled from the official network map:
+    # https://tiscon-maps-stagecoachbus.s3.amazonaws.com/RouteMaps/East%20Scotland/ESCOT_MAP_DundeeCity.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["20", "20C"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFD41F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["21", "21A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F08262"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["22"]
+      transporttypes: [Bus]
+      set:
+        colour: "#A71681"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["41", "42", "46", "99"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00142E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["57"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F4AACC"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["59"]
+      transporttypes: [Bus]
+      set:
+        colour: "#007B3D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["72"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B71B56"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["73"]
+      transporttypes: [Bus]
+      set:
+        colour: "#76B82A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["X7"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F9AE00"
+    # Stagecoach Dundee map (current official page links this Feb 2025 map):
+    # https://www.stagecoachbus.com/promos-and-offers/east-scotland/dundee-buses
+    # https://tiscon-maps-stagecoachbus.s3.amazonaws.com/RouteMaps/East%20Scotland/ESCOT_MAP_DundeeCity.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["16", "16B"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C98627"
+    # Official Bedfordshire network map, May 2026; exact flat badge swatches:
+    # https://www.stagecoachbus.com/promos-and-offers/east/bedford-new-network
+    # https://tiscon-maps-stagecoachbus.s3.amazonaws.com/RouteMaps/East/NETWORK%20MAPS/Bedfordshire%20Network%20-%20MAY26.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["28"]
+      transporttypes: [Bus]
+      set:
+        colour: "#36944E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SCCM]
+      services: ["905"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4895D5"
     # Lothian Buses' current city route list uses the Lothian operator brand.
     # Keep this fallback on those published day routes only; Airlink and
     # NightBus are separate passenger-facing brands and remain neutral unless
@@ -122919,6 +123548,1259 @@ overrides:
       fallback: true
       set:
         colour: "#368BFF"
+    # Estimated Bee Network yellow badge from the published livery paint code
+    # NCS S-1050-Y, using NCS's approximate digital sample (#F6D65B).
+    # Current network identity: https://tfgm.com/the-bee-network
+    # Livery paint-code source copy: https://www.scribd.com/document/720878366/Bee-Network-Bus-Livery-Pack
+    # NCS digital sample: https://ncscolour.com/products/s-1050-y
+    # This shared fallback covers NW Bee-branded services across TfGM's contracted operators.
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
+      operators: [gb-noc-BNML, gb-noc-BNVB, gb-noc-BNSM, gb-noc-BNGN, gb-noc-BNDB]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F6D65B"
+    # Approximate flat route-badge swatches sampled from Stagecoach's current
+    # Grimsby map (September 2026); these are raster estimates, not published HEX:
+    # https://www.stagecoachbus.com/promos-and-offers/east-midlands/grimsby-services
+    # https://www.stagecoachbus.com/media-library/files/east-midlands/maps/current-maps/emid-grimsby-map-september-2026.ashx
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["2", "20"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F32F9D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["3", "4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B8DC20"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["5M", "5B", "5S"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FBA90D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["7"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00B5AE"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["8"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFF100"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["9", "10"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F3352F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["12"]
+      transporttypes: [Bus]
+      set:
+        colour: "#988DCE"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["53", "53A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8F3C94"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-SCEM]
+      services: ["250", "251"]
+      transporttypes: [Bus]
+      set:
+        colour: "#1784CC"
+    # Approximate route-badge colors sampled from the current 2026 East Kent map:
+    # https://www.stagecoachbus.com/promos-and-offers/south-east/cccu-unirider
+    # https://www.stagecoachbus.com/media-library/images/opcos/south-east/2026/university-pages/east-kent-network-map.ashx
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["1X"]
+      transporttypes: [Bus]
+      set:
+        colour: "#488BC7"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["8", "8A", "10"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F89363"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["12"]
+      transporttypes: [Bus]
+      set:
+        colour: "#6BC689"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["15"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00AA75"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["16"]
+      transporttypes: [Bus]
+      set:
+        colour: "#64BE9F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["17"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D2E289"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["81"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FCB970"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["82"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C84786"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["91"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C2A093"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["93"]
+      transporttypes: [Bus]
+      set:
+        colour: "#A995BF"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["100"]
+      transporttypes: [Bus]
+      set:
+        colour: "#2CAAC9"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["102"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F3869D"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["400"]
+      transporttypes: [Bus]
+      set:
+        colour: "#45C3DB"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["401"]
+      transporttypes: [Bus]
+      set:
+        colour: "#038090"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["600"]
+      transporttypes: [Bus]
+      set:
+        colour: "#A4DDE2"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["601"]
+      transporttypes: [Bus]
+      set:
+        colour: "#5169B3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-SCEK]
+      services: ["602"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ABBAE0"
+    # Approximate colors visually sampled from the official Nexus Metro map;
+    # no digital HEX values are published.
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-NXMT]
+      services: ["GRN"]
+      transporttypes: [Metro]
+      set:
+        colour: "#3FBA5A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-NXMT]
+      services: ["YEL"]
+      transporttypes: [Metro]
+      set:
+        colour: "#FFB63A"
+    # Sheffield route-line swatches sampled from the current Travel South Yorkshire map:
+    # https://www.travelsouthyorkshire.com/getmedia/e920a132-4ae5-4162-b57c-f0edabf6a0d2/DGNM-SHEFFIELD_SEPT-2026-WEB.pdf?ext=.pdf
+    # Adapted as approximate badge colors; they do not specify vehicle livery.
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["120"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FAA634"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["18", "18A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EC008C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["20"]
+      transporttypes: [Bus]
+      set:
+        colour: "#AEC5E7"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["207", "X5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#969897"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["24", "25"]
+      transporttypes: [Bus]
+      set:
+        colour: "#005581"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["47", "48"]
+      transporttypes: [Bus]
+      set:
+        colour: "#5A481C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["51"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FFDD00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["52A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EF4135"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["56"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ED1D24"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["61", "62"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ED1261"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["70A", "X1", "X2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#808285"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["73"]
+      transporttypes: [Bus]
+      set:
+        colour: "#005BAA"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["75"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C2A204"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["76", "76A", "76E"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B62F25"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["8", "8A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D7DF23"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["81", "82"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C78FBF"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["83"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0072BC"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["86"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8DC63F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["95"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8FB73E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["97", "98"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C9252C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["9A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#CB7D65"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["X11"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00B6DE"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FSYO]
+      services: ["X3"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B55594"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["10A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#872175"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["120"]
+      transporttypes: [Bus]
+      set:
+        colour: "#FAA634"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["137", "137A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F79679"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["20"]
+      transporttypes: [Bus]
+      set:
+        colour: "#AEC5E7"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["218"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8781BD"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["32"]
+      transporttypes: [Bus]
+      set:
+        colour: "#83272A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["52"]
+      transporttypes: [Bus]
+      set:
+        colour: "#EF4135"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["57", "57A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C2A204"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#CE9F9A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["61", "62"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ED1261"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["7"]
+      transporttypes: [Bus]
+      set:
+        colour: "#6B7415"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["8", "8A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#D7DF23"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["83"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0072BC"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["86"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8DC63F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["88"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00A651"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["9"]
+      transporttypes: [Bus]
+      set:
+        colour: "#CB7D65"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["95"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8FB73E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SYRK]
+      services: ["M35"]
+      transporttypes: [Bus]
+      set:
+        colour: "#577E73"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SCEM]
+      services: ["62"]
+      transporttypes: [Bus]
+      set:
+        colour: "#ED1261"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SCEM]
+      services: ["70"]
+      transporttypes: [Bus]
+      set:
+        colour: "#808285"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SCEM]
+      services: ["81", "82"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C78FBF"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-SCEM]
+      services: ["83"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0072BC"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["20"]
+      transporttypes: [Bus]
+      set:
+        colour: "#AEC5E7"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["30", "30A"]
+      transporttypes: [Bus]
+      set:
+        colour: "#72A581"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["31"]
+      transporttypes: [Bus]
+      set:
+        colour: "#006C67"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["32"]
+      transporttypes: [Bus]
+      set:
+        colour: "#83272A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#70845C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["9"]
+      transporttypes: [Bus]
+      set:
+        colour: "#CB7D65"
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TMTL]
+      services: ["M76"]
+      transporttypes: [Bus]
+      set:
+        colour: "#B62F25"
+    # Approximate Stagecoach's new dark-blue fleet identity from its official
+    # press image. This is a low-confidence screen estimate, not a published
+    # paint code; route-map colors above remain in force where available.
+    # https://media.stagecoachgroup.com/news/stagecoach-rolls-out-new-look-buses-across-its-network
+    - datasets: ["gb-dft-bods-gtfs-schedule-*"]
+      operators: [gb-noc-SCFI, gb-noc-SCEM, gb-noc-SCEK, gb-noc-SCMY, gb-noc-SCCU, gb-noc-SCNH, gb-noc-SCSO, gb-noc-SCNE, gb-noc-SCGL, gb-noc-SCCM, gb-noc-SYRK, gb-noc-SSWL, gb-noc-STWS, gb-noc-SDVN, gb-noc-SBLB]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#16283F"
+    # Hertford H1-H6 map colors are sampled estimates from the official June
+    # 2026 network map; preserve these named route colors over the operator hue.
+    # https://www.central-connect.co.uk/h-is-for-hertford
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F82000"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00B050"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H3"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F89048"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F8B800"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#8040A0"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-TMSB]
+      services: ["H6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#00B8F0"
+    # Central Connect's fleet is usually blue; estimate the service badge color
+    # from current fleet imagery, preserving named map colors above.
+    # https://www.central-connect.co.uk/eeg/one/
+    # https://www.alexander-dennis.com/26-new-alexander-dennis-buses-for-central-connect-as-vectare-becomes-transport-made-simple/
+    - datasets: ["gb-dft-bods-gtfs-schedule-*"]
+      operators: [gb-noc-KCTB, gb-noc-HEDO, gb-noc-TMSB]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#30A8E8"
+    # Go North East identifies these 14 current services as X-lines. Estimate
+    # the badge from the shared gold livery; route accents remain service-specific.
+    # https://www.gonortheast.co.uk/x-lines/
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["X1", "X1A", "X1B", "X5", "X15", "X10", "X30", "X31", "X32", "X21", "X45", "X70", "X71", "X71A", "X72", "X73"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C9A04A"
+    # Stephensons' current fleet is green-and-white; estimate a badge color
+    # from the published current fleet photo, preserving any feed route color.
+    # https://www.alexander-dennis.com/stephensons-of-essex-upgrades-fleet-with-nine-new-single-deck-enviro200-buses-from-alexander-dennis/
+    - datasets: ["gb-dft-bods-gtfs-schedule-*"]
+      operators: [gb-noc-SESX]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#40B820"
+    # Approximate the Airlink 100 blue from the official Lothian brand guide's
+    # Pantone 540 C specification; this is a screen estimate, not a published HEX.
+    # https://www.lothianbuses.com/wp-content/uploads/2022/01/BrandGuidelines_January_2022.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-LOTH]
+      services: ["100"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#002F5F"
+    # Nottingham City Transport publishes these service-family color names.
+    # HEX values are approximate badge colors because no numeric palette is published.
+    # https://apps.nctx.co.uk/services
+    # https://apps.nctx.co.uk/Timetable-Changes-11-January-2026
+    # https://www.nctx.co.uk/june26change
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["1", "1A", "1B", "1E", "4", "48", "48A"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#142B55"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["5", "5A", "6", "7", "8", "9", "9B", "10", "10A", "10C", "11", "11C", "12", "12C", "12E"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#00843D"
+    # https://www.nctx.co.uk/node/638
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["15", "16", "17"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#795548"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["25", "25B", "27"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#8E5AA7"
+    # Current June 2026 review names Pathfinder 26; 90 is also published as Pathfinder.
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["26", "26A", "90"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#70A83B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["28", "30"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D9468F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["34", "34C", "35", "35A", "35B", "36"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F58220"
+    # https://www.nctx.co.uk/CityHop
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["39", "40", "40A", "41", "42"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1976B9"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["43", "44", "44A", "45", "45B"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C62838"
+    # https://www.nctx.co.uk/node/638
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["53", "54", "55"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#6B7075"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["56", "58", "59"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#84BD00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["60", "61"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1EA5D7"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["68", "68A", "69", "69A", "69B", "70", "70B", "71", "71B"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F2C500"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["77", "77C", "78", "78A", "78B", "79", "79B"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#00A6A6"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-midlands"]
+      operators: [gb-noc-NCTR]
+      services: ["87", "88", "89"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#7040A0"
+    # Sanders fleet branding uses orange with blue/white stripes. The screen
+    # color is an estimate; keep current yellow Coasthopper buses distinct.
+    # https://www.sanderscoaches.com/our-people
+    # https://www.sanderscoaches.com/full-sized-coach-hire
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SNDR]
+      services: ["CH1"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E6B82F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SNDR]
+      services: ["CH2"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E6B82F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-east-anglia"]
+      operators: [gb-noc-SNDR]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C84800"
+    # Brighton & Hove's gradual fleet refresh introduces a teal and aqua livery.
+    # Estimate the teal primary hue for ordinary services; keep named brands
+    # such as Coaster, Regency, Breeze, night buses, and school routes distinct.
+    # https://www.buses.co.uk/Brand-Refresh
+    # https://images-brightonhove.passenger-website.com/inline-images/MicrosoftTeams-image_0.png
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-BHBC]
+      services: ["1", "1X", "2", "2B", "3X", "5", "5A", "5B", "6", "7", "20", "21", "22", "23", "24", "25", "25X", "26", "46", "48", "49", "59", "59A", "60", "71", "71A"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#008D95"
+    # NightBus branding is red text on black; approximate the named colors for
+    # the current Lothian City NightBus routes. No digital badge HEX is published.
+    # https://www.lothianbuses.com/our-services/nightbus/
+    # https://www.lothianbuses.com/our-services/nightbus/celebrating-100-years-of-nightbuses/
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-LOTH]
+      services: ["N1", "N3", "N11", "N14", "N16", "N25", "N26", "N30", "N31", "N35", "N37", "N44"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#101010"
+        secondarycolour: "#E8403A"
+    # Diamond consolidates its former regional divisions under one blue identity.
+    # Approximate the unified brand accent; no digital badge HEX is published.
+    # https://www.diamondbuses.com/about-us/diamond-bus/
+    - datasets: ["gb-dft-bods-gtfs-schedule-*"]
+      operators: [gb-noc-DIAM]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#0077B5"
+    # The current public network is West Midlands Bus; estimate a red badge from
+    # its red/grey identity and the inherited regional fleet palette.
+    # https://westmidlandsbus.co.uk/west-midlands/services-timetables
+    # https://westmidlandsbus.co.uk/west-midlands/news/mobico-group-announced-that-it-has-reached-an-agreement-to-sell-our-national-express-bus-business
+    # https://nxbus.co.uk/media/11922/toybusnxwmgreytransparency.png
+    - datasets: ["gb-dft-bods-gtfs-schedule-west-midlands"]
+      operators: [gb-noc-TNXB]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C8102E"
+    # Estimate Angel 21's green badge from Go North East's current Angel
+    # electric-bus livery. No route-badge HEX is published.
+    # https://www.gonortheast.co.uk/clean-travel-takes-centre-stage-our-electric-bus-launch
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["21"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#5D9F45"
+    # Estimate Cityrider 56's badge from the official orange-and-red fleet livery.
+    # https://www.gonortheast.co.uk/services/GNE/56
+    # https://images-gonortheast.passenger-website.com/downloads/Fleet%20Archive%20-%207%20January%202024-v2.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["56"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D75B2D"
+    # Estimate the Transport for Cornwall badge background from its 2025
+    # primary red brand palette and the current red fleet livery. Keep this
+    # scoped to TFCN; PLYC routes use a separate operator identity.
+    # https://www.transportforcornwall.co.uk/fleet-list
+    # https://www.scribd.com/document/1075232475/TfC-Brand-Guidelines-2025
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-TFCN]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#DA291C"
+    # Estimate named Go North East brand badge colours from current operator
+    # route branding and official fleet imagery; no digital badge HEX is
+    # published. Keep unrelated routes and other operators out of scope.
+    # https://www.gonortheast.co.uk/services/GNE/16
+    # https://newsroom.gonortheast.co.uk/news/ps1-dot-6m-investment-in-new-buses-for-durham-diamond-221675
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["16", "16A", "16B"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1685C2"
+    # https://www.gonortheast.co.uk/services/GNE/20
+    # https://images-gonortheast.passenger-website.com/downloads/20%20-%2026th%20Oct%2025.pdf
+    # https://images-gonortheast.passenger-website.com/downloads/65%20-%2026th%20Oct%2025.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["20", "20A", "65"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#702F8A"
+    # Estimate River Rapids badge blue from the current official X40/NX40 fleet
+    # imagery. The operator publishes no digital badge HEX; keep the rule on
+    # these named routes rather than applying it to Thames Travel's mixed fleet.
+    # https://www.oxfordbus.co.uk/river-rapids
+    # https://www.oxfordbus.co.uk/service-changes-22nd-feb-26
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-THTR]
+      services: ["X40", "NX40"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#0086B3"
+    # Estimate the Greenline 757 badge from the current official coach imagery.
+    # No digital badge HEX is published; both bus and coach feed identities use
+    # the same passenger-facing Greenline route brand.
+    # https://www.arrivabus.co.uk/airport-services/greenline
+    # https://www.route-one.net/news/arriva-retains-greenline-757-coach-contract-for-at-least-five-years/
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-ARBB]
+      services: ["757"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#176B48"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-GLAR]
+      services: ["757"]
+      transporttypes: [Coach]
+      fallback: true
+      set:
+        colour: "#176B48"
+    # Gold 38 is named on Stagecoach's current local Gold page. Estimate the
+    # badge blue from its blue-and-gold livery; 38A is not included in this brand.
+    # https://www.stagecoachbus.com/promos-and-offers/merseyside-and-south-lancashire/stagecoach-gold
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
+      operators: [gb-noc-MNSC]
+      services: ["38"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#16283F"
+    # Estimate Plymouth Citybus red for its separate PLYC feed identity. The
+    # current fleet imagery is red; no digital service-badge HEX is published.
+    # https://www.plymouthbus.co.uk/fleet-list
+    # https://www.plymouthbus.co.uk/advertising
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-west"]
+      operators: [gb-noc-PLYC]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C8102E"
+    # Coaster 301 retains its named route brand on the current official fleet
+    # listing; estimate the blue badge from the route's official fleet livery.
+    # https://www.gonortheast.co.uk/fleet-list
+    # https://www.gonortheast.co.uk/services/GNE/301
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["301"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#0077B5"
+    # Estimate Cardiff Bus badge backgrounds from the current orange fleet
+    # rebrand, applied across its full portfolio. No digital badge HEX is
+    # published; retain the user-requested approximate paint-derived colour.
+    # https://passenger.tech/news/cardiff-bus-rebrands-ahead-of-120th-anniversary/
+    # https://www.cardiffbus.com/cardiff-bus-story
+    - datasets: ["gb-dft-bods-gtfs-schedule-wales"]
+      operators: [gb-noc-CBUS]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F57C21"
+    # Estimate standard Compass Travel badges from the maroon-and-white fleet
+    # livery. Exclude the distinct Citybuzz routes until a badge palette is
+    # established for that separate brand.
+    # https://www.alexander-dennis.com/compass-travel-takes-its-first-ever-new-enviro400-double-deckers-from-alexander-dennis/
+    # https://compass-travel.co.uk/bus-timetables/
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-COMT]
+      services: ["100", "106", "119", "12", "120", "121", "122", "123", "125", "126", "127", "128", "145", "166", "167", "168", "18", "19", "19A", "225", "227", "228", "23", "231", "24", "25", "26", "30", "31", "318", "31A", "31B", "32", "33", "331", "33A", "35A", "35C", "37C", "38", "39", "42", "43", "45", "468", "62", "625", "64", "662", "66A", "66C", "67", "69", "71", "74", "740", "743", "74A", "74B", "8", "85", "85A", "89", "8A", "900", "99"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#74243A"
+    # Estimate the three services explicitly identified in Carousel's current
+    # announcement as having a bespoke purple vehicle livery. Other new buses
+    # in that announcement are not identified as part of this purple group.
+    # https://www.carouselbuses.co.uk/carousel-buses-invests-nine-new-low-emission-vehicles
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-CSLB]
+      services: ["3", "4", "9"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#713B9C"
+    # First's current LeedsCity page identifies route 5 as its dedicated
+    # green-bus service. Estimate the badge background from that route livery;
+    # no digital HEX value is published. Scope it to the Yorkshire feed and
+    # preserve any publisher-supplied colour.
+    # https://www.firstbus.co.uk/west-yorkshire/route-5
+    # https://www.firstbus.co.uk/west-yorkshire/leedscity
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-FLDS]
+      services: ["5"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#00843D"
+    # Estimate the Airlink badge background from the dedicated blue fleet.
+    # X10/X20/X30 are current Essex Airlink services; route 320 is an X20
+    # Airlink school variation. No digital service-badge HEX is published.
+    # https://www.firstbus.co.uk/essex/airlink
+    # https://www.firstbus.co.uk/essex/news-and-service-updates/news/first-bus-offers-overnight-options-x20-service-stansted-airport
+    # https://www.firstbus.co.uk/essex/honywood-school
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-FESX]
+      services: ["X10", "X20", "X30", "320"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#005A9C"
+    # Metrobus' current Gatwick spider map gives these routes distinct
+    # passenger-facing line colours. Approximate HEX values below are based
+    # on the map's named swatches; preserve publisher-supplied route colours.
+    # https://www.metrobus.co.uk/maps/430
+    # https://www.metrobus.co.uk/services
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["1"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#8BC34A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["2"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#173F8A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["3"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#B39DDB"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["4", "5"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D32F2F"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["10"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#EF6C00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["20"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1976D2"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["21"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#388E3C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["22"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#757575"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["23"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E91E63"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["84"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#BCAAA4"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["100"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#43A047"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["200"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#C2185B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["271"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#00897B"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["272"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1565C0"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["273"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#9575CD"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["281"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#512DA8"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["291"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#1B5E20"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["400"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#64B5F6"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["424"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#7E57C2"
+    - datasets: ["gb-dft-bods-gtfs-schedule-south-east"]
+      operators: [gb-noc-METR]
+      services: ["460"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E53935"
+    # Sunderland District routes retain their official named color brands.
+    # Approximate badge HEX values from the operator's published paint colors;
+    # no digital service-badge values are published.
+    # https://newsroom.gonortheast.co.uk/news/better-fares-and-revitalised-buses-launched-across-the-city-of-sunderland-to-aid-the-regions-recovery-431969
+    # https://www.gonortheast.co.uk/service-changes-3-september-2023
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["2"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D95A9C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["33"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#A7ADB4"
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["35"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#7A1E3A"
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["61"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#006DAA"
+    # Tyne Valley Ten services 10/10A/10B share the current green branded
+    # fleet. Estimate a badge HEX from the current operator imagery; no
+    # digital route badge value is published.
+    # https://www.gonortheast.co.uk/services/GNE/10
+    # https://www.gonortheast.co.uk/go-north-east-serve-tyneview-retail-park-prudhoe-2-january
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["10", "10A", "10B"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#2F9E44"
+    # Stagecoach's current East Scotland JET747 and JET787 airport services
+    # share the white-and-purple JET livery. Estimate the badge HEX from the
+    # current fleet image; no digital route badge value is published.
+    # https://www.stagecoachbus.com/promos-and-offers/east-scotland/jet-747-edinburgh-airport-bus
+    # https://www.stagecoachbus.com/promos-and-offers/east-scotland/go-to-dunfermline-by-bus
+    - datasets: ["gb-dft-bods-gtfs-schedule-scotland"]
+      operators: [gb-noc-SCFI]
+      services: ["747", "787"]
+      transporttypes: [Bus]
+      set:
+        colour: "#714A98"
+    # Go North East's VOLTRA 53/54 services share green-accented silver
+    # electric buses. Estimate a badge HEX from the operator's published fleet
+    # image; no digital service badge HEX is published.
+    # https://www.gonortheast.co.uk/go-north-east-launches-game-changing-electric-buses-newcastle-and-gateshead
+    # https://www.gonortheast.co.uk/services
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["53", "54"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4F9A54"
+    # Team Pennine's published fleet standard is bright pink. Estimate the
+    # dominant badge color from its current fleet image; preserve any feed
+    # route color.
+    # https://www.transdevbus.co.uk/brands/team-pennine
+    # https://www.transdevbus.co.uk/media/ixtan50d/talk-for-screens-feb25-2.pdf
+    # https://www.transdevbus.co.uk/team-pennine/careers/team-pennine-driver/
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-TPEN]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D83B8F"
+    # TrawsCymru T1 variants share the orange brand used on TfW's current bus
+    # network map. Estimate a HEX from that published route-map swatch.
+    # Apply to raw GTFS route numbers before passenger-facing name overrides.
+    # https://traws.cymru/en/services
+    # https://tfw.wales/sites/default/files/2025-12/TfW-bus-network-map-02.12.2025_BIL.pdf
+    - datasets: ["gb-dft-bods-gtfs-schedule-wales"]
+      operators: [gb-noc-FCYM]
+      services: ["T1", "T1A", "T1X"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E8751A"
+    # East Yorkshire's current Coaster brand covers these Scarborough routes.
+    # Estimate a deep blue badge from the current yellow/blue/red fleet image.
+    # https://www.eastyorkshirebuses.co.uk/services/coaster
+    # https://www.eastyorkshirebuses.co.uk/ride-every-day-coaster-12-13-back-new-season
+    - datasets: ["gb-dft-bods-gtfs-schedule-yorkshire"]
+      operators: [gb-noc-EYMS]
+      services: ["12", "12A", "12C", "13", "14"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#00789A"
+    # Tynedale Links routes share the yellow branded fleet shown in current
+    # Go North East imagery. Estimate badge HEX from the livery; preserve feed
+    # colors when supplied.
+    # https://www.gonortheast.co.uk/services
+    # https://www.gonortheast.co.uk/hadrians-wall
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["74", "680", "681", "682", "683", "684", "686", "687", "688", "689", "691", "X85"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#E3B02B"
+    # Toon Tour's current seasonal sightseeing service uses a yellow and blue
+    # branded open-top bus. Estimate the badge from its dominant yellow livery.
+    # https://newsroom.gonortheast.co.uk/pressreleases/open-top-bus-tour-returns-this-weekend-with-25-percent-off-tickets-3383837
+    # https://www.gonortheast.co.uk/open-top-bus-winners
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["TOON"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F2C230"
+    # Go North East's Q3/Q3X fleet retains the yellow and black QuayCity
+    # livery. Estimate the badge from current route imagery; preserve feed
+    # colors and make no exact digital HEX claim.
+    # https://www.gonortheast.co.uk/services/GNE/Q3
+    # https://www.gonortheast.co.uk/Service-Changes-1-September
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-east"]
+      operators: [gb-noc-GNEL]
+      services: ["Q3", "Q3X"]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#D5A913"
+    # Warrington's Own Buses uses a uniform bright yellow fleet across its
+    # Metro Network services. Estimate the badge from current livery imagery;
+    # preserve any feed-supplied color.
+    # https://www.warrington.gov.uk/sites/default/files/2024-08/Warrington%20bus%20service%20improvement%20plan%20-%20June%202024.pdf
+    # https://www.warringtonsownbuses.co.uk/on-bus-fares
+    # https://oyoo.design/portfolio/warringtons-own-buses/
+    - datasets: ["gb-dft-bods-gtfs-schedule-north-west"]
+      operators: [gb-noc-WBTR]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#F2CC24"
+    # Newport Bus' current operator fleet is consistently green. Estimate a
+    # shared badge color from current fleet imagery and preserve feed colors.
+    # https://www.newportbus.co.uk/3080
+    # https://www.newportbus.co.uk/NewportBus-fleet-yutong-electric-buses
+    - datasets: ["gb-dft-bods-gtfs-schedule-wales"]
+      operators: [gb-noc-NWPT]
+      transporttypes: [Bus]
+      fallback: true
+      set:
+        colour: "#268A45"
 datasets:
 - identifier: naptan
   format: gb-naptan

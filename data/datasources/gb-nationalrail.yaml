@@ -12,6 +12,75 @@ overrides:
         colour: "#00286A"
         secondarycolour: "#FCF5D8"
         icon: "/icons/eurostar.webp"
+    # Current GWR site palette and logo asset:
+    # https://www.gwr.com/about-gwr
+    # https://www.gwr.com/img/logo-gwr.png
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-GW]
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#0A493E"
+    # ScotRail core blue from Scotland's 2023 identity guidelines:
+    # https://www.transport.gov.scot/media/5jcjdjmv/scotrail-guidelines-core-identity-p4-p13.pdf
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-SR]
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#002664"
+    # TfL Colour Standard lists the London Underground mode colour as RGB 0,25,168:
+    # https://content.tfl.gov.uk/tfl-colour-standard.pdf
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-LT]
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#0019A8"
+    # Approximate screen colors visually sampled from current official brand
+    # assets. These operators do not publish service-badge HEX values.
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-CS]  # Caledonian Sleeper
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#006B68"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-EM]  # East Midlands Railway
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#5B2C83"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-GC]  # Grand Central
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#F58220"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-HT]  # Hull Trains
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#0076A8"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-HX]  # Heathrow Express
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#592C82"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-LD]  # Lumo
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#009FE3"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-ME]  # Merseyrail
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#F2C900"
 datasets:
 - identifier: toc
   format: gb-nationalrailtoc
