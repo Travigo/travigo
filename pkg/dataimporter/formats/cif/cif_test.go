@@ -88,6 +88,7 @@ func TestCreateJourneyStoresPassingPathBetweenCalls(t *testing.T) {
 	}
 	cif := &CommonInterfaceFormat{}
 	journey := cif.CreateJourneyFromTraindef("test", &TrainDefinitionSet{
+		BasicSchedule:  BasicSchedule{PowerType: "DMU", TimingLoad: "156"},
 		OriginLocation: OriginLocation{Location: "ORIGIN"},
 		IntermediateLocations: []*IntermediateLocation{
 			{Location: "PASSING2", PublicArrivalTime: "0000"},
@@ -97,6 +98,9 @@ func TestCreateJourneyStoresPassingPathBetweenCalls(t *testing.T) {
 		},
 		TerminatingLocation: TerminatingLocation{Location: "END"},
 	})
+	if train := journey.DetailedRailInformation.Trains[0]; train.VehicleTypeName != "Class 156" || len(train.Carriages) != 0 {
+		t.Fatalf("scheduled train has incorrect class details or a layout without a known length: %+v", train)
+	}
 	if got := journey.GetStopRefs(); !reflect.DeepEqual(got, []string{"a", "b", "c"}) {
 		t.Fatalf("passenger stops = %v", got)
 	}

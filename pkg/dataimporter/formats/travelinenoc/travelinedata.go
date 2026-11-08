@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -215,6 +216,7 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 
 	log.Info().Msg("Converting to CTDF")
 	operators, operatorGroups := t.convertToCTDF()
+	applyOperatorMetadataOverrides(dataset, operators)
 	log.Info().Msgf(" - %d Operators", len(operators))
 	log.Info().Msgf(" - %d OperatorGroups", len(operatorGroups))
 
@@ -344,4 +346,21 @@ func (t *TravelineData) Import(dataset datasets.DataSet, datasource *ctdf.DataSo
 		ImportedStops:      int(operatorOperationInsert),
 		ImportedStopGroups: int(operatorGroupOperationInsert),
 	}, nil
+}
+
+func applyOperatorMetadataOverrides(dataset datasets.DataSet, operators []*ctdf.Operator) {
+	datasetIdentifier := dataset.Identifier
+	if dataset.DataSourceRef != "" {
+		datasetIdentifier = strings.TrimPrefix(dataset.Identifier, dataset.DataSourceRef+"-")
+	}
+	for _, operator := range operators {
+		for _, override := range dataset.OperatorMetadata {
+			if override.Matches(datasetIdentifier, operator.PrimaryIdentifier) {
+				override.Apply(operator)
+			}
+		}
+		// Multiple NOC lines can assign the same region to one operator.
+		// Keep the first occurrence while preserving the distinct source regions.
+		operator.Regions = util.RemoveDuplicateStrings(operator.Regions, []string{})
+	}
 }

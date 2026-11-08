@@ -35,11 +35,29 @@ type Schedule struct {
 	ctdfServices  map[string]*ctdf.Service
 	routeMap      map[string]Route
 	stopLocations map[string]ctdf.Location
+	stopNames     map[string]string
 	frequencies   map[string][]frequencyWindow
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
 	translationIndex map[string]string
+}
+
+type routeEndpointPair struct {
+	Origin      string
+	Destination string
+}
+
+func appendServiceRoute(service *ctdf.Service, seen map[routeEndpointPair]struct{}, origin, destination string) {
+	if service == nil || origin == "" || destination == "" {
+		return
+	}
+	pair := routeEndpointPair{Origin: origin, Destination: destination}
+	if _, exists := seen[pair]; exists {
+		return
+	}
+	seen[pair] = struct{}{}
+	service.Routes = append(service.Routes, ctdf.Route{Origin: origin, Destination: destination})
 }
 
 func validGTFSCoordinates(longitude, latitude float64) bool {
@@ -393,6 +411,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	//// Stops ////
 	g.stopLocations = map[string]ctdf.Location{}
+	g.stopNames = map[string]string{}
 	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
 		timezone := s.Timezone
 
@@ -401,13 +420,15 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, s.ID)
+		stopName := g.GetTranslation("stops", "stop_name", "en", s.Name)
+		g.stopNames[s.ID] = stopName
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier:    stopID,
 			OtherIdentifiers:     []string{stopID},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
 			DataSource:           datasource,
-			PrimaryName:          g.GetTranslation("stops", "stop_name", "en", s.Name),
+			PrimaryName:          stopName,
 			Descriptor:           s.Description,
 			Website:              s.URL,
 			LocationType:         s.Type,
@@ -750,6 +771,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	if dataset.SupportedObjects.Journeys {
 		journeysQueue.Process()
 	}
+	serviceRouteKeys := make(map[string]map[routeEndpointPair]struct{}, len(g.ctdfServices))
+	for routeID, service := range g.ctdfServices {
+		keys := make(map[routeEndpointPair]struct{}, len(service.Routes))
+		for _, route := range service.Routes {
+			keys[routeEndpointPair{Origin: route.Origin, Destination: route.Destination}] = struct{}{}
+		}
+		serviceRouteKeys[routeID] = keys
+	}
 
 	useGBAtcoStopRef := strings.Contains(dataset.Identifier, "gb-dft-bods-gtfs-schedule-")
 	datasetStopPrefix := fmt.Sprintf("%s-stop-", dataset.Identifier)
@@ -759,6 +788,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		if !exists {
 			log.Debug().Str("trip", tripID).Msg("Cannot find journey for this trip")
 			return nil
+		}
+		if len(stopTimes) > 1 {
+			appendServiceRoute(g.ctdfServices[trip.RouteID], serviceRouteKeys[trip.RouteID], g.stopNames[stopTimes[0].StopID], g.stopNames[stopTimes[len(stopTimes)-1].StopID])
 		}
 
 		journey := buildJourney(trip)
@@ -919,6 +951,28 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return nil
 	}); err != nil {
 		return datasets.DataImportReport{}, err
+	}
+	if dataset.SupportedObjects.Services {
+		serviceRoutesQueue := NewDatabaseBatchProcessingQueue("services_raw", 1*time.Second, 1*time.Minute, 1000)
+		serviceRoutesQueue.Process()
+		for _, service := range g.ctdfServices {
+			if len(service.Routes) == 0 {
+				continue
+			}
+			sort.Slice(service.Routes, func(i, j int) bool {
+				if service.Routes[i].Origin != service.Routes[j].Origin {
+					return service.Routes[i].Origin < service.Routes[j].Origin
+				}
+				return service.Routes[i].Destination < service.Routes[j].Destination
+			})
+			update, err := bson.Marshal(bson.M{"$set": bson.M{"routes": service.Routes}})
+			if err != nil {
+				return datasets.DataImportReport{}, err
+			}
+			model := mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": service.PrimaryIdentifier}).SetUpdate(update)
+			serviceRoutesQueue.Add(model)
+		}
+		serviceRoutesQueue.Wait()
 	}
 	gtfsTrips = nil
 

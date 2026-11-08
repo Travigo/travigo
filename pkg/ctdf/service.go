@@ -3,6 +3,8 @@ package ctdf
 import (
 	"io"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Service struct {
@@ -14,10 +16,11 @@ type Service struct {
 
 	DataSource *DataSourceReference `groups:"detailed,web-stop-detail,web-journey,web-service-detail"`
 
-	ServiceName string `groups:"basic,search,search-llm,stop-llm,departures-llm,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-board,web-journey,web-planner,web-service-summary,web-service-detail,web-saved,web-notification"`
-	Description string `groups:"detailed" bson:",omitempty"`
-	Website     string `groups:"detailed" bson:",omitempty"`
-	NetworkRef  string `groups:"detailed" bson:",omitempty"`
+	ServiceName          string  `groups:"basic,search,search-llm,stop-llm,departures-llm,web-stop-map,web-stop-search,web-stop-summary,web-stop-detail,web-board,web-journey,web-planner,web-service-summary,web-service-detail,web-saved,web-notification"`
+	PublisherServiceName *string `bson:",omitempty" json:"-"`
+	Description          string  `groups:"detailed" bson:",omitempty"`
+	Website              string  `groups:"detailed" bson:",omitempty"`
+	NetworkRef           string  `groups:"detailed" bson:",omitempty"`
 
 	OperatorRef string `groups:"basic,web-service-detail"`
 	// Operator *Operator
@@ -43,8 +46,24 @@ type Route struct {
 // Still not perfect as something like st pancras actually covers multiple coordinates
 func (service *Service) GenerateDeterministicID(writer io.Writer) {
 	writer.Write([]byte(service.OperatorRef))
-	writer.Write([]byte(service.ServiceName))
+	writer.Write([]byte(service.LineName()))
 	writer.Write([]byte(service.TransportType))
+}
+
+// LineName is the publisher's line name used for matching external feeds.
+func (service *Service) LineName() string {
+	if service.PublisherServiceName != nil {
+		return *service.PublisherServiceName
+	}
+	return service.ServiceName
+}
+
+// ServiceLineNameFilter matches a publisher line name on both enriched and older services.
+func ServiceLineNameFilter(name string) bson.M {
+	return bson.M{"$or": bson.A{
+		bson.M{"publisherservicename": name},
+		bson.M{"publisherservicename": bson.M{"$exists": false}, "servicename": name},
+	}}
 }
 
 func (service *Service) GetPrimaryIdentifier() string {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -72,11 +73,9 @@ func (r *SiriSX) IdentifyService() (string, error) {
 		return "", errors.New("Missing field linkedDataset")
 	}
 
-	servicesQuery := bson.M{
-		"servicename":          lineRef,
-		"operatorref":          fmt.Sprintf("gb-noc-%s", operatorRef),
-		"datasource.datasetid": linkedDataset,
-	}
+	servicesQuery := ctdf.ServiceLineNameFilter(lineRef)
+	servicesQuery["operatorref"] = fmt.Sprintf("gb-noc-%s", operatorRef)
+	servicesQuery["datasource.datasetid"] = linkedDataset
 
 	if strings.Contains(linkedDataset, "*") {
 		servicesQuery["datasource.datasetid"] = bson.M{"$regex": linkedDataset}

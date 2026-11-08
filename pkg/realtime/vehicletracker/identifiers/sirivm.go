@@ -58,6 +58,7 @@ func (i *SiriVM) getServices() []string {
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "primaryidentifier", Value: 1},
 		bson.E{Key: "servicename", Value: 1},
+		bson.E{Key: "publisherservicename", Value: 1},
 	})
 	operatorRefs := append([]string{i.Operator.PrimaryIdentifier}, i.Operator.OtherIdentifiers...)
 	operatorRefs = uniqueNonEmptyStrings(operatorRefs)
@@ -81,7 +82,7 @@ func (i *SiriVM) getServices() []string {
 			log.Error().Err(err).Str("serviceName", serviceName).Msg("Failed to decode service")
 		}
 
-		if sameServiceName(service.ServiceName, serviceName) {
+		if sameServiceName(service.LineName(), serviceName) {
 			services = append(services, service.PrimaryIdentifier)
 		}
 	}

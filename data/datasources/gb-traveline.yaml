@@ -3,6 +3,781 @@ region: gb
 provider:
   name: Traveline
   website: "https://www.travelinedata.org.uk/"
+overrides:
+  operatormetadata:
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137760"] # Stephensons of Essex
+      set:
+        website: "https://stephensonsofessex.com/"
+        email: "customerservices@stephensonsofessex.com"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135887", "gb-nocid-135888"] # Centrebus and Centrebus North
+      set:
+        website: "https://www.centrebus.info/"
+        email: "help@centrebus.co.uk"
+        phonenumber: "0116 410 5050"
+        address: "Customer Services Team, 43 Wenlock Way, Leicester, LE4 9HU"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135887"] # Centrebus Ltd legal name
+      set:
+        othernames:
+          - "Centrebus Ltd"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135888"] # Centrebus North Ltd legal name
+      set:
+        othernames:
+          - "Centrebus North Ltd"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138306"] # Go North West; operates Bee Network and Metro Network services
+      set:
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137004"] # Lothian Buses
+      set:
+        website: "https://www.lothianbuses.com/"
+        phonenumber: "01315556363"
+        address: "55 Annandale Street, Edinburgh EH7 4AZ"
+        othernames:
+          - "Lothian Buses Limited"
+        socialmedia:
+          Twitter: "@on_lothianbuses"
+        regions:
+          - "UK:REGION:SCOTLAND"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137430"] # Preston Bus
+      set:
+        website: "https://www.prestonbus.co.uk/"
+        email: "customer.care@rotala.co.uk"
+        phonenumber: "01772 253 671"
+        address: "Preston Bus Limited, 221 Deepdale Road, Preston, PR1 6NY"
+        socialmedia:
+          Twitter: "@PrestonBus"
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137625"] # Scottish Citylink
+      set:
+        phonenumber: "0141 352 4444"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136228"] # Scarborough & District / East Yorkshire
+      set:
+        website: "https://www.eastyorkshirebuses.co.uk/"
+        email: "busline@eyms.co.uk"
+        phonenumber: "01482 592929"
+        regions:
+          - "UK:REGION:YORKSHIRE"
+        socialmedia:
+          Twitter: "@EYBuses"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138393"] # FlixBus
+      set:
+        email: "info@flixbus.co.uk"
+        address: "Flixbus UK Ltd., First Floor, Templeback, 10 Temple Back, Bristol, United Kingdom, BS1 6FL"
+        phonenumber: "+44 (0)1491 502156"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137214"] # National Express Shuttle
+      set:
+        website: "https://www.nationalexpress.com"
+        address: "National Express House, Birmingham Coach Station, Mill Lane, Digbeth, Birmingham B5 6DD"
+        phonenumber: "03717 81 81 81"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136332"] # Stagecoach East Scotland
+      set:
+        website: "https://www.stagecoachbus.com/about/east-scotland"
+        email: "customer.services@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        address: "10 Dunkeld Road, Perth, PH1 5TW"
+        othernames:
+          - "Fife Scottish Omnibuses Limited"
+          - "Stagecoach in Fife"
+          - "Stagecoach in Perth"
+          - "Stagecoach Strathtay"
+          - "Rennies Coaches"
+        regions:
+          - "UK:REGION:SCOTLAND"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136485"] # Go North East
+      set:
+        website: "https://www.gonortheast.co.uk"
+        address: "Go North East, Customer Services, 117 Queen Street, Gateshead, Tyne and Wear, NE8 2UA"
+        phonenumber: "0191 420 5050"
+        regions:
+          - "UK:REGION:NORTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138528"] # Bee Network
+      set:
+        website: "https://tfgm.com/the-bee-network"
+        email: "hello@beenetwork.com"
+        address: "Transport for Greater Manchester, 2 Piccadilly Place, Manchester, M1 3BG"
+        phonenumber: "0161 244 1000"
+        socialmedia:
+          Twitter: "@beenetwork"
+        regions:
+          - "UK:REGION:NORTHWEST"
+          - "UK:REGION:EASTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137284"] # Nottingham City Transport
+      set:
+        website: "https://www.nctx.co.uk"
+        address: "Nottingham City Transport, NCT Travel Centre, 28-30 Lister Gate, Nottingham, NG1 7DD"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135637"] # Arriva North West
+      set:
+        website: "https://www.arrivabus.co.uk/locations/north-west"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Twitter: "@arrivanorthwest"
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135638"] # Arriva Midlands
+      set:
+        website: "https://www.arrivabus.co.uk/locations/midlands"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        regions:
+          - "UK:REGION:EASTMIDLANDS"
+          - "UK:REGION:WESTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136164"] # Diamond Bus / West Midlands
+      set:
+        primaryname: "Diamond Bus"
+        othernames:
+          - "Diamond Bus Limited"
+        website: "https://www.diamondbuses.com/west-midlands/"
+        email: "comments@diamondbuses.com"
+        phonenumber: "0121 322 2222"
+        address: "Diamond Bus Customer Services, Hallbridge Way, Tipton Road, Tividale, West Midlands, B69 3HW"
+        socialmedia:
+          Twitter: "@diamondbuses"
+        regions:
+          - "UK:REGION:WESTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136340"] # First Bristol, Bath & the West
+      set:
+        primaryname: "First West of England"
+        othernames:
+          - "First West of England Limited"
+        address: "First West of England Ltd, Enterprise House, Easton Road, Bristol, BS5 0DZ"
+        socialmedia:
+          Twitter: "@FirstBSA"
+        regions:
+          - "UK:REGION:SOUTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136351"] # First Essex
+      set:
+        primaryname: "First Essex"
+        othernames:
+          - "First Essex Buses Limited"
+          - "First Bus"
+        website: "https://www.firstbus.co.uk/essex"
+        phonenumber: "0345 646 0707"
+        address: "First Essex Buses Limited, First Bus, Westway, Chelmsford, Essex CM1 3AR"
+        socialmedia:
+          Twitter: "@FirstEssex"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:EASTANGLIA"
+          - "UK:REGION:LONDON"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136354"] # First in Hants & Dorset
+      set:
+        website: "https://www.firstbus.co.uk/wessex-dorset-south-somerset"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:SOUTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136355"] # First Greater Manchester / First Manchester Limited
+      set:
+        address: "First Manchester Limited, Wallshaw Street, Oldham, Lancashire, OL1 3TR"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136521"] # Diamond Bus North West
+      set:
+        website: "https://www.diamondbuses.com/north-west/"
+        email: "commentsdiamondbusnorthwest@rotala.co.uk"
+        phonenumber: "01204 937 535"
+        address: "Customer Services, Diamond Bus North West, 13 Silverwell Street, Bolton, BL1 1PP"
+        socialmedia:
+          Twitter: "@DiamondBusNW"
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135848"] # Cardiff Bus
+      set:
+        website: "https://www.cardiffbus.com"
+        address: "Cardiff Bus, Leckwith Depot & Offices, Sloper Road, Leckwith, Cardiff, CF11 8TB"
+        regions:
+          - "UK:REGION:WALES"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137469"] # Stagecoach South Wales
+      set:
+        website: "https://www.stagecoachbus.com/about/south-wales"
+        email: "southwales.enquiries@stagecoachbus.com"
+        regions:
+          - "UK:REGION:WALES"
+          - "UK:REGION:SOUTHWEST"
+          - "UK:REGION:WESTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138454"] # Stagecoach London
+      set:
+        website: "https://www.stagecoachbus.com/about/london"
+        phonenumber: "0343 222 1234"
+        address: "TfL London Buses Customer Services, 4th floor, Zone B5, 14 Pier Walk, London, SE10 0ES"
+        regions:
+          - "UK:REGION:LONDON"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138286"] # Unibus
+      set:
+        email: "enquiries@morebus.co.uk"
+        phonenumber: "01202 338 420"
+        address: "Go South Coast Ltd, Customer Services Manager, Towngate House, 2-8 Parkstone Road, Poole, BH15 2PR"
+        regions:
+          - "UK:REGION:SOUTHWEST"
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137159"] # Stagecoach Midlands
+      set:
+        othernames:
+          - "Midland Red (South) Ltd"
+        website: "https://www.stagecoachbus.com/about/midlands"
+        email: "customer.services@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        address: "Customer Services, FREEPOST STAGECOACH"
+        socialmedia:
+          Twitter: "@StagecoachMids"
+        regions:
+          - "UK:REGION:EASTMIDLANDS"
+          - "UK:REGION:WESTMIDLANDS"
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136971"] # Stagecoach East Midlands
+      set:
+        othernames:
+          - "Lincolnshire Road Car Co Ltd"
+        website: "https://www.stagecoachbus.com/about/east-midlands"
+        email: "eastmidlands.enquiries@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        address: "Stagecoach East Midlands, Warneford House, Runcorn Road, Lincoln LN6 3QP"
+        regions:
+          - "UK:REGION:EASTMIDLANDS"
+          - "UK:REGION:YORKSHIRE"
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136221"] # Stagecoach South East
+      set:
+        website: "https://www.stagecoachbus.com/about/south-east"
+        email: "customer.services@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136477"] # Stagecoach Merseyside and South Lancashire
+      set:
+        website: "https://www.stagecoachbus.com/about/merseyside-and-south-lancashire"
+        phonenumber: "0345 241 8000"
+        address: "Customer Services, FREEPOST STAGECOACH"
+        socialmedia:
+          Twitter: "@StagecoachMSL"
+        regions:
+          - "UK:REGION:WALES"
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136515"] # Stagecoach Manchester
+      set:
+        website: "https://www.stagecoachbus.com/about/manchester"
+        phonenumber: "0161 244 1000"
+        email: "manchester.enquiries@stagecoachbus.com"
+        address: "Greater Manchester Buses South Limited, One Stockport Exchange, 20 Railway Road, Stockport, Cheshire, SK1 3SW"
+        socialmedia:
+          Twitter: "@StagecoachGM"
+        regions:
+          - "UK:REGION:NORTHWEST"
+          - "UK:REGION:EASTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136935"] # Central Connect (Konect Bus / Hedingham NOCs)
+      set:
+        website: "https://www.central-connect.co.uk/"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138311"] # Central Connect (Transport Made Simple NOC)
+      set:
+        email: "contact@central-connect.co.uk"
+        address: "Central Connect Local Bus Team, Roswald House, Oak Drive, Diss, IP22 4GX"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136353"] # First Greater Glasgow
+      set:
+        othernames:
+          - "First Glasgow No 1 Limited"
+          - "First Glasgow No 2 Limited"
+          - "First in Greater Glasgow"
+        socialmedia:
+          Twitter: "@FirstinGlasgow"
+        regions:
+          - "UK:REGION:SCOTLAND"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136347"] # First Cymru / First South & West Wales
+      set:
+        socialmedia:
+          Twitter: "@FirstCymru_"
+        regions:
+          - "UK:REGION:WALES"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138306"] # Go North West
+      set:
+        phonenumber: "0161 244 1000"
+        address: "Second Floor, 55 Degrees North, Pilgrim Street, Newcastle Upon Tyne, NE1 6BL"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136349"] # First Norfolk & Suffolk / First Eastern Counties
+      set:
+        primaryname: "First Norfolk & Suffolk"
+        othernames:
+          - "First Eastern Counties Buses Limited"
+          - "First"
+        phonenumber: "0345 646 0707"
+        socialmedia:
+          Twitter: "@FirstNorwich"
+        regions:
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135629"] # Arriva North East
+      set:
+        primaryname: "Arriva North East"
+        website: "https://www.arrivabus.co.uk/locations/north-east"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Twitter: "@arrivanortheast"
+        regions:
+          - "UK:REGION:NORTHEAST"
+          - "UK:REGION:YORKSHIRE"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136221"] # Stagecoach South East
+      set:
+        address: "East Kent Road Car Co Ltd, One Stockport Exchange, 20 Railway Road, Stockport, SK1 3SW"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135840"] # Cambus Limited / Stagecoach East
+      set:
+        primaryname: "Stagecoach East"
+        othernames:
+          - "Cambus Limited"
+        website: "https://www.stagecoachbus.com/about/east"
+        phonenumber: "0345 241 8000"
+        address: "Cambus Limited, Registered Office, One Stockport Exchange, 20 Railway Road, Stockport, SK1 3SW"
+        socialmedia:
+          Twitter: "@Stagecoach_East"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:EASTANGLIA"
+          - "UK:REGION:EASTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135902"] # Cheltenham & Gloucester Omnibus Co Ltd / Stagecoach West
+      set:
+        primaryname: "Stagecoach West"
+        othernames:
+          - "Cheltenham & Gloucester Omnibus Co Ltd"
+        website: "https://www.stagecoachbus.com/about/west"
+        email: "west.enquiries@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        address: "Stagecoach West, 3rd Floor, 65 London Road, Gloucester, GL1 3HF"
+        socialmedia:
+          Twitter: "@Stagecoach_West"
+        regions:
+          - "UK:REGION:SOUTHWEST"
+          - "UK:REGION:WESTMIDLANDS"
+          - "UK:REGION:WALES"
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138032"] # National Express West Midlands
+      set:
+        primaryname: "West Midlands Bus"
+        website: "https://westmidlandsbus.co.uk/west-midlands"
+        phonenumber: "0121 254 7272"
+        address: "Bus Customer Relations, National Express House, Digbeth, Birmingham, B5 6DD"
+        regions:
+          - "UK:REGION:WESTMIDLANDS"
+        othernames:
+          - "National Express West Midlands"
+          - "West Midlands Travel Ltd"
+          - "National Express Coventry"
+          - "Travel Coventry"
+          - "Birmingham Services"
+        socialmedia:
+          Twitter: "@WestMidsBus"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138416"] # Transport for London
+      set:
+        website: "https://tfl.gov.uk/modes/buses"
+        phonenumber: "0343 222 1234"
+        address: "TfL Customer Services, 9th Floor, 5 Endeavour Square, London, E20 1JN"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137726"] # Stagecoach Cumbria and Lancashire
+      set:
+        socialmedia:
+          Twitter: "@StagecoachCNL"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136362"] # First South Yorkshire / Travel South Yorks NOC group
+      set:
+        primaryname: "First South Yorkshire"
+        othernames:
+          - "First South Yorkshire Ltd"
+        website: "https://www.firstbus.co.uk/south-yorkshire"
+        phonenumber: "0345 646 0707"
+        address: "First South Yorkshire, Midland Road, Rotherham S61 1TF"
+        socialmedia:
+          Facebook: "https://en-gb.facebook.com/FirstSouthYorks/"
+        regions:
+          - "UK:REGION:YORKSHIRE"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136364"] # First West Yorkshire
+      set:
+        othernames:
+          - "First Bradford"
+          - "First Leeds"
+          - "First Halifax, Calder Valley & Huddersfield"
+        regions:
+          - "UK:REGION:YORKSHIRE"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136564"] # Stagecoach South
+      set:
+        website: "https://www.stagecoachbus.com/about/south"
+        phonenumber: "0345 241 8000"
+        address: "Stagecoach South, The Bus Station, Southgate, Chichester, West Sussex, PO19 8DG"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:SOUTHWEST"
+        socialmedia:
+          Twitter: "@stagecoachsouth"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138497"] # Stagecoach North East
+      set:
+        primaryname: "Stagecoach North East"
+        othernames:
+          - "Stagecoach in Newcastle"
+          - "Stagecoach in South Shields"
+          - "Stagecoach in Sunderland"
+          - "Stagecoach in Hartlepool"
+          - "Stagecoach on Teesside"
+          - "Busways Travel Services Ltd"
+          - "Cleveland Transit Ltd"
+        website: "https://www.stagecoachbus.com/about/north-east"
+        email: "customer.services@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        address: "Stagecoach North East Head Office, North Bridge Street, Wheatsheaf, Sunderland, SR5 1AQ"
+        socialmedia:
+          Twitter: "@stagecoachNE"
+        regions:
+          - "UK:REGION:NORTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135748"] # Stagecoach Invergo / North Scotland NOC aggregate
+      set:
+        website: "https://www.stagecoachbus.com/about/north-scotland"
+        phonenumber: "0345 241 8000"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135858"] # Carousel Buses
+      set:
+        primaryname: "Carousel Buses"
+        othernames:
+          - "Carousel Buses Ltd"
+        website: "https://www.carouselbuses.co.uk"
+        email: "info@carouselbuses.co.uk"
+        phonenumber: "01494 450151"
+        address: "Carousel Buses Ltd, Unit 2, Hughenden Avenue, High Wycombe HP13 5SG"
+        socialmedia:
+          Twitter: "@CarouselBus"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135552"] # Happy Al's / Al's Coaches
+      set:
+        primaryname: "Happy Al's"
+        othernames:
+          - "Al's Coaches"
+          - "Als Coaches Ltd"
+        website: "https://www.alscoaches.com/"
+        email: "info@alsbookings.com"
+        phonenumber: "0151 653 0222"
+        address: "400 Cleveland St, Birkenhead CH41 8EQ"
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135778"] # Brighton & Hove Buses
+      set:
+        primaryname: "Brighton & Hove Buses"
+        othernames:
+          - "Brighton & Hove Bus and Coach Company Limited"
+        website: "https://www.buses.co.uk"
+        email: "info@buses.co.uk"
+        phonenumber: "01273 886200"
+        address: "43 Conway Street, Hove, East Sussex BN3 3LT"
+        socialmedia:
+          Twitter: "@BrightonHoveBus"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137122"] # Metrobus
+      set:
+        primaryname: "Metrobus"
+        othernames:
+          - "Metrobus Limited"
+          - "Fastway (operated by Metrobus)"
+        website: "https://www.metrobus.co.uk"
+        email: "feedback@metrobus.co.uk"
+        phonenumber: "01293 449191"
+        socialmedia:
+          Facebook: "https://facebook.com/gometrobus"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135628"] # Arriva Wales
+      set:
+        primaryname: "Arriva Wales"
+        othernames:
+          - "Arriva Cymru Limited"
+          - "Arriva Cymru"
+        website: "https://www.arrivabus.co.uk/locations/wales"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Facebook: "https://www.facebook.com/arrivabuseswales/"
+          Twitter: "@arrivabuswales"
+        regions:
+          - "UK:REGION:WALES"
+          - "UK:REGION:NORTHWEST"
+          - "UK:REGION:WESTMIDLANDS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135640"] # Arriva North West
+      set:
+        primaryname: "Arriva North West"
+        othernames:
+          - "Arriva North West Limited"
+        website: "https://www.arrivabus.co.uk/locations/north-west"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Twitter: "@arrivanorthwest"
+        regions:
+          - "UK:REGION:NORTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135641"] # Arriva North East
+      set:
+        primaryname: "Arriva North East"
+        othernames:
+          - "Arriva Northumbria Limited"
+        website: "https://www.arrivabus.co.uk/locations/north-east"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Twitter: "@arrivanortheast"
+        regions:
+          - "UK:REGION:NORTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135645"] # Arriva Yorkshire
+      set:
+        primaryname: "Arriva Yorkshire"
+        othernames:
+          - "Arriva Yorkshire Limited"
+        website: "https://www.arrivabus.co.uk/locations/yorkshire"
+        email: "customerservice@arriva.co.uk"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+        socialmedia:
+          Twitter: "@arrivainyorkshire"
+        regions:
+          - "UK:REGION:YORKSHIRE"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137244"] # Newport Bus
+      set:
+        primaryname: "Newport Bus"
+        othernames:
+          - "Newport Transport Limited"
+        website: "https://www.newportbus.co.uk/"
+        phonenumber: "01633 670563"
+        address: "160 Corporation Road, Newport NP19 0WF"
+        socialmedia:
+          Twitter: "@NewportBus"
+        regions:
+          - "UK:REGION:WALES"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136845"] # Faresaver / Fosseway Coaches
+      set:
+        primaryname: "Faresaver Buses"
+        othernames:
+          - "Fosseway Coaches"
+        website: "https://faresaver.co.uk/"
+        email: "enquiries@faresaver.co.uk"
+        phonenumber: "01249 444444"
+        address: "Coach Yard, Vincients Road, Bumpers Farm Industrial Estate, Chippenham SN14 6NQ"
+        socialmedia:
+          Twitter: "@faresaverbuses"
+        regions:
+          - "UK:REGION:SOUTHWEST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137476"] # Red Rose Travel
+      set:
+        primaryname: "Red Rose Travel"
+        othernames:
+          - "Red Rose Travel Limited"
+        website: "https://www.redrosetravel.com/"
+        phonenumber: "01296 747926"
+        address: "Blinking Owl Garage, Oxford Road, Haddenham, Aylesbury HP17 8TT"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137609"] # Sanders Coaches
+      set:
+        primaryname: "Sanders Coaches"
+        othernames:
+          - "Sanders Coaches Ltd"
+        website: "https://www.sanderscoaches.com/"
+        phonenumber: "01263 712800"
+        address: "Sanders Coaches Ltd, Heath Drive, Hempstead Road Industrial Estate, Holt, Norfolk NR25 6ER"
+        regions:
+          - "UK:REGION:EASTANGLIA"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136040"] # West Coast Motors
+      set:
+        primaryname: "West Coast Motors"
+        othernames:
+          - "Craig of Campbeltown Ltd"
+        website: "https://www.westcoastmotors.co.uk/"
+        phonenumber: "01586 552319"
+        regions:
+          - "UK:REGION:SCOTLAND"
+        address: "Benmhor, Campbeltown, Argyll PA28 6DN"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137106"] # McGill's
+      set:
+        primaryname: "McGill's"
+        othernames:
+          - "McGill's Bus Service Limited"
+          - "McGill's Bus Service"
+        website: "https://www.mcgillsbuses.co.uk/"
+        phonenumber: "03330 16 61 62"
+        address: "McGill's Bus Service Ltd, 99 Earnhill Road, Larkfield Industrial Estate, Greenock PA16 0EQ (registered office)"
+        regions:
+          - "UK:REGION:SCOTLAND"
+        socialmedia:
+          Twitter: "@mcgillswest"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138036"] # Stagecoach West Scotland
+      set:
+        primaryname: "Stagecoach West Scotland"
+        website: "https://www.stagecoachbus.com/about/west-scotland"
+        email: "customer.service@stagecoachbus.com"
+        phonenumber: "0345 241 8000"
+        regions:
+          - "UK:REGION:SCOTLAND"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138448"] # Midland Bluebird
+      set:
+        website: "https://www.mcgillsscotlandeast.co.uk/"
+        phonenumber: "03330166162"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137465"] # Reading Buses umbrella for Windsor Express records
+      set:
+        primaryname: "Reading Buses"
+        othernames:
+          - "Reading Transport Limited"
+          - "Newbury & District"
+        website: "https://www.reading-buses.co.uk/"
+        address: "Reading Transport Limited, Great Knollys Street, Reading RG1 7HH"
+        regions:
+          - "UK:REGION:LONDON"
+          - "UK:REGION:SOUTHEAST"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137471"] # Red Eagle
+      set:
+        primaryname: "Red Eagle Buses"
+        othernames:
+          - "Red Eagle Buses Ltd"
+        website: "https://redeagle.org.uk/"
+        email: "enquiries@redeagle.org.uk"
+        phonenumber: "01296 747296"
+        address: "Red Eagle Buses, The Blinking Owl Garage, Oxford Road, Dinton, HP17 8TT"
+        regions:
+          - "UK:REGION:SOUTHEAST"
+        socialmedia:
+          Twitter: "@Red_Eagle_Buses"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-135632"] # Arriva Herts and Essex customer contacts
+      set:
+        website: "https://www.arrivabus.co.uk/locations/herts-and-essex"
+        phonenumber: "0344 800 44 11"
+        address: "Arriva Customer Services, 487 Dunstable Road, FREEPOST ANG7624, Luton, Bedfordshire, LU4 8DS"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136878"] # The Keighley Bus Company current contacts
+      set:
+        website: "https://www.transdevbus.co.uk/brands/keighley-bus-company"
+        email: "customer.services@transdevbus.co.uk"
+        phonenumber: "01422 553 576"
+        address: "Transdev Blazefield Limited registered office, Prospect Park, Broughton Way, Harrogate HG2 7NY"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138382"] # Team Pennine current contacts
+      set:
+        website: "https://www.transdevbus.co.uk/brands/team-pennine"
+        email: "customer.services@transdevbus.co.uk"
+        phonenumber: "01422 553 576"
+        address: "Transdev Blazefield Limited registered office, Prospect Park, Broughton Way, Harrogate HG2 7NY"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136005"] # operator region/social verification
+      set:
+        regions:
+          - "UK:REGION:SOUTHEAST"
+        socialmedia:
+          Twitter: "@compassbus"
+        website: "https://compass-travel.co.uk/"
+        email: "office@compass-travel.co.uk"
+        phonenumber: "01903 690025"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-136878"] # The Keighley Bus Company
+      set:
+        primaryname: "The Keighley Bus Company"
+        othernames:
+          - "Keighley and District Travel Limited"
+          - "Keighley & District Travel Ltd"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138382"] # Team Pennine
+      set:
+        primaryname: "Team Pennine"
+        othernames:
+          - "Team Pennine Limited"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-137292"] # verified operator contact metadata
+      set:
+        website: "https://www.nu-venture.co.uk/"
+        phonenumber: "01622882288"
+        address: "Nu-Venture Coaches Ltd, Unit 2F Deacon Trading Estate, Aylesford, Kent ME20 7SP"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138447", "gb-nocid-138448"] # Midland Bluebird / McGill's Scotland East
+      set:
+        website: "https://www.mcgillsscotlandeast.co.uk/"
+        email: "enquiries@mcgillsscotlandeast.co.uk"
+        phonenumber: "03330166162"
+        address: "Midland Bluebird Customer Service, 300 Stirling Road, Larbert, Stirlingshire, FK5 3NJ"
+        socialmedia:
+          Twitter: "@MidBluebird"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138448"] # Remove duplicate Scotland tag
+      set:
+        regions:
+          - "UK:REGION:SCOTLAND"
+    - datasets: ["noc"]
+      operators: ["gb-nocid-138448"] # Exact current legal alternate name
+      set:
+        othernames:
+          - "McGill's Scotland East Bus Service Limited"
 datasets:
 - identifier: noc
   format: gb-travelinenoc

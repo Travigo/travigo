@@ -90,7 +90,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 	totalScanned := 0
 	totalUpdated := 0
 	for serviceIndex, service := range services {
-		candidates := append([]Route{}, routesByServiceName[serviceKey(service.TransportType, service.ServiceName)]...)
+		candidates := append([]Route{}, routesByServiceName[serviceKey(service.TransportType, service.LineName())]...)
 		serviceRefs := append([]string{service.PrimaryIdentifier}, service.OtherIdentifiers...)
 		for _, serviceRef := range serviceRefs {
 			candidates = appendUniqueRoutes(candidates, routesByServiceRef[serviceRef]...)

@@ -18,6 +18,7 @@ func GetRegisteredDataSets() []datasets.DataSet {
 	for _, datasource := range registeredDatasources {
 		for _, dataset := range datasource.Datasets {
 			dataset.OperatorAliases = datasource.Overrides.AliasesFor(dataset.Identifier)
+			dataset.OperatorMetadata = datasource.Overrides.OperatorMetadataFor(dataset.Identifier)
 			dataset.Identifier = fmt.Sprintf("%s-%s", datasource.Identifier, dataset.Identifier)
 			dataset.DataSourceRef = datasource.Identifier
 			dataset.Provider = datasource.Provider

@@ -12,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -84,7 +83,6 @@ func populateSavedObject(savedObject *ctdf.SavedObject) {
 			return
 		}
 		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: stop})
-		transforms.Transform(stop.Services, 1)
 		savedObject.Object = stop
 	case "journey", "journeys":
 		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: savedObject.ObjectIdentifier})
@@ -92,7 +90,6 @@ func populateSavedObject(savedObject *ctdf.SavedObject) {
 			return
 		}
 		journey.GetService()
-		transforms.Transform(journey.Service, 1)
 		if len(journey.Path) > 0 {
 			journey.Path[0].GetOriginStop()
 			if journey.Path[0].OriginStop != nil {

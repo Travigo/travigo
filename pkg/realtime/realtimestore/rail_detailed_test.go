@@ -1,41 +1,10 @@
 package realtimestore
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
-	"sync"
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
-	"github.com/travigo/travigo/pkg/transforms"
 )
-
-var setupRailDetailedTransformsOnce sync.Once
-
-func setupRailDetailedTransforms(t *testing.T) {
-	t.Helper()
-
-	setupRailDetailedTransformsOnce.Do(func() {
-		_, filename, _, ok := runtime.Caller(0)
-		if !ok {
-			t.Fatal("failed to resolve test path")
-		}
-
-		originalWorkingDirectory, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		repoRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "../../.."))
-		if err := os.Chdir(repoRoot); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(originalWorkingDirectory)
-
-		transforms.SetupClient()
-	})
-}
 
 func TestMergeRailDetailedScopesLoadingToTrain(t *testing.T) {
 	merged := mergeRailDetailed(
@@ -72,8 +41,6 @@ func TestMergeRailDetailedScopesLoadingToTrain(t *testing.T) {
 }
 
 func TestEnrichRailDetailedAllocationTransformsMixedUnitsByOwnLength(t *testing.T) {
-	setupRailDetailedTransforms(t)
-
 	enriched := enrichRailDetailedAllocation(ctdf.JourneyDetailedRail{
 		Trains: []ctdf.RailTrain{
 			{
@@ -125,8 +92,6 @@ func TestEnrichRailDetailedAllocationTransformsMixedUnitsByOwnLength(t *testing.
 }
 
 func TestEnrichRailTrainAllocationPreservesMixedSeatingClasses(t *testing.T) {
-	setupRailDetailedTransforms(t)
-
 	carriages := make([]ctdf.RailCarriage, 8)
 	for index := range carriages {
 		carriages[index] = ctdf.RailCarriage{ID: string(rune('1' + index)), Occupancy: -1}
@@ -149,8 +114,6 @@ func TestEnrichRailTrainAllocationPreservesMixedSeatingClasses(t *testing.T) {
 }
 
 func TestEnrichRailTrainAllocationAppliesCarriageTransformsAcrossPassengerCarriages(t *testing.T) {
-	setupRailDetailedTransforms(t)
-
 	enriched := enrichRailTrainAllocation(ctdf.RailTrain{
 		FleetID: "755/4",
 		Carriages: []ctdf.RailCarriage{
@@ -180,5 +143,24 @@ func TestEnrichRailTrainAllocationAppliesCarriageTransformsAcrossPassengerCarria
 	}
 	if enriched.Carriages[2].VehicleRole != ctdf.RailCarriageVehicleRolePowerCar {
 		t.Fatalf("expected power car role to be preserved, got %+v", enriched.Carriages[2])
+	}
+}
+
+func TestDecodeRailAllocationEnrichesOnlyLegacyValues(t *testing.T) {
+	raw := `{"Trains":[{"FleetID":"156","Carriages":[{"ID":"A"},{"ID":"B"}]}]}`
+	allocation, err := decodeRailDetailedPart(raw, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if train := allocation.Trains[0]; train.VehicleTypeName != "Class 156" || train.TrainLength != 2 ||
+		train.Carriages[0].ID != "A" || len(train.Carriages[0].Toilets) == 0 {
+		t.Fatalf("legacy allocation was not enriched: %+v", train)
+	}
+	current, err := decodeRailDetailedPart(`{"enriched":true,`+raw[1:], true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if train := current.Trains[0]; train.VehicleTypeName != "" || train.TrainLength != 0 {
+		t.Fatalf("marked allocation was enriched again: %+v", train)
 	}
 }

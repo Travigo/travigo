@@ -12,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -77,9 +76,6 @@ func getJourney(c *fiber.Ctx) error {
 			}
 		} else {
 			applyJourneyServiceStopNameOverrides(journey)
-
-			transforms.Transform(journey.Service, 1)
-			transforms.Transform(journey.DetailedRailInformation, 1)
 
 			journeyReduced, err = marshalWithSheriffView(c, journey, []string{"basic", "detailed"}, sheriffViews{
 				"web":          {"web-journey"},

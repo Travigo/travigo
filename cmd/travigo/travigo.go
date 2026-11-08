@@ -19,7 +19,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/urfave/cli/v2"
 
 	_ "net/http/pprof"
@@ -42,8 +41,6 @@ func main() {
 	} else {
 		log.Logger = log.Logger.Level(zerolog.InfoLevel)
 	}
-
-	transforms.SetupClient()
 
 	app := &cli.App{
 		Name:        "travigo",

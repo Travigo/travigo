@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
-	"github.com/travigo/travigo/pkg/transforms"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -110,8 +109,6 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						stationStopGroupsMutex.Unlock()
 					}
 
-					transforms.Transform(ctdfStopGroup, 3)
-
 					updateModel := mongo.NewUpdateOneModel().
 						SetFilter(bson.M{"primaryidentifier": ctdfStopGroup.PrimaryIdentifier}).
 						SetUpdate(bson.M{"$set": ctdfStopGroup}).
@@ -203,8 +200,6 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						continue
 					}
 
-					transforms.Transform(ctdfStop, 3)
-
 					updateModel := mongo.NewUpdateOneModel().
 						SetFilter(bson.M{"primaryidentifier": ctdfStop.PrimaryIdentifier}).
 						SetUpdate(bson.M{"$set": ctdfStop}).
@@ -253,8 +248,6 @@ func (naptanDoc *NaPTAN) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				stationStop.OtherIdentifiers = append(stationStop.OtherIdentifiers, stop.PrimaryIdentifier)
 			}
 		}
-
-		transforms.Transform(stationStop, 2)
 
 		updateModel := mongo.NewUpdateOneModel().
 			SetFilter(bson.M{"primaryidentifier": stationStop.PrimaryIdentifier}).

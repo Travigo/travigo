@@ -12,8 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/railclasses"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -455,10 +455,12 @@ func applyStoredLocation(journey *ctdf.RealtimeJourney, location storedVehicleLo
 		journey.VehicleLocation = location.Location
 		journey.VehicleBearing = location.Bearing
 		journey.VehicleLocationObservedAt = nil
+		if !location.ObservedAt.IsZero() {
+			journey.VehicleLocationObservedAt = &location.ObservedAt
+		}
 		journey.VehicleLocationSource = ""
 		journey.VehicleLocationConfidence = ""
 		if location.Position != nil {
-			journey.VehicleLocationObservedAt = &location.Position.ObservedAt
 			journey.VehicleLocationSource = location.Position.Source
 			journey.VehicleLocationConfidence = location.Position.Confidence
 		}
@@ -521,8 +523,6 @@ func GetRailDetailed(ctx context.Context, identifier string) (ctdf.JourneyDetail
 		return loading, nil
 	}
 
-	allocation = enrichRailDetailedAllocation(allocation)
-
 	if loadingErr != nil {
 		return allocation, nil
 	}
@@ -536,12 +536,25 @@ func getRailDetailedPart(ctx context.Context, detailType string, identifier stri
 		return ctdf.JourneyDetailedRail{}, detailedRailResult.Err()
 	}
 
-	var detailedRailInformation ctdf.JourneyDetailedRail
-	if err := json.Unmarshal([]byte(detailedRailResult.Val()), &detailedRailInformation); err != nil {
+	return decodeRailDetailedPart(detailedRailResult.Val(), detailType == "allocation")
+}
+
+// Keep the original JSON shape so older readers can decode new allocations.
+type storedRailAllocation struct {
+	ctdf.JourneyDetailedRail
+	Enriched bool `json:"enriched,omitempty"`
+}
+
+func decodeRailDetailedPart(raw string, allocation bool) (ctdf.JourneyDetailedRail, error) {
+	var stored storedRailAllocation
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
 		return ctdf.JourneyDetailedRail{}, err
 	}
-
-	return detailedRailInformation, nil
+	if allocation && !stored.Enriched {
+		// Older allocation keys remain readable until rewritten or expired.
+		return enrichRailDetailedAllocation(stored.JourneyDetailedRail), nil
+	}
+	return stored.JourneyDetailedRail, nil
 }
 
 func enrichRailDetailedAllocation(allocation ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {
@@ -560,42 +573,8 @@ func enrichRailTrainAllocation(train ctdf.RailTrain) ctdf.RailTrain {
 	}
 
 	train = inferRailTrainAllocationFields(train)
-	originalCarriages := append([]ctdf.RailCarriage(nil), train.Carriages...)
-	enriched := train
-	transforms.Transform(&enriched, 0)
-
-	if len(originalCarriages) == 0 {
-		for carriageIndex := range enriched.Carriages {
-			if enriched.Carriages[carriageIndex].VehicleRole == "" {
-				enriched.Carriages[carriageIndex].VehicleRole = ctdf.RailCarriageVehicleRolePassenger
-			}
-		}
-		return enriched
-	}
-	if len(enriched.Carriages) == 0 {
-		return enriched
-	}
-
-	transformCarriages := enriched.Carriages
-	if len(transformCarriages) > len(originalCarriages) {
-		transformCarriages = transformCarriages[len(originalCarriages):]
-	}
-
-	enriched.Carriages = originalCarriages
-	transformCarriageIndex := 0
-	for carriageIndex := range enriched.Carriages {
-		if !enriched.Carriages[carriageIndex].CountsTowardsTrainLength() {
-			continue
-		}
-		if transformCarriageIndex >= len(transformCarriages) {
-			continue
-		}
-
-		applyRailCarriageEnrichment(&enriched.Carriages[carriageIndex], transformCarriages[transformCarriageIndex])
-		transformCarriageIndex++
-	}
-
-	return enriched
+	railclasses.Enrich(&train)
+	return train
 }
 
 func inferRailTrainAllocationFields(train ctdf.RailTrain) ctdf.RailTrain {
@@ -665,15 +644,6 @@ func railClassVehicleType(value string) string {
 	}
 
 	return "gb-railclass-" + class
-}
-
-func applyRailCarriageEnrichment(carriage *ctdf.RailCarriage, enrichment ctdf.RailCarriage) {
-	if len(carriage.SeatingClasses) == 0 {
-		carriage.SeatingClasses = enrichment.SeatingClasses
-	}
-	if len(carriage.Toilets) == 0 {
-		carriage.Toilets = enrichment.Toilets
-	}
 }
 
 func mergeRailDetailed(allocation ctdf.JourneyDetailedRail, loading ctdf.JourneyDetailedRail) ctdf.JourneyDetailedRail {

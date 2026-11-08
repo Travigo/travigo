@@ -17,6 +17,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/railclasses"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -637,6 +638,7 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		detailedRailInformation.ReplacementBus = true
 		railTrain.VehicleType = "gb-railclass-REPLACEMENTBUS"
 	}
+	railclasses.Enrich(&railTrain)
 	detailedRailInformation.Trains = []ctdf.RailTrain{railTrain}
 
 	// Put it all together

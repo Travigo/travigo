@@ -25,10 +25,12 @@ type TrainOperatingCompanyList struct {
 }
 
 func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.Service) {
+	return t.convertToCTDFWithStopNameOverrides(generateRailStopNameOverrides())
+}
+
+func (t *TrainOperatingCompanyList) convertToCTDFWithStopNameOverrides(stopNameOverrides map[string]string) ([]*ctdf.Operator, []*ctdf.Service) {
 	operators := make([]*ctdf.Operator, 0, len(t.Companies))
 	services := make([]*ctdf.Service, 0, len(t.Companies))
-
-	stopNameOverrides := generateRailStopNameOverrides()
 
 	now := time.Now()
 
@@ -68,7 +70,6 @@ func (t *TrainOperatingCompanyList) convertToCTDF() ([]*ctdf.Operator, []*ctdf.S
 			TransportType:        ctdf.TransportTypeRail,
 
 			BrandIcon:        "/icons/national-rail.svg",
-			BrandColour:      "#ffffff",
 			BrandDisplayMode: "short",
 
 			StopNameOverrides: stopNameOverrides,

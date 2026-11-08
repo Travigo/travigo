@@ -203,6 +203,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			realtimeJourney,
 			vehicleUpdateEvent.VehicleLocationUpdate.Location,
 			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
+			vehicleUpdateEvent.RecordedAt,
 		)
 		if position, ok := matchJourneyPosition(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location); ok {
 			storeVehicleJourneyHistory(context.Background(), vehicleUpdateEvent, journeyID, position.JourneyProgress)

@@ -8,67 +8,69 @@ overrides:
     - operators: [gb-noc-TFLO]
       services: ["Bakerloo"]
       set:
-        colour: "#994f14"
+        colour: "#B26300"
+        secondarycolour: "#000000"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Central"]
       set:
-        colour: "#d42e12"
+        colour: "#DC241F"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Circle"]
       set:
-        colour: "#f7d117"
+        colour: "#FFC80A"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["District"]
       set:
-        colour: "#007336"
+        colour: "#007D32"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Hammersmith & City"]
       set:
-        colour: "#eb9ca8"
+        colour: "#F589A6"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Jubilee"]
       set:
-        colour: "#8c8f91"
+        colour: "#838D93"
+        secondarycolour: "#000000"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Metropolitan"]
       set:
-        colour: "#8a004f"
+        colour: "#9B0058"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Northern"]
       set:
-        colour: "#332b24"
+        colour: "#000000"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Piccadilly"]
       set:
-        colour: "#2905a1"
+        colour: "#0019A8"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Victoria"]
       set:
-        colour: "#00a3e0"
+        colour: "#039BE5"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       services: ["Waterloo & City"]
       set:
-        colour: "#7dd1b8"
+        colour: "#76D0BD"
         icon: "/icons/tfl-roundel-underground.svg"
         displaymode: "short"
     - operators: [gb-noc-TFLO]
@@ -79,6 +81,7 @@ overrides:
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       transporttypes: [Bus]
+      fallback: true
       set:
         colour: "#DC241F"
     - operators: [gb-noc-TFLO]
@@ -89,17 +92,96 @@ overrides:
         displaymode: "short"
     - operators: [gb-noc-TFLO]
       transporttypes: [Ferry]
+      services: ["RB1", "RB4", "RB6"]
+      fallback: true
       set:
         colour: "#039BE5"
+    - operators: [gb-noc-TFLO]
+      transporttypes: [CableCar]
+      fallback: true
+      set:
+        colour: "#734FA0"
+    # TfL Superloop route colours. Keep the underlying BODS operator unchanged;
+    # SL7 is currently published under Metrobus (METR).
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL1"]
+      transporttypes: [Bus]
+      set:
+        colour: "#BBCF00"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL2"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E63714"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL3"]
+      transporttypes: [Bus]
+      set:
+        colour: "#851F71"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL4"]
+      transporttypes: [Bus]
+      set:
+        colour: "#575756"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL5"]
+      transporttypes: [Bus]
+      set:
+        colour: "#009FE3"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL6"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E71984"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-METR]
+      services: ["SL7"]
+      transporttypes: [Bus]
+      set:
+        colour: "#C80B62"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL8"]
+      transporttypes: [Bus]
+      set:
+        colour: "#4E358C"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL9"]
+      transporttypes: [Bus]
+      set:
+        colour: "#0B9A9E"
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL10"]
+      transporttypes: [Bus]
+      set:
+        colour: "#F39200"
+    # TfL's current route palette does not assign distinct colours to these
+    # expansion routes, so use the published Superloop core red (#E42313).
+    - datasets: ["gb-dft-bods-gtfs-schedule-london"]
+      operators: [gb-noc-TFLO]
+      services: ["SL11", "SL12"]
+      transporttypes: [Bus]
+      set:
+        colour: "#E42313"
     - operators: [gb-toc-LO]
       transporttypes: [Rail]
+      fallback: true
       set:
-        colour: "#FFFFFF"
+        colour: "#FA7B05"
         icon: "/icons/tfl-roundel-overground.svg"
     - operators: [gb-toc-XR]
       transporttypes: [Rail]
+      fallback: true
       set:
-        colour: "#FFFFFF"
+        colour: "#60399E"
         icon: "/icons/tfl-roundel-elizabeth-line.svg"
 datasets:
 - identifier: tfl-api

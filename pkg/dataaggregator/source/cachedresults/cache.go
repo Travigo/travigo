@@ -16,6 +16,8 @@ import (
 	"github.com/travigo/travigo/pkg/redis_client"
 )
 
+const ServicesByStopPrefix = "cachedresults/servicesbystopquery-v2/"
+
 type Cache struct {
 	Cache *cache.Cache[string]
 }

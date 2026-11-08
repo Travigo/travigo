@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -14,9 +15,10 @@ import (
 )
 
 type storedVehicleLocation struct {
-	Location ctdf.Location    `json:"location"`
-	Position *RailObservation `json:"position,omitempty"`
-	Bearing  float64          `json:"bearing"`
+	Location   ctdf.Location    `json:"location"`
+	Position   *RailObservation `json:"position,omitempty"`
+	Bearing    float64          `json:"bearing"`
+	ObservedAt time.Time        `json:"observedAt"`
 }
 
 const (
@@ -115,16 +117,19 @@ func UpdateRailDetailedAllocation(ctx context.Context, identifier string, detail
 		return redis_client.Client.Del(ctx, realtimeJourneyRailDetailedKey("allocation", identifier)).Err()
 	}
 
-	for trainIndex := range detailedRailInformation.Trains {
-		for carriageIndex := range detailedRailInformation.Trains[trainIndex].Carriages {
-			detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].Occupancy = -1
-			if detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].VehicleRole == "" {
-				detailedRailInformation.Trains[trainIndex].Carriages[carriageIndex].VehicleRole = ctdf.RailCarriageVehicleRoleUnknown
-			}
+	detailedRailInformation.Trains = slices.Clone(detailedRailInformation.Trains)
+	for i := range detailedRailInformation.Trains {
+		train := &detailedRailInformation.Trains[i]
+		train.Carriages = slices.Clone(train.Carriages)
+		for j := range train.Carriages {
+			train.Carriages[j].Occupancy = -1
 		}
 	}
 
-	detailedRailInformationJSON, err := json.Marshal(detailedRailInformation)
+	detailedRailInformationJSON, err := json.Marshal(storedRailAllocation{
+		JourneyDetailedRail: enrichRailDetailedAllocation(detailedRailInformation),
+		Enriched:            true,
+	})
 	if err != nil {
 		return err
 	}
@@ -257,22 +262,27 @@ func UpdateLocationDescription(ctx context.Context, identifier string, descripti
 	return redis_client.Client.Set(ctx, realtimeJourneyLocationDescriptionKey(identifier), description, realtimeJourneyTTL(ctx, identifier)).Err()
 }
 
-func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64) error {
-	return updateLocation(ctx, identifier, location, bearing, realtimeJourneyTTL(ctx, identifier))
+func UpdateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64, observedAt ...time.Time) error {
+	return updateLocation(ctx, identifier, location, bearing, realtimeJourneyTTL(ctx, identifier), observedAt...)
 }
 
-func UpdateLocationForRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney, location ctdf.Location, bearing float64) error {
+func UpdateLocationForRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney, location ctdf.Location, bearing float64, observedAt ...time.Time) error {
 	if realtimeJourney == nil {
 		return errors.New("realtime journey is required")
 	}
 
-	return updateLocation(ctx, realtimeJourney.PrimaryIdentifier, location, bearing, realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes))
+	return updateLocation(ctx, realtimeJourney.PrimaryIdentifier, location, bearing, realtimeJourneyExpiration(realtimeJourney.TimeoutDurationMinutes), observedAt...)
 }
 
-func updateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64, timeoutDuration time.Duration) error {
+func updateLocation(ctx context.Context, identifier string, location ctdf.Location, bearing float64, timeoutDuration time.Duration, observedAt ...time.Time) error {
+	updatedAt := time.Now()
+	if len(observedAt) > 0 && !observedAt[0].IsZero() {
+		updatedAt = observedAt[0]
+	}
 	locationJSON, err := json.Marshal(storedVehicleLocation{
-		Location: location,
-		Bearing:  bearing,
+		Location:   location,
+		Bearing:    bearing,
+		ObservedAt: updatedAt,
 	})
 	if err != nil {
 		return err

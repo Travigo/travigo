@@ -15,7 +15,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/source/localdepartureboard"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
-	"github.com/travigo/travigo/pkg/transforms"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -126,7 +125,6 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		}
 	}
 	servicesByRef := loadTFLBoardServices(services, realtimeJourneys)
-	transforms.Transform(tflOperator, 2)
 
 	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
 
@@ -248,7 +246,6 @@ func loadTFLBoardServices(services []*ctdf.Service, realtimeJourneys []ctdf.Real
 		if service == nil {
 			continue
 		}
-		transforms.Transform(service, 2)
 		servicesByRef[service.PrimaryIdentifier] = service
 	}
 
@@ -258,7 +255,6 @@ func loadTFLBoardServices(services []*ctdf.Service, realtimeJourneys []ctdf.Real
 			continue
 		}
 		if journey.Service != nil {
-			transforms.Transform(journey.Service, 2)
 			servicesByRef[journey.ServiceRef] = journey.Service
 		} else if journey.ServiceRef != "" && servicesByRef[journey.ServiceRef] == nil {
 			serviceRefs[journey.ServiceRef] = struct{}{}
@@ -297,7 +293,6 @@ func loadTFLBoardServices(services []*ctdf.Service, realtimeJourneys []ctdf.Real
 			log.Error().Err(err).Msg("Failed to decode TfL departure board service")
 			continue
 		}
-		transforms.Transform(&service, 2)
 		servicesByRef[service.PrimaryIdentifier] = &service
 		for _, identifier := range service.OtherIdentifiers {
 			servicesByRef[identifier] = &service

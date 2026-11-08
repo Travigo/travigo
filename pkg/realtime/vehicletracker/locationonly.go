@@ -20,6 +20,7 @@ func (consumer *BatchConsumer) updateRealtimeJourneyLocationOnly(journeyID strin
 			realtimeJourneyID,
 			vehicleUpdateEvent.VehicleLocationUpdate.Location,
 			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
+			vehicleUpdateEvent.RecordedAt,
 		)
 		telemetry.Observe(telemetry.Persistence, time.Since(start))
 		if err == nil {

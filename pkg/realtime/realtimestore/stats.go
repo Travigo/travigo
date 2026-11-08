@@ -2,7 +2,6 @@ package realtimestore
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 
 	"github.com/travigo/travigo/pkg/ctdf"
@@ -152,11 +151,8 @@ func applyRealtimeJourneyRailOverlays(ctx context.Context, identifiers []string,
 
 	for i, journey := range journeys {
 		var allocation, loading ctdf.JourneyDetailedRail
-		hasAllocation := allocationErr == nil && decodeRailOverlay(allocations[i], &allocation)
-		hasLoading := loadingErr == nil && decodeRailOverlay(loadings[i], &loading)
-		if hasAllocation {
-			allocation = enrichRailDetailedAllocation(allocation)
-		}
+		hasAllocation := allocationErr == nil && decodeRailOverlay(allocations[i], &allocation, true)
+		hasLoading := loadingErr == nil && decodeRailOverlay(loadings[i], &loading, false)
 
 		switch {
 		case hasAllocation && hasLoading:
@@ -169,12 +165,14 @@ func applyRealtimeJourneyRailOverlays(ctx context.Context, identifiers []string,
 	}
 }
 
-func decodeRailOverlay(value interface{}, rail *ctdf.JourneyDetailedRail) bool {
+func decodeRailOverlay(value interface{}, rail *ctdf.JourneyDetailedRail, allocation bool) bool {
 	valueString, ok := redisString(value)
 	if !ok || valueString == "" {
 		return false
 	}
-	return json.Unmarshal([]byte(valueString), rail) == nil
+	decoded, err := decodeRailDetailedPart(valueString, allocation)
+	*rail = decoded
+	return err == nil
 }
 
 func countCountries(datasources map[string]int) map[string]int {

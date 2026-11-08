@@ -2,14 +2,12 @@ package databaselookup
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -22,7 +20,7 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 	// permanently publish yesterday's service list from it, even after the cache
 	// later expires. Use generation-scoped entries or a fresh import snapshot when
 	// enriching indexes, and invalidate TfL-source selection when dependencies change.
-	cacheItemPath := fmt.Sprintf("cachedresults/servicesbystopquery/%s", q.Stop.PrimaryIdentifier)
+	cacheItemPath := cachedresults.ServicesByStopPrefix + q.Stop.PrimaryIdentifier
 	services, err := cachedresults.Get[[]*ctdf.Service](s.CachedResults, cacheItemPath)
 	if err == nil {
 		return services, nil
@@ -92,7 +90,6 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 			continue
 		}
 
-		transforms.Transform(&service, 1)
 		services = append(services, &service)
 		seenServices[service.PrimaryIdentifier] = struct{}{}
 	}

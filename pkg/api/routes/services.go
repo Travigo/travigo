@@ -8,7 +8,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
-	"github.com/travigo/travigo/pkg/transforms"
 )
 
 func ServicesRouter(router fiber.Router) {
@@ -29,7 +28,6 @@ func getService(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
-		transforms.Transform(service, 2)
 
 		if c.Query("view") == "web" {
 			reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-service-detail"}}, service)

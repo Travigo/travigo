@@ -13,7 +13,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -152,8 +151,6 @@ func getOperatorServices(c *fiber.Ctx) error {
 			services = append(services, &service)
 		}
 
-		transforms.Transform(services, 3)
-
 		if c.Query("view") == "web" {
 			reducedServices, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-service-summary"}}, services)
 			if marshalErr != nil {
@@ -173,8 +170,6 @@ func getOperatorById(identifier string) (*ctdf.Operator, error) {
 	operator, err := dataaggregator.Lookup[*ctdf.Operator](query.Operator{
 		AnyIdentifier: identifier,
 	})
-
-	transforms.Transform(operator, 2)
 
 	return operator, err
 }

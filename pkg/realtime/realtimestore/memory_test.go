@@ -2,6 +2,7 @@ package realtimestore
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -173,7 +174,7 @@ func TestRailAllocationRemainsAvailableForDay(t *testing.T) {
 	server := setupMemoryTestRedis(t)
 	ctx := context.Background()
 	detailed := ctdf.JourneyDetailedRail{
-		Trains: []ctdf.RailTrain{{ID: "unit-1", Carriages: []ctdf.RailCarriage{{ID: "A"}}}},
+		Trains: []ctdf.RailTrain{{ID: "unit-1", FleetID: "156", Carriages: []ctdf.RailCarriage{{ID: "A"}, {ID: "B"}}}},
 	}
 
 	if err := UpdateRailDetailedAllocation(ctx, "rail-journey", detailed); err != nil {
@@ -183,6 +184,21 @@ func TestRailAllocationRemainsAvailableForDay(t *testing.T) {
 	key := realtimeJourneyRailDetailedKey("allocation", "rail-journey")
 	if ttl := server.TTL(key); ttl != railAllocationTTL {
 		t.Fatalf("expected TTL %s, got %s", railAllocationTTL, ttl)
+	}
+	raw, err := server.Get(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stored storedRailAllocation
+	if err := json.Unmarshal([]byte(raw), &stored); err != nil {
+		t.Fatal(err)
+	}
+	if !stored.Enriched || stored.Trains[0].VehicleTypeName != "Class 156" ||
+		len(stored.Trains[0].Carriages[0].Toilets) == 0 || stored.Trains[0].Carriages[0].Occupancy != -1 {
+		t.Fatalf("allocation was not enriched before writing: %+v", stored)
+	}
+	if detailed.Trains[0].Carriages[0].Occupancy != 0 || detailed.Trains[0].VehicleType != "" {
+		t.Fatal("allocation write mutated the caller's train")
 	}
 }
 

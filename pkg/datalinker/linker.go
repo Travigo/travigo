@@ -10,6 +10,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/util"
@@ -171,9 +172,19 @@ func (l Linker[T]) Run() error {
 	// Delete any remaining manual merge entries from staging
 	stagingCollection.DeleteMany(context.Background(), bson.M{"primaryidentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
 
+	if l.objectName == "service" {
+		if err := enrichStagedServices(context.Background(), stagingCollection); err != nil {
+			return err
+		}
+	}
+
 	// Copy staging to live
 	if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
 		return err
+	}
+
+	if l.objectName == "service" {
+		cachedresults.DeletePrefix(cachedresults.ServicesByStopPrefix + "*")
 	}
 
 	compactLinkedCollections(context.Background(), rawCollectionName, liveCollectionName)

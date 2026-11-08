@@ -20,7 +20,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -117,7 +116,6 @@ func listStops(c *fiber.Ctx) error {
 				services, _ := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 					Stop: stop,
 				})
-				transforms.Transform(services, 1)
 				stop.Services = services
 			}
 		}()
@@ -157,8 +155,6 @@ func getStop(c *fiber.Ctx) error {
 		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 			Stop: stop,
 		})
-
-		transforms.Transform(stop, 3)
 
 		reduceGroupsName := []string{"basic", "detailed"}
 		if isLLM == "true" {
@@ -349,11 +345,9 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	destinationFallbacks, destinationServiceOverridesApplied := resolveDepartureBoardDestinationDisplays(departureBoard)
 	destinationDisplayDuration := time.Since(destinationDisplayStart)
 
-	currentTime := time.Now()
-	// Transforming the whole document is incredibly ineffecient
-	// Instead just transform the Operator & Service as those are the key values
-	nilDepartureItems, transformedOperators, transformedServices, reusedOperators, reusedServices := transformDepartureBoardReferences(departureBoard)
-	transformDuration := time.Since(currentTime)
+	operatorHydrationStart := time.Now()
+	hydrateDepartureBoardOperators(departureBoard)
+	operatorHydrationDuration := time.Since(operatorHydrationStart)
 
 	reduceGroupsName := []string{"basic"}
 	if isLLM == "true" {
@@ -378,18 +372,13 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 		Str("board_type", string(boardType)).
 		Int("entries_before_sort", beforeSortCount).
 		Int("entries_after_truncate", afterTruncateCount).
-		Int("nil_departure_items", nilDepartureItems).
 		Int("destination_fallbacks", destinationFallbacks).
 		Int("destination_service_overrides_applied", destinationServiceOverridesApplied).
-		Int("transformed_operators", transformedOperators).
-		Int("transformed_services", transformedServices).
-		Int("reused_operators", reusedOperators).
-		Int("reused_services", reusedServices).
 		Dur("stop_lookup_duration", stopLookupDuration).
 		Dur("board_lookup_duration", departureLookupDuration).
 		Dur("sort_duration", sortDuration).
 		Dur("destination_display_duration", destinationDisplayDuration).
-		Dur("transform_duration", transformDuration).
+		Dur("operator_hydration_duration", operatorHydrationDuration).
 		Dur("marshal_duration", marshalDuration).
 		Dur("total_duration", time.Since(requestStart)).
 		Msg("Stop board response stats")
@@ -398,8 +387,7 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 }
 
 func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBoard) (int, int) {
-	// Only selected entries reach this point. Share hydrated services with the
-	// transform pass so overrides and display fields use the same request data.
+	// Resolve service-specific names only for entries included in the response.
 	hydrateBoardServices(departureBoard)
 	refs := map[string]struct{}{}
 	for _, item := range departureBoard {
@@ -488,65 +476,20 @@ func resolveStopDisplayName(stop *ctdf.Stop, stopNameOverrides map[string]string
 	return stop.PrimaryName, false
 }
 
-func transformDepartureBoardReferences(departureBoard []*ctdf.DepartureBoard) (int, int, int, int, int) {
-	nilDepartureItems := 0
-	transformedOperators := 0
-	transformedServices := 0
-	reusedOperators := 0
-	reusedServices := 0
+func hydrateDepartureBoardOperators(departureBoard []*ctdf.DepartureBoard) {
 	operatorRefs := map[string]struct{}{}
-
 	for _, item := range departureBoard {
-		if item == nil || item.Journey == nil {
-			continue
-		}
-
-		if item.Journey.Operator == nil && item.Journey.OperatorRef != "" {
+		if item != nil && item.Journey != nil && item.Journey.Operator == nil && item.Journey.OperatorRef != "" {
 			operatorRefs[item.Journey.OperatorRef] = struct{}{}
 		}
-
 	}
 
 	operatorsByID := loadOperatorsByReferences(operatorRefs)
-
-	transformedOperatorPointers := map[*ctdf.Operator]struct{}{}
-	transformedServicePointers := map[*ctdf.Service]struct{}{}
-
 	for _, item := range departureBoard {
-		if item == nil || item.Journey == nil {
-			nilDepartureItems++
-			continue
-		}
-
-		operatorKey := item.Journey.OperatorRef
-		if operatorKey == "" && item.Journey.Operator != nil {
-			operatorKey = item.Journey.Operator.PrimaryIdentifier
-		}
-		if item.Journey.Operator == nil && operatorKey != "" {
-			item.Journey.Operator = operatorsByID[operatorKey]
-		}
-		if item.Journey.Operator != nil {
-			if _, alreadyTransformed := transformedOperatorPointers[item.Journey.Operator]; alreadyTransformed {
-				reusedOperators++
-			} else {
-				transforms.Transform(item.Journey.Operator, 1)
-				transformedOperatorPointers[item.Journey.Operator] = struct{}{}
-				transformedOperators++
-			}
-		}
-
-		if item.Journey.Service != nil {
-			if _, alreadyTransformed := transformedServicePointers[item.Journey.Service]; alreadyTransformed {
-				reusedServices++
-			} else {
-				transforms.Transform(item.Journey.Service, 1)
-				transformedServicePointers[item.Journey.Service] = struct{}{}
-				transformedServices++
-			}
+		if item != nil && item.Journey != nil && item.Journey.Operator == nil {
+			item.Journey.Operator = operatorsByID[item.Journey.OperatorRef]
 		}
 	}
-
-	return nilDepartureItems, transformedOperators, transformedServices, reusedOperators, reusedServices
 }
 
 func loadOperatorsByReferences(refs map[string]struct{}) map[string]*ctdf.Operator {

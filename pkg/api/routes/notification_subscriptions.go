@@ -11,7 +11,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/transforms"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -206,13 +205,11 @@ func populateNotificationSubscription(subscription *ctdf.UserNotificationSubscri
 		subscription.Subject, _ = dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: subscription.Values.StopRef})
 	} else if subscription.Values.ServiceRef != "" {
 		service, _ := dataaggregator.Lookup[*ctdf.Service](query.Service{PrimaryIdentifier: subscription.Values.ServiceRef})
-		transforms.Transform(service, 1)
 		subscription.Subject = service
 	} else if subscription.Values.JourneyRef != "" {
 		journey, _ := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: subscription.Values.JourneyRef})
 		if journey != nil {
 			journey.GetReferences()
-			transforms.Transform(journey.Service, 1)
 			if len(journey.Path) > 0 {
 				journey.Path[0].GetOriginStop()
 				if journey.Path[0].OriginStop != nil {

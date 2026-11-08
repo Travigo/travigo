@@ -79,8 +79,8 @@ func TestBoardDisplayBatchAndProjection(t *testing.T) {
 			mt.Fatal("arrival fallback lost")
 		}
 		// Reusing attached services must not trigger another service query, even for
-		// multiple entries; transform has no operator work in this fixture.
-		transformDepartureBoardReferences(board)
+		// multiple entries; this fixture has no operators to hydrate.
+		hydrateDepartureBoardOperators(board)
 		events := mt.GetAllStartedEvents()
 		if len(events) != 2 {
 			mt.Fatalf("got %d reads, want one service and one stop batch", len(events))

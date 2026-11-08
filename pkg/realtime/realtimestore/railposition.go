@@ -46,6 +46,7 @@ func RecordRailObservation(ctx context.Context, journey *ctdf.RealtimeJourney, o
 			changed = true
 			previous.Location = *point
 			previous.Position = &observation
+			previous.ObservedAt = observation.ObservedAt
 			raw, err = json.Marshal(previous)
 			if err != nil {
 				return err
