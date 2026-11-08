@@ -68,7 +68,7 @@ func RegisterCLI() *cli.Command {
 					},
 					&cli.BoolFlag{
 						Name:  "skip-staging",
-						Usage: "Incrementally publish datasets updated in the last 24 hours without a staging collection (journeys only)",
+						Usage: "Incrementally publish changed journey datasets with per-dataset checkpoints",
 					},
 					&cli.IntFlag{
 						Name:  "oplog-clear-size-mb",

@@ -15,8 +15,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const recentlyUpdatedDatasetWindow = 24 * time.Hour
-
 type PlainCopyConfig struct {
 	SkipStaging bool
 }
@@ -37,8 +35,10 @@ func (l PlainCopyLinker) collectionNames() (string, string, string) {
 func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 	liveCollectionName, rawCollectionName, stagingCollectionName := l.collectionNames()
 
+	ctx := context.Background()
+	linkerDataset := datasetversion.LinkerDataset(l.objectName)
 	if config.SkipStaging {
-		if err := l.publishRecentlyUpdatedDatasets(context.Background(), rawCollectionName, liveCollectionName, time.Now().Add(-recentlyUpdatedDatasetWindow)); err != nil {
+		if err := publishUpdatedDatasets(ctx, rawCollectionName, liveCollectionName, linkerDataset); err != nil {
 			return err
 		}
 	} else {
@@ -53,129 +53,123 @@ func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 		}
 	}
 
-	return datasetversion.Upsert(context.Background(), ctdf.DatasetVersion{
-		Dataset:      datasetversion.LinkerDataset(l.objectName),
+	return datasetversion.Upsert(ctx, ctdf.DatasetVersion{
+		Dataset:      linkerDataset,
 		LastModified: time.Now(),
 	})
 }
 
-func (l PlainCopyLinker) publishRecentlyUpdatedDatasets(ctx context.Context, rawCollectionName string, liveCollectionName string, updatedAfter time.Time) error {
-	datasetIDs, err := recentlyUpdatedDatasetIDs(ctx, updatedAfter)
+func publishUpdatedDatasets(ctx context.Context, rawCollectionName, liveCollectionName, linkerDataset string) error {
+	versions := database.GetCollection("dataset_versions")
+	pending, err := pendingJourneyDatasets(ctx, versions, linkerDataset)
 	if err != nil {
 		return err
-	}
-	if len(datasetIDs) == 0 {
-		log.Info().Time("updated_after", updatedAfter).Msg("No recently updated datasets to publish")
-		return nil
 	}
 
 	rawCollection := database.GetCollection(rawCollectionName)
 	liveCollection := database.GetCollection(liveCollectionName)
-	datasetFilter := bson.M{"datasource.datasetid": bson.M{"$in": datasetIDs}}
+	log.Info().Int("datasets", len(pending)).Msg("Publishing changed journey datasets without staging")
+	for _, version := range pending {
+		log.Info().Str("dataset", version.Dataset).Time("version", version.LastModified).Msg("Publishing journey dataset")
+		deleted, err := publishJourneyDataset(ctx, rawCollection, liveCollection, version.Dataset)
+		if err != nil {
+			return fmt.Errorf("publish journey dataset %s: %w", version.Dataset, err)
+		}
 
-	timestampsByDataset, err := currentDatasetTimestamps(ctx, rawCollection, datasetFilter)
-	if err != nil {
-		return err
+		// Save the observed source version, so an import that finished during
+		// publication is still picked up on the next run.
+		result, err := versions.UpdateMany(ctx, bson.M{"dataset": version.Dataset}, bson.M{
+			"$max": bson.M{"publishedjourneysversion": version.LastModified},
+		})
+		if err != nil {
+			return fmt.Errorf("checkpoint journey dataset %s: %w", version.Dataset, err)
+		}
+		if result.MatchedCount == 0 {
+			return fmt.Errorf("checkpoint journey dataset %s: source version disappeared", version.Dataset)
+		}
+		log.Info().Str("dataset", version.Dataset).Int64("deleted", deleted).Msg("Published journey dataset")
 	}
-
-	log.Info().
-		Int("datasets", len(datasetIDs)).
-		Time("updated_after", updatedAfter).
-		Msg("Publishing recently updated datasets without staging")
-
-	mergePipeline := incrementalMergePipeline(datasetFilter, liveCollectionName)
-	cursor, err := rawCollection.Aggregate(ctx, mergePipeline)
-	if err != nil {
-		return fmt.Errorf("publish recently updated datasets to %s: %w", liveCollectionName, err)
-	}
-	if err := cursor.Close(ctx); err != nil {
-		return fmt.Errorf("close recent dataset publisher cursor: %w", err)
-	}
-	if err := cursor.Err(); err != nil {
-		return fmt.Errorf("publish recently updated datasets to %s: %w", liveCollectionName, err)
-	}
-
-	deleteModels := make([]mongo.WriteModel, 0, len(datasetIDs))
-	for _, datasetID := range datasetIDs {
-		filter := staleDatasetRecordsFilter(datasetID, timestampsByDataset[datasetID])
-		deleteModels = append(deleteModels, mongo.NewDeleteManyModel().SetFilter(filter))
-	}
-
-	result, err := liveCollection.BulkWrite(ctx, deleteModels, options.BulkWrite().SetOrdered(false))
-	if err != nil {
-		return fmt.Errorf("delete stale records from %s: %w", liveCollectionName, err)
-	}
-	log.Info().
-		Int("datasets", len(datasetIDs)).
-		Int64("deleted", result.DeletedCount).
-		Msg("Published recently updated datasets")
-
 	return nil
 }
 
-func recentlyUpdatedDatasetIDs(ctx context.Context, updatedAfter time.Time) ([]string, error) {
-	cursor, err := database.GetCollection("dataset_versions").Find(
-		ctx,
-		bson.M{"lastmodified": bson.M{"$gte": updatedAfter}},
-		options.Find().SetProjection(bson.M{"dataset": 1}),
+func pendingJourneyDatasets(ctx context.Context, versions *mongo.Collection, linkerDataset string) ([]ctdf.DatasetVersion, error) {
+	cursor, err := versions.Find(ctx, bson.M{"dataset": bson.M{"$nin": []string{"", linkerDataset}}},
+		options.Find().SetProjection(bson.M{
+			"dataset": 1, "lastmodified": 1, "rawjourneysmodified": 1, "publishedjourneysversion": 1,
+		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("find recently updated datasets: %w", err)
+		return nil, fmt.Errorf("find journey dataset versions: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	datasetIDSet := map[string]struct{}{}
+	pendingByDataset := map[string]ctdf.DatasetVersion{}
 	for cursor.Next(ctx) {
 		var version ctdf.DatasetVersion
 		if err := cursor.Decode(&version); err != nil {
-			return nil, fmt.Errorf("decode recently updated dataset: %w", err)
+			return nil, fmt.Errorf("decode journey dataset version: %w", err)
 		}
-		if version.Dataset != "" {
-			datasetIDSet[version.Dataset] = struct{}{}
+		if version.RawJourneysModified.After(version.LastModified) {
+			version.LastModified = version.RawJourneysModified
+		}
+		if version.Dataset == "" || !version.LastModified.After(version.PublishedJourneysVersion) {
+			continue
+		}
+		if version.LastModified.After(pendingByDataset[version.Dataset].LastModified) {
+			pendingByDataset[version.Dataset] = version
 		}
 	}
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("iterate recently updated datasets: %w", err)
+		return nil, fmt.Errorf("iterate journey dataset versions: %w", err)
 	}
 
-	datasetIDs := make([]string, 0, len(datasetIDSet))
-	for datasetID := range datasetIDSet {
-		datasetIDs = append(datasetIDs, datasetID)
+	pending := make([]ctdf.DatasetVersion, 0, len(pendingByDataset))
+	for _, version := range pendingByDataset {
+		pending = append(pending, version)
 	}
-	sort.Strings(datasetIDs)
-	return datasetIDs, nil
+	sort.Slice(pending, func(i, j int) bool { return pending[i].Dataset < pending[j].Dataset })
+	return pending, nil
 }
 
-func currentDatasetTimestamps(ctx context.Context, rawCollection *mongo.Collection, datasetFilter bson.M) (map[string][]string, error) {
-	pipeline := mongo.Pipeline{
-		bson.D{{Key: "$match", Value: datasetFilter}},
-		bson.D{{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: "$datasource.datasetid"},
-			{Key: "timestamps", Value: bson.D{{Key: "$addToSet", Value: "$datasource.timestamp"}}},
-		}}},
+func publishJourneyDataset(ctx context.Context, rawCollection, liveCollection *mongo.Collection, datasetID string) (int64, error) {
+	datasetFilter := bson.M{"datasource.datasetid": datasetID}
+	currentTimestamps, err := currentDatasetTimestamps(ctx, rawCollection, datasetFilter)
+	if err != nil {
+		return 0, err
 	}
-	cursor, err := rawCollection.Aggregate(ctx, pipeline)
+
+	cursor, err := rawCollection.Aggregate(ctx, incrementalMergePipeline(datasetFilter, liveCollection.Name()))
+	if err != nil {
+		return 0, fmt.Errorf("merge journeys: %w", err)
+	}
+	if err := cursor.Close(ctx); err != nil {
+		return 0, fmt.Errorf("close journey publisher cursor: %w", err)
+	}
+	if err := cursor.Err(); err != nil {
+		return 0, fmt.Errorf("merge journeys: %w", err)
+	}
+
+	result, err := liveCollection.DeleteMany(ctx, staleDatasetRecordsFilter(datasetID, currentTimestamps))
+	if err != nil {
+		return 0, fmt.Errorf("delete stale journeys: %w", err)
+	}
+	return result.DeletedCount, nil
+}
+
+func currentDatasetTimestamps(ctx context.Context, rawCollection *mongo.Collection, datasetFilter bson.M) ([]string, error) {
+	values, err := rawCollection.Distinct(ctx, "datasource.timestamp", datasetFilter)
 	if err != nil {
 		return nil, fmt.Errorf("load current raw dataset timestamps: %w", err)
 	}
-	defer cursor.Close(ctx)
-
-	timestampsByDataset := map[string][]string{}
-	for cursor.Next(ctx) {
-		var result struct {
-			DatasetID  string   `bson:"_id"`
-			Timestamps []string `bson:"timestamps"`
+	timestamps := make([]string, 0, len(values))
+	for _, value := range values {
+		timestamp, ok := value.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid raw dataset timestamp type %T", value)
 		}
-		if err := cursor.Decode(&result); err != nil {
-			return nil, fmt.Errorf("decode current raw dataset timestamps: %w", err)
-		}
-		timestampsByDataset[result.DatasetID] = result.Timestamps
+		timestamps = append(timestamps, timestamp)
 	}
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("iterate current raw dataset timestamps: %w", err)
-	}
-
-	return timestampsByDataset, nil
+	return timestamps, nil
 }
 
 func staleDatasetRecordsFilter(datasetID string, currentTimestamps []string) bson.M {

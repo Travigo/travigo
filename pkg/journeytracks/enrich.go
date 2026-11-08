@@ -89,6 +89,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 	log.Info().Int("services", len(services)).Int("routes", len(routes)).Msg("Loaded journey track enrichment inputs")
 	totalScanned := 0
 	totalUpdated := 0
+	changedRawDatasets := map[string]struct{}{}
 	for serviceIndex, service := range services {
 		candidates := append([]Route{}, routesByServiceName[serviceKey(service.TransportType, service.LineName())]...)
 		serviceRefs := append([]string{service.PrimaryIdentifier}, service.OtherIdentifiers...)
@@ -99,7 +100,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 			continue
 		}
 		startedAt := time.Now()
-		stats, err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, keepFallback, ownedTrackRefs, writeCollectionNames)
+		stats, err := applyServiceJourneys(ctx, serviceRefs, candidates, readCollectionName, keepFallback, ownedTrackRefs, writeCollectionNames, changedRawDatasets)
 		if err != nil {
 			return err
 		}
@@ -114,6 +115,21 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 			Int("write_batches", stats.Batches).
 			Dur("elapsed", time.Since(startedAt)).
 			Msg("Applied journey tracks for service")
+	}
+	// OSM track enrichment changes raw journeys without reimporting their
+	// source datasets. Make those datasets eligible for publication again.
+	if len(changedRawDatasets) > 0 {
+		datasetIDs := make([]string, 0, len(changedRawDatasets))
+		for datasetID := range changedRawDatasets {
+			datasetIDs = append(datasetIDs, datasetID)
+		}
+		_, err := database.GetCollection("dataset_versions").UpdateMany(ctx,
+			bson.M{"dataset": bson.M{"$in": datasetIDs}},
+			bson.M{"$max": bson.M{"rawjourneysmodified": time.Now()}},
+		)
+		if err != nil {
+			return fmt.Errorf("mark enriched raw journey datasets for publication: %w", err)
+		}
 	}
 	log.Info().Int("services", len(services)).Int("journeys_scanned", totalScanned).Int("journeys_updated", totalUpdated).Msg("Completed journey track enrichment")
 	return nil
@@ -255,7 +271,7 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, 
 	return flush()
 }
 
-func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, keepFallback bool, ownedTrackRefs map[string]struct{}, writeCollectionNames []string) (serviceJourneyStats, error) {
+func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, keepFallback bool, ownedTrackRefs map[string]struct{}, writeCollectionNames []string, changedRawDatasets map[string]struct{}) (serviceJourneyStats, error) {
 	stats := serviceJourneyStats{}
 	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
 	cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
@@ -293,6 +309,9 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 			return stats, err
 		}
 		if changed {
+			if keepFallback && journey.DataSource != nil && journey.DataSource.DatasetID != "" {
+				changedRawDatasets[journey.DataSource.DatasetID] = struct{}{}
+			}
 			models = append(models, journeyPathUpdate(&journey))
 			stats.Updated++
 			if len(models) == journeyPathUpdateBatchSize {
