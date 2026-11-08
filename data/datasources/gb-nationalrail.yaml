@@ -99,6 +99,13 @@ overrides:
       fallback: true
       set:
         colour: "#43165c"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-SE]  # South Eastern
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#1e1e50"
+        secondarycolour: "#32bef0"
 datasets:
 - identifier: toc
   format: gb-nationalrailtoc
