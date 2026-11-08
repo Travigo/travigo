@@ -81,6 +81,21 @@ overrides:
       fallback: true
       set:
         colour: "#F2C900"
+    - datasets: ["gb-nationalrail-toc"]
+      operators: [gb-toc-GR]  # LNER
+      transporttypes: [Rail]
+      set:
+        colour: "#ce0e2d"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-TL]  # Thameslink
+      transporttypes: [Rail]
+      set:
+        colour: "#ced0d2"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-GN]  # Great Northern
+      transporttypes: [Rail]
+      set:
+        colour: "#43165c"
 datasets:
 - identifier: toc
   format: gb-nationalrailtoc
