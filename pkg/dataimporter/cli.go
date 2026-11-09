@@ -1,6 +1,7 @@
 package dataimporter
 
 import (
+	"math/rand/v2"
 	"os"
 	"os/signal"
 	"runtime"
@@ -196,7 +197,7 @@ func RegisterCLI() *cli.Command {
 								executionDuration := time.Since(startTime)
 								log.Info().Str("id", dataset.Identifier).Msgf("Operation took %s", executionDuration.String())
 
-								waitTime := repeatDuration - executionDuration
+								waitTime := repeatDuration - executionDuration + (time.Duration(rand.IntN(10)) * time.Second)
 
 								if waitTime.Seconds() > 0 {
 									time.Sleep(waitTime)
