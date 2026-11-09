@@ -37,7 +37,7 @@ func RegisterCLI() *cli.Command {
 					redisConsumer := consumer.RedisConsumer{
 						QueueName:       "events-queue",
 						NumberConsumers: 5,
-						BatchSize:       20,
+						BatchSize:       100,
 						Timeout:         2 * time.Second,
 						Consumer:        NewEventsBatchConsumer(),
 					}
