@@ -10,10 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const (
-	StopTransfersDataset = "stop-transfers"
-	StopsIndexerDataset  = "indexer-stops"
-)
+const StopTransfersDataset = "stop-transfers"
 
 func LinkerDataset(objectName string) string {
 	return "linker-" + objectName + "s"

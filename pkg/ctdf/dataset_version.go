@@ -10,4 +10,5 @@ type DatasetVersion struct {
 
 	RawJourneysModified      time.Time `bson:",omitempty"`
 	PublishedJourneysVersion time.Time `bson:",omitempty"`
+	IndexedStopsVersion      time.Time `bson:",omitempty"`
 }

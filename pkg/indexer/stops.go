@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"strings"
 	"sync"
@@ -16,61 +16,75 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
-	"github.com/travigo/travigo/pkg/datasetversion"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
-	"github.com/kr/pretty"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 )
 
-func IndexStops() error {
-	ctx := context.Background()
-	lastIndexerVersion := ctdf.DatasetVersion{}
-	indexerVersionErr := database.GetCollection("dataset_versions").FindOne(ctx, bson.M{
-		"dataset": datasetversion.StopsIndexerDataset,
-	}).Decode(&lastIndexerVersion)
-	firstRun := indexerVersionErr != nil
-
+func IndexStops(ctx context.Context) error {
+	versions := database.GetCollection("dataset_versions")
 	for _, dataset := range manager.GetRegisteredDataSets() {
 		if !dataset.SupportedObjects.Stops ||
 			dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue ||
 			dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
 			continue
 		}
-
-		sourceVersion := ctdf.DatasetVersion{}
-		if err := database.GetCollection("dataset_versions").FindOne(ctx, bson.M{
-			"dataset": dataset.Identifier,
-		}).Decode(&sourceVersion); err != nil {
-			continue
+		if err := indexStopDataset(ctx, versions, dataset.Identifier); err != nil {
+			return fmt.Errorf("index stop dataset %s: %w", dataset.Identifier, err)
 		}
+	}
+	return nil
+}
 
-		indexName := stopDatasetIndexName(dataset.Identifier)
-		// Performance Review [Set N] [PR093] [P1] (indexing): These documents embed services/branding
-		// derived from journey, service and transform data, but this skip decision
-		// watches only the stop dataset. Timetable/operator changes can leave search
-		// stale indefinitely. Record the consumed dependency generations per index
-		// and rebuild affected stops when any of those inputs changes.
-		if !firstRun && !sourceVersion.LastModified.After(lastIndexerVersion.LastModified) && indexExists(indexName) {
-			continue
-		}
-
-		// Performance Review [Set N] [PR094] [P1] (indexing): Deleting the serving index exposes an
-		// empty/partial replacement while asynchronous bulk writes are in flight.
-		// Build a versioned index, verify all reads/writes and refresh completion,
-		// then atomically switch a serving alias. Search must use that alias rather
-		// than the current wildcard, and overlapping builders need publication guards
-		// before retiring the previous successful index.
-		deleteIndex(indexName)
-		createStopIndex(indexName)
-		indexStopsFromMongo(indexName, dataset.Identifier)
+func indexStopDataset(ctx context.Context, versions *mongo.Collection, datasetID string) error {
+	filter := bson.M{"dataset": datasetID}
+	var source ctdf.DatasetVersion
+	err := versions.FindOne(ctx, filter).Decode(&source)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load dataset version: %w", err)
 	}
 
+	indexName := stopDatasetIndexName(datasetID)
+	// This comparison tracks the stop import. Service and journey dependencies
+	// embedded in the index have their own refresh lifecycle.
+	if !source.IndexedStopsVersion.IsZero() && !source.LastModified.After(source.IndexedStopsVersion) {
+		exists, err := indexExists(ctx, indexName)
+		if err != nil {
+			return err
+		}
+		if exists {
+			return nil
+		}
+
+		// The rebuild will create the index before it finishes writing. Clear
+		// the old checkpoint so a retry cannot mistake a partial index for success.
+		if _, err := versions.UpdateOne(ctx, filter, bson.M{"$unset": bson.M{"indexedstopsversion": ""}}); err != nil {
+			return fmt.Errorf("clear checkpoint for missing index: %w", err)
+		}
+	}
+
+	log.Info().Str("dataset", datasetID).Time("version", source.LastModified).Msg("Indexing stop dataset")
+	if err := rebuildStopIndex(ctx, indexName, datasetID); err != nil {
+		return err
+	}
+	result, err := versions.UpdateOne(ctx, filter, bson.M{"$max": bson.M{"indexedstopsversion": source.LastModified}})
+	if err != nil {
+		return fmt.Errorf("save stop index checkpoint: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("save stop index checkpoint: source version disappeared")
+	}
+	log.Info().Str("dataset", datasetID).Msg("Indexed stop dataset")
 	return nil
 }
 
@@ -78,30 +92,38 @@ func stopDatasetIndexName(dataset string) string {
 	return fmt.Sprintf("travigo-stops-%s", dataset)
 }
 
-func indexExists(indexName string) bool {
-	// Performance Review [Set D] [PR095] [P2] (indexing): Exists/Delete/Create responses all need
-	// their bodies closed, including non-success statuses. Create currently prints
-	// its body without checking IsError, so a rejected mapping can be followed by
-	// bulk writes into an unintended/default index. Return checked operation errors
-	// to IndexStops and release HTTP resources before proceeding to the next dataset.
-	resp, err := elastic_client.Client.Indices.Exists([]string{indexName})
+func indexExists(ctx context.Context, indexName string) (bool, error) {
+	request := esapi.IndicesExistsRequest{Index: []string{indexName}}
+	resp, err := request.Do(ctx, elastic_client.Client)
 	if err != nil {
-		log.Error().Err(err).Str("index", indexName).Msg("Failed to check stop index")
-		return false
+		return false, fmt.Errorf("check stop index: %w", err)
 	}
-	return resp.StatusCode == 200
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		return false, nil
+	}
+	if resp.StatusCode != 200 {
+		return false, fmt.Errorf("check stop index: %s", resp.Status())
+	}
+	return true, nil
 }
 
-func deleteIndex(indexName string) {
-	deleteReq := esapi.IndicesDeleteRequest{Index: []string{indexName}}
-	resp, err := deleteReq.Do(context.Background(), elastic_client.Client)
-	if err != nil || (resp != nil && resp.StatusCode != 404 && resp.IsError()) {
-		log.Error().Err(err).Str("index", indexName).Msg("Failed to delete stop index")
+func deleteIndex(ctx context.Context, indexName string) error {
+	request := esapi.IndicesDeleteRequest{Index: []string{indexName}}
+	resp, err := request.Do(ctx, elastic_client.Client)
+	if err != nil {
+		return fmt.Errorf("delete stop index: %w", err)
 	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 404 && resp.IsError() {
+		return fmt.Errorf("delete stop index: %s", resp.Status())
+	}
+	return nil
 }
 
-func deleteLegacyStopIndexes() {
+func deleteLegacyStopIndexes(ctx context.Context) {
 	resp, err := elastic_client.Client.Cat.Indices(
+		elastic_client.Client.Cat.Indices.WithContext(ctx),
 		elastic_client.Client.Cat.Indices.WithIndex("travigo-stops-*"),
 		elastic_client.Client.Cat.Indices.WithFormat("json"),
 	)
@@ -122,12 +144,14 @@ func deleteLegacyStopIndexes() {
 	legacyPattern := regexp.MustCompile(`^travigo-stops-[0-9]+$`)
 	for _, index := range indexes {
 		if legacyPattern.MatchString(index.Index) {
-			deleteIndex(index.Index)
+			if err := deleteIndex(ctx, index.Index); err != nil {
+				log.Error().Err(err).Str("index", index.Index).Msg("Failed to delete legacy stop index")
+			}
 		}
 	}
 }
 
-func createStopIndex(indexName string) {
+func createStopIndex(ctx context.Context, indexName string) error {
 	// Performance Review [Set N] [PR096] [P2] (indexing): searchStops queries
 	// OtherIdentifiers.search_as_you_type, but this mapping creates only text and
 	// keyword fields there; identifier-prefix searches cannot use the requested
@@ -210,16 +234,82 @@ func createStopIndex(indexName string) {
 
 	indexReq := esapi.IndicesCreateRequest{
 		Index: indexName,
-		Body:  strings.NewReader(string(mapping)),
+		Body:  strings.NewReader(mapping),
 	}
 
-	resp, err := indexReq.Do(context.Background(), elastic_client.Client)
+	resp, err := indexReq.Do(ctx, elastic_client.Client)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create index")
+		return fmt.Errorf("create stop index: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.IsError() {
+		return fmt.Errorf("create stop index: %s", resp.String())
+	}
+	var result struct {
+		Acknowledged bool `json:"acknowledged"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode stop index creation result: %w", err)
+	}
+	if !result.Acknowledged {
+		return fmt.Errorf("stop index creation was not acknowledged")
+	}
+	return nil
+}
+
+func rebuildStopIndex(ctx context.Context, indexName, datasetID string) error {
+	// Stop search uses the dataset index directly. Replacing it in place
+	// preserves that contract, but it can be partial until the rebuild finishes.
+	if err := deleteIndex(ctx, indexName); err != nil {
+		return err
+	}
+	if err := createStopIndex(ctx, indexName); err != nil {
+		return err
 	}
 
-	responseBytes, _ := io.ReadAll(resp.Body)
-	pretty.Println(string(responseBytes))
+	bulk, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
+		Client:        elastic_client.Client,
+		Index:         indexName,
+		FlushInterval: 15 * time.Second,
+		OnError: func(_ context.Context, err error) {
+			log.Error().Err(err).Str("index", indexName).Msg("Stop index bulk request failed")
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("create stop bulk indexer: %w", err)
+	}
+	indexErr := indexStopsFromMongo(ctx, datasetID, bulk)
+	closeErr := bulk.Close(ctx)
+	if err := errors.Join(indexErr, closeErr); err != nil {
+		return err
+	}
+	stats := bulk.Stats()
+	if stats.NumFailed != 0 || stats.NumIndexed != stats.NumAdded {
+		return fmt.Errorf("stop index bulk writes incomplete: indexed %d of %d stops (%d failed)", stats.NumIndexed, stats.NumAdded, stats.NumFailed)
+	}
+
+	refresh := esapi.IndicesRefreshRequest{Index: []string{indexName}}
+	resp, err := refresh.Do(ctx, elastic_client.Client)
+	if err != nil {
+		return fmt.Errorf("refresh stop index: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.IsError() {
+		return fmt.Errorf("refresh stop index: %s", resp.String())
+	}
+	var result struct {
+		Shards struct {
+			Successful int `json:"successful"`
+			Failed     int `json:"failed"`
+		} `json:"_shards"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode stop index refresh result: %w", err)
+	}
+	if result.Shards.Failed > 0 || result.Shards.Successful == 0 {
+		return fmt.Errorf("stop index refresh incomplete: %d successful shards, %d failed", result.Shards.Successful, result.Shards.Failed)
+	}
+	return nil
 }
 
 type basicService struct {
@@ -234,16 +324,15 @@ type basicService struct {
 
 const railDepartureBoardWarmConcurrency = 4
 
-func indexStopsFromMongo(indexName string, datasetID string) {
+func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.BulkIndexer) error {
 	now := time.Now()
 	stopsCollection := database.GetCollection("stops")
 
-	cursor, err := stopsCollection.Find(context.Background(), bson.M{"datasource.datasetid": datasetID})
+	cursor, err := stopsCollection.Find(ctx, bson.M{"datasource.datasetid": datasetID})
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to fetch stops for indexing")
-		return
+		return fmt.Errorf("fetch stops: %w", err)
 	}
-	defer cursor.Close(context.Background())
+	defer cursor.Close(ctx)
 
 	railWarmJobs := make(chan *ctdf.Stop, railDepartureBoardWarmConcurrency)
 	var railWarmGroup sync.WaitGroup
@@ -276,34 +365,42 @@ func indexStopsFromMongo(indexName string, datasetID string) {
 	indexedStops := 0
 	railIndexedStops := 0
 
-	for cursor.Next(context.Background()) {
-		var stop *ctdf.Stop
-		err := cursor.Decode(&stop)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode stop for indexing")
-			continue
+	defer func() {
+		close(railWarmJobs)
+		railWarmGroup.Wait()
+		log.Info().
+			Int("total_stops", totalStops).
+			Int("indexed_stops", indexedStops).
+			Int("rail_indexed_stops", railIndexedStops).
+			Int("inactive_skipped", inactiveSkipped).
+			Int("rail_inactive_skipped", railInactiveSkipped).
+			Int64("rail_cache_warm_requested", railWarmRequested.Load()).
+			Int64("rail_cache_warm_completed", railWarmCompleted.Load()).
+			Int64("rail_cache_warm_errors", railWarmErrors.Load()).
+			Msg("Scanned stops for indexing")
+	}()
+
+	for cursor.Next(ctx) {
+		var stop ctdf.Stop
+		if err := cursor.Decode(&stop); err != nil {
+			return fmt.Errorf("decode stop: %w", err)
 		}
 
 		totalStops++
 
 		if !stop.Active {
 			inactiveSkipped++
-			if stopHasTransportType(stop, ctdf.TransportTypeRail) {
+			if stopHasTransportType(&stop, ctdf.TransportTypeRail) {
 				railInactiveSkipped++
 			}
 			continue
 		}
 
-		var services []*ctdf.Service
+		services, err := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: &stop})
+		if err != nil {
+			return fmt.Errorf("load services for stop %s: %w", stop.PrimaryIdentifier, err)
+		}
 		var basicServices []*basicService
-		// Performance Review [Set N] [PR097] [P1] (indexing): Enrichment errors are discarded, yet
-		// this stop is indexed with no services and counted as complete. Cursor/decode
-		// failures likewise do not fail IndexStops. Return/aggregate failures
-		// and verify expected document counts before publishing or advancing progress;
-		// otherwise a transient dependency outage persists in the serving index.
-		services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-			Stop: stop,
-		})
 
 		// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
 		// Performance Review [Set N] [PR098] [P2] (indexing): Sending to this small warm-up queue
@@ -313,7 +410,11 @@ func indexStopsFromMongo(indexName string, datasetID string) {
 		// publication and warm only versioned static cache entries with a time budget.
 		if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
 			railWarmRequested.Add(1)
-			railWarmJobs <- stop
+			select {
+			case railWarmJobs <- &stop:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
 
 		for _, service := range services {
@@ -328,7 +429,7 @@ func indexStopsFromMongo(indexName string, datasetID string) {
 			})
 		}
 
-		jsonStop, _ := json.Marshal(map[string]interface{}{
+		jsonStop, err := json.Marshal(map[string]interface{}{
 			"PrimaryIdentifier": stop.PrimaryIdentifier,
 			"OtherIdentifiers":  stop.OtherIdentifiers,
 			"PrimaryName":       stop.PrimaryName,
@@ -338,28 +439,29 @@ func indexStopsFromMongo(indexName string, datasetID string) {
 			"Services":          basicServices,
 		})
 
-		elastic_client.IndexRequestWithID(indexName, stop.PrimaryIdentifier, bytes.NewReader(jsonStop))
+		if err != nil {
+			return fmt.Errorf("encode stop %s: %w", stop.PrimaryIdentifier, err)
+		}
+		err = bulk.Add(ctx, esutil.BulkIndexerItem{
+			DocumentID: stop.PrimaryIdentifier,
+			Action:     "index",
+			Body:       bytes.NewReader(jsonStop),
+			OnFailure: func(_ context.Context, item esutil.BulkIndexerItem, response esutil.BulkIndexerResponseItem, err error) {
+				log.Error().Err(err).Str("stop", item.DocumentID).Str("reason", response.Error.Reason).Msg("Failed to index stop")
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("queue stop %s: %w", stop.PrimaryIdentifier, err)
+		}
 		indexedStops++
-		if stopHasTransportType(stop, ctdf.TransportTypeRail) {
+		if stopHasTransportType(&stop, ctdf.TransportTypeRail) {
 			railIndexedStops++
 		}
 	}
 	if err := cursor.Err(); err != nil {
-		log.Error().Err(err).Msg("Failed while iterating stops for indexing")
+		return fmt.Errorf("iterate stops: %w", err)
 	}
-	close(railWarmJobs)
-	railWarmGroup.Wait()
-
-	log.Info().
-		Int("total_stops", totalStops).
-		Int("indexed_stops", indexedStops).
-		Int("rail_indexed_stops", railIndexedStops).
-		Int("inactive_skipped", inactiveSkipped).
-		Int("rail_inactive_skipped", railInactiveSkipped).
-		Int64("rail_cache_warm_requested", railWarmRequested.Load()).
-		Int64("rail_cache_warm_completed", railWarmCompleted.Load()).
-		Int64("rail_cache_warm_errors", railWarmErrors.Load()).
-		Msg("Sent stop index requests to queue")
+	return nil
 }
 
 func stopHasTransportType(stop *ctdf.Stop, transportType ctdf.TransportType) bool {

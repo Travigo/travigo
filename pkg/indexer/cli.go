@@ -1,13 +1,8 @@
 package indexer
 
 import (
-	"time"
-
-	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/ctdf"
 	dataaggregator "github.com/travigo/travigo/pkg/dataaggregator/global"
 	"github.com/travigo/travigo/pkg/database"
-	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"github.com/urfave/cli/v2"
@@ -34,28 +29,11 @@ func RegisterCLI() *cli.Command {
 
 					dataaggregator.Setup()
 
-					if err := IndexStops(); err != nil {
+					if err := IndexStops(c.Context); err != nil {
 						return err
 					}
 
-					elastic_client.WaitUntilQueueEmpty()
-
-					log.Info().Msg("Index queue emptied")
-
-					deleteLegacyStopIndexes()
-
-					// Performance Review [Set N] [PR092] [P1] (indexing): End-of-run wall time is not the
-					// source generation actually consumed. An import finishing during this
-					// run can fall before time.Now and then be skipped on the next run even
-					// though its data was never indexed. Checkpoint each verified index's
-					// captured dependency versions only after successful bulk publication;
-					// queue closure/logged errors must not authorize cleanup or advancement.
-					if err := datasetversion.Upsert(c.Context, ctdf.DatasetVersion{
-						Dataset:      datasetversion.StopsIndexerDataset,
-						LastModified: time.Now(),
-					}); err != nil {
-						return err
-					}
+					deleteLegacyStopIndexes(c.Context)
 
 					return nil
 				},
