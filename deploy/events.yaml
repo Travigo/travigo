@@ -3,7 +3,7 @@ image:
   - events
   - run
 
-replicaCount: 3
+replicaCount: 5
 
 ingress:
   enabled: true
