@@ -84,10 +84,11 @@ func populateSavedObject(savedObject *ctdf.SavedObject) error {
 		if err != nil {
 			return nil
 		}
-		stop.Services, err = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: stop})
+		servicesByStop, err := lookupStopServicesOrEmpty(context.Background(), []*ctdf.Stop{stop})
 		if err != nil {
 			return err
 		}
+		stop.Services = servicesByStop[stop.PrimaryIdentifier]
 		savedObject.Object = stop
 	case "journey", "journeys":
 		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: savedObject.ObjectIdentifier})

@@ -726,10 +726,7 @@ func attachStopServices(ctx context.Context, stops []*ctdf.Stop) error {
 	if len(stops) == 0 {
 		return nil
 	}
-	servicesByStop, err := dataaggregator.Lookup[map[string][]*ctdf.Service](query.ServicesByStops{
-		Stops:   stops,
-		Context: ctx,
-	})
+	servicesByStop, err := lookupStopServicesOrEmpty(ctx, stops)
 	if err != nil {
 		return err
 	}
@@ -817,10 +814,7 @@ func attachSearchStopServices(ctx context.Context, searchHits []*ctdf.Stop) erro
 			currentStopsToResolve = append(currentStopsToResolve, stop)
 		}
 	}
-	servicesByStop, err := dataaggregator.Lookup[map[string][]*ctdf.Service](query.ServicesByStops{
-		Stops:   currentStopsToResolve,
-		Context: ctx,
-	})
+	servicesByStop, err := lookupStopServicesOrEmpty(ctx, currentStopsToResolve)
 	if err != nil {
 		return err
 	}
