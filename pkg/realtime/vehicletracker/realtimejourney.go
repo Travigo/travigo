@@ -33,14 +33,27 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
 	ctx := context.Background()
 	currentTime := vehicleUpdateEvent.RecordedAt
+	if currentTime.IsZero() {
+		currentTime = time.Now()
+	}
 	update := vehicleUpdateEvent.VehicleLocationUpdate
+	if len(update.StopUpdates) == 0 && update.Location.Type == "" {
+		return errors.New("realtime update has no stop predictions or location")
+	}
+	serviceDate, err := time.Parse("2006-01-02", update.Timeframe)
+	if err != nil {
+		return fmt.Errorf("invalid realtime timeframe %q: %w", update.Timeframe, err)
+	}
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, update.Timeframe, journeyID)
 	snapshot, err := realtimestore.FindForTrackerUpdate(ctx, realtimeJourneyIdentifier)
 	if err != nil {
 		return err
 	}
 	realtimeJourney := snapshot.Journey
-	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
+	realtimeJourneyReliability := ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
+	if len(update.StopUpdates) > 0 {
+		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityExternalProvided
+	}
 
 	newRealtimeJourney := false
 	if realtimeJourney != nil && realtimeJourney.Journey == nil {
@@ -58,28 +71,25 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		return err
 	}
 	journey := cachedJourney.Journey
+	if journey == nil || len(journey.Path) == 0 {
+		return errors.New("tracked journey has no path")
+	}
+	journeyTimezone := consumer.loadLocation(journey.DepartureTimezone)
 	if update.Location.Type == "Point" {
-		if len(update.StopUpdates) == 0 {
-			if realtimeJourney == nil {
-				// Creation emits the full event view, which can also serve matching.
-				journey = cachedJourney.journeyForEvents()
-			} else {
-				journey = cachedJourney.journeyForMatching()
-			}
-		} else if historyKey != "" {
-			journey = cachedJourney.journeyForProgress()
+		if realtimeJourney == nil && len(update.StopUpdates) == 0 {
+			// Creation emits the full event view, which can also serve matching.
+			journey = cachedJourney.journeyForEvents()
+		} else {
+			journey = cachedJourney.journeyForMatching()
 		}
 	}
 
 	if realtimeJourney == nil {
-		journeyDate, _ := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
-
 		realtimeJourney = &ctdf.RealtimeJourney{
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
 			ActivelyTracked:        true,
 			TimeoutDurationMinutes: 10,
 			Journey:                journey,
-			JourneyRunDate:         journeyDate,
 			Service:                journey.Service,
 
 			CreationDateTime: currentTime,
@@ -92,51 +102,39 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		realtimeJourney.Journey = journey
 		realtimeJourney.Service = journey.Service
 	}
+	realtimeJourney.JourneyRunDate = serviceDate
 
-	var offset time.Duration
+	offset := realtimeJourney.Offset
+	if len(update.StopUpdates) > 0 {
+		offset = 0
+	}
 	var historyPosition journeyPositionMatch
-	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
-	var closestDistanceJourneyPath *ctdf.JourneyPathItem // TODO maybe not here?
-	closestDistanceJourneyPathIndex := -1
+	positionMatched := false
+	if update.Location.Type == "Point" {
+		historyPosition, positionMatched = matchJourneyPositionWithStopFallback(journey, update.Location)
+	}
 
-	// Calculate everything based on location if we aren't provided with updates
-	if len(vehicleUpdateEvent.VehicleLocationUpdate.StopUpdates) == 0 && vehicleUpdateEvent.VehicleLocationUpdate.Location.Type == "Point" {
-		position, matched := matchJourneyPositionWithStopFallback(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location)
-		if !matched || position.PathIndex < 0 || position.PathIndex >= len(realtimeJourney.Journey.Path) {
-			return errors.New("unable to match vehicle location to journey track")
-		}
-		historyPosition = position
-		closestDistanceJourneyPathIndex = position.PathIndex
-		closestDistanceJourneyPath = realtimeJourney.Journey.Path[position.PathIndex]
-		closestDistanceJourneyPathPercentComplete := position.LegProgress
-		if position.UsedGlobalTrack {
+	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
+	nextStopIndex := -1
+	// GPS can generate estimates when the feed supplies no stop predictions.
+	if len(update.StopUpdates) == 0 && positionMatched {
+		pathIndex := historyPosition.PathIndex
+		path := journey.Path[pathIndex]
+		nextStopIndex = pathIndex + 1
+		if historyPosition.UsedGlobalTrack {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
 		} else {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
 		}
-
-		// Calculate new stop arrival times
-		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse realtime time frame")
-		}
-
-		if closestDistanceJourneyPath == nil {
-			return errors.New("nil closestdistancejourneypath")
-		}
-
-		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
-
-		// Get the arrival & departure times with date of the journey
-		destinationArrivalTimeWithDate := serviceTimeOnDate(realtimeTimeframe, closestDistanceJourneyPath.DestinationArrivalTime, journeyTimezone)
-		originDepartureTimeWithDate := serviceTimeOnDate(realtimeTimeframe, closestDistanceJourneyPath.OriginDepartureTime, journeyTimezone)
+		destinationArrivalTimeWithDate := stopPredictionTime(path.DestinationArrivalTime, time.Time{}, 0, serviceDate, journeyTimezone)
+		originDepartureTimeWithDate := stopPredictionTime(path.OriginDepartureTime, time.Time{}, 0, serviceDate, journeyTimezone)
 
 		// How long it take to travel between origin & destination
 		currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
 
 		// How far we are between origin & departure (% of journey path, NOT time or metres)
 		// TODO: this is a hack, replace with actual distance
-		currentPathPercentageComplete := closestDistanceJourneyPathPercentComplete
+		currentPathPercentageComplete := historyPosition.LegProgress
 
 		// Calculate what the expected time of the current position of the vehicle should be
 		currentPathPositionExpectedTime := originDepartureTimeWithDate.Add(
@@ -153,8 +151,10 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		// Calculate all the estimated stop arrival & departure times. A vehicle
 		// cannot leave a timed stop before its scheduled departure, so its delay
 		// can be absorbed by scheduled dwell time before calculating later calls.
-		if newRealtimeJourney || realtimeJourney.NextStopIndex != closestDistanceJourneyPathIndex+1 || realtimeJourney.Offset != offset || futureStopsNeedRebuild(realtimeJourney, cachedJourney.StopKeys, closestDistanceJourneyPathIndex, offset) {
-			for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, closestDistanceJourneyPathIndex, offset) {
+		if newRealtimeJourney || realtimeJourney.NextStopIndex != nextStopIndex || realtimeJourney.Offset != offset || futureStopsNeedRebuild(realtimeJourney, cachedJourney.StopKeys, pathIndex, offset, journeyTimezone) {
+			for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, pathIndex, offset) {
+				stopUpdate.ArrivalTime = stopPredictionTime(stopUpdate.ArrivalTime, time.Time{}, 0, serviceDate, journeyTimezone)
+				stopUpdate.DepartureTime = stopPredictionTime(stopUpdate.DepartureTime, time.Time{}, 0, serviceDate, journeyTimezone)
 				journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
 			}
 		}
@@ -180,11 +180,10 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 				scheduledDepartureTime = lastPath.DestinationArrivalTime
 			}
 
-			if arrivalTime.Year() == 1970 {
-				arrivalTime = scheduledArrivalTime.Add(time.Duration(stopUpdate.ArrivalOffset) * time.Second)
-			}
-			if departureTime.Year() == 1970 {
-				departureTime = scheduledDepartureTime.Add(time.Duration(stopUpdate.DepartureOffset) * time.Second)
+			arrivalTime = stopPredictionTime(arrivalTime, scheduledArrivalTime, stopUpdate.ArrivalOffset, serviceDate, journeyTimezone)
+			departureTime = stopPredictionTime(departureTime, scheduledDepartureTime, stopUpdate.DepartureOffset, serviceDate, journeyTimezone)
+			if (stopUpdate.DepartureTime.IsZero() || stopUpdate.DepartureTime.Year() == 1970) && arrivalTime.After(departureTime) && !departureTime.IsZero() {
+				departureTime = arrivalTime
 			}
 
 			realtimeStop := &ctdf.RealtimeJourneyStops{
@@ -198,69 +197,43 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 			journeyStopUpdates[ctdf.RealtimeJourneyStopKey(realtimeStop.StopRef, realtimeStop.JourneyStopIndex)] = realtimeStop
 		}
 
-		closestPathTime := 9999999 * time.Minute
-		now := time.Now()
-		realtimeTimeframe, err := time.Parse("2006-01-02", vehicleUpdateEvent.VehicleLocationUpdate.Timeframe)
-
-		journeyTimezone := consumer.loadLocation(realtimeJourney.Journey.DepartureTimezone)
-
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to parse realtime time frame")
+		if positionMatched {
+			nextStopIndex = historyPosition.PathIndex + 1
 		}
-		for pathIndex, path := range realtimeJourney.Journey.Path {
-			refTime := time.Date(
-				realtimeTimeframe.Year(),
-				realtimeTimeframe.Month(),
-				realtimeTimeframe.Day(),
-				path.OriginArrivalTime.Hour(),
-				path.OriginArrivalTime.Minute(),
-				path.OriginArrivalTime.Second(),
-				path.OriginArrivalTime.Nanosecond(),
-				journeyTimezone,
-			)
-
-			if update := journeyStopUpdates[ctdf.RealtimeJourneyStopKey(path.OriginStopRef, pathIndex)]; update != nil {
-				refTime = update.ArrivalTime
-			}
-
-			if refTime.Before(now) && now.Sub(refTime) < closestPathTime {
-				closestDistanceJourneyPath = path
-				closestDistanceJourneyPathIndex = pathIndex
-
-				closestPathTime = now.Sub(refTime)
-			}
-		}
-
-		realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityExternalProvided
-	}
-
-	if closestDistanceJourneyPath == nil {
-		return errors.New("unable to find next journeypath")
-	}
-
-	// Update database
-	realtimeJourney.ModificationDateTime = currentTime
-	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
-	realtimeJourney.NextStopRef = closestDistanceJourneyPath.DestinationStopRef
-	realtimeJourney.NextStopIndex = closestDistanceJourneyPathIndex + 1
-	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
-	realtimeJourney.Reliability = realtimeJourneyReliability
-	realtimeJourney.VehicleRef = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
-	realtimeJourney.DataSource = vehicleUpdateEvent.DataSource
-	// "vehiclelocationdescription": fmt.Sprintf("Passed %s", closestDistanceJourneyPath.OriginStop.PrimaryName),
-
-	if (offset.Seconds() != realtimeJourney.Offset.Seconds()) || newRealtimeJourney {
-		realtimeJourney.Offset = offset
 	}
 
 	if realtimeJourney.Stops == nil {
 		realtimeJourney.Stops = map[string]*ctdf.RealtimeJourneyStops{}
 	}
-	for key, stopUpdate := range journeyStopUpdates {
-		if key != "" {
-			realtimeJourney.Stops[key] = stopUpdate
+	for key, stop := range journeyStopUpdates {
+		realtimeJourney.Stops[key] = stop
+	}
+	if nextStopIndex < 0 && len(journeyStopUpdates) > 0 {
+		inferred := nextStopAt(realtimeJourney, cachedJourney.StopOccurrences, serviceDate, journeyTimezone, currentTime)
+		// Time estimates alone must not move a tracked run backwards.
+		if realtimeJourney.NextStopRef == "" || inferred >= realtimeJourney.NextStopIndex {
+			nextStopIndex = inferred
 		}
 	}
+	if nextStopIndex >= 0 {
+		realtimeJourney.NextStopIndex = nextStopIndex
+		realtimeJourney.DepartedStopRef = ""
+		if nextStopIndex == 0 {
+			realtimeJourney.NextStopRef = journey.Path[0].OriginStopRef
+		} else {
+			path := journey.Path[nextStopIndex-1]
+			realtimeJourney.DepartedStopRef = path.OriginStopRef
+			realtimeJourney.NextStopRef = path.DestinationStopRef
+		}
+	}
+
+	realtimeJourney.ModificationDateTime = currentTime
+	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
+	realtimeJourney.Reliability = realtimeJourneyReliability
+	realtimeJourney.VehicleRef = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
+	realtimeJourney.DataSource = vehicleUpdateEvent.DataSource
+
+	realtimeJourney.Offset = offset
 
 	snapshot.Journey = realtimeJourney
 	if update.Location.Type != "" {
@@ -277,15 +250,62 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	}
 	telemetry.CommittedEvent(currentTime)
 
-	if historyKey != "" {
-		if len(update.StopUpdates) > 0 {
-			historyPosition, _ = matchJourneyProgress(realtimeJourney.Journey, update.Location)
-		}
-		if historyPosition.HasTrackMatch {
-			storeVehicleJourneyHistory(ctx, historyKey, currentTime, journeyID, historyPosition.JourneyProgress)
-		}
+	if historyKey != "" && historyPosition.HasTrackMatch {
+		storeVehicleJourneyHistory(ctx, historyKey, currentTime, journeyID, historyPosition.JourneyProgress)
 	}
 	return nil
+}
+
+// GTFS omits absolute times for delay-only updates. Resolve those against the
+// service day before adding delay, keeping zero times absent and 24h+ clocks.
+func stopPredictionTime(value, scheduled time.Time, delaySeconds int, serviceDate time.Time, location *time.Location) time.Time {
+	delay := time.Duration(0)
+	if value.IsZero() || value.Year() == 1970 {
+		value = scheduled
+		delay = time.Duration(delaySeconds) * time.Second
+	}
+	if value.IsZero() {
+		return time.Time{}
+	}
+	if value.Year() <= 1 {
+		value = serviceTimeOnDate(serviceDate, value, location)
+	}
+	return value.Add(delay)
+}
+
+// Predictions describe a call as next until its departure, including dwell.
+// If every usable time has passed, progress is uncertain and stays as stored.
+func nextStopAt(realtimeJourney *ctdf.RealtimeJourney, occurrences map[string][]int, serviceDate time.Time, location *time.Location, observedAt time.Time) int {
+	paths := realtimeJourney.Journey.Path
+	for index := 0; index <= len(paths); index++ {
+		var ref string
+		var arrival, departure time.Time
+		if index < len(paths) {
+			path := paths[index]
+			ref, arrival, departure = path.OriginStopRef, path.OriginArrivalTime, path.OriginDepartureTime
+		} else {
+			path := paths[len(paths)-1]
+			ref, arrival = path.DestinationStopRef, path.DestinationArrivalTime
+		}
+		arrival = stopPredictionTime(arrival, time.Time{}, 0, serviceDate, location)
+		departure = stopPredictionTime(departure, time.Time{}, 0, serviceDate, location)
+		stop := realtimeJourney.Stops[ctdf.RealtimeJourneyStopKey(ref, index)]
+		// Existing records can still use stop-reference keys without an index.
+		if stop == nil && len(occurrences[ref]) > 0 && occurrences[ref][0] == index {
+			stop = realtimeJourney.Stops[ref]
+		}
+		if stop != nil {
+			arrival = stopPredictionTime(stop.ArrivalTime, arrival, 0, serviceDate, location)
+			departure = stopPredictionTime(stop.DepartureTime, departure, 0, serviceDate, location)
+		}
+		if index == len(paths) || arrival.After(departure) {
+			departure = arrival
+		}
+		if departure.After(observedAt) {
+			return index
+		}
+	}
+	return -1
 }
 
 func journeyStopOccurrenceIndex(journey *ctdf.Journey, stopRef string, occurrence int) int {
@@ -352,7 +372,7 @@ func absDuration(value time.Duration) time.Duration {
 
 // Compare predictions without allocating a replacement slice. Recomputing the
 // expected times also detects timetable edits and delay absorbed by dwell time.
-func futureStopsNeedRebuild(journey *ctdf.RealtimeJourney, keys []string, start int, offset time.Duration) bool {
+func futureStopsNeedRebuild(journey *ctdf.RealtimeJourney, keys []string, start int, offset time.Duration, location *time.Location) bool {
 	for i := start; i < len(journey.Journey.Path); i++ {
 		path := journey.Journey.Path[i]
 		arrival := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
@@ -364,6 +384,10 @@ func futureStopsNeedRebuild(journey *ctdf.RealtimeJourney, keys []string, start 
 				departure = arrival
 			}
 			offset = departure.Sub(scheduled)
+		}
+		if !journey.JourneyRunDate.IsZero() {
+			arrival = stopPredictionTime(arrival, time.Time{}, 0, journey.JourneyRunDate, location)
+			departure = stopPredictionTime(departure, time.Time{}, 0, journey.JourneyRunDate, location)
 		}
 		stop := journey.Stops[keys[i]]
 		if stop == nil || stop.TimeType != ctdf.RealtimeJourneyStopTimeEstimatedFuture || !stop.ArrivalTime.Equal(arrival) || !stop.DepartureTime.Equal(departure) {

@@ -2,6 +2,7 @@ package vehicletracker
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -49,6 +50,14 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	journey, err := loadTrackedJourney(journeyID)
 	if err != nil {
 		return nil, err
+	}
+	if journey == nil || len(journey.Path) == 0 {
+		return nil, fmt.Errorf("tracked journey %q has no path", journeyID)
+	}
+	for _, path := range journey.Path {
+		if path == nil {
+			return nil, fmt.Errorf("tracked journey %q contains a nil path item", journeyID)
+		}
 	}
 
 	journey.GetService()

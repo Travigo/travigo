@@ -21,20 +21,20 @@ func predictionFixture(n int) *ctdf.RealtimeJourney {
 
 func TestFutureStopsNeedRebuild(t *testing.T) {
 	j := predictionFixture(20)
-	if futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0) {
+	if futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("unchanged predictions rebuilt")
 	}
 	delete(j.Stops, ctdf.RealtimeJourneyStopKey(j.Journey.Path[5].DestinationStopRef, 6))
-	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0) {
+	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("missing prediction ignored")
 	}
 	j = predictionFixture(20)
 	j.Journey.Path[5].DestinationArrivalTime = j.Journey.Path[5].DestinationArrivalTime.Add(2 * time.Minute)
-	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0) {
+	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("timetable edit ignored")
 	}
 	j = predictionFixture(20)
-	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, time.Minute) {
+	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, time.Minute, time.UTC) {
 		t.Fatal("offset change ignored")
 	}
 }
@@ -75,7 +75,7 @@ func BenchmarkUnchangedPredictions(b *testing.B) {
 		b.Run(fmt.Sprintf("%d/after", n), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				benchmarkRebuildSink = futureStopsNeedRebuild(j, keys, 0, 0)
+				benchmarkRebuildSink = futureStopsNeedRebuild(j, keys, 0, 0, time.UTC)
 			}
 		})
 	}
