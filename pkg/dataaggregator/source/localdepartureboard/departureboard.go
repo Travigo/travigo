@@ -103,7 +103,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 				break
 			}
 		}
-		journeys, fromGraph, err := s.getBoardJourneysWithSource(q, baseCacheItemPath, staticQuery, date, boardType)
+		journeys, _, err := s.getBoardJourneysWithSource(q, baseCacheItemPath, staticQuery, date, boardType)
 		if err != nil {
 			return nil, err
 		}
@@ -111,20 +111,9 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		lookup := s.realtimeLookup(journeys, date, allStopIDs)
 		doEstimates := date.Format(ctdf.YearMonthDayFormat) == time.Now().In(date.Location()).Format(ctdf.YearMonthDayFormat)
 		entries := ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
-		// Performance Review [Set K] [PR019] [P1]: Missing realtime data makes a valid scheduled-only
-		// board repeat timetable loading, realtime lookup, and generation. Base fallback
-		// on graph freshness/completeness or insufficient candidates instead, preserving
-		// delayed departures and cancellation handling. Measure fallback frequency and
-		// board latency before changing this behaviour.
-		if fromGraph && !hasRealtimeBoardEntry(entries) {
-			journeys, err = s.getDateJourneys(baseCacheItemPath, staticQuery, date)
-			if err != nil {
-				return nil, err
-			}
-			journeys = mergeJourneyAmendments(journeys, dynamic, date)
-			lookup = s.realtimeLookup(journeys, date, allStopIDs)
-			entries = ctdf.GenerateBoardFromJourneysForServiceDate(journeys, allStopIDs, date, q.StartDateTime, doEstimates, lookup, boardType)
-		}
+		// A successful, unsaturated graph window is complete even when it has
+		// no realtime updates (or no departures). Realtime coverage is not a
+		// reason to reload the same timetable from MongoDB.
 		departureBoard = append(departureBoard, entries...)
 	}
 
@@ -179,27 +168,9 @@ func (s Source) getBoardJourneysWithSource(q query.DepartureBoard, baseCacheItem
 	return journeys, false, err
 }
 
-func hasRealtimeBoardEntry(entries []*ctdf.DepartureBoard) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Type == ctdf.DepartureBoardRecordTypeRealtimeTracked || entry.Type == ctdf.DepartureBoardRecordTypeCancelled {
-			return true
-		}
-		if entry.Journey != nil && entry.Journey.RealtimeJourney != nil {
-			return true
-		}
-	}
-	return false
-}
-
 func departureGraphCandidateLimit(count int) int {
-	// Performance Review [Set K] [PR021] [P2] (boards): A fixed 8x overfetch is not a completeness
-	// guarantee after deduplication, activity/replacement filtering and realtime
-	// reordering. One surviving live entry prevents fallback even if later candidates
-	// could fill today's board. Return exhaustion/cursor information and fetch bounded
-	// further windows until enough usable entries exist or the day is exhausted.
+	// Overfetch to include delayed and filtered calls. A saturated window
+	// falls back to the full timetable before any board entries are generated.
 	limit := count * departureGraphCandidateMultiplier
 	if limit < departureGraphMinimumCandidates {
 		limit = departureGraphMinimumCandidates

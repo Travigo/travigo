@@ -154,6 +154,63 @@ func TestPreviousServiceDayGraphWindowKeepsOvernightCalls(t *testing.T) {
 	}
 }
 
+func TestBoardUsesCompleteGraphWithoutRealtime(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	previousRedis := redis_client.Client
+	redis_client.Client = client
+	t.Cleanup(func() { redis_client.Client = previousRedis; client.Close() })
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, empty := range []bool{false, true} {
+		mt.Run(fmt.Sprintf("empty=%t", empty), func(mt *mtest.T) {
+			previousDB := database.Instance
+			database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+			mt.Cleanup(func() { database.Instance = previousDB })
+			serviceDate := time.Date(2027, 1, 10, 0, 0, 0, 0, time.UTC)
+			at := time.Date(0, 1, 1, 10, 0, 0, 0, time.UTC)
+			var journeys []*ctdf.Journey
+			if !empty {
+				journeys = []*ctdf.Journey{{PrimaryIdentifier: "scheduled", DepartureTime: at,
+					Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}},
+					Path:         []*ctdf.JourneyPathItem{{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)}},
+				}}
+			}
+			cache := &cachedresults.Cache{}
+			cache.Setup()
+			source := Source{DepartureGraph: departuregraph.New(overnightGraphLoader{journeys}, departuregraph.Config{Enabled: true}), CachedResults: cache}
+			for attempt := 0; attempt < 2; attempt++ {
+				mt.ClearEvents()
+				// Only the dynamic amendments query and, for a nonempty window,
+				// cancellation alerts should touch MongoDB. Static schedules stay in the graph.
+				mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch))
+				if !empty {
+					mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".service_alerts", mtest.FirstBatch))
+				}
+				entries, err := source.BoardQuery(query.DepartureBoard{Stop: &ctdf.Stop{PrimaryIdentifier: "stop"}, Count: 1, StartDateTime: serviceDate.Add(9 * time.Hour)})
+				if err != nil {
+					mt.Fatal(err)
+				}
+				want := 1
+				if empty {
+					want = 0
+				}
+				if len(entries) != want {
+					mt.Fatalf("got %d entries, want %d", len(entries), want)
+				}
+				journeyReads := 0
+				for _, event := range mt.GetAllStartedEvents() {
+					if event.CommandName == "find" && event.Command.Lookup("find").StringValue() == "journeys" {
+						journeyReads++
+					}
+				}
+				if journeyReads != 1 {
+					mt.Fatalf("got %d journey reads, want only the dynamic amendments query", journeyReads)
+				}
+			}
+		})
+	}
+}
+
 func TestSaturatedGraphFallsBackToCompleteJourneyCache(t *testing.T) {
 	server := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: server.Addr()})

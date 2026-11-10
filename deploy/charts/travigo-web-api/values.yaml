@@ -38,9 +38,9 @@ auth:
 departureGraph:
   enabled: true
   backgroundEnabled: true
-  # Departure boards only need the current and following service days warmed.
-  # Older dates can still be filled lazily when explicitly requested.
-  daysBehind: 0
+  # Boards always check yesterday for overnight and delayed departures.
+  # Warm it too so the first board request does not trigger a database fill.
+  daysBehind: 1
   daysAhead: 1
   batchSize: 1000
   batchPause: 50ms
