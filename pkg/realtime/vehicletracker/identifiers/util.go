@@ -42,22 +42,20 @@ func findPrimaryIdentifiers(collection *mongo.Collection, query bson.M, limit in
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
 	var journeys []*ctdf.Journey
 
-	// Performance Review [Set J] [PR147] [P2] (tracker): SIRI identification can execute this query
-	// for trip IDs, block IDs, and endpoints during one miss. The exclusion projection
-	// removes per-leg tracks but still permits whole-journey Track and unrelated rich
-	// fields. Use an explicit lightweight identification projection/model, retaining
-	// every field needed by availability, functional hashing, direction, endpoints,
-	// and time narrowing. Measure decoded bytes/candidate counts for each fallback.
+	// Keep precisely the fields consumed by availability, functional hashing,
+	// direction, endpoint and departure-time matching.
 	opts := options.Find().SetProjection(bson.D{
-		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
-		bson.E{Key: "datasource", Value: 0},
-		bson.E{Key: "creationdatetime", Value: 0},
-		bson.E{Key: "modificationdatetime", Value: 0},
-		bson.E{Key: "destinationdisplay", Value: 0},
-		bson.E{Key: "path.track", Value: 0},
-		bson.E{Key: "path.originactivity", Value: 0},
-		bson.E{Key: "path.destinationactivity", Value: 0},
+		{Key: "_id", Value: 0},
+		{Key: "primaryidentifier", Value: 1},
+		{Key: "serviceref", Value: 1},
+		{Key: "direction", Value: 1},
+		{Key: "departuretime", Value: 1},
+		{Key: "availability", Value: 1},
+		{Key: "path.originstopref", Value: 1},
+		{Key: "path.destinationstopref", Value: 1},
+		{Key: "path.originarrivaltime", Value: 1},
+		{Key: "path.origindeparturetime", Value: 1},
+		{Key: "path.destinationarrivaltime", Value: 1},
 	})
 	cursor, err := journeysCollection.Find(context.Background(), query, opts)
 	if err != nil {
@@ -71,6 +69,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		err := cursor.Decode(&journey)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to decode journey")
+			continue
 		}
 
 		// if it has no availability then we'll just ignore it

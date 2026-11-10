@@ -113,7 +113,7 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	publishRealtimeJourneyEvents(previousRealtimeJourney, realtimeJourney, previousRealtimeJourneyKnown, nil)
+	publishRealtimeJourneyEvents(previousRealtimeJourney, realtimeJourney, previousRealtimeJourneyKnown)
 
 	return nil
 }
@@ -161,8 +161,7 @@ func (snapshot *RealtimeJourneySnapshot) SetLocation(location ctdf.Location, bea
 // SaveRealtimeJourneySnapshot atomically saves the tracker snapshot only if
 // the persisted details still match the value returned by FindForTrackerUpdate.
 // A location overlay set with SetLocation is committed in the same script.
-// journeyForEvents lazily supplies full geometry for event payloads only.
-func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneySnapshot, journeyForEvents func() *ctdf.Journey) error {
+func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneySnapshot) error {
 	if snapshot == nil || snapshot.Journey == nil {
 		return errors.New("realtime journey snapshot is required")
 	}
@@ -202,7 +201,7 @@ func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneyS
 	if result == 0 {
 		return ErrRealtimeJourneyConflict
 	}
-	publishRealtimeJourneyEvents(snapshot.previous, snapshot.Journey, true, journeyForEvents)
+	publishRealtimeJourneyEvents(snapshot.previous, snapshot.Journey, true)
 	return nil
 }
 

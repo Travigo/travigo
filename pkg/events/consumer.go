@@ -3,7 +3,6 @@ package events
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/expr-lang/expr"
 	"github.com/rs/zerolog/log"
@@ -40,24 +39,29 @@ func (c *EventsBatchConsumer) Consume(batch rmq.Deliveries) {
 	payloads := batch.Payloads()
 
 	for _, payload := range payloads {
-		var event ctdf.Event
-		err := json.Unmarshal([]byte(payload), &event)
-
-		if err != nil {
+		var header struct {
+			Type ctdf.EventType
+		}
+		if err := json.Unmarshal([]byte(payload), &header); err != nil {
+			continue
+		}
+		var subscriptions []ctdf.UserNotificationSubscription
+		if c.Subscriptions != nil {
+			subscriptions = c.Subscriptions.ForEventType(header.Type)
+		}
+		if len(subscriptions) == 0 {
 			continue
 		}
 
-		log.Debug().Str("type", fmt.Sprintf("%s", event.Type)).Msg("Received event")
-
-		// Performance Review [Set Q] [PR090] [P2]: Every event evaluates every subscription of its
-		// type, multiplying event volume by subscriber count. Add explicit journey,
-		// service, or stop targeting metadata and index candidates before evaluating
-		// expressions. Keep a fallback group for general expressions that cannot be
-		// narrowed safely; measure candidate counts and consumer lag at scale.
-		var subscriptions []ctdf.UserNotificationSubscription
-		if c.Subscriptions != nil {
-			subscriptions = c.Subscriptions.ForEventType(event.Type)
+		var event ctdf.Event
+		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			continue
 		}
+		log.Debug().Str("type", string(event.Type)).Msg("Received event")
+
+		// Performance Review [Set Q] [PR090] [P2]: Subscriptions are grouped
+		// by event type. Journey/stop targeting can narrow this further before
+		// evaluating expressions if subscriber counts grow.
 
 		for _, userEventSubscription := range subscriptions {
 			output, err := expr.Run(userEventSubscription.Program, event)

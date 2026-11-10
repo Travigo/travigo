@@ -1,6 +1,7 @@
 package vehicletracker
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"testing"
@@ -25,6 +26,48 @@ func TestMatchJourneyPositionUsesDistanceAlongLeg(t *testing.T) {
 	}
 	if match.PathIndex != 0 || match.LegProgress < 0.74 || match.LegProgress > 0.76 {
 		t.Fatalf("got %#v", match)
+	}
+}
+
+func TestClosestTrackPositionRejectsDegenerateGeometry(t *testing.T) {
+	point := ctdf.Location{Type: "Point", Coordinates: []float64{0, 51}}
+	for _, track := range [][]ctdf.Location{
+		nil, {point}, {point, point}, {{}, point, {}},
+	} {
+		if _, _, ok := closestTrackPosition(point, track); ok {
+			t.Fatalf("accepted track with no usable length: %+v", track)
+		}
+	}
+	if _, _, ok := closestTrackPosition(ctdf.Location{}, []ctdf.Location{point, point}); ok {
+		t.Fatal("accepted a location without coordinates")
+	}
+}
+
+func BenchmarkClosestTrackPosition(b *testing.B) {
+	track := make([]ctdf.Location, 2000)
+	for index := range track {
+		track[index] = ctdf.Location{Type: "Point", Coordinates: []float64{float64(index) / 10000, 51.5}}
+	}
+	point := ctdf.Location{Type: "Point", Coordinates: []float64{0.05, 51.5}}
+	for _, extraLengthPass := range []bool{true, false} {
+		b.Run(fmt.Sprintf("extra-length-pass=%t", extraLengthPass), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				// Reproduce the old additional length pass before the same scan.
+				if extraLengthPass {
+					length := 0.0
+					for index := 0; index < len(track)-1; index++ {
+						length += track[index].Distance(&track[index+1])
+					}
+					if length <= 0 {
+						b.Fatal("empty benchmark track")
+					}
+				}
+				if _, _, ok := closestTrackPosition(point, track); !ok {
+					b.Fatal("benchmark location did not match")
+				}
+			}
+		})
 	}
 }
 

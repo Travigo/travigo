@@ -1,7 +1,6 @@
 package realtimestore
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -36,7 +35,7 @@ func previousRealtimeJourneyForEvents(ctx context.Context, identifier string) (*
 	return realtimeJourney, true
 }
 
-func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool, journeyForEvents func() *ctdf.Journey) {
+func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool) {
 	events := realtimeJourneyEvents(previous, current, previousKnown, time.Now())
 	if len(events) == 0 {
 		return
@@ -51,31 +50,10 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 		log.Error().Err(err).Str("id", current.PrimaryIdentifier).Msg("Failed to open events queue")
 		return
 	}
-	eventJourney := current
-	if journeyForEvents != nil {
-		if journey := journeyForEvents(); journey != nil {
-			enriched := *current
-			enriched.Journey = journey
-			eventJourney = &enriched
-			replaceRealtimeJourneyEventBodies(events, enriched)
-		}
-	}
-
+	replaceRealtimeJourneyEventBodies(events, notificationJourney(current))
 	payloads := make([][]byte, 0, len(events))
-	// Events keep the full journey body for downstream filter compatibility. For
-	// multi-event updates, reuse its encoding; the queue still carries that body once
-	// per event. A versioned compact body could reduce queue bytes separately.
-	var sharedJourneyJSON []byte
-	if len(events) > 1 {
-		sharedJourneyJSON, _ = json.Marshal(eventJourney)
-	}
 	for _, event := range events {
-		var eventBytes []byte
-		if len(sharedJourneyJSON) > 0 {
-			eventBytes, err = marshalRealtimeJourneyEvent(event, sharedJourneyJSON)
-		} else {
-			eventBytes, err = json.Marshal(event)
-		}
+		eventBytes, err := json.Marshal(event)
 		if err != nil {
 			log.Error().Err(err).Str("id", current.PrimaryIdentifier).Str("type", string(event.Type)).Msg("Failed to encode realtime journey event")
 			continue
@@ -97,7 +75,7 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 	}
 }
 
-func replaceRealtimeJourneyEventBodies(events []ctdf.Event, current ctdf.RealtimeJourney) {
+func replaceRealtimeJourneyEventBodies(events []ctdf.Event, current realtimeJourneyEventBody) {
 	for index := range events {
 		switch body := events[index].Body.(type) {
 		case ctdf.RealtimeJourney:
@@ -111,47 +89,58 @@ func replaceRealtimeJourneyEventBodies(events []ctdf.Event, current ctdf.Realtim
 	}
 }
 
-func marshalRealtimeJourneyEvent(event ctdf.Event, journeyJSON []byte) ([]byte, error) {
-	marker := []byte(`"Body":null`)
-	originalBody := event.Body
-	var body map[string]interface{}
-	var previousJourney interface{}
-	switch eventBody := event.Body.(type) {
-	case ctdf.RealtimeJourney:
-		event.Body = nil
-	case map[string]interface{}:
-		if _, ok := eventBody["RealtimeJourney"].(ctdf.RealtimeJourney); ok {
-			body = eventBody
-			previousJourney = body["RealtimeJourney"]
-			body["RealtimeJourney"] = nil
-			marker = []byte(`"RealtimeJourney":null`)
-		} else {
-			return json.Marshal(event)
-		}
-	default:
-		return json.Marshal(event)
-	}
+// Queue snapshots retain the JSON fields used by notification filters,
+// messages and links. Static geometry and full stop documents stay out of them.
+type realtimeJourneyEventBody struct {
+	PrimaryIdentifier          string
+	Journey                    *notificationSchedule
+	JourneyRunDate             time.Time
+	VehicleLocationDescription string
+	NextStopRef                string
+	NextStopIndex              int
+	NextStop                   *notificationStop
+	ReplacedByJourneyRef       string
+}
 
-	encoded, err := json.Marshal(event)
-	if body != nil {
-		body["RealtimeJourney"] = previousJourney
+type notificationSchedule struct {
+	PrimaryIdentifier  string
+	DepartureTime      time.Time
+	DestinationDisplay string
+	Path               []notificationPath
+}
+
+type notificationPath struct {
+	OriginStopRef string
+}
+
+type notificationStop struct {
+	PrimaryName string
+}
+
+func notificationJourney(current *ctdf.RealtimeJourney) realtimeJourneyEventBody {
+	body := realtimeJourneyEventBody{
+		PrimaryIdentifier:          current.PrimaryIdentifier,
+		JourneyRunDate:             current.JourneyRunDate,
+		VehicleLocationDescription: current.VehicleLocationDescription,
+		NextStopRef:                current.NextStopRef,
+		NextStopIndex:              current.NextStopIndex,
+		ReplacedByJourneyRef:       current.ReplacedByJourneyRef,
 	}
-	event.Body = originalBody
-	if err != nil {
-		return nil, err
+	if current.Journey != nil {
+		body.Journey = &notificationSchedule{
+			PrimaryIdentifier:  current.Journey.PrimaryIdentifier,
+			DepartureTime:      current.Journey.DepartureTime,
+			DestinationDisplay: current.Journey.DestinationDisplay,
+		}
+		// Cancellation messages use the origin of the first leg.
+		if len(current.Journey.Path) > 0 && current.Journey.Path[0] != nil {
+			body.Journey.Path = []notificationPath{{OriginStopRef: current.Journey.Path[0].OriginStopRef}}
+		}
 	}
-	// Splice in the already-encoded journey at the unique placeholder.
-	// An ambiguous envelope uses the standard encoder with its restored body.
-	index := bytes.Index(encoded, marker)
-	if index < 0 || bytes.Contains(encoded[index+len(marker):], marker) {
-		return json.Marshal(event)
+	if current.NextStop != nil {
+		body.NextStop = &notificationStop{PrimaryName: current.NextStop.PrimaryName}
 	}
-	start := index + len(marker) - len("null")
-	withJourney := make([]byte, 0, len(encoded)-len("null")+len(journeyJSON))
-	withJourney = append(withJourney, encoded[:start]...)
-	withJourney = append(withJourney, journeyJSON...)
-	withJourney = append(withJourney, encoded[start+len("null"):]...)
-	return withJourney, nil
+	return body
 }
 
 func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool, timestamp time.Time) []ctdf.Event {

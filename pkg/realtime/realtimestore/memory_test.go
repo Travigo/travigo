@@ -49,13 +49,13 @@ func TestTrackerSnapshotCASRejectsStaleWriteAndCommitsLocation(t *testing.T) {
 	if err := first.SetLocation(ctdf.Location{Type: "Point", Coordinates: []float64{-0.1, 51.5}}, 90, observedAt); err != nil {
 		t.Fatalf("set snapshot location: %v", err)
 	}
-	if err := SaveRealtimeJourneySnapshot(ctx, first, nil); err != nil {
+	if err := SaveRealtimeJourneySnapshot(ctx, first); err != nil {
 		t.Fatalf("save first tracker snapshot: %v", err)
 	}
 
 	stale.Journey.ModificationDateTime = modified.Add(30 * time.Second)
 	stale.Journey.NextStopRef = "stale-stop"
-	if err := SaveRealtimeJourneySnapshot(ctx, stale, nil); !errors.Is(err, ErrRealtimeJourneyConflict) {
+	if err := SaveRealtimeJourneySnapshot(ctx, stale); !errors.Is(err, ErrRealtimeJourneyConflict) {
 		t.Fatalf("stale snapshot error = %v, want conflict", err)
 	}
 
@@ -89,11 +89,11 @@ func TestTrackerSnapshotCASRejectsConcurrentCreation(t *testing.T) {
 		t.Fatal(err)
 	}
 	first.Journey = &ctdf.RealtimeJourney{PrimaryIdentifier: "tracker-create-race", NextStopRef: "first"}
-	if err := SaveRealtimeJourneySnapshot(ctx, first, nil); err != nil {
+	if err := SaveRealtimeJourneySnapshot(ctx, first); err != nil {
 		t.Fatalf("save initial creation: %v", err)
 	}
 	second.Journey = &ctdf.RealtimeJourney{PrimaryIdentifier: "tracker-create-race", NextStopRef: "second"}
-	if err := SaveRealtimeJourneySnapshot(ctx, second, nil); !errors.Is(err, ErrRealtimeJourneyConflict) {
+	if err := SaveRealtimeJourneySnapshot(ctx, second); !errors.Is(err, ErrRealtimeJourneyConflict) {
 		t.Fatalf("concurrent creation error = %v, want conflict", err)
 	}
 	stored, err := FindByIdentifier(ctx, "tracker-create-race")

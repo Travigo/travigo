@@ -1,7 +1,6 @@
 package realtimestore
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -10,96 +9,36 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
-func TestMarshalRealtimeJourneyEventReusesBodyWithoutChangingJSON(t *testing.T) {
-	journey := ctdf.RealtimeJourney{
-		PrimaryIdentifier: "realtime-test",
-		Journey: &ctdf.Journey{
-			PrimaryIdentifier: "journey-test",
-			Path: []*ctdf.JourneyPathItem{{
-				OriginStopRef:      "origin",
-				DestinationStopRef: "destination",
-			}},
-		},
-		Stops: map[string]*ctdf.RealtimeJourneyStops{
-			"destination": {StopRef: "destination", JourneyStopIndex: 1, Platform: "2"},
-		},
-	}
-	events := []ctdf.Event{
-		{Type: ctdf.EventTypeRealtimeJourneyCreated, Timestamp: time.Unix(1, 0).UTC(), Body: journey},
-		{Type: ctdf.EventTypeRealtimeJourneyDelayed, Timestamp: time.Unix(2, 0).UTC(), Body: map[string]interface{}{
-			"RealtimeJourney": journey,
-			"DelaySeconds":    60,
-			"Stop":            "destination",
-		}},
-		{Type: ctdf.EventTypeRealtimeJourneyDelayed, Timestamp: time.Unix(3, 0).UTC(), Body: map[string]interface{}{
-			"RealtimeJourney": journey,
-			"Metadata":        map[string]interface{}{"RealtimeJourney": nil},
-		}},
-	}
-
-	want := make([][]byte, len(events))
-	for index, event := range events {
-		var err error
-		want[index], err = json.Marshal(event)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	journeyJSON, err := json.Marshal(journey)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for index, event := range events {
-		got, err := marshalRealtimeJourneyEvent(event, journeyJSON)
-		if err != nil {
-			t.Fatalf("marshal event %d: %v", index, err)
-		}
-		if !bytes.Equal(got, want[index]) {
-			t.Fatalf("event %d JSON changed:\n got: %s\nwant: %s", index, got, want[index])
-		}
-	}
-}
-
-func BenchmarkRealtimeJourneyMultiEventEncoding(b *testing.B) {
-	journey := ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-benchmark", Journey: &ctdf.Journey{PrimaryIdentifier: "journey-benchmark"}}
+func BenchmarkRealtimeJourneyEventEncoding(b *testing.B) {
+	journey := ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-benchmark", Journey: &ctdf.Journey{
+		PrimaryIdentifier: "journey-benchmark", DestinationDisplay: "London",
+	}}
 	for index := 0; index < 40; index++ {
+		track := make([]ctdf.Location, 50)
+		for point := range track {
+			track[point] = ctdf.Location{Type: "Point", Coordinates: []float64{float64(point) / 100, 51.5}}
+		}
 		journey.Journey.Path = append(journey.Journey.Path, &ctdf.JourneyPathItem{
-			OriginStopRef:      fmt.Sprintf("origin-%d", index),
-			DestinationStopRef: fmt.Sprintf("destination-%d", index),
-			Track:              []ctdf.Location{{Type: "Point", Coordinates: []float64{float64(index), float64(index) / 2}}},
+			OriginStopRef: fmt.Sprintf("origin-%d", index), DestinationStopRef: fmt.Sprintf("destination-%d", index),
+			Track: track, DestinationStop: &ctdf.Stop{PrimaryName: "Destination", OtherIdentifiers: []string{"alias"}},
 		})
 	}
-	events := []ctdf.Event{
-		{Type: ctdf.EventTypeRealtimeJourneyCreated, Timestamp: time.Unix(1, 0).UTC(), Body: journey},
-		{Type: ctdf.EventTypeRealtimeJourneyDelayed, Timestamp: time.Unix(2, 0).UTC(), Body: map[string]interface{}{"RealtimeJourney": journey, "DelaySeconds": 60}},
-		{Type: ctdf.EventTypeRealtimeJourneyCancelled, Timestamp: time.Unix(3, 0).UTC(), Body: journey},
+	for _, compact := range []bool{false, true} {
+		b.Run(fmt.Sprintf("compact=%t", compact), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				var body interface{} = journey
+				if compact {
+					body = notificationJourney(&journey)
+				}
+				payload, err := json.Marshal(ctdf.Event{Type: ctdf.EventTypeRealtimeJourneyNextStopChanged, Body: body})
+				if err != nil {
+					b.Fatal(err)
+				}
+				b.ReportMetric(float64(len(payload)), "bytes/event")
+			}
+		})
 	}
-
-	b.Run("per-event", func(b *testing.B) {
-		b.ReportAllocs()
-		for iteration := 0; iteration < b.N; iteration++ {
-			for _, event := range events {
-				if _, err := json.Marshal(event); err != nil {
-					b.Fatal(err)
-				}
-			}
-		}
-	})
-	b.Run("shared-journey-encoding", func(b *testing.B) {
-		b.ReportAllocs()
-		for iteration := 0; iteration < b.N; iteration++ {
-			journeyJSON, err := json.Marshal(journey)
-			if err != nil {
-				b.Fatal(err)
-			}
-			for _, event := range events {
-				if _, err := marshalRealtimeJourneyEvent(event, journeyJSON); err != nil {
-					b.Fatal(err)
-				}
-			}
-		}
-	})
 }
 
 func TestRealtimeJourneyEventsDetectsNewCancellation(t *testing.T) {

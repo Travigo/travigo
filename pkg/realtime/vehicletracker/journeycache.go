@@ -29,7 +29,7 @@ type cachedTrackedJourney struct {
 	LastUsed        time.Time
 	journeyID       string
 	hydrationMu     sync.Mutex
-	matching, event journeyView
+	matching        journeyView
 	previous, next  *cachedTrackedJourney
 }
 
@@ -178,23 +178,16 @@ func (entry *cachedTrackedJourney) journeyForMatching() *ctdf.Journey {
 	return entry.hydratedJourney(&entry.matching, bson.M{"primaryidentifier": 1, "otheridentifiers": 1, "location": 1})
 }
 
-func (entry *cachedTrackedJourney) journeyForEvents() *ctdf.Journey {
-	return entry.hydratedJourney(&entry.event, nil)
-}
-
 func (entry *cachedTrackedJourney) journeyForProgress() *ctdf.Journey {
 	return entry.hydratedJourney(nil, nil)
 }
 
-// A nil view needs tracks only. A full event view can also serve matching and
-// progress, while projected stop documents must stay out of event payloads.
+// A nil view needs tracks only. Matching additionally loads stop coordinates
+// for global-track projection and the stop fallback.
 func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView, projection bson.M) *ctdf.Journey {
 	entry.hydrationMu.Lock()
 	defer entry.hydrationMu.Unlock()
 	now := time.Now()
-	if entry.event.expires.After(now) {
-		return entry.event.journey
-	}
 	if view == nil {
 		if entry.matching.expires.After(now) {
 			return entry.matching.journey

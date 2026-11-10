@@ -134,8 +134,7 @@ func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, 
 }
 
 func closestTrackPosition(location ctdf.Location, track []ctdf.Location) (float64, float64, bool) {
-	total := trackLengthMetres(track)
-	if total <= 0 {
+	if len(location.Coordinates) < 2 {
 		return 0, 0, false
 	}
 	closestDistance := math.Inf(1)
@@ -155,20 +154,10 @@ func closestTrackPosition(location ctdf.Location, track []ctdf.Location) (float6
 		}
 		along += segmentLength
 	}
-	if math.IsInf(closestDistance, 1) {
+	if along <= 0 || math.IsInf(closestDistance, 1) {
 		return 0, 0, false
 	}
-	return closestDistance, closestAlong / total, true
-}
-
-func trackLengthMetres(track []ctdf.Location) float64 {
-	total := 0.0
-	for index := 0; index < len(track)-1; index++ {
-		if len(track[index].Coordinates) >= 2 && len(track[index+1].Coordinates) >= 2 {
-			total += track[index].Distance(&track[index+1])
-		}
-	}
-	return total
+	return closestDistance, closestAlong / along, true
 }
 
 func projectOntoTrackSegment(point, start, end ctdf.Location) (ctdf.Location, float64) {

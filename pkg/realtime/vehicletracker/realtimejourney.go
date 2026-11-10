@@ -76,12 +76,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	}
 	journeyTimezone := consumer.loadLocation(journey.DepartureTimezone)
 	if update.Location.Type == "Point" {
-		if realtimeJourney == nil && len(update.StopUpdates) == 0 {
-			// Creation emits the full event view, which can also serve matching.
-			journey = cachedJourney.journeyForEvents()
-		} else {
-			journey = cachedJourney.journeyForMatching()
-		}
+		journey = cachedJourney.journeyForMatching()
 	}
 
 	if realtimeJourney == nil {
@@ -240,7 +235,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		_ = snapshot.SetLocation(update.Location, update.Bearing, currentTime)
 	}
 	persistenceStarted := time.Now()
-	saveErr := realtimestore.SaveRealtimeJourneySnapshot(ctx, snapshot, cachedJourney.journeyForEvents)
+	saveErr := realtimestore.SaveRealtimeJourneySnapshot(ctx, snapshot)
 	telemetry.Observe(telemetry.Persistence, time.Since(persistenceStarted))
 	if saveErr != nil {
 		// Consume still acknowledges failed deliveries after identification has
