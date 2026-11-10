@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -20,10 +19,13 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/stopservices"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+const stopServicesRouteTimeout = 20 * time.Second
 
 func StopsRouter(router fiber.Router) {
 	router.Get("/", listStops)
@@ -75,14 +77,15 @@ func listStops(c *fiber.Ctx) error {
 
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
-		bson.E{Key: "otheridentifiers", Value: 0},
 		bson.E{Key: "datasource", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "associations", Value: 0},
 	})
 
-	cursor, err := stopsCollection.Find(context.Background(), bsonQuery, opts)
+	requestContext, cancel := context.WithTimeout(c.UserContext(), stopServicesRouteTimeout)
+	defer cancel()
+	cursor, err := stopsCollection.Find(requestContext, bsonQuery, opts)
 	if err != nil {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{
@@ -90,41 +93,31 @@ func listStops(c *fiber.Ctx) error {
 		})
 	}
 
-	for cursor.Next(context.Background()) {
+	for cursor.Next(requestContext) {
 		var stop *ctdf.Stop
 		err := cursor.Decode(&stop)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode Stop")
+			cursor.Close(requestContext)
+			return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Failed to decode stops"})
 		}
 
 		stops = append(stops, stop)
 	}
-
-	const maxConcurrentServiceLookups = 8
-	workerCount := maxConcurrentServiceLookups
-	if len(stops) < workerCount {
-		workerCount = len(stops)
+	if err := cursor.Err(); err != nil {
+		cursor.Close(requestContext)
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Failed to read stops"})
 	}
-
-	jobs := make(chan *ctdf.Stop)
-	wg := sync.WaitGroup{}
-	for worker := 0; worker < workerCount; worker++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for stop := range jobs {
-				services, _ := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-					Stop: stop,
-				})
-				stop.Services = services
-			}
-		}()
+	if err := cursor.Close(requestContext); err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "Failed to finish reading stops"})
+	}
+	if err := attachStopServices(requestContext, stops); err != nil {
+		return stopServicesLookupError(c, err)
 	}
 	for _, stop := range stops {
-		jobs <- stop
+		if stop != nil {
+			stop.OtherIdentifiers = nil
+		}
 	}
-	close(jobs)
-	wg.Wait()
 
 	reducedStops, err := marshalWithSheriffView(c, stops, []string{"basic"}, sheriffViews{
 		"map": {"web-stop-map"},
@@ -152,9 +145,9 @@ func getStop(c *fiber.Ctx) error {
 			"error": err.Error(),
 		})
 	} else {
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
-			Stop: stop,
-		})
+		if err := attachStopServices(c.UserContext(), []*ctdf.Stop{stop}); err != nil {
+			return stopServicesLookupError(c, err)
+		}
 
 		reduceGroupsName := []string{"basic", "detailed"}
 		if isLLM == "true" {
@@ -679,9 +672,12 @@ func searchStops(c *fiber.Ctx) error {
 	}
 	json.Unmarshal(responseBytes, &responseStruct)
 
-	stops := []ctdf.Stop{}
+	stops := []*ctdf.Stop{}
 	for _, hit := range responseStruct.Hits.Hits {
-		stops = append(stops, hit.Source)
+		stops = append(stops, &hit.Source)
+	}
+	if err := attachSearchStopServices(c.UserContext(), stops); err != nil {
+		return stopServicesLookupError(c, err)
 	}
 
 	reduceGroupName := "search"
@@ -724,4 +720,132 @@ func stopSearchTransportTypes(c *fiber.Ctx) []string {
 	}
 
 	return transportTypes
+}
+
+func attachStopServices(ctx context.Context, stops []*ctdf.Stop) error {
+	if len(stops) == 0 {
+		return nil
+	}
+	servicesByStop, err := dataaggregator.Lookup[map[string][]*ctdf.Service](query.ServicesByStops{
+		Stops:   stops,
+		Context: ctx,
+	})
+	if err != nil {
+		return err
+	}
+	for _, stop := range stops {
+		if stop == nil {
+			continue
+		}
+		services := servicesByStop[stop.PrimaryIdentifier]
+		if services == nil {
+			services = []*ctdf.Service{}
+		}
+		stop.Services = services
+	}
+	return nil
+}
+
+func attachSearchStopServices(ctx context.Context, searchHits []*ctdf.Stop) error {
+	if len(searchHits) == 0 {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, stopServicesRouteTimeout)
+	defer cancel()
+
+	primaryIDs := make([]string, 0, len(searchHits))
+	seenPrimaryIDs := make(map[string]struct{}, len(searchHits))
+	for _, stop := range searchHits {
+		if stop == nil || stop.PrimaryIdentifier == "" {
+			continue
+		}
+		if _, exists := seenPrimaryIDs[stop.PrimaryIdentifier]; exists {
+			continue
+		}
+		seenPrimaryIDs[stop.PrimaryIdentifier] = struct{}{}
+		primaryIDs = append(primaryIDs, stop.PrimaryIdentifier)
+	}
+	if len(primaryIDs) == 0 {
+		return nil
+	}
+
+	projection := bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "primaryidentifier", Value: 1},
+		{Key: "otheridentifiers", Value: 1},
+		{Key: "platforms.primaryidentifier", Value: 1},
+	}
+	cursor, err := database.GetCollection("stops").Find(ctx, bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": bson.M{"$in": primaryIDs}},
+			bson.M{"otheridentifiers": bson.M{"$in": primaryIDs}},
+			bson.M{"platforms.primaryidentifier": bson.M{"$in": primaryIDs}},
+		},
+	}, options.Find().SetProjection(projection))
+	if err != nil {
+		return fmt.Errorf("load current search stops for service hydration: %w", err)
+	}
+	currentStopsByReference := make(map[string]*ctdf.Stop, len(primaryIDs))
+	for cursor.Next(ctx) {
+		var stop ctdf.Stop
+		if err := cursor.Decode(&stop); err != nil {
+			cursor.Close(ctx)
+			return fmt.Errorf("decode current search stop for service hydration: %w", err)
+		}
+		for _, stopID := range stop.GetAllStopIDs() {
+			if stopID == stop.PrimaryIdentifier || currentStopsByReference[stopID] == nil {
+				currentStopsByReference[stopID] = &stop
+			}
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		cursor.Close(ctx)
+		return fmt.Errorf("iterate current search stops for service hydration: %w", err)
+	}
+	if err := cursor.Close(ctx); err != nil {
+		return fmt.Errorf("close current search stops cursor: %w", err)
+	}
+
+	currentStopsToResolve := make([]*ctdf.Stop, 0, len(primaryIDs))
+	seenCurrentStops := make(map[string]struct{}, len(primaryIDs))
+	for _, primaryID := range primaryIDs {
+		if stop := currentStopsByReference[primaryID]; stop != nil {
+			if _, exists := seenCurrentStops[stop.PrimaryIdentifier]; exists {
+				continue
+			}
+			seenCurrentStops[stop.PrimaryIdentifier] = struct{}{}
+			currentStopsToResolve = append(currentStopsToResolve, stop)
+		}
+	}
+	servicesByStop, err := dataaggregator.Lookup[map[string][]*ctdf.Service](query.ServicesByStops{
+		Stops:   currentStopsToResolve,
+		Context: ctx,
+	})
+	if err != nil {
+		return err
+	}
+	for _, hit := range searchHits {
+		if hit == nil {
+			continue
+		}
+		currentStop := currentStopsByReference[hit.PrimaryIdentifier]
+		if currentStop == nil {
+			hit.Services = []*ctdf.Service{}
+			continue
+		}
+		services := servicesByStop[currentStop.PrimaryIdentifier]
+		if services == nil {
+			services = []*ctdf.Service{}
+		}
+		hit.Services = services
+	}
+	return nil
+}
+
+func stopServicesLookupError(c *fiber.Ctx, err error) error {
+	status := fiber.StatusBadGateway
+	if errors.Is(err, stopservices.ErrUnbuilt) {
+		status = fiber.StatusServiceUnavailable
+	}
+	return c.Status(status).JSON(fiber.Map{"error": err.Error()})
 }

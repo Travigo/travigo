@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,7 +15,11 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/stopservices"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 type boardTestSource struct {
@@ -205,5 +210,106 @@ func TestStopSearchTransportTypesSupportsMultiSelect(t *testing.T) {
 	expected := []string{"Bus", "Rail", "Tram", "Metro"}
 	if !reflect.DeepEqual(transportTypes, expected) {
 		t.Fatalf("transport types = %#v, want %#v", transportTypes, expected)
+	}
+}
+
+type currentStopServicesTestSource struct {
+	query *query.ServicesByStops
+}
+
+func (currentStopServicesTestSource) GetName() string { return "current stop services test" }
+
+func (currentStopServicesTestSource) Supports() []reflect.Type {
+	return []reflect.Type{reflect.TypeFor[map[string][]*ctdf.Service]()}
+}
+
+func (s currentStopServicesTestSource) Lookup(value any) (any, error) {
+	q, ok := value.(query.ServicesByStops)
+	if !ok {
+		return nil, errors.New("unexpected lookup")
+	}
+	*s.query = q
+	servicesByStop := make(map[string][]*ctdf.Service, len(q.Stops))
+	for _, stop := range q.Stops {
+		servicesByStop[stop.PrimaryIdentifier] = []*ctdf.Service{{PrimaryIdentifier: "service-1"}}
+	}
+	return servicesByStop, nil
+}
+
+func TestSearchServiceHydrationResolvesRelinkedPrimaryAsAlias(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("search hit aliases use current stop refs", func(mt *mtest.T) {
+		previousDB, previousAggregator := database.Instance, dataaggregator.GlobalAggregator
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		var batchQuery query.ServicesByStops
+		dataaggregator.GlobalAggregator = dataaggregator.Aggregator{}
+		dataaggregator.GlobalAggregator.RegisterSource(currentStopServicesTestSource{query: &batchQuery})
+		mt.Cleanup(func() {
+			database.Instance, dataaggregator.GlobalAggregator = previousDB, previousAggregator
+		})
+
+		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".stops", mtest.FirstBatch, bson.D{
+			{Key: "primaryidentifier", Value: "current-stop"},
+			{Key: "otheridentifiers", Value: bson.A{"old-stop"}},
+			{Key: "platforms", Value: bson.A{bson.D{{Key: "primaryidentifier", Value: "current-platform"}}}},
+		}))
+		hit := &ctdf.Stop{PrimaryIdentifier: "old-stop", PrimaryName: "Name from search index"}
+		if err := attachSearchStopServices(context.Background(), []*ctdf.Stop{hit}); err != nil {
+			mt.Fatal(err)
+		}
+		if len(batchQuery.Stops) != 1 {
+			mt.Fatalf("hydrated stops = %#v, want one current stop", batchQuery.Stops)
+		}
+		current := batchQuery.Stops[0]
+		if current.PrimaryIdentifier != "current-stop" || len(current.OtherIdentifiers) != 1 || current.OtherIdentifiers[0] != "old-stop" {
+			mt.Fatalf("service lookup used stale stop refs: %#v", current)
+		}
+		if len(current.Platforms) != 1 || current.Platforms[0].PrimaryIdentifier != "current-platform" {
+			mt.Fatalf("service lookup omitted current platforms: %#v", current.Platforms)
+		}
+		if hit.PrimaryName != "Name from search index" || len(hit.Services) != 1 || hit.Services[0].PrimaryIdentifier != "service-1" {
+			mt.Fatalf("search hit was not hydrated without replacing its shape: %#v", hit)
+		}
+	})
+}
+
+func TestSearchServiceHydrationPrefersPrimaryOverAlias(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("primary identifier wins over another stop alias", func(mt *mtest.T) {
+		previousDB, previousAggregator := database.Instance, dataaggregator.GlobalAggregator
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		var batchQuery query.ServicesByStops
+		dataaggregator.GlobalAggregator = dataaggregator.Aggregator{}
+		dataaggregator.GlobalAggregator.RegisterSource(currentStopServicesTestSource{query: &batchQuery})
+		mt.Cleanup(func() {
+			database.Instance, dataaggregator.GlobalAggregator = previousDB, previousAggregator
+		})
+
+		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".stops", mtest.FirstBatch,
+			bson.D{{Key: "primaryidentifier", Value: "other-stop"}, {Key: "otheridentifiers", Value: bson.A{"shared-ref"}}},
+			bson.D{{Key: "primaryidentifier", Value: "shared-ref"}},
+		))
+		hit := &ctdf.Stop{PrimaryIdentifier: "shared-ref"}
+		if err := attachSearchStopServices(context.Background(), []*ctdf.Stop{hit}); err != nil {
+			mt.Fatal(err)
+		}
+		if len(batchQuery.Stops) != 1 || batchQuery.Stops[0].PrimaryIdentifier != "shared-ref" {
+			mt.Fatalf("resolved search stop = %#v, want primary stop shared-ref", batchQuery.Stops)
+		}
+	})
+}
+
+func TestUnbuiltStopServicesReturnUnavailable(t *testing.T) {
+	app := fiber.New()
+	app.Get("/", func(c *fiber.Ctx) error {
+		return stopServicesLookupError(c, stopservices.ErrUnbuilt)
+	})
+	response, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
 	}
 }

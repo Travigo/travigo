@@ -90,6 +90,9 @@ func getStopServiceAlerts(c *fiber.Ctx) error {
 	services, err = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{
 		Stop: stop,
 	})
+	if err != nil {
+		return stopServicesLookupError(c, err)
+	}
 
 	// setup query for disruptions
 	matchingIdentifiers := []string{

@@ -58,7 +58,9 @@ func listSavedObjects(c *fiber.Ctx) error {
 
 	if c.Query("view") == "web" {
 		for _, savedObject := range savedObjects {
-			populateSavedObject(savedObject)
+			if err := populateSavedObject(savedObject); err != nil {
+				return stopServicesLookupError(c, err)
+			}
 		}
 		reduced, marshalErr := sheriff.Marshal(&sheriff.Options{Groups: []string{"web-saved"}}, savedObjects)
 		if marshalErr != nil {
@@ -72,22 +74,25 @@ func listSavedObjects(c *fiber.Ctx) error {
 	return c.JSON(savedObjects)
 }
 
-func populateSavedObject(savedObject *ctdf.SavedObject) {
+func populateSavedObject(savedObject *ctdf.SavedObject) error {
 	if savedObject == nil || savedObject.ObjectIdentifier == "" {
-		return
+		return nil
 	}
 	switch strings.ToLower(savedObject.Type) {
 	case "stop", "stops":
 		stop, err := dataaggregator.Lookup[*ctdf.Stop](query.Stop{Identifier: savedObject.ObjectIdentifier})
 		if err != nil {
-			return
+			return nil
 		}
-		stop.Services, _ = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: stop})
+		stop.Services, err = dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: stop})
+		if err != nil {
+			return err
+		}
 		savedObject.Object = stop
 	case "journey", "journeys":
 		journey, err := dataaggregator.Lookup[*ctdf.Journey](query.Journey{PrimaryIdentifier: savedObject.ObjectIdentifier})
 		if err != nil {
-			return
+			return nil
 		}
 		journey.GetService()
 		if len(journey.Path) > 0 {
@@ -98,6 +103,7 @@ func populateSavedObject(savedObject *ctdf.SavedObject) {
 		}
 		savedObject.Object = journey
 	}
+	return nil
 }
 
 func getSavedObject(c *fiber.Ctx) error {
@@ -120,7 +126,9 @@ func getSavedObject(c *fiber.Ctx) error {
 	}
 
 	if c.Query("view") == "web" {
-		populateSavedObject(savedObject)
+		if err := populateSavedObject(savedObject); err != nil {
+			return stopServicesLookupError(c, err)
+		}
 		return writeSavedObject(c, savedObject)
 	}
 	if c.Query("view") != "" {

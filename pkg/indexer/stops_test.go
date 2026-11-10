@@ -12,6 +12,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataaggregator"
+	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
 	"go.mongodb.org/mongo-driver/bson"
@@ -24,7 +25,8 @@ func TestStopDatasetIndexingResumesAfterBulkFailure(t *testing.T) {
 		previousDB, previousElastic, previousAggregator := database.Instance, elastic_client.Client, dataaggregator.GlobalAggregator
 		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
 		dataaggregator.GlobalAggregator = dataaggregator.Aggregator{}
-		dataaggregator.GlobalAggregator.RegisterSource(stopIndexTestServices{})
+		serviceBatchLookups := 0
+		dataaggregator.GlobalAggregator.RegisterSource(stopIndexTestServices{batchLookups: &serviceBatchLookups})
 		mt.Cleanup(func() {
 			database.Instance, elastic_client.Client, dataaggregator.GlobalAggregator = previousDB, previousElastic, previousAggregator
 		})
@@ -109,6 +111,9 @@ func TestStopDatasetIndexingResumesAfterBulkFailure(t *testing.T) {
 		if len(responses) != 0 {
 			mt.Fatalf("unused Elasticsearch responses: %v", responses)
 		}
+		if serviceBatchLookups != 3 {
+			mt.Fatalf("stop service batch lookups = %d, want one per rebuild", serviceBatchLookups)
+		}
 
 		var updates []string
 		for _, event := range mt.GetAllStartedEvents() {
@@ -142,14 +147,32 @@ func (transport stopIndexTestTransport) RoundTrip(request *http.Request) (*http.
 	return transport(request)
 }
 
-type stopIndexTestServices struct{}
+type stopIndexTestServices struct {
+	batchLookups *int
+}
 
 func (stopIndexTestServices) GetName() string { return "test services" }
 
 func (stopIndexTestServices) Supports() []reflect.Type {
-	return []reflect.Type{reflect.TypeFor[[]*ctdf.Service]()}
+	return []reflect.Type{reflect.TypeFor[[]*ctdf.Service](), reflect.TypeFor[map[string][]*ctdf.Service]()}
 }
 
-func (stopIndexTestServices) Lookup(any) (any, error) {
-	return []*ctdf.Service{}, nil
+func (source stopIndexTestServices) Lookup(value any) (any, error) {
+	switch q := value.(type) {
+	case query.ServicesByStops:
+		if source.batchLookups != nil {
+			*source.batchLookups = *source.batchLookups + 1
+		}
+		servicesByStop := make(map[string][]*ctdf.Service, len(q.Stops))
+		for _, stop := range q.Stops {
+			if stop != nil {
+				servicesByStop[stop.PrimaryIdentifier] = []*ctdf.Service{}
+			}
+		}
+		return servicesByStop, nil
+	case query.ServicesByStop:
+		return []*ctdf.Service{}, nil
+	default:
+		return nil, fmt.Errorf("unexpected stop service query %T", value)
+	}
 }

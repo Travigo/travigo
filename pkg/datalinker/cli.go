@@ -1,8 +1,10 @@
 package datalinker
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/insertrecords"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/redis_client"
+	"github.com/travigo/travigo/pkg/stopservices"
 	"github.com/urfave/cli/v2"
 
 	"github.com/rs/zerolog/log"
@@ -23,6 +26,71 @@ func RegisterCLI() *cli.Command {
 		Name:  "data-linker",
 		Usage: "Link & merge data objects that reference the same thing",
 		Subcommands: []*cli.Command{
+			{
+				Name:  "stop-services",
+				Usage: "Build the materialized stop-services collection",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "build",
+						Usage: "Build the complete static stop-services view, or one dataset",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "dataset", Usage: "Build only this dataset's contribution"},
+							&cli.IntFlag{Name: "batch-size", Value: stopservices.DefaultBatchSize, Usage: "Maximum stop-service rows buffered per Mongo bulk write"},
+							&cli.DurationFlag{Name: "timeout", Value: 90 * time.Minute, Usage: "Maximum build duration"},
+						},
+						Action: func(c *cli.Context) error {
+							return runStopServicesCommand(c, func(ctx context.Context, db *mongo.Database) error {
+								buildOptions := stopservices.BuildOptions{BatchSize: c.Int("batch-size")}
+								if datasetID := c.String("dataset"); datasetID != "" {
+									return stopservices.BuildDatasetWithOptions(ctx, db, datasetID, buildOptions)
+								}
+								return stopservices.BuildWithOptions(ctx, db, buildOptions)
+							})
+						},
+					},
+					{
+						Name:  "pending",
+						Usage: "Refresh dirty datasets without rebuilding the complete view",
+						Flags: []cli.Flag{
+							&cli.DurationFlag{Name: "timeout", Value: 90 * time.Minute, Usage: "Maximum refresh duration"},
+						},
+						Action: func(c *cli.Context) error {
+							return runStopServicesCommand(c, func(ctx context.Context, db *mongo.Database) error {
+								built, err := stopservices.BuildPending(ctx, db)
+								if errors.Is(err, stopservices.ErrUnbuilt) {
+									log.Info().Msg("Stop-services materialization has not been bootstrapped; skipping pending refresh")
+									return nil
+								}
+								if err != nil {
+									return err
+								}
+								log.Info().Int("datasets", built).Msg("Refreshed pending stop-services datasets")
+								return nil
+							})
+						},
+					},
+					{
+						Name:  "recover-writers",
+						Usage: "Clear source-write markers left by a stopped publisher",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{Name: "confirm-no-publishers", Required: true, Usage: "Confirm every journey publisher has stopped"},
+							&cli.DurationFlag{Name: "timeout", Value: 30 * time.Second, Usage: "Maximum recovery duration"},
+						},
+						Action: func(c *cli.Context) error {
+							if !c.Bool("confirm-no-publishers") {
+								return fmt.Errorf("--confirm-no-publishers must be true after stopping all journey publishers")
+							}
+							return runStopServicesCommand(c, func(ctx context.Context, db *mongo.Database) error {
+								if err := stopservices.RecoverSourceWriters(ctx, db); err != nil {
+									return err
+								}
+								log.Warn().Msg("Recovered stop-services source markers; run pending refresh to rebuild affected datasets")
+								return nil
+							})
+						},
+					},
+				},
+			},
 			{
 				Name:  "run",
 				Usage: "Link",
@@ -188,4 +256,26 @@ func RegisterCLI() *cli.Command {
 			},
 		},
 	}
+}
+
+func runStopServicesCommand(c *cli.Context, run func(context.Context, *mongo.Database) error) error {
+	if err := database.Connect(); err != nil {
+		return err
+	}
+
+	ctx := c.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	timeout := c.Duration("timeout")
+	if timeout <= 0 {
+		return fmt.Errorf("--timeout must be positive")
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	if err := stopservices.EnsureSchema(ctx, database.Instance.Database); err != nil {
+		return fmt.Errorf("ensure stop-services schema: %w", err)
+	}
+	return run(ctx, database.Instance.Database)
 }

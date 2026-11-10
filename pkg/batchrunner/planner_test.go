@@ -29,8 +29,8 @@ func TestBuildRunTasksDatasetSelection(t *testing.T) {
 	}
 
 	allTasks := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
-	if len(allTasks) != 7 {
-		t.Fatalf("expected all plan tasks to produce 7 tasks, got %d", len(allTasks))
+	if len(allTasks) != 8 {
+		t.Fatalf("expected all plan tasks to produce 8 tasks, got %d", len(allTasks))
 	}
 
 	selectedTasks := BuildRunTasks(plan, RunOptions{TaskIDs: []string{"medium-a", "link-stops"}})
@@ -91,6 +91,32 @@ func TestJourneyPublisherTask(t *testing.T) {
 	}
 }
 
+func TestStopServicesRefreshTaskSelectionAndOrder(t *testing.T) {
+	plan := Plan{Groups: map[string][]PlanTask{
+		journeyPublishingGroup: buildPostProcessingPlanTasks(journeyPublishingGroup),
+	}}
+
+	selected := BuildRunTasks(plan, RunOptions{TaskIDs: []string{"refresh-stop-services"}})
+	if len(selected) != 1 {
+		t.Fatalf("expected one selected stop-services task, got %d", len(selected))
+	}
+	if selected[0].Kind != TaskKindStopServices {
+		t.Fatalf("selected task kind = %s, want %s", selected[0].Kind, TaskKindStopServices)
+	}
+	wantArgs := []string{"data-linker", "stop-services", "pending", "--timeout", "90m"}
+	if !slices.Equal(selected[0].Args, wantArgs) {
+		t.Fatalf("stop-services task args = %q, want %q", selected[0].Args, wantArgs)
+	}
+
+	all := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
+	journeyIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "link-journeys" })
+	refreshIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "refresh-stop-services" })
+	indexIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "index-stops" })
+	if journeyIndex < 0 || refreshIndex != journeyIndex+1 || indexIndex != refreshIndex+1 {
+		t.Fatalf("journey refresh order = link:%d refresh:%d index:%d", journeyIndex, refreshIndex, indexIndex)
+	}
+}
+
 func TestBuildPlanIncludesTfLRouteTracks(t *testing.T) {
 	workingDirectory, err := os.Getwd()
 	if err != nil {
@@ -134,7 +160,9 @@ func TestOSMRailTracksRunsBeforeJourneyPublishing(t *testing.T) {
 	serviceLinkIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "link-services" })
 	osmIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "global-openstreetmap-gb-national-rail-tracks" })
 	journeyLinkIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "link-journeys" })
-	if serviceLinkIndex < 0 || osmIndex < 0 || journeyLinkIndex < 0 || !(serviceLinkIndex < osmIndex && osmIndex < journeyLinkIndex) {
+	refreshIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "refresh-stop-services" })
+	indexStopsIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "index-stops" })
+	if serviceLinkIndex < 0 || osmIndex < 0 || journeyLinkIndex < 0 || refreshIndex != journeyLinkIndex+1 || indexStopsIndex != refreshIndex+1 || !(serviceLinkIndex < osmIndex && osmIndex < journeyLinkIndex) {
 		t.Fatalf("pipeline positions: services=%d osm=%d journeys=%d", serviceLinkIndex, osmIndex, journeyLinkIndex)
 	}
 	berthIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.Kind == TaskKindTDMappings })

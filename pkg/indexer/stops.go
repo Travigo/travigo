@@ -323,6 +323,7 @@ type basicService struct {
 }
 
 const railDepartureBoardWarmConcurrency = 4
+const stopServiceIndexBatchSize = 250
 
 func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.BulkIndexer) error {
 	now := time.Now()
@@ -364,6 +365,79 @@ func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.Bulk
 	railInactiveSkipped := 0
 	indexedStops := 0
 	railIndexedStops := 0
+	activeStops := make([]*ctdf.Stop, 0, stopServiceIndexBatchSize)
+	indexStopBatch := func(stops []*ctdf.Stop) error {
+		if len(stops) == 0 {
+			return nil
+		}
+		servicesByStop, err := dataaggregator.Lookup[map[string][]*ctdf.Service](query.ServicesByStops{
+			Stops:   stops,
+			Context: ctx,
+		})
+		if err != nil {
+			return fmt.Errorf("load services for stop batch starting at %s: %w", stops[0].PrimaryIdentifier, err)
+		}
+
+		for _, stop := range stops {
+			services := servicesByStop[stop.PrimaryIdentifier]
+			basicServices := make([]*basicService, 0, len(services))
+
+			// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
+			// Performance Review [Set N] [PR098] [P2] (indexing): Sending to this small warm-up queue
+			// blocks the Mongo cursor and all subsequent index production when boards are
+			// slow. Count=1 still runs full board/realtime/estimate work and can trigger
+			// graph-to-Mongo fallback. Decouple optional warming from successful index
+			// publication and warm only versioned static cache entries with a time budget.
+			if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
+				railWarmRequested.Add(1)
+				select {
+				case railWarmJobs <- stop:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+
+			for _, service := range services {
+				basicServices = append(basicServices, &basicService{
+					PrimaryIdentifier:    service.PrimaryIdentifier,
+					ServiceName:          service.ServiceName,
+					OperatorRef:          service.OperatorRef,
+					BrandColour:          service.BrandColour,
+					SecondaryBrandColour: service.SecondaryBrandColour,
+					BrandIcon:            service.BrandIcon,
+					TransportType:        service.TransportType,
+				})
+			}
+
+			jsonStop, err := json.Marshal(map[string]interface{}{
+				"PrimaryIdentifier": stop.PrimaryIdentifier,
+				"OtherIdentifiers":  stop.OtherIdentifiers,
+				"PrimaryName":       stop.PrimaryName,
+				"Descriptor":        stop.Descriptor,
+				"TransportTypes":    stop.TransportTypes,
+				"Location":          stop.Location,
+				"Services":          basicServices,
+			})
+			if err != nil {
+				return fmt.Errorf("encode stop %s: %w", stop.PrimaryIdentifier, err)
+			}
+			if err := bulk.Add(ctx, esutil.BulkIndexerItem{
+				DocumentID: stop.PrimaryIdentifier,
+				Action:     "index",
+				Body:       bytes.NewReader(jsonStop),
+				OnFailure: func(_ context.Context, item esutil.BulkIndexerItem, response esutil.BulkIndexerResponseItem, err error) {
+					log.Error().Err(err).Str("stop", item.DocumentID).Str("reason", response.Error.Reason).Msg("Failed to index stop")
+				},
+			}); err != nil {
+				return fmt.Errorf("queue stop %s: %w", stop.PrimaryIdentifier, err)
+			}
+			indexedStops++
+			if stopHasTransportType(stop, ctdf.TransportTypeRail) {
+				railIndexedStops++
+			}
+		}
+		return nil
+	}
 
 	defer func() {
 		close(railWarmJobs)
@@ -381,8 +455,8 @@ func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.Bulk
 	}()
 
 	for cursor.Next(ctx) {
-		var stop ctdf.Stop
-		if err := cursor.Decode(&stop); err != nil {
+		stop := new(ctdf.Stop)
+		if err := cursor.Decode(stop); err != nil {
 			return fmt.Errorf("decode stop: %w", err)
 		}
 
@@ -390,76 +464,25 @@ func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.Bulk
 
 		if !stop.Active {
 			inactiveSkipped++
-			if stopHasTransportType(&stop, ctdf.TransportTypeRail) {
+			if stopHasTransportType(stop, ctdf.TransportTypeRail) {
 				railInactiveSkipped++
 			}
 			continue
 		}
 
-		services, err := dataaggregator.Lookup[[]*ctdf.Service](query.ServicesByStop{Stop: &stop})
-		if err != nil {
-			return fmt.Errorf("load services for stop %s: %w", stop.PrimaryIdentifier, err)
-		}
-		var basicServices []*basicService
-
-		// Force a filling of the cache of the stops journeys for rail only - TODO a bit of a hack
-		// Performance Review [Set N] [PR098] [P2] (indexing): Sending to this small warm-up queue
-		// blocks the Mongo cursor and all subsequent index production when boards are
-		// slow. Count=1 still runs full board/realtime/estimate work and can trigger
-		// graph-to-Mongo fallback. Decouple optional warming from successful index
-		// publication and warm only versioned static cache entries with a time budget.
-		if len(stop.TransportTypes) == 1 && stop.TransportTypes[0] == ctdf.TransportTypeRail {
-			railWarmRequested.Add(1)
-			select {
-			case railWarmJobs <- &stop:
-			case <-ctx.Done():
-				return ctx.Err()
+		activeStops = append(activeStops, stop)
+		if len(activeStops) == cap(activeStops) {
+			if err := indexStopBatch(activeStops); err != nil {
+				return err
 			}
-		}
-
-		for _, service := range services {
-			basicServices = append(basicServices, &basicService{
-				PrimaryIdentifier:    service.PrimaryIdentifier,
-				ServiceName:          service.ServiceName,
-				OperatorRef:          service.OperatorRef,
-				BrandColour:          service.BrandColour,
-				SecondaryBrandColour: service.SecondaryBrandColour,
-				BrandIcon:            service.BrandIcon,
-				TransportType:        service.TransportType,
-			})
-		}
-
-		jsonStop, err := json.Marshal(map[string]interface{}{
-			"PrimaryIdentifier": stop.PrimaryIdentifier,
-			"OtherIdentifiers":  stop.OtherIdentifiers,
-			"PrimaryName":       stop.PrimaryName,
-			"Descriptor":        stop.Descriptor,
-			"TransportTypes":    stop.TransportTypes,
-			"Location":          stop.Location,
-			"Services":          basicServices,
-		})
-
-		if err != nil {
-			return fmt.Errorf("encode stop %s: %w", stop.PrimaryIdentifier, err)
-		}
-		err = bulk.Add(ctx, esutil.BulkIndexerItem{
-			DocumentID: stop.PrimaryIdentifier,
-			Action:     "index",
-			Body:       bytes.NewReader(jsonStop),
-			OnFailure: func(_ context.Context, item esutil.BulkIndexerItem, response esutil.BulkIndexerResponseItem, err error) {
-				log.Error().Err(err).Str("stop", item.DocumentID).Str("reason", response.Error.Reason).Msg("Failed to index stop")
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("queue stop %s: %w", stop.PrimaryIdentifier, err)
-		}
-		indexedStops++
-		if stopHasTransportType(&stop, ctdf.TransportTypeRail) {
-			railIndexedStops++
+			activeStops = activeStops[:0]
 		}
 	}
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("iterate stops: %w", err)
+	}
+	if err := indexStopBatch(activeStops); err != nil {
+		return err
 	}
 	return nil
 }

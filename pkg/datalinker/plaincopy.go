@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/datasetversion"
+	"github.com/travigo/travigo/pkg/stopservices"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -18,6 +20,8 @@ import (
 type PlainCopyConfig struct {
 	SkipStaging bool
 }
+
+const sourceWriteFinishTimeout = 10 * time.Second
 
 type PlainCopyLinker struct {
 	objectName string
@@ -48,7 +52,9 @@ func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 		if err := copyCollection(rawCollectionName, stagingCollectionName); err != nil {
 			return err
 		}
-		if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
+		if err := runJourneySourceWrite(ctx, func() error {
+			return copyCollection(stagingCollectionName, liveCollectionName)
+		}); err != nil {
 			return err
 		}
 	}
@@ -57,6 +63,36 @@ func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 		Dataset:      linkerDataset,
 		LastModified: time.Now(),
 	})
+}
+
+// runJourneySourceWrite brackets changes to the published journey collection
+// with a durable marker consumed by the stop-services builder. It is cheap on
+// the publisher path and lets builders detect overlapping source changes
+// without holding a lock through their full aggregation.
+func runJourneySourceWrite(ctx context.Context, publish func() error, datasetIDs ...string) error {
+	if database.Instance == nil || database.Instance.Database == nil {
+		return errors.New("begin stop-services source write: database is not connected")
+	}
+
+	finish, err := stopservices.BeginSourceWrite(ctx, database.Instance.Database, datasetIDs...)
+	if err != nil {
+		return fmt.Errorf("begin stop-services source write: %w", err)
+	}
+
+	publishErr := publish()
+	finishCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), sourceWriteFinishTimeout)
+	defer cancel()
+	finishErr := finish(finishCtx)
+	if publishErr != nil && finishErr != nil {
+		return errors.Join(publishErr, fmt.Errorf("finish stop-services source write: %w", finishErr))
+	}
+	if publishErr != nil {
+		return publishErr
+	}
+	if finishErr != nil {
+		return fmt.Errorf("finish stop-services source write: %w", finishErr)
+	}
+	return nil
 }
 
 func publishUpdatedDatasets(ctx context.Context, rawCollectionName, liveCollectionName, linkerDataset string) error {
@@ -132,28 +168,33 @@ func pendingJourneyDatasets(ctx context.Context, versions *mongo.Collection, lin
 }
 
 func publishJourneyDataset(ctx context.Context, rawCollection, liveCollection *mongo.Collection, datasetID string) (int64, error) {
-	datasetFilter := bson.M{"datasource.datasetid": datasetID}
-	currentTimestamps, err := currentDatasetTimestamps(ctx, rawCollection, datasetFilter)
-	if err != nil {
-		return 0, err
-	}
+	var deleted int64
+	err := runJourneySourceWrite(ctx, func() error {
+		datasetFilter := bson.M{"datasource.datasetid": datasetID}
+		currentTimestamps, err := currentDatasetTimestamps(ctx, rawCollection, datasetFilter)
+		if err != nil {
+			return err
+		}
 
-	cursor, err := rawCollection.Aggregate(ctx, incrementalMergePipeline(datasetFilter, liveCollection.Name()))
-	if err != nil {
-		return 0, fmt.Errorf("merge journeys: %w", err)
-	}
-	if err := cursor.Close(ctx); err != nil {
-		return 0, fmt.Errorf("close journey publisher cursor: %w", err)
-	}
-	if err := cursor.Err(); err != nil {
-		return 0, fmt.Errorf("merge journeys: %w", err)
-	}
+		cursor, err := rawCollection.Aggregate(ctx, incrementalMergePipeline(datasetFilter, liveCollection.Name()))
+		if err != nil {
+			return fmt.Errorf("merge journeys: %w", err)
+		}
+		if err := cursor.Close(ctx); err != nil {
+			return fmt.Errorf("close journey publisher cursor: %w", err)
+		}
+		if err := cursor.Err(); err != nil {
+			return fmt.Errorf("merge journeys: %w", err)
+		}
 
-	result, err := liveCollection.DeleteMany(ctx, staleDatasetRecordsFilter(datasetID, currentTimestamps))
-	if err != nil {
-		return 0, fmt.Errorf("delete stale journeys: %w", err)
-	}
-	return result.DeletedCount, nil
+		result, err := liveCollection.DeleteMany(ctx, staleDatasetRecordsFilter(datasetID, currentTimestamps))
+		if err != nil {
+			return fmt.Errorf("delete stale journeys: %w", err)
+		}
+		deleted = result.DeletedCount
+		return nil
+	}, datasetID)
+	return deleted, err
 }
 
 func currentDatasetTimestamps(ctx context.Context, rawCollection *mongo.Collection, datasetFilter bson.M) ([]string, error) {

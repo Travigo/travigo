@@ -33,6 +33,7 @@ func (s Source) Supports() []reflect.Type {
 		reflect.TypeOf(ctdf.OSMStop{}),
 		reflect.TypeOf(ctdf.StopDetailed{}),
 		reflect.TypeOf([]*ctdf.Service{}),
+		reflect.TypeOf(map[string][]*ctdf.Service{}),
 		reflect.TypeOf([]*ctdf.ServiceAlert{}),
 	}
 }
@@ -57,6 +58,8 @@ func (s Source) Lookup(q any) (interface{}, error) {
 		return s.StopDetailedQuery(q.(query.StopDetailed))
 	case query.ServicesByStop:
 		return s.ServicesByStopQuery(q.(query.ServicesByStop))
+	case query.ServicesByStops:
+		return s.ServicesByStopsQuery(q.(query.ServicesByStops))
 	case query.ServiceAlertsForMatchingIdentifiers:
 		return s.ServiceAlertsForMatchingIdentifiersQuery(q.(query.ServiceAlertsForMatchingIdentifiers))
 	}

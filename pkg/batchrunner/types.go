@@ -11,6 +11,7 @@ const (
 	TaskKindLinkTransfers TaskKind = "link-stop-transfers"
 	TaskKindLinkServices  TaskKind = "link-services"
 	TaskKindLinkJourneys  TaskKind = "link-journeys"
+	TaskKindStopServices  TaskKind = "stop-services"
 	TaskKindIndexStops    TaskKind = "index-stops"
 )
 
