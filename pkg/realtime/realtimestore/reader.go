@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"math"
 	"strconv"
 	"strings"
@@ -742,16 +743,10 @@ func FindByIdentifier(ctx context.Context, identifier string) (*ctdf.RealtimeJou
 	return realtimeJourney, nil
 }
 
-// FindForUpdate avoids the rail allocation/loading reads that a vehicle update
-// does not use, while retaining the location overlays that must be preserved by
-// the following full realtime-journey write.
+// FindForUpdate loads details with location overlays and skips rail allocation
+// and loading data. The vehicle tracker uses FindForTrackerUpdate to save
+// against a specific details snapshot.
 func FindForUpdate(ctx context.Context, identifier string) (*ctdf.RealtimeJourney, error) {
-	// Performance Review [Set L] [PR127] [P2]: Details and both location overlays are read serially;
-	// SaveRealtimeJourney then reads/decodes the previous details again for events.
-	// Pipeline independent reads and retain an immutable previous snapshot through
-	// the update. Preserve event-diff correctness with per-journey ordering/version
-	// checks rather than reusing an already-mutated object. Measure Redis commands
-	// and processing latency per vehicle update.
 	realtimeJourney, err := findStoredByIdentifier(ctx, identifier, false)
 	if err != nil {
 		return nil, err
@@ -760,6 +755,66 @@ func FindForUpdate(ctx context.Context, identifier string) (*ctdf.RealtimeJourne
 	ApplyLocation(ctx, realtimeJourney)
 	ApplyLocationDescription(ctx, realtimeJourney)
 	return realtimeJourney, nil
+}
+
+// FindForTrackerUpdate reads one immutable details version and returns a
+// mutable working copy with the same location overlays as FindForUpdate.
+// SaveRealtimeJourneySnapshot uses the private raw value for its atomic CAS.
+func FindForTrackerUpdate(ctx context.Context, identifier string) (*RealtimeJourneySnapshot, error) {
+	if identifier == "" {
+		return nil, errors.New("realtime journey identifier is required")
+	}
+
+	var detailsCommand, locationCommand, descriptionCommand *redis.StringCmd
+	_, _ = redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		detailsCommand = pipe.Get(ctx, realtimeJourneyDetailsKey(identifier))
+		locationCommand = pipe.Get(ctx, realtimeJourneyLocationKey(identifier))
+		descriptionCommand = pipe.Get(ctx, realtimeJourneyLocationDescriptionKey(identifier))
+		return nil
+	})
+	raw, err := detailsCommand.Bytes()
+	if errors.Is(err, redis.Nil) {
+		return &RealtimeJourneySnapshot{identifier: identifier}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	previous, err := decodeStoredRealtimeJourney(ctx, raw, false)
+	if err != nil {
+		return nil, err
+	}
+	working := copyRealtimeJourneyForTracker(previous)
+	if locationJSON, locationErr := locationCommand.Bytes(); locationErr == nil {
+		var location storedVehicleLocation
+		if json.Unmarshal(locationJSON, &location) == nil {
+			applyStoredLocation(working, location)
+		}
+	}
+	if description, descriptionErr := descriptionCommand.Result(); descriptionErr == nil {
+		working.VehicleLocationDescription = description
+	}
+
+	return &RealtimeJourneySnapshot{
+		Journey:    working,
+		identifier: identifier,
+		raw:        raw,
+		previous:   previous,
+	}, nil
+}
+
+func copyRealtimeJourneyForTracker(previous *ctdf.RealtimeJourney) *ctdf.RealtimeJourney {
+	if previous == nil {
+		return nil
+	}
+
+	working := *previous
+	if previous.Stops != nil {
+		// Tracker updates replace map entries; existing stop values remain
+		// read-only so event comparisons keep the previous snapshot intact.
+		working.Stops = maps.Clone(previous.Stops)
+	}
+	return &working
 }
 
 func findStoredByIdentifier(ctx context.Context, identifier string, hydrateJourney bool) (*ctdf.RealtimeJourney, error) {

@@ -14,14 +14,20 @@ type journeyPositionMatch struct {
 	JourneyProgress float64
 	DistanceMetres  float64
 	UsedGlobalTrack bool
+	HasTrackMatch   bool
 }
 
-func matchJourneyPosition(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
+// matchJourneyProgress returns the closest shaped match and whole-journey
+// progress without projecting scheduled stops onto the global track. It is for
+// callers that score candidates from distance and progress but do not need the
+// corresponding leg and leg progress.
+func matchJourneyProgress(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
 	start := time.Now()
 	defer func() { telemetry.Observe(telemetry.Geometry, time.Since(start)) }()
-	return matchJourneyPositionUnmeasured(journey, vehicle)
+	return matchJourneyTrack(journey, vehicle, false)
 }
-func matchJourneyPositionUnmeasured(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
+
+func matchJourneyTrack(journey *ctdf.Journey, vehicle ctdf.Location, mapGlobalProgressToPath bool) (journeyPositionMatch, bool) {
 	if journey == nil || vehicle.Type != "Point" || len(vehicle.Coordinates) < 2 {
 		return journeyPositionMatch{}, false
 	}
@@ -36,7 +42,7 @@ func matchJourneyPositionUnmeasured(journey *ctdf.Journey, vehicle ctdf.Location
 		if !ok || (found && distance >= best.DistanceMetres) {
 			continue
 		}
-		best = journeyPositionMatch{PathIndex: pathIndex, LegProgress: progress, DistanceMetres: distance}
+		best = journeyPositionMatch{PathIndex: pathIndex, LegProgress: progress, DistanceMetres: distance, HasTrackMatch: true}
 		found = true
 	}
 	if found {
@@ -51,18 +57,21 @@ func matchJourneyPositionUnmeasured(journey *ctdf.Journey, vehicle ctdf.Location
 	if !ok {
 		return journeyPositionMatch{}, false
 	}
-	pathIndex, legProgress := pathForGlobalProgress(journey, globalProgress)
-	return journeyPositionMatch{PathIndex: pathIndex, LegProgress: legProgress, JourneyProgress: globalProgress, DistanceMetres: distance, UsedGlobalTrack: true}, true
+	match := journeyPositionMatch{PathIndex: -1, JourneyProgress: globalProgress, DistanceMetres: distance, UsedGlobalTrack: true, HasTrackMatch: true}
+	if mapGlobalProgressToPath {
+		match.PathIndex, match.LegProgress = pathForGlobalProgress(journey, globalProgress)
+	}
+	return match, true
 }
 
 // matchJourneyPositionWithStopFallback keeps identified journeys trackable when
 // their source feed has no shape geometry. Candidate discovery deliberately uses
-// matchJourneyPosition only: nearest stops are too weak a signal to identify an
+// matchJourneyProgress only: nearest stops are too weak a signal to identify an
 // otherwise unknown trip.
 func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Location) (journeyPositionMatch, bool) {
 	start := time.Now()
 	defer func() { telemetry.Observe(telemetry.Geometry, time.Since(start)) }()
-	if match, ok := matchJourneyPositionUnmeasured(journey, vehicle); ok {
+	if match, ok := matchJourneyTrack(journey, vehicle, true); ok {
 		return match, true
 	}
 	if journey == nil || vehicle.Type != "Point" || len(vehicle.Coordinates) < 2 {
@@ -101,18 +110,14 @@ func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Lo
 }
 
 func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, float64) {
-	// Performance Review [Set J] [PR151] [P2]: Each stop projection scans the whole track and
-	// recalculates its length, giving stops-times-track-points work on this fallback.
-	// Cache cumulative segment lengths and stop progress when loading geometry;
-	// search near the previous position with a full-search fallback. The updater
-	// also matches again for history, so reuse the first suitable match. Benchmark
-	// long routes and loops to preserve matching behaviour.
+	track := journey.Track
+	shape := newStopProjectionShape(journey.TrackRef, track)
 	previous := 0.0
 	for index, path := range journey.Path {
-		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil {
+		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil || len(path.DestinationStop.Location.Coordinates) < 2 {
 			continue
 		}
-		_, destinationProgress, ok := closestTrackPosition(*path.DestinationStop.Location, journey.Track)
+		destinationProgress, ok := cachedStopProgress(shape, *path.DestinationStop.Location, track)
 		if !ok {
 			continue
 		}

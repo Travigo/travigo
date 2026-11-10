@@ -28,6 +28,35 @@ const (
 	railAllocationTTL = 24 * time.Hour
 )
 
+// ErrRealtimeJourneyConflict means the tracker snapshot was superseded before
+// it could be saved. Callers should read a fresh snapshot and recompute once.
+var ErrRealtimeJourneyConflict = errors.New("realtime journey changed during tracker update")
+
+var saveRealtimeJourneySnapshotScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if (current or '') ~= ARGV[1] then
+	return 0
+end
+
+local ttl = ARGV[3]
+redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
+for index = 4, #KEYS do
+	redis.call('SET', KEYS[index], ARGV[4], 'EX', ttl)
+end
+
+if ARGV[5] then
+	redis.call('SET', KEYS[2], ARGV[5], 'EX', ttl)
+	-- Keep the overlay even if the geo-index update fails.
+	if ARGV[6] then
+		redis.pcall('GEOADD', KEYS[3], ARGV[6], ARGV[7], ARGV[4])
+	else
+		redis.pcall('ZREM', KEYS[3], ARGV[4])
+	end
+end
+
+return 1
+`)
+
 func realtimeJourneyDetailsKey(identifier string) string {
 	return fmt.Sprintf("realtime-journey:details/%s", identifier)
 }
@@ -84,8 +113,96 @@ func SaveRealtimeJourney(ctx context.Context, realtimeJourney *ctdf.RealtimeJour
 		return err
 	}
 
-	publishRealtimeJourneyEvents(previousRealtimeJourney, realtimeJourney, previousRealtimeJourneyKnown)
+	publishRealtimeJourneyEvents(previousRealtimeJourney, realtimeJourney, previousRealtimeJourneyKnown, nil)
 
+	return nil
+}
+
+// RealtimeJourneySnapshot is the tracker update's read version. Journey is a
+// mutable working copy; the original Redis value and decoded details remain
+// private so saving can compare-and-set and publish events against the exact
+// previous state without another GET or decode.
+type RealtimeJourneySnapshot struct {
+	Journey *ctdf.RealtimeJourney
+
+	identifier string
+	raw        []byte
+	previous   *ctdf.RealtimeJourney
+	location   []byte
+	point      *[2]float64
+}
+
+// SetLocation records the tracker's location overlay to commit atomically with
+// the journey. GPS-only callers should continue to use UpdateLocation.
+func (snapshot *RealtimeJourneySnapshot) SetLocation(location ctdf.Location, bearing float64, observedAt time.Time) error {
+	if snapshot == nil {
+		return errors.New("realtime journey snapshot is required")
+	}
+	if observedAt.IsZero() {
+		observedAt = time.Now()
+	}
+	value, err := json.Marshal(storedVehicleLocation{
+		Location:   location,
+		Bearing:    bearing,
+		ObservedAt: observedAt,
+	})
+	if err != nil {
+		return err
+	}
+
+	snapshot.location = value
+	snapshot.point = nil
+	if location.Type == "Point" && len(location.Coordinates) >= 2 {
+		snapshot.point = &[2]float64{location.Coordinates[0], location.Coordinates[1]}
+	}
+	return nil
+}
+
+// SaveRealtimeJourneySnapshot atomically saves the tracker snapshot only if
+// the persisted details still match the value returned by FindForTrackerUpdate.
+// A location overlay set with SetLocation is committed in the same script.
+// journeyForEvents lazily supplies full geometry for event payloads only.
+func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneySnapshot, journeyForEvents func() *ctdf.Journey) error {
+	if snapshot == nil || snapshot.Journey == nil {
+		return errors.New("realtime journey snapshot is required")
+	}
+	if snapshot.identifier == "" || snapshot.Journey.PrimaryIdentifier != snapshot.identifier {
+		return errors.New("realtime journey snapshot identifier does not match journey")
+	}
+
+	storedRealtimeJourney := storedRealtimeJourneyFromCTDF(snapshot.Journey)
+	realtimeJourneyJSON, err := json.Marshal(storedRealtimeJourney)
+	if err != nil {
+		return err
+	}
+	timeoutDuration := realtimeJourneyExpiration(snapshot.Journey.TimeoutDurationMinutes)
+
+	keys := []string{
+		realtimeJourneyDetailsKey(snapshot.identifier),
+		realtimeJourneyLocationKey(snapshot.identifier),
+		realtimeJourneyLocationGeoIndexKey(),
+	}
+	if snapshot.Journey.Journey != nil && snapshot.Journey.Journey.PrimaryIdentifier != "" {
+		keys = append(keys, realtimeJourneyMappingKey("travigo-journeyid", snapshot.Journey.Journey.PrimaryIdentifier))
+	}
+	for mappingType, identifier := range snapshot.Journey.OtherIdentifiers {
+		keys = append(keys, realtimeJourneyMappingKey(mappingType, identifier))
+	}
+	args := []interface{}{snapshot.raw, realtimeJourneyJSON, int64(timeoutDuration / time.Second), snapshot.identifier}
+	if snapshot.location != nil {
+		args = append(args, snapshot.location)
+		if snapshot.point != nil {
+			args = append(args, snapshot.point[0], snapshot.point[1])
+		}
+	}
+	result, err := saveRealtimeJourneySnapshotScript.Run(ctx, redis_client.Client, keys, args...).Int()
+	if err != nil {
+		return err
+	}
+	if result == 0 {
+		return ErrRealtimeJourneyConflict
+	}
+	publishRealtimeJourneyEvents(snapshot.previous, snapshot.Journey, true, journeyForEvents)
 	return nil
 }
 

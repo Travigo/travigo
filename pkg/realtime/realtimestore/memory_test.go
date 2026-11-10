@@ -3,6 +3,7 @@ package realtimestore
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -11,6 +12,95 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
+
+func TestTrackerSnapshotCASRejectsStaleWriteAndCommitsLocation(t *testing.T) {
+	server := setupMemoryTestRedis(t)
+	ctx := context.Background()
+	identifier := "tracker-cas"
+	modified := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	initial := &ctdf.RealtimeJourney{
+		PrimaryIdentifier:    identifier,
+		Journey:              &ctdf.Journey{PrimaryIdentifier: "scheduled-journey"},
+		OtherIdentifiers:     map[string]string{"provider": "provider-id"},
+		ModificationDateTime: modified,
+		Stops: map[string]*ctdf.RealtimeJourneyStops{
+			"stop-a": {StopRef: "stop-a", JourneyStopIndex: 1, Platform: "1"},
+		},
+	}
+	if err := SaveRealtimeJourney(ctx, initial); err != nil {
+		t.Fatalf("save initial journey: %v", err)
+	}
+
+	first, err := FindForTrackerUpdate(ctx, identifier)
+	if err != nil {
+		t.Fatalf("find first tracker snapshot: %v", err)
+	}
+	stale, err := FindForTrackerUpdate(ctx, identifier)
+	if err != nil {
+		t.Fatalf("find stale tracker snapshot: %v", err)
+	}
+	first.Journey.ModificationDateTime = modified.Add(time.Minute)
+	first.Journey.NextStopRef = "stop-b"
+	first.Journey.Stops["stop-a"] = &ctdf.RealtimeJourneyStops{StopRef: "stop-a", JourneyStopIndex: 1, Platform: "2"}
+	if first.previous.Stops["stop-a"].Platform != "1" {
+		t.Fatalf("working stop replacement mutated previous event snapshot: %#v", first.previous.Stops["stop-a"])
+	}
+	observedAt := modified.Add(time.Second)
+	if err := first.SetLocation(ctdf.Location{Type: "Point", Coordinates: []float64{-0.1, 51.5}}, 90, observedAt); err != nil {
+		t.Fatalf("set snapshot location: %v", err)
+	}
+	if err := SaveRealtimeJourneySnapshot(ctx, first, nil); err != nil {
+		t.Fatalf("save first tracker snapshot: %v", err)
+	}
+
+	stale.Journey.ModificationDateTime = modified.Add(30 * time.Second)
+	stale.Journey.NextStopRef = "stale-stop"
+	if err := SaveRealtimeJourneySnapshot(ctx, stale, nil); !errors.Is(err, ErrRealtimeJourneyConflict) {
+		t.Fatalf("stale snapshot error = %v, want conflict", err)
+	}
+
+	latest, err := FindByIdentifier(ctx, identifier)
+	if err != nil {
+		t.Fatalf("find saved journey: %v", err)
+	}
+	if latest.NextStopRef != "stop-b" {
+		t.Fatalf("stale snapshot overwrote latest next stop: %q", latest.NextStopRef)
+	}
+	if latest.VehicleLocationObservedAt == nil || !latest.VehicleLocationObservedAt.Equal(observedAt) || len(latest.VehicleLocation.Coordinates) < 2 || latest.VehicleLocation.Coordinates[0] != -0.1 {
+		t.Fatalf("tracker location overlay was not committed with journey: %#v", latest)
+	}
+	if ttl := server.TTL(realtimeJourneyDetailsKey(identifier)); ttl != defaultRealtimeJourneyTTL {
+		t.Fatalf("details TTL = %s, want %s", ttl, defaultRealtimeJourneyTTL)
+	}
+	if ttl := server.TTL(realtimeJourneyMappingKey("travigo-journeyid", "scheduled-journey")); ttl != defaultRealtimeJourneyTTL {
+		t.Fatalf("mapping TTL = %s, want %s", ttl, defaultRealtimeJourneyTTL)
+	}
+}
+
+func TestTrackerSnapshotCASRejectsConcurrentCreation(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	first, err := FindForTrackerUpdate(ctx, "tracker-create-race")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := FindForTrackerUpdate(ctx, "tracker-create-race")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Journey = &ctdf.RealtimeJourney{PrimaryIdentifier: "tracker-create-race", NextStopRef: "first"}
+	if err := SaveRealtimeJourneySnapshot(ctx, first, nil); err != nil {
+		t.Fatalf("save initial creation: %v", err)
+	}
+	second.Journey = &ctdf.RealtimeJourney{PrimaryIdentifier: "tracker-create-race", NextStopRef: "second"}
+	if err := SaveRealtimeJourneySnapshot(ctx, second, nil); !errors.Is(err, ErrRealtimeJourneyConflict) {
+		t.Fatalf("concurrent creation error = %v, want conflict", err)
+	}
+	stored, err := FindByIdentifier(ctx, "tracker-create-race")
+	if err != nil || stored.NextStopRef != "first" {
+		t.Fatalf("concurrent creation replaced winner: journey=%#v err=%v", stored, err)
+	}
+}
 
 func setupMemoryTestRedis(t *testing.T) *miniredis.Miniredis {
 	t.Helper()

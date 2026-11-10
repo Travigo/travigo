@@ -10,14 +10,36 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
+	"github.com/travigo/travigo/pkg/redis_client"
 )
 
 func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
+	err := consumer.tryUpdateRealtimeJourney(journeyID, vehicleUpdateEvent)
+	if errors.Is(err, realtimestore.ErrRealtimeJourneyConflict) {
+		// Only compare against the watermark of this feed's admitted stream.
+		if vehicleUpdateEvent.LocalID != "" {
+			key := realtimeIdentificationMappingKey(vehicleUpdateEvent.LocalID)
+			latest, readErr := redis_client.Client.HGet(context.Background(), key, "last_updated").Int64()
+			if readErr == nil && latest > vehicleUpdateEvent.RecordedAt.UnixNano() {
+				return nil
+			}
+		}
+		// Recompute against the winning write while this delivery is still held.
+		return consumer.tryUpdateRealtimeJourney(journeyID, vehicleUpdateEvent)
+	}
+	return err
+}
+
+func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicleUpdateEvent *VehicleUpdateEvent) error {
+	ctx := context.Background()
 	currentTime := vehicleUpdateEvent.RecordedAt
-
-	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, vehicleUpdateEvent.VehicleLocationUpdate.Timeframe, journeyID)
-
-	realtimeJourney, _ := realtimestore.FindForUpdate(context.Background(), realtimeJourneyIdentifier)
+	update := vehicleUpdateEvent.VehicleLocationUpdate
+	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, update.Timeframe, journeyID)
+	snapshot, err := realtimestore.FindForTrackerUpdate(ctx, realtimeJourneyIdentifier)
+	if err != nil {
+		return err
+	}
+	realtimeJourney := snapshot.Journey
 	var realtimeJourneyReliability ctdf.RealtimeJourneyReliabilityType
 
 	newRealtimeJourney := false
@@ -27,9 +49,26 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		return errors.New("RealtimeJourney without a Journey found, deleting")
 	}
 
+	var historyKey string
+	if update.Location.Type == "Point" {
+		historyKey = vehicleHistoryKey(vehicleUpdateEvent)
+	}
 	cachedJourney, err := consumer.getCachedTrackedJourney(journeyID, currentTime)
 	if err != nil {
 		return err
+	}
+	journey := cachedJourney.Journey
+	if update.Location.Type == "Point" {
+		if len(update.StopUpdates) == 0 {
+			if realtimeJourney == nil {
+				// Creation emits the full event view, which can also serve matching.
+				journey = cachedJourney.journeyForEvents()
+			} else {
+				journey = cachedJourney.journeyForMatching()
+			}
+		} else if historyKey != "" {
+			journey = cachedJourney.journeyForProgress()
+		}
 	}
 
 	if realtimeJourney == nil {
@@ -39,9 +78,9 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 			PrimaryIdentifier:      realtimeJourneyIdentifier,
 			ActivelyTracked:        true,
 			TimeoutDurationMinutes: 10,
-			Journey:                cachedJourney.Journey,
+			Journey:                journey,
 			JourneyRunDate:         journeyDate,
-			Service:                cachedJourney.Journey.Service,
+			Service:                journey.Service,
 
 			CreationDateTime: currentTime,
 
@@ -50,11 +89,12 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		}
 		newRealtimeJourney = true
 	} else {
-		realtimeJourney.Journey = cachedJourney.Journey
-		realtimeJourney.Service = cachedJourney.Journey.Service
+		realtimeJourney.Journey = journey
+		realtimeJourney.Service = journey.Service
 	}
 
 	var offset time.Duration
+	var historyPosition journeyPositionMatch
 	journeyStopUpdates := map[string]*ctdf.RealtimeJourneyStops{}
 	var closestDistanceJourneyPath *ctdf.JourneyPathItem // TODO maybe not here?
 	closestDistanceJourneyPathIndex := -1
@@ -65,6 +105,7 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		if !matched || position.PathIndex < 0 || position.PathIndex >= len(realtimeJourney.Journey.Path) {
 			return errors.New("unable to match vehicle location to journey track")
 		}
+		historyPosition = position
 		closestDistanceJourneyPathIndex = position.PathIndex
 		closestDistanceJourneyPath = realtimeJourney.Journey.Path[position.PathIndex]
 		closestDistanceJourneyPathPercentComplete := position.LegProgress
@@ -197,19 +238,6 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 		return errors.New("unable to find next journeypath")
 	}
 
-	if vehicleUpdateEvent.VehicleLocationUpdate.Location.Type != "" {
-		_ = realtimestore.UpdateLocationForRealtimeJourney(
-			context.Background(),
-			realtimeJourney,
-			vehicleUpdateEvent.VehicleLocationUpdate.Location,
-			vehicleUpdateEvent.VehicleLocationUpdate.Bearing,
-			vehicleUpdateEvent.RecordedAt,
-		)
-		if position, ok := matchJourneyPosition(realtimeJourney.Journey, vehicleUpdateEvent.VehicleLocationUpdate.Location); ok {
-			storeVehicleJourneyHistory(context.Background(), vehicleUpdateEvent, journeyID, position.JourneyProgress)
-		}
-	}
-
 	// Update database
 	realtimeJourney.ModificationDateTime = currentTime
 	realtimeJourney.DepartedStopRef = closestDistanceJourneyPath.OriginStopRef
@@ -230,30 +258,33 @@ func (consumer *BatchConsumer) updateRealtimeJourney(journeyID string, vehicleUp
 	}
 	for key, stopUpdate := range journeyStopUpdates {
 		if key != "" {
-			if realtimeJourney.Stops[key] == nil {
-				realtimeJourney.Stops[key] = &ctdf.RealtimeJourneyStops{}
-			}
 			realtimeJourney.Stops[key] = stopUpdate
 		}
 	}
 
-	// Performance Review [Set L] [PR155] [P1] (tracker): Save errors are discarded here, as are
-	// location/history write failures above; this caller also discards FindForUpdate's
-	// read error and treats the result as a missing record. Consume acknowledges even
-	// reported update errors after identification has advanced its timestamp. Propagate
-	// transient failures, distinguish missing data from read failure, and acknowledge only
-	// a committed update or intentional discard. Design bounded, idempotent retries with
-	// the commit watermark so replay is neither rejected as stale nor allowed to duplicate
-	// notification events under load.
+	snapshot.Journey = realtimeJourney
+	if update.Location.Type != "" {
+		_ = snapshot.SetLocation(update.Location, update.Bearing, currentTime)
+	}
 	persistenceStarted := time.Now()
-	saveErr := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	saveErr := realtimestore.SaveRealtimeJourneySnapshot(ctx, snapshot, cachedJourney.journeyForEvents)
 	telemetry.Observe(telemetry.Persistence, time.Since(persistenceStarted))
 	if saveErr != nil {
-		telemetry.Add(telemetry.UpdateFailed, 1)
-	} else {
-		telemetry.CommittedEvent(vehicleUpdateEvent.RecordedAt)
+		// Consume still acknowledges failed deliveries after identification has
+		// advanced its timestamp. Retrying dependency errors requires coordinating
+		// the admission watermark with the commit.
+		return saveErr
 	}
+	telemetry.CommittedEvent(currentTime)
 
+	if historyKey != "" {
+		if len(update.StopUpdates) > 0 {
+			historyPosition, _ = matchJourneyProgress(realtimeJourney.Journey, update.Location)
+		}
+		if historyPosition.HasTrackMatch {
+			storeVehicleJourneyHistory(ctx, historyKey, currentTime, journeyID, historyPosition.JourneyProgress)
+		}
+	}
 	return nil
 }
 

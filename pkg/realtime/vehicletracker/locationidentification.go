@@ -40,13 +40,11 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		serviceDate = event.RecordedAt
 	}
 
-	// Performance Review [Set J] [PR152] [P2] (tracker): Availability is projected but never decoded
-	// into row below, so cold inactive candidates hydrate journey/stops/tracks/service
-	// before rejection. Decode and filter lightweight date/time/direction metadata
-	// first, then batch-load or coalesce hydration for eligible candidates. The
-	// unsorted limit of 100 currently applies before eligibility; rank/bound eligible
-	// candidates without hiding the valid trip. Reuse already-resolved SIRI services
-	// instead of repeating operator/service discovery after normal matching fails.
+	// Performance Review [Set J] [PR152] [P2] (tracker): Geometry hydration waits
+	// for the availability check below, but inactive candidates still load their
+	// timetable and service. Filter lightweight availability metadata first and
+	// rank eligible candidates before applying the unsorted limit of 100. Reuse
+	// resolved SIRI services after normal matching fails.
 	cursor, err := database.GetCollection("journeys").Find(context.Background(), bson.M{"serviceref": bson.M{"$in": serviceIDs}}, options.Find().SetProjection(bson.M{"primaryidentifier": 1, "availability": 1}).SetLimit(maxLocationCandidates))
 	if err != nil {
 		return ""
@@ -66,7 +64,8 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		if err != nil || journey.Journey == nil || (journey.Journey.Availability != nil && !journey.Journey.Availability.MatchDate(serviceDate)) {
 			continue
 		}
-		match, ok := matchJourneyPosition(journey.Journey, event.VehicleLocationUpdate.Location)
+		matchingJourney := journey.journeyForProgress()
+		match, ok := matchJourneyProgress(matchingJourney, event.VehicleLocationUpdate.Location)
 		if ok && match.DistanceMetres <= locationCandidateDistanceMetres {
 			candidates = append(candidates, locationJourneyCandidate{journeyID: row.PrimaryIdentifier, distance: match.DistanceMetres, score: scoreLocationCandidate(match.DistanceMetres, match.JourneyProgress, row.PrimaryIdentifier, history)})
 		}

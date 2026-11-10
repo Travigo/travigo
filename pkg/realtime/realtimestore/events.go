@@ -1,6 +1,7 @@
 package realtimestore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,7 +36,7 @@ func previousRealtimeJourneyForEvents(ctx context.Context, identifier string) (*
 	return realtimeJourney, true
 }
 
-func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool) {
+func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool, journeyForEvents func() *ctdf.Journey) {
 	events := realtimeJourneyEvents(previous, current, previousKnown, time.Now())
 	if len(events) == 0 {
 		return
@@ -50,19 +51,37 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 		log.Error().Err(err).Str("id", current.PrimaryIdentifier).Msg("Failed to open events queue")
 		return
 	}
+	eventJourney := current
+	if journeyForEvents != nil {
+		if journey := journeyForEvents(); journey != nil {
+			enriched := *current
+			enriched.Journey = journey
+			eventJourney = &enriched
+			replaceRealtimeJourneyEventBodies(events, enriched)
+		}
+	}
 
 	payloads := make([][]byte, 0, len(events))
-	// Performance Review [Set Q] [PR122] [P2] (tracker): Each event embeds the full current journey;
-	// tracker snapshots include hydrated geometry and stops, bypassing the compact
-	// Redis storage representation. Several changes in one update serialize that
-	// same graph repeatedly and enlarge queue storage/downstream decoding. Define a
-	// versioned compact event snapshot with notification/filter fields, or reference
-	// an immutable versioned snapshot. A pointer to mutable latest state would lose
-	// event-time meaning, and existing subscription expressions need compatibility.
+	// Events keep the full journey body for downstream filter compatibility. For
+	// multi-event updates, reuse its encoding; the queue still carries that body once
+	// per event. A versioned compact body could reduce queue bytes separately.
+	var sharedJourneyJSON []byte
+	if len(events) > 1 {
+		sharedJourneyJSON, _ = json.Marshal(eventJourney)
+	}
 	for _, event := range events {
-		eventBytes, err := json.Marshal(event)
+		var eventBytes []byte
+		if len(sharedJourneyJSON) > 0 {
+			eventBytes, err = marshalRealtimeJourneyEvent(event, sharedJourneyJSON)
+		} else {
+			eventBytes, err = json.Marshal(event)
+		}
 		if err != nil {
 			log.Error().Err(err).Str("id", current.PrimaryIdentifier).Str("type", string(event.Type)).Msg("Failed to encode realtime journey event")
+			continue
+		}
+
+		if len(eventBytes) == 0 {
 			continue
 		}
 
@@ -76,6 +95,63 @@ func publishRealtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.
 	if err := eventQueue.PublishBytes(payloads...); err != nil {
 		log.Error().Err(err).Str("id", current.PrimaryIdentifier).Int("events", len(payloads)).Msg("Failed to publish realtime journey events")
 	}
+}
+
+func replaceRealtimeJourneyEventBodies(events []ctdf.Event, current ctdf.RealtimeJourney) {
+	for index := range events {
+		switch body := events[index].Body.(type) {
+		case ctdf.RealtimeJourney:
+			events[index].Body = current
+		case map[string]interface{}:
+			if _, ok := body["RealtimeJourney"]; !ok {
+				continue
+			}
+			body["RealtimeJourney"] = current
+		}
+	}
+}
+
+func marshalRealtimeJourneyEvent(event ctdf.Event, journeyJSON []byte) ([]byte, error) {
+	marker := []byte(`"Body":null`)
+	originalBody := event.Body
+	var body map[string]interface{}
+	var previousJourney interface{}
+	switch eventBody := event.Body.(type) {
+	case ctdf.RealtimeJourney:
+		event.Body = nil
+	case map[string]interface{}:
+		if _, ok := eventBody["RealtimeJourney"].(ctdf.RealtimeJourney); ok {
+			body = eventBody
+			previousJourney = body["RealtimeJourney"]
+			body["RealtimeJourney"] = nil
+			marker = []byte(`"RealtimeJourney":null`)
+		} else {
+			return json.Marshal(event)
+		}
+	default:
+		return json.Marshal(event)
+	}
+
+	encoded, err := json.Marshal(event)
+	if body != nil {
+		body["RealtimeJourney"] = previousJourney
+	}
+	event.Body = originalBody
+	if err != nil {
+		return nil, err
+	}
+	// Splice in the already-encoded journey at the unique placeholder.
+	// An ambiguous envelope uses the standard encoder with its restored body.
+	index := bytes.Index(encoded, marker)
+	if index < 0 || bytes.Contains(encoded[index+len(marker):], marker) {
+		return json.Marshal(event)
+	}
+	start := index + len(marker) - len("null")
+	withJourney := make([]byte, 0, len(encoded)-len("null")+len(journeyJSON))
+	withJourney = append(withJourney, encoded[:start]...)
+	withJourney = append(withJourney, journeyJSON...)
+	withJourney = append(withJourney, encoded[start+len("null"):]...)
+	return withJourney, nil
 }
 
 func realtimeJourneyEvents(previous *ctdf.RealtimeJourney, current *ctdf.RealtimeJourney, previousKnown bool, timestamp time.Time) []ctdf.Event {

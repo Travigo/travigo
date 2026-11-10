@@ -2,6 +2,7 @@ package vehicletracker
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -9,6 +10,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Performance Review [Set J] [PR148] [P2] (tracker): This limit is per consumer: five independent
@@ -25,6 +27,8 @@ type cachedTrackedJourney struct {
 	StopKeys        []string
 	LastUsed        time.Time
 	journeyID       string
+	hydrationMu     sync.Mutex
+	matching, event journeyView
 	previous, next  *cachedTrackedJourney
 }
 
@@ -46,17 +50,6 @@ func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now tim
 	if err != nil {
 		return nil, err
 	}
-
-	// Performance Review [Set J] [PR149] [P2] (tracker): Every cold journey hydrates full destination
-	// stop documents, tracks, and service data, including GTFS updates containing only
-	// stop times and no position. Split lightweight schedule/occurrence metadata from
-	// geometry, loading geometry only when matching actually needs it. For matching,
-	// project stop identifiers/aliases and location rather than retaining whole stop
-	// documents. Keep separately enriched API/event views compatible with consumers.
-	if err := hydrateDestinationStops(journey); err != nil {
-		log.Warn().Err(err).Str("journey", journeyID).Msg("Failed to hydrate journey destination stops")
-	}
-	journey.GetTracks()
 
 	journey.GetService()
 
@@ -105,7 +98,7 @@ func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
 	return journey, err
 }
 
-func hydrateDestinationStops(journey *ctdf.Journey) error {
+func hydrateDestinationStops(journey *ctdf.Journey, projection bson.M) error {
 	if journey == nil || len(journey.Path) == 0 {
 		return nil
 	}
@@ -126,12 +119,16 @@ func hydrateDestinationStops(journey *ctdf.Journey) error {
 	}
 
 	stopsCollection := database.GetCollection("stops")
+	findOptions := options.Find()
+	if projection != nil {
+		findOptions.SetProjection(projection)
+	}
 	cursor, err := stopsCollection.Find(context.Background(), bson.M{
 		"$or": bson.A{
 			bson.M{"primaryidentifier": bson.M{"$in": stopRefs}},
 			bson.M{"otheridentifiers": bson.M{"$in": stopRefs}},
 		},
-	})
+	}, findOptions)
 	if err != nil {
 		return err
 	}
@@ -161,6 +158,75 @@ func hydrateDestinationStops(journey *ctdf.Journey) error {
 	}
 
 	return nil
+}
+
+type journeyView struct {
+	journey *ctdf.Journey
+	expires time.Time
+}
+
+func (entry *cachedTrackedJourney) journeyForMatching() *ctdf.Journey {
+	return entry.hydratedJourney(&entry.matching, bson.M{"primaryidentifier": 1, "otheridentifiers": 1, "location": 1})
+}
+
+func (entry *cachedTrackedJourney) journeyForEvents() *ctdf.Journey {
+	return entry.hydratedJourney(&entry.event, nil)
+}
+
+func (entry *cachedTrackedJourney) journeyForProgress() *ctdf.Journey {
+	return entry.hydratedJourney(nil, nil)
+}
+
+// A nil view needs tracks only. A full event view can also serve matching and
+// progress, while projected stop documents must stay out of event payloads.
+func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView, projection bson.M) *ctdf.Journey {
+	entry.hydrationMu.Lock()
+	defer entry.hydrationMu.Unlock()
+	now := time.Now()
+	if entry.event.expires.After(now) {
+		return entry.event.journey
+	}
+	if view == nil {
+		if entry.matching.expires.After(now) {
+			return entry.matching.journey
+		}
+	} else if view.expires.After(now) {
+		return view.journey
+	}
+
+	journey := cloneJourneyPath(entry.Journey)
+	var stopErr error
+	if view != nil {
+		stopErr = hydrateDestinationStops(journey, projection)
+		if stopErr != nil {
+			log.Warn().Err(stopErr).Str("journey", entry.journeyID).Msg("Failed to hydrate journey destination stops")
+		}
+	}
+	tracksOK, tracksComplete := hydrateJourneyTracksWithCache(journey)
+	if view != nil && stopErr == nil && tracksOK {
+		ttl := journeyTrackMissCacheTTL
+		if tracksComplete {
+			ttl = journeyTrackCacheTTL
+		}
+		*view = journeyView{journey: journey, expires: time.Now().Add(ttl)}
+	}
+	return journey
+}
+
+func cloneJourneyPath(journey *ctdf.Journey) *ctdf.Journey {
+	if journey == nil {
+		return nil
+	}
+	clone := *journey
+	clone.Path = make([]*ctdf.JourneyPathItem, len(journey.Path))
+	for index, path := range journey.Path {
+		if path == nil {
+			continue
+		}
+		pathClone := *path
+		clone.Path[index] = &pathClone
+	}
+	return &clone
 }
 
 func (consumer *BatchConsumer) loadLocation(name string) *time.Location {
