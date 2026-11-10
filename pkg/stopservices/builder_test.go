@@ -168,25 +168,3 @@ func TestWriteGenerationRejectsUnownedStaticRows(t *testing.T) {
 		}
 	})
 }
-
-func TestBuildPendingBeforeInitialBuildIsNoop(t *testing.T) {
-	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
-	mt.Run("scheduled refresh never performs an implicit full backfill", func(mt *mtest.T) {
-		state := bson.D{
-			{Key: "_id", Value: stateDocumentID},
-			{Key: "initialized", Value: false},
-			{Key: "sources", Value: bson.D{}},
-		}
-		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+StateCollectionName, mtest.FirstBatch, state))
-		built, err := BuildPending(mt.Context(), mt.DB)
-		if err != nil {
-			mt.Fatal(err)
-		}
-		if built != 0 {
-			mt.Fatalf("built datasets = %d, want 0", built)
-		}
-		if events := mt.GetAllStartedEvents(); len(events) != 1 || events[0].CommandName != "find" {
-			mt.Fatalf("pending refresh should only read state before initial build, got %#v", events)
-		}
-	})
-}

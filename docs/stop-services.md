@@ -14,36 +14,33 @@ The view covers static timetable datasets. It intentionally excludes
 ## Rollout
 
 Upgrade every static journey publisher first so live timetable publishes
-update the durable dirty marker. Run the initial full backfill with the
-build-capable binary before deploying the always-on API and stop-indexer
-readers. After the backfill succeeds, deploy the batch runner with
-`refresh-stop-services` after journey publication and deploy the new readers.
+update the durable dirty marker. Run the importer batch plan with
+`refresh-stop-services` after journey publication. That task builds the full
+view on its first run and refreshes dirty datasets on later runs. The always-on
+API and stop-indexer readers require the view to have been built successfully.
 
-Run one full backfill against the production database before deploying the
-always-on readers:
+The same task can be run manually against the production database before
+deploying the always-on readers:
 
 ```sh
-travigo data-linker stop-services build
+travigo data-linker stop-services pending
 ```
 
-The command builds all eligible static dataset contributions and publishes
-their manifest only after the source revision is still current. It uses
-bounded batches and returns an error if source writes overlap the build, so a
-failed initial backfill can be retried safely.
+When the view is uninitialized, this command builds all eligible static dataset
+contributions and publishes their manifest only after the source revision is
+still current. It uses bounded batches and returns an error if source writes
+overlap the build, so a failed initial backfill can be retried safely. Once
+initialized, it refreshes only pending datasets.
 Production build duration and resource use have not yet been benchmarked; use
 the first backfill to measure them. The default client write batch is 1,000
 rows; use `--batch-size` on a manual full or per-dataset build to adjust it.
 
-The existing importer batch run refreshes pending datasets immediately after
-`link-journeys` publishes them. The task ID is `refresh-stop-services`; include
-it in any batch run that selects a custom task subset. The default scheduled
-batch trigger includes all plan tasks. The refresh has a 90-minute command
-timeout and processes dirty datasets one at a time, using the builder's
-1,000-row default write batch. Before the one-time backfill, this task logs a
-skip and succeeds; `pending` does not initialize the materialized view itself.
-The default batch plan runs `index-stops` after this task, and that indexer
-requires the materialized view. Hold the scheduled batch plan until the full
-backfill succeeds, or omit `index-stops` from any pre-backfill custom run.
+The importer batch run builds or refreshes the view immediately after
+`link-journeys` publishes. The task ID is `refresh-stop-services`; include it
+in any batch run that selects a custom task subset. The default scheduled batch
+trigger includes all plan tasks. It has a 90-minute command timeout and uses the
+builder's 1,000-row default write batch. The default batch plan runs
+`index-stops` after this task.
 
 After the full backfill, API service endpoints and `indexer stops` use the
 materialized view automatically.

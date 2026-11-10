@@ -61,8 +61,8 @@ func TestMongoStaticDatasetContributions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := Build(ctx, db); err != nil {
-		t.Fatal(err)
+	if count, err := BuildPending(ctx, db); err != nil || count != 2 {
+		t.Fatalf("initial pending build: got dataset count=%d err=%v, want 2 datasets", count, err)
 	}
 	assertRefs := func(want map[string][]string) {
 		t.Helper()

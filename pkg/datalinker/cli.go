@@ -50,21 +50,17 @@ func RegisterCLI() *cli.Command {
 					},
 					{
 						Name:  "pending",
-						Usage: "Refresh dirty datasets without rebuilding the complete view",
+						Usage: "Build the initial view if needed, then refresh dirty datasets",
 						Flags: []cli.Flag{
 							&cli.DurationFlag{Name: "timeout", Value: 90 * time.Minute, Usage: "Maximum refresh duration"},
 						},
 						Action: func(c *cli.Context) error {
 							return runStopServicesCommand(c, func(ctx context.Context, db *mongo.Database) error {
 								built, err := stopservices.BuildPending(ctx, db)
-								if errors.Is(err, stopservices.ErrUnbuilt) {
-									log.Info().Msg("Stop-services materialization has not been bootstrapped; skipping pending refresh")
-									return nil
-								}
 								if err != nil {
 									return err
 								}
-								log.Info().Int("datasets", built).Msg("Refreshed pending stop-services datasets")
+								log.Info().Int("datasets", built).Msg("Built or refreshed stop-services datasets")
 								return nil
 							})
 						},

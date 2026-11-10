@@ -269,8 +269,8 @@ func BuildDatasetWithOptions(ctx context.Context, db *mongo.Database, dataset st
 	return pruneExpiredGenerations(lease.ctx, db, lease.token)
 }
 
-// BuildPending refreshes only dirty static datasets. It never creates the
-// initial materialization implicitly.
+// BuildPending refreshes dirty static datasets. If the materialization has not
+// been initialized yet, it creates the initial full view first.
 func BuildPending(ctx context.Context, db *mongo.Database) (int, error) {
 	if db == nil {
 		return 0, errors.New("stop-service database is nil")
@@ -280,8 +280,21 @@ func BuildPending(ctx context.Context, db *mongo.Database) (int, error) {
 		return 0, err
 	}
 	if !state.Initialized {
-		log.Info().Msg("Skipping pending stop-service refresh before explicit initial build")
-		return 0, nil
+		log.Info().Msg("Stop-services materialization is uninitialized; building the full view")
+		if err := Build(ctx, db); err != nil {
+			return 0, err
+		}
+		state, err = readState(ctx, db)
+		if err != nil {
+			return 0, fmt.Errorf("read stop-service state after initial build: %w", err)
+		}
+		built := 0
+		for _, source := range state.Sources {
+			if source.Dataset != "" && !excluded(source.Dataset) && source.Generation != "" {
+				built++
+			}
+		}
+		return built, nil
 	}
 	if fullPending, count, err := publishFullIfPending(ctx, db); err != nil {
 		return 0, err
