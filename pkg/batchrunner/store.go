@@ -94,7 +94,7 @@ func (s *Store) ListRuns() ([]Run, error) {
 
 	runs := []Run{}
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+		if entry.IsDir() || isRunTempFile(entry.Name()) || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 
@@ -115,6 +115,10 @@ func (s *Store) ListRuns() ([]Run, error) {
 	})
 
 	return runs, nil
+}
+
+func isRunTempFile(name string) bool {
+	return strings.HasPrefix(name, ".") && filepath.Ext(name) == ".json"
 }
 
 func (s *Store) PrepareLog(runID string, taskID string) (string, error) {

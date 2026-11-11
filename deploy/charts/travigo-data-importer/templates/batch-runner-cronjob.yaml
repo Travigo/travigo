@@ -33,6 +33,9 @@ spec:
                 - --max-active-tasks
                 - {{ .Values.batchRunner.maxActiveTasks | quote }}
                 - --continue-on-failure={{ .Values.batchRunner.continueOnFailure }}
+                {{- if .Values.batchRunner.smartMode }}
+                - --smart-mode
+                {{- end }}
                 {{- if .Values.batchRunner.forceImport }}
                 - --force
                 {{- end }}

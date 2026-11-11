@@ -78,7 +78,8 @@ batchRunner:
   # single-AZ storage node pool with the rest of the stateful workloads.
   nodeSelector: {}
   tolerations: []
-  maxActiveTasks: 1
+  maxActiveTasks: 2
+  smartMode: true
   continueOnFailure: true
   forceImport: false
   allowConcurrentRuns: false
@@ -89,7 +90,8 @@ batchRunner:
   persistence:
     enabled: true
     existingClaim: ""
-    size: 4Gi
+    # Applies when provisioning a new claim; upgrades preserve an existing claim's request.
+    size: 8Gi
     accessModes:
       - ReadWriteOnce
     storageClassName: ""

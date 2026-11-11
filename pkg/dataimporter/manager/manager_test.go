@@ -18,6 +18,36 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
+func TestCanPrepareDatasetSource(t *testing.T) {
+	remote := &datasets.DataSet{Identifier: "feed", Format: datasets.DataSetFormatGTFSSchedule, Source: "https://example.test/feed.zip"}
+	if !CanPrepareDatasetSource(remote) {
+		t.Fatal("remote static GTFS source should be preparable")
+	}
+	for _, format := range []datasets.DataSetFormat{datasets.DataSetFormatNationalRailTOC, datasets.DataSetFormatCIF} {
+		nationalRail := *remote
+		nationalRail.Format = format
+		nationalRail.SourceAuthentication = &datasets.SourceAuthentication{Custom: "gb-nationalrail-login"}
+		if !CanPrepareDatasetSource(&nationalRail) {
+			t.Fatalf("National Rail format %s should be preparable", format)
+		}
+	}
+	local := *remote
+	local.Source = "/tmp/feed.zip"
+	if CanPrepareDatasetSource(&local) {
+		t.Fatal("local source should not be preparable")
+	}
+	realtime := *remote
+	realtime.ImportDestination = datasets.ImportDestinationRealtimeQueue
+	if CanPrepareDatasetSource(&realtime) {
+		t.Fatal("realtime source should not be preparable")
+	}
+	specific := *remote
+	specific.ImportDestination = datasets.ImportDestinationSpecificRunner
+	if CanPrepareDatasetSource(&specific) {
+		t.Fatal("specific runner source should not be preparable")
+	}
+}
+
 func TestImportScheduleSkipsMatchingPublisherVersion(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	for _, test := range []struct {

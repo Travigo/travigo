@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 type TaskExecutor interface {
 	RunTask(ctx context.Context, runID string, task *Task, logPath string, recovering bool, updatePod func(PodObservation)) (int, error)
 	DeleteJob(ctx context.Context, name string) error
+	JobExists(ctx context.Context, name string) (bool, error)
 }
 
 type PodObservation struct {
@@ -70,33 +72,31 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 			return 1, err
 		}
 		if job == nil {
-			return 1, fmt.Errorf("cannot resume job %s: job does not exist", jobName)
-		}
-		if terminal, exitCode, outcomeErr := jobOutcome(jobName, job); terminal {
+			if task.ArtifactToken == "" {
+				return 1, fmt.Errorf("cannot resume job %s: job does not exist", jobName)
+			}
+			// A smart task records its staged input before creating the Job.
+			// The runner may have stopped between those two operations.
+			recovering = false
+		} else if terminal, exitCode, outcomeErr := jobOutcome(jobName, job); terminal {
 			e.client.captureFinishedJobLogs(ctx, jobName, logPath, updatePod)
 			return exitCode, outcomeErr
+		} else if task.ArtifactToken == "" {
+			if _, err := e.client.findRunningJobPod(ctx, jobName, updatePod); err != nil {
+				return 1, err
+			}
 		}
-		// Active recovery remains deliberately strict: only a genuinely Running
-		// Pod is safe to reattach. Pending or terminal Pods are reconciled, not
-		// treated as resumable work.
-		if _, err := e.client.findRunningJobPod(ctx, jobName, updatePod); err != nil {
-			return 1, err
-		}
-	} else {
-		if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
-			return 1, err
-		}
-		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
-			e.client.cleanupPodDisruptionBudget(jobName)
-			return 1, err
-		}
-		defer e.client.cleanupPodDisruptionBudget(jobName)
 	}
-	if recovering {
-		if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
+
+	if err := e.client.ensurePodDisruptionBudget(ctx, jobName); err != nil {
+		return 1, err
+	}
+	defer e.client.cleanupPodDisruptionBudget(jobName)
+
+	if !recovering {
+		if err := e.client.ensureJob(ctx, e.config, jobName, runID, task); err != nil {
 			return 1, err
 		}
-		defer e.client.cleanupPodDisruptionBudget(jobName)
 	}
 
 	logContext, cancelLog := context.WithCancel(ctx)
@@ -120,10 +120,6 @@ func (e *KubernetesExecutor) RunTask(ctx context.Context, runID string, task *Ta
 	cancelLog()
 
 	if ctx.Err() != nil {
-		reportPodStatus(updatePod, PodStatusTerminating)
-		deleteContext, cancelDelete := context.WithTimeout(context.Background(), 30*time.Second)
-		_ = e.DeleteJob(deleteContext, jobName)
-		cancelDelete()
 		return 1, ctx.Err()
 	}
 
@@ -159,8 +155,40 @@ func (c *kubernetesClient) ensureJob(ctx context.Context, config Config, jobName
 	return err
 }
 
+func (e *KubernetesExecutor) JobExists(ctx context.Context, name string) (bool, error) {
+	job, err := e.client.getJob(ctx, name)
+	return job != nil, err
+}
+
 func (e *KubernetesExecutor) DeleteJob(ctx context.Context, name string) error {
-	return e.client.deleteJob(ctx, name)
+	if err := e.client.deleteJob(ctx, name); err != nil && !isKubernetesStatus(err, http.StatusNotFound) {
+		return err
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		exists, err := e.JobExists(ctx, name)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			pods, err := e.client.listJobPods(ctx, name)
+			if err != nil {
+				return err
+			}
+			active := slices.ContainsFunc(pods.Items, func(pod kubernetesPod) bool {
+				return pod.Status.Phase != "Succeeded" && pod.Status.Phase != "Failed"
+			})
+			if !active {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
 }
 
 type kubernetesClient struct {
@@ -538,7 +566,7 @@ func (c *kubernetesClient) copyPodLogs(ctx context.Context, podName string, logP
 }
 
 func (c *kubernetesClient) deleteJob(ctx context.Context, name string) error {
-	path := fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s?propagationPolicy=Background", c.namespace, name)
+	path := fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s?propagationPolicy=Foreground", c.namespace, name)
 	return c.doJSON(ctx, http.MethodDelete, path, nil, nil)
 }
 

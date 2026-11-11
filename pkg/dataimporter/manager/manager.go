@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -33,7 +32,6 @@ import (
 	"github.com/travigo/travigo/pkg/datasetversion"
 	"github.com/travigo/travigo/pkg/journeytracks"
 	"github.com/travigo/travigo/pkg/redis_client"
-	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -123,6 +121,10 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 }
 
 func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool) error {
+	return importDataset(dataset, forceImport, skipCleanup, "", "")
+}
+
+func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool, sourceOverride string, overrideETag string) error {
 	importStartedAt := time.Now()
 	datasetVersionCollection := database.GetCollection("dataset_versions")
 	datasetImportReportCollection := database.GetCollection("dataset_import_reports")
@@ -187,8 +189,11 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 
 	source := dataset.Source
 	var etag string
+	if sourceOverride != "" {
+		source, etag = sourceOverride, overrideETag
+	}
 
-	if isValidUrl(dataset.Source) {
+	if sourceOverride == "" && isValidUrl(dataset.Source) {
 		var tempFile *os.File
 		var hasChanged bool
 		var err error
@@ -204,6 +209,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 
 		source = tempFile.Name()
 		defer os.Remove(tempFile.Name())
+		defer tempFile.Close()
 	}
 
 	// Calculate the hash of the file
@@ -232,8 +238,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	}
 
 	var datasetProvidedVersion string
-	if dataset.Format == datasets.DataSetFormatGTFSSchedule &&
-		(dataset.UnpackBundle == "" || dataset.UnpackBundle == datasets.BundleFormatNone) {
+	if hasPublisherGTFSVersion(dataset) {
 		datasetProvidedVersion = gtfs.ReadScheduleFeedVersion(f, sourceSize)
 		if !forceImport && existingDatasetVersion != nil && datasetProvidedVersion != "" &&
 			datasetProvidedVersion == existingDatasetVersion.DatasetProvidedVersion {
@@ -251,6 +256,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	switch dataset.UnpackBundle {
 	case datasets.BundleFormatNone, "":
@@ -455,102 +461,6 @@ func isValidUrl(toTest string) bool {
 	}
 
 	return true
-}
-
-func tempDownloadFile(dataset *datasets.DataSet, etag string) (bool, *os.File, string, error) {
-	req, err := http.NewRequest("GET", dataset.Source, nil)
-	if err != nil {
-		return false, nil, "", fmt.Errorf("create download request: %w", err)
-	}
-	req.Header.Set("user-agent", "curl/7.54.1") // TfL is protected by cloudflare and it gets angry when no user agent is set
-
-	if etag != "" {
-		req.Header.Set("If-None-Match", etag)
-	}
-
-	//// Handle authentication ////
-	if dataset.SourceAuthentication != nil {
-		env := util.GetEnvironmentVariables()
-		// Query paramaters
-		for queryKey, queryValue := range dataset.SourceAuthentication.Query {
-			if env[queryValue] == "" {
-				return false, nil, "", fmt.Errorf("%s must be set", queryValue)
-			}
-
-			q := req.URL.Query()
-			q.Add(queryKey, env[queryValue])
-			req.URL.RawQuery = q.Encode()
-		}
-		// Basic auth
-		if dataset.SourceAuthentication.Basic.Username != "" && dataset.SourceAuthentication.Basic.Password != "" {
-			if env[dataset.SourceAuthentication.Basic.Username] == "" {
-				return false, nil, "", fmt.Errorf("%s must be set", dataset.SourceAuthentication.Basic.Username)
-			}
-			if env[dataset.SourceAuthentication.Basic.Password] == "" {
-				return false, nil, "", fmt.Errorf("%s must be set", dataset.SourceAuthentication.Basic.Password)
-			}
-
-			req.SetBasicAuth(env[dataset.SourceAuthentication.Basic.Username], env[dataset.SourceAuthentication.Basic.Password])
-		}
-		// Headers
-		for headerKey, headerValue := range dataset.SourceAuthentication.Header {
-			if env[headerValue] == "" {
-				return false, nil, "", fmt.Errorf("%s must be set", headerValue)
-			}
-
-			req.Header.Set(headerKey, env[headerValue])
-		}
-		if dataset.SourceAuthentication.AuthHeader != "" {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", env[dataset.SourceAuthentication.AuthHeader]))
-		}
-		// Customs
-		switch dataset.SourceAuthentication.Custom {
-		case "gb-nationalrail-login":
-			token := customAuthNationalRailLogin()
-			req.Header.Set("X-Auth-Token", token)
-		}
-	}
-
-	// Performance Review [Set D] [PR067] [P2] (batch): There is no download deadline, cancellation
-	// or byte limit. A slow body can pin a scheduled SIRI/GTFS worker indefinitely
-	// and grow its temporary file. Use a shared configured client with dataset-aware
-	// transfer budgets, idle/progress limits and capped retry/backoff; retain the
-	// existing status/ETag validation and measure download time separately from import.
-	client := &http.Client{}
-	resp, err := client.Do(req)
-
-	if err != nil {
-		return false, nil, "", fmt.Errorf("download file: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotModified {
-		return false, nil, "", nil
-	}
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return false, nil, "", fmt.Errorf("download file: unexpected HTTP status %s", resp.Status)
-	}
-
-	tmpFile, err := os.CreateTemp(os.TempDir(), "travigo-data-importer-")
-	if err != nil {
-		return false, nil, "", fmt.Errorf("create temporary file: %w", err)
-	}
-
-	log.Debug().Str("path", tmpFile.Name()).Msg("Data file downloaded")
-
-	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-		return false, nil, "", fmt.Errorf("save downloaded file: %w", err)
-	}
-
-	// Performance Review [Set D] [PR068] [P2] (batch): Ownership of this open descriptor is returned
-	// to ImportDataset, which removes its pathname but never closes it; that caller
-	// also leaves its separate parsing os.Open handle unclosed. Repeated SIRI/GTFS
-	// polls depend on GC finalizers for release and can retain unlinked file storage.
-	// Define explicit ownership/Close on all success and error paths, or return a
-	// closed temporary pathname and let a single scoped reader own the import.
-	return true, tmpFile, resp.Header.Get("Etag"), nil
 }
 
 func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {

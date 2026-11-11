@@ -1,53 +1,43 @@
 package manager
 
 import (
+	"context"
 	"encoding/json"
-	"io"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/rs/zerolog/log"
-	"github.com/travigo/travigo/pkg/util"
+	"time"
 )
 
-func customAuthNationalRailLogin() string {
-	env := util.GetEnvironmentVariables()
-	if env["TRAVIGO_NATIONALRAIL_USERNAME"] == "" {
-		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_USERNAME must be set")
+func customAuthNationalRailLogin(ctx context.Context, client *http.Client, endpoint, username, password string) (string, error) {
+	if username == "" || password == "" {
+		return "", errors.New("TRAVIGO_NATIONALRAIL_USERNAME and TRAVIGO_NATIONALRAIL_PASSWORD must be set")
 	}
-	if env["TRAVIGO_NATIONALRAIL_PASSWORD"] == "" {
-		log.Fatal().Msg("TRAVIGO_NATIONALRAIL_PASSWORD must be set")
-	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
 
-	formData := url.Values{
-		"username": {env["TRAVIGO_NATIONALRAIL_USERNAME"]},
-		"password": {env["TRAVIGO_NATIONALRAIL_PASSWORD"]},
-	}
-
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", "https://opendata.nationalrail.co.uk/authenticate", strings.NewReader(formData.Encode()))
+	form := url.Values{"username": {username}, "password": {password}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to create auth HTTP request")
+		return "", safeHTTPError("create National Rail authentication request", err)
 	}
-
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to perform auth HTTP request")
+		return "", safeHTTPError("authenticate with National Rail", err)
 	}
 	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to read auth HTTP request")
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("National Rail authentication returned HTTP %d", resp.StatusCode)
 	}
 
-	var loginResponse struct {
+	var login struct {
 		Token string `json:"token"`
 	}
-	json.Unmarshal(body, &loginResponse)
-
-	return loginResponse.Token
+	if err := json.NewDecoder(resp.Body).Decode(&login); err != nil || login.Token == "" {
+		return "", errors.New("National Rail authentication did not return a valid token")
+	}
+	return login.Token, nil
 }

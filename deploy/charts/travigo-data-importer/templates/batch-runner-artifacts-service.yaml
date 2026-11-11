@@ -1,0 +1,18 @@
+{{- if .Values.batchRunner.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner-artifacts
+  labels:
+    {{- include "travigo-data-importer.labels" . | nindent 4 }}
+    app.kubernetes.io/component: batch-runner-artifacts
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8081
+      targetPort: artifacts
+      protocol: TCP
+      name: artifacts
+  selector:
+    app: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+{{- end }}

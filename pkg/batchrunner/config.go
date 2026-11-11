@@ -8,6 +8,8 @@ import (
 
 type Config struct {
 	Address                  string
+	ArtifactAddress          string
+	ArtifactBaseURL          string
 	StoragePath              string
 	Namespace                string
 	JobImage                 string
@@ -40,6 +42,8 @@ type Config struct {
 func ConfigFromEnv() Config {
 	return Config{
 		Address:                  envOrDefault("TRAVIGO_BATCH_ADDRESS", ":8080"),
+		ArtifactAddress:          envOrDefault("TRAVIGO_BATCH_ARTIFACT_ADDRESS", ":8081"),
+		ArtifactBaseURL:          os.Getenv("TRAVIGO_BATCH_ARTIFACT_BASE_URL"),
 		StoragePath:              envOrDefault("TRAVIGO_BATCH_STORAGE_PATH", "/batch-runs"),
 		Namespace:                envOrDefault("TRAVIGO_BATCH_NAMESPACE", currentNamespace()),
 		JobImage:                 envOrDefault("TRAVIGO_BATCH_JOB_IMAGE", "ghcr.io/travigo/travigo:main"),

@@ -1,4 +1,7 @@
 {{- if .Values.batchRunner.enabled -}}
+{{- if and .Values.batchRunner.schedule.enabled .Values.batchRunner.smartMode (not .Values.batchRunner.persistence.enabled) -}}
+{{- fail "batchRunner.persistence.enabled must be true when scheduled smart mode is enabled so staged artifacts survive runner restarts" -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,6 +43,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            - name: artifacts
+              containerPort: 8081
+              protocol: TCP
           env:
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
@@ -54,6 +60,10 @@ spec:
                   key: token
             - name: TRAVIGO_BATCH_ADDRESS
               value: ":8080"
+            - name: TRAVIGO_BATCH_ARTIFACT_ADDRESS
+              value: ":8081"
+            - name: TRAVIGO_BATCH_ARTIFACT_BASE_URL
+              value: "http://{{ include "travigo-data-importer.fullname" . }}-batch-runner-artifacts:8081"
             - name: TRAVIGO_BATCH_STORAGE_PATH
               value: {{ .Values.batchRunner.storagePath | quote }}
             - name: TRAVIGO_BATCH_JOB_IMAGE
@@ -96,6 +106,55 @@ spec:
               value: {{ .Values.database.connectionStringSecret | quote }}
             - name: TRAVIGO_BATCH_MONGODB_DATABASE
               value: {{ .Values.database.database | quote }}
+            - name: TRAVIGO_MONGODB_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.connectionStringSecret | quote }}
+                  key: connectionString.standard
+            - name: TRAVIGO_MONGODB_DATABASE
+              value: {{ .Values.database.database | quote }}
+            - name: TRAVIGO_NATIONALRAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nationalRail.credentialsSecret | quote }}
+                  key: username
+                  optional: true
+            - name: TRAVIGO_NATIONALRAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nationalRail.credentialsSecret | quote }}
+                  key: password
+                  optional: true
+            - name: TRAVIGO_NETWORKRAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nationalRail.networkRailCredentialsSecret | quote }}
+                  key: username
+                  optional: true
+            - name: TRAVIGO_NETWORKRAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nationalRail.networkRailCredentialsSecret | quote }}
+                  key: password
+                  optional: true
+            - name: TRAVIGO_SE_TRAFIKLAB_STATIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.se_trafiklab.staticSecret | quote }}
+                  key: api_key
+                  optional: true
+            - name: TRAVIGO_JP_ODPT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.jp_odpt.apiKeySecret | quote }}
+                  key: api_key
+                  optional: true
+            - name: TRAVIGO_WMATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.wmata.apiKeySecret | quote }}
+                  key: api_key
+                  optional: true
             - name: TRAVIGO_BATCH_ELASTICSEARCH_ADDRESS
               value: {{ .Values.elasticsearch.address | quote }}
             - name: TRAVIGO_BATCH_ELASTICSEARCH_USER_SECRET

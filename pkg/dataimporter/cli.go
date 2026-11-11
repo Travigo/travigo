@@ -46,6 +46,7 @@ func RegisterCLI() *cli.Command {
 						Name:  "force",
 						Usage: "Force the import of the dataset",
 					},
+					&cli.StringFlag{Name: "source-override", Usage: "Internal staged source URL"},
 					&cli.BoolFlag{
 						Name:  "skip-cleanup",
 						Usage: "Skip cleaning up of old records",
@@ -124,7 +125,12 @@ func RegisterCLI() *cli.Command {
 							profiler = startMemoryProfiler(1 * time.Second)
 						}
 
-						err := manager.ImportDataset(&dataset, forceImport, skipCleanup)
+						var err error
+						if sourceOverride := c.String("source-override"); sourceOverride != "" {
+							err = manager.ImportDatasetWithSourceOverride(c.Context, &dataset, forceImport, skipCleanup, sourceOverride)
+						} else {
+							err = manager.ImportDataset(&dataset, forceImport, skipCleanup)
+						}
 
 						executionDuration := time.Since(startTime)
 						if profiler != nil {

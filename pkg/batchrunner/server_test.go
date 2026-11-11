@@ -73,6 +73,39 @@ func TestRunSummaryViewExcludesTasksAndOptions(t *testing.T) {
 	}
 }
 
+func TestRunViewsShowCheckingAndCancellation(t *testing.T) {
+	store, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveRun(&Run{ID: "run-1", Status: RunStatusRunning, CancelRequested: true, Tasks: []Task{{
+		ID: "feed", Kind: TaskKindDataset, Status: TaskStatusChecking,
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+	handler := NewServer(store, nil).handlerWithTokenValidator(adminTokenValidator)
+	for _, path := range []string{"/runs?view=summary", "/runs/run-1?view=detail"} {
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		request.Header.Set("Authorization", "Bearer test")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s returned %d", path, response.Code)
+		}
+		if path == "/runs?view=summary" {
+			var runs []Run
+			if err := json.Unmarshal(response.Body.Bytes(), &runs); err != nil || len(runs) != 1 || !runs[0].CancelRequested {
+				t.Fatalf("summary did not include cancellation: %+v, %v", runs, err)
+			}
+		} else {
+			var run Run
+			if err := json.Unmarshal(response.Body.Bytes(), &run); err != nil || !run.CancelRequested || len(run.Tasks) != 1 || run.Tasks[0].Status != TaskStatusChecking {
+				t.Fatalf("detail did not include cancellation and checking: %+v, %v", run, err)
+			}
+		}
+	}
+}
+
 func TestTaskLogSupportsIncrementalOffsets(t *testing.T) {
 	store, err := NewStore(t.TempDir())
 	if err != nil {

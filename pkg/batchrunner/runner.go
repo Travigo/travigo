@@ -3,10 +3,20 @@ package batchrunner
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/dataimporter/manager"
 )
+
+const smartPreparationBatchSize = 6
 
 type Runner struct {
 	config   Config
@@ -14,20 +24,40 @@ type Runner struct {
 	executor TaskExecutor
 
 	mu     sync.Mutex
-	active map[string]context.CancelFunc
+	active map[string]*activeRun
+
+	databaseMu      sync.Mutex
+	databaseReady   bool
+	databaseConnect func() error
+	canPrepare      func(*datasets.DataSet) bool
+	prepareSource   func(context.Context, *datasets.DataSet, bool, *os.File) (bool, string, error)
+	datasetsOnce    sync.Once
+	datasetsByID    map[string]datasets.DataSet
+}
+
+type activeRun struct {
+	run    *Run
+	mu     sync.Mutex
+	cancel context.CancelFunc
 }
 
 func NewRunner(config Config, store *Store, executor TaskExecutor) *Runner {
 	return &Runner{
-		config:   config,
-		store:    store,
-		executor: executor,
-		active:   map[string]context.CancelFunc{},
+		config:          config,
+		store:           store,
+		executor:        executor,
+		active:          map[string]*activeRun{},
+		databaseConnect: database.Connect,
+		canPrepare:      manager.CanPrepareDatasetSource,
+		prepareSource:   manager.PrepareDatasetSource,
 	}
 }
 
 func (r *Runner) StartRun(options RunOptions) (*Run, error) {
 	options = defaultRunOptions(options)
+	if options.SmartMode && r.config.ArtifactBaseURL == "" {
+		return nil, errors.New("smart mode requires an internal artifact URL")
+	}
 	runID := newRunID()
 
 	r.mu.Lock()
@@ -66,13 +96,15 @@ func (r *Runner) StartRun(options RunOptions) (*Run, error) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	active := &activeRun{run: run, cancel: cancel}
+	response := *run
+	response.Tasks = append([]Task(nil), run.Tasks...)
 	r.mu.Lock()
-	r.active[run.ID] = cancel
+	r.active[run.ID] = active
 	r.mu.Unlock()
+	go r.executeRun(ctx, active)
 
-	go r.executeRun(ctx, run)
-
-	return run, nil
+	return &response, nil
 }
 
 // ResumeRuns reconnects the runner to unfinished work recorded on persistent storage.
@@ -96,10 +128,13 @@ func (r *Runner) ResumeRuns() error {
 			cancel()
 			continue
 		}
-		r.active[run.ID] = cancel
+		active := &activeRun{run: run, cancel: cancel}
+		r.active[run.ID] = active
+		if run.CancelRequested {
+			cancel()
+		}
 		r.mu.Unlock()
-
-		go r.executeRun(ctx, run)
+		go r.executeRun(ctx, active)
 	}
 
 	return nil
@@ -107,27 +142,31 @@ func (r *Runner) ResumeRuns() error {
 
 func (r *Runner) CancelRun(id string) error {
 	r.mu.Lock()
-	cancel, ok := r.active[id]
+	active := r.active[id]
 	r.mu.Unlock()
-	if !ok {
+	if active == nil {
 		run, err := r.store.LoadRun(id)
 		if err != nil {
 			return err
 		}
-		if run.Status == RunStatusRunning || run.Status == RunStatusPending {
-			run.CancelRequested = true
-			run.Status = RunStatusCancelled
-			now := time.Now().UTC()
-			run.FinishedAt = &now
-			return r.store.SaveRun(run)
+		if isTerminalRunStatus(run.Status) {
+			return nil
 		}
-		return nil
-	}
-	if cancel == nil {
-		return nil
+		return errors.New("batch run is not active")
 	}
 
-	cancel()
+	active.mu.Lock()
+	defer active.mu.Unlock()
+	run := active.run
+	if isTerminalRunStatus(run.Status) || run.CancelRequested {
+		return nil
+	}
+	run.CancelRequested = true
+	if err := r.store.SaveRun(run); err != nil {
+		run.CancelRequested = false
+		return fmt.Errorf("persist cancellation request: %w", err)
+	}
+	active.cancel()
 	return nil
 }
 
@@ -137,8 +176,12 @@ func (r *Runner) clearActive(id string) {
 	delete(r.active, id)
 }
 
-func (r *Runner) executeRun(ctx context.Context, run *Run) {
-	var runMu sync.Mutex
+func (r *Runner) executeRun(ctx context.Context, active *activeRun) {
+	run, runMu := active.run, &active.mu
+	defer active.cancel()
+	defer r.clearActive(run.ID)
+
+	runMu.Lock()
 	if run.StartedAt == nil {
 		started := time.Now().UTC()
 		run.StartedAt = &started
@@ -146,6 +189,7 @@ func (r *Runner) executeRun(ctx context.Context, run *Run) {
 	run.Status = RunStatusRunning
 	run.Error = ""
 	_ = r.store.SaveRun(run)
+	runMu.Unlock()
 
 	failed := false
 	for _, stage := range buildStages(run.Tasks) {
@@ -153,83 +197,96 @@ func (r *Runner) executeRun(ctx context.Context, run *Run) {
 			break
 		}
 		if failed && !run.Options.ContinueOnFailure {
-			r.markStageSkipped(run, &runMu, stage)
+			r.markStageSkipped(run, runMu, stage)
 			continue
 		}
-
-		stageFailed := r.executeStage(ctx, run, &runMu, stage)
-		if stageFailed {
+		if r.executeStage(ctx, run, runMu, stage) {
 			failed = true
 		}
 	}
 
-	finished := time.Now().UTC()
-	runMu.Lock()
-	run.FinishedAt = &finished
-	if ctx.Err() != nil {
-		run.Status = RunStatusCancelled
-		run.CancelRequested = true
-		for i := range run.Tasks {
-			if run.Tasks[i].Status == TaskStatusPending || run.Tasks[i].Status == TaskStatusRunning {
-				run.Tasks[i].Status = TaskStatusCancelled
-				now := time.Now().UTC()
-				run.Tasks[i].FinishedAt = &now
-				run.Tasks[i].Error = "run cancelled"
+	jobsStopped := false
+	for {
+		runMu.Lock()
+		if run.CancelRequested && !jobsStopped {
+			runMu.Unlock()
+			r.stopRunJobs(run)
+			jobsStopped = true
+			continue
+		}
+
+		finished := time.Now().UTC()
+		run.FinishedAt = &finished
+		switch {
+		case run.CancelRequested:
+			run.Status = RunStatusCancelled
+			for i := range run.Tasks {
+				task := &run.Tasks[i]
+				switch task.Status {
+				case TaskStatusPending, TaskStatusChecking, TaskStatusRunning:
+					task.Status = TaskStatusCancelled
+					task.FinishedAt = &finished
+					task.Error = "run cancelled"
+				}
+			}
+		case failed:
+			run.Status = RunStatusFailed
+		default:
+			run.Status = RunStatusSucceeded
+		}
+		err := r.store.SaveRun(run)
+		if err != nil {
+			run.Status = RunStatusRunning
+			run.FinishedAt = nil
+		}
+		runMu.Unlock()
+		if err == nil {
+			break
+		}
+		log.Error().Err(err).Str("run", run.ID).Msg("Unable to save terminal run state; retrying")
+		time.Sleep(2 * time.Second)
+	}
+
+	if err := r.store.RemoveRunArtifacts(run.ID); err != nil {
+		log.Warn().Err(err).Str("run", run.ID).Msg("Unable to clean completed run artifacts")
+	}
+}
+
+func (r *Runner) stopRunJobs(run *Run) {
+	var jobs []string
+	for _, task := range run.Tasks {
+		if task.Status == TaskStatusRunning && task.JobName != "" {
+			jobs = append(jobs, task.JobName)
+		}
+	}
+	for len(jobs) > 0 {
+		remaining := jobs[:0]
+		for _, job := range jobs {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			err := r.executor.DeleteJob(ctx, job)
+			cancel()
+			if err != nil {
+				log.Warn().Err(err).Str("job", job).Msg("Unable to confirm Job cancellation; retrying")
+				remaining = append(remaining, job)
 			}
 		}
-	} else if failed {
-		run.Status = RunStatusFailed
-	} else {
-		run.Status = RunStatusSucceeded
+		jobs = remaining
+		if len(jobs) > 0 {
+			time.Sleep(2 * time.Second)
+		}
 	}
-	_ = r.store.SaveRun(run)
-	runMu.Unlock()
-
-	r.mu.Lock()
-	delete(r.active, run.ID)
-	r.mu.Unlock()
 }
 
 func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int) bool {
 	if len(indexes) == 0 {
 		return false
 	}
-
-	maxActive := run.Options.MaxActiveTasks
-	if maxActive < 1 {
-		maxActive = 1
-	}
-	if len(indexes) == 1 {
-		maxActive = 1
+	if run.Options.SmartMode && r.config.ArtifactBaseURL != "" && run.Tasks[indexes[0]].Kind == TaskKindDataset {
+		return r.executeSmartStage(ctx, run, runMu, indexes)
 	}
 
-	jobs := make(chan int)
-	var wg sync.WaitGroup
-	var failedMu sync.Mutex
 	failed := false
-
-	worker := func() {
-		defer wg.Done()
-		for index := range jobs {
-			if ctx.Err() != nil {
-				r.markTaskCancelled(run, runMu, index, "run cancelled")
-				continue
-			}
-
-			taskFailed := r.executeTask(ctx, run, runMu, index)
-			if taskFailed {
-				failedMu.Lock()
-				failed = true
-				failedMu.Unlock()
-			}
-		}
-	}
-
-	for i := 0; i < maxActive; i++ {
-		wg.Add(1)
-		go worker()
-	}
-
+	ready := make([]int, 0, len(indexes))
 	for _, index := range indexes {
 		switch run.Tasks[index].Status {
 		case TaskStatusSucceeded, TaskStatusSkipped, TaskStatusCancelled:
@@ -238,21 +295,266 @@ func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, 
 			failed = true
 			continue
 		}
+		ready = append(ready, index)
+	}
+	return r.executeIndexes(ctx, run, runMu, ready, run.Options.MaxActiveTasks) || failed
+}
+
+// executeSmartStage preflights dataset sources in bounded waves. Each wave
+// checks at most six sources at once; only changed sources and legacy fallbacks
+// become child jobs, and those jobs still obey MaxActiveTasks.
+func (r *Runner) executeSmartStage(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int) bool {
+	type preparation struct {
+		index   int
+		dataset datasets.DataSet
+		err     error
+	}
+	type result struct {
+		index int
+		token string
+		err   error
+	}
+	failed := false
+	databaseAttempted := false
+	var databaseErr error
+	for batch := range slices.Chunk(indexes, smartPreparationBatchSize) {
 		if ctx.Err() != nil {
-			r.markTaskCancelled(run, runMu, index, "run cancelled")
-			continue
+			break
 		}
+		ready := make([]int, 0, len(batch))
+		preparations := make([]preparation, 0, len(batch))
+		for _, index := range batch {
+			task := &run.Tasks[index]
+			switch task.Status {
+			case TaskStatusSucceeded, TaskStatusSkipped, TaskStatusCancelled:
+				continue
+			case TaskStatusFailed:
+				failed = true
+				continue
+			}
+			if task.ArtifactToken != "" {
+				keep, err := r.keepStagedTask(ctx, run.ID, task)
+				if err != nil {
+					if ctx.Err() != nil {
+						break
+					}
+					preparations = append(preparations, preparation{index: index, err: err})
+					continue
+				}
+				if keep {
+					ready = append(ready, index)
+					continue
+				}
+				runMu.Lock()
+				clearStagedSource(task)
+				runMu.Unlock()
+			}
+			if task.Status == TaskStatusRunning {
+				ready = append(ready, index)
+				continue
+			}
+			dataset, ok := r.dataset(task.DatasetID)
+			if !ok || !r.canPrepare(&dataset) {
+				ready = append(ready, index)
+				continue
+			}
+			preparations = append(preparations, preparation{index: index, dataset: dataset})
+		}
+		if ctx.Err() != nil {
+			break
+		}
+		if len(preparations) > 0 {
+			runMu.Lock()
+			for _, prep := range preparations {
+				run.Tasks[prep.index].Status = TaskStatusChecking
+			}
+			if err := r.store.SaveRun(run); err != nil {
+				log.Warn().Err(err).Str("run", run.ID).Msg("Unable to save source checking progress")
+			}
+			runMu.Unlock()
+			if !databaseAttempted {
+				databaseAttempted = true
+				databaseErr = r.connectDatabase()
+			}
+		}
+
+		results := make(chan result, len(preparations))
+		for _, prep := range preparations {
+			switch {
+			case prep.err != nil:
+				results <- result{index: prep.index, err: prep.err}
+			case databaseErr != nil:
+				results <- result{index: prep.index, err: fmt.Errorf("connect to database: %w", databaseErr)}
+			default:
+				go func() {
+					token, err := r.store.StageArtifact(run.ID, func(file *os.File) (bool, string, error) {
+						return r.prepareSource(ctx, &prep.dataset, run.Options.ForceImport, file)
+					})
+					results <- result{index: prep.index, token: token, err: err}
+				}()
+			}
+		}
+		for range preparations {
+			result := <-results
+			if ctx.Err() != nil {
+				continue
+			}
+			runMu.Lock()
+			task := &run.Tasks[result.index]
+			switch {
+			case result.err != nil:
+				r.finishPreparation(run, task, TaskStatusFailed, "source preparation failed: "+result.err.Error())
+				failed = true
+			case result.token == "":
+				r.finishPreparation(run, task, TaskStatusSkipped, "dataset source is unchanged; import skipped")
+			default:
+				task.Status = TaskStatusPending
+				task.ArtifactToken = result.token
+				source := strings.TrimRight(r.config.ArtifactBaseURL, "/") + "/artifacts/" + run.ID + "/" + result.token
+				task.Args = append(task.Args, "--source-override", source)
+				if err := r.store.SaveRun(run); err != nil {
+					_ = r.store.RemoveArtifact(run.ID, result.token)
+					clearStagedSource(task)
+					r.finishPreparation(run, task, TaskStatusFailed, "persist staged source: "+err.Error())
+					failed = true
+				} else {
+					ready = append(ready, result.index)
+				}
+			}
+			runMu.Unlock()
+		}
+		if r.executeIndexes(ctx, run, runMu, ready, run.Options.MaxActiveTasks) {
+			failed = true
+		}
+	}
+	return failed
+}
+
+func (r *Runner) keepStagedTask(ctx context.Context, runID string, task *Task) (bool, error) {
+	exists, err := r.store.artifactExists(runID, task.ArtifactToken)
+	if err != nil || exists || task.Status != TaskStatusRunning {
+		return exists, err
+	}
+	// An existing Job still has its original URL and may already have fetched the feed.
+	// Only check the publisher again if the old Job is absent.
+	for {
+		exists, err := r.executor.JobExists(ctx, task.JobName)
+		if err == nil {
+			return exists, nil
+		}
+		log.Warn().Err(err).Str("job", task.JobName).Msg("Unable to check Job before restaging; retrying")
+		select {
+		case <-ctx.Done():
+			return false, ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func clearStagedSource(task *Task) {
+	task.ArtifactToken = ""
+	if i := slices.Index(task.Args, "--source-override"); i >= 0 {
+		task.Args = slices.Delete(task.Args, i, min(i+2, len(task.Args)))
+	}
+	task.Status = TaskStatusPending
+	task.JobName = ""
+	task.PodStatus = ""
+}
+
+func (r *Runner) executeIndexes(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int, maxActive int) bool {
+	if len(indexes) == 0 {
+		return false
+	}
+	if maxActive < 1 {
+		maxActive = 1
+	}
+	if len(indexes) == 1 {
+		maxActive = 1
+	}
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	var failedMu sync.Mutex
+	failed := false
+	worker := func() {
+		defer wg.Done()
+		for index := range jobs {
+			if ctx.Err() != nil {
+				continue
+			}
+			if r.executeTask(ctx, run, runMu, index) {
+				failedMu.Lock()
+				failed = true
+				failedMu.Unlock()
+			}
+		}
+	}
+	for i := 0; i < maxActive; i++ {
+		wg.Add(1)
+		go worker()
+	}
+	for _, index := range indexes {
 		jobs <- index
 	}
 	close(jobs)
 	wg.Wait()
-
 	return failed
+}
+
+func (r *Runner) dataset(identifier string) (datasets.DataSet, bool) {
+	r.datasetsOnce.Do(func() {
+		r.datasetsByID = make(map[string]datasets.DataSet)
+		for _, dataset := range manager.GetRegisteredDataSets() {
+			r.datasetsByID[dataset.Identifier] = dataset
+		}
+	})
+	dataset, ok := r.datasetsByID[identifier]
+	return dataset, ok
+}
+
+func (r *Runner) connectDatabase() error {
+	r.databaseMu.Lock()
+	defer r.databaseMu.Unlock()
+	if r.databaseReady {
+		return nil
+	}
+	if r.databaseConnect == nil {
+		return nil
+	}
+	if err := r.databaseConnect(); err != nil {
+		return err
+	}
+	r.databaseReady = true
+	return nil
+}
+
+func (r *Runner) finishPreparation(run *Run, task *Task, status TaskStatus, message string) {
+	now := time.Now().UTC()
+	task.Status = status
+	task.FinishedAt = &now
+	task.Error = message
+	_ = r.store.SaveRun(run)
+	writeTaskReason(task.LogPath, message)
+}
+
+func writeTaskReason(path, message string) {
+	if path == "" {
+		return
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	_, _ = fmt.Fprintln(file, message)
+	_ = file.Close()
 }
 
 func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, index int) bool {
 	now := time.Now().UTC()
 	runMu.Lock()
+	if run.CancelRequested || ctx.Err() != nil {
+		runMu.Unlock()
+		return false
+	}
 	recovering := run.Tasks[index].Status == TaskStatusRunning
 	if run.Tasks[index].JobName == "" {
 		run.Tasks[index].JobName = jobNameForTask(run.ID, run.Tasks[index].ID)
@@ -266,12 +568,19 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	}
 	run.Tasks[index].Error = ""
 	task := run.Tasks[index]
-	_ = r.store.SaveRun(run)
+	if err := r.store.SaveRun(run); err != nil && !recovering {
+		r.finishPreparation(run, &run.Tasks[index], TaskStatusFailed, "persist job start: "+err.Error())
+		runMu.Unlock()
+		return true
+	}
 	runMu.Unlock()
 
 	updatePod := func(observation PodObservation) {
 		runMu.Lock()
 		defer runMu.Unlock()
+		if run.CancelRequested || ctx.Err() != nil || run.Tasks[index].Status != TaskStatusRunning {
+			return
+		}
 		changed := false
 		if observation.Status != "" && run.Tasks[index].PodStatus != observation.Status {
 			run.Tasks[index].PodStatus = observation.Status
@@ -291,20 +600,36 @@ func (r *Runner) executeTask(ctx context.Context, run *Run, runMu *sync.Mutex, i
 	run.Tasks[index].JobName = task.JobName
 	run.Tasks[index].FinishedAt = &finished
 	run.Tasks[index].ExitCode = &exitCode
-	if ctx.Err() != nil {
-		run.Tasks[index].Status = TaskStatusCancelled
+	if run.CancelRequested || ctx.Err() != nil {
 		run.Tasks[index].PodStatus = PodStatusTerminating
-		run.Tasks[index].Error = "run cancelled"
-	} else if err != nil {
+		runMu.Unlock()
+		return false
+	}
+	if err != nil || exitCode != 0 {
 		run.Tasks[index].Status = TaskStatusFailed
 		run.Tasks[index].PodStatus = PodStatusFailed
-		run.Tasks[index].Error = err.Error()
+		if err != nil {
+			run.Tasks[index].Error = err.Error()
+		} else {
+			run.Tasks[index].Error = fmt.Sprintf("job exited with code %d", exitCode)
+		}
 	} else {
 		run.Tasks[index].Status = TaskStatusSucceeded
 		run.Tasks[index].PodStatus = PodStatusSucceeded
 	}
-	_ = r.store.SaveRun(run)
+	run.Tasks[index].ArtifactToken = ""
+	saveErr := r.store.SaveRun(run)
+	if saveErr != nil {
+		run.Tasks[index].ArtifactToken = task.ArtifactToken
+	}
 	runMu.Unlock()
+	if saveErr != nil {
+		log.Error().Err(saveErr).Str("run", run.ID).Str("task", task.ID).Msg("Unable to save terminal task state")
+	} else if task.ArtifactToken != "" {
+		if err := r.store.RemoveArtifact(run.ID, task.ArtifactToken); err != nil {
+			log.Warn().Err(err).Str("run", run.ID).Str("task", task.ID).Msg("Unable to remove terminal task artifact")
+		}
+	}
 
 	return err != nil || exitCode != 0
 }
@@ -375,26 +700,13 @@ func (r *Runner) markStageSkipped(run *Run, runMu *sync.Mutex, indexes []int) {
 	defer runMu.Unlock()
 	now := time.Now().UTC()
 	for _, index := range indexes {
-		if run.Tasks[index].Status != TaskStatusPending {
+		if run.Tasks[index].Status != TaskStatusPending && run.Tasks[index].Status != TaskStatusChecking {
 			continue
 		}
 		run.Tasks[index].Status = TaskStatusSkipped
 		run.Tasks[index].FinishedAt = &now
 		run.Tasks[index].Error = "skipped after prior failure"
 	}
-	_ = r.store.SaveRun(run)
-}
-
-func (r *Runner) markTaskCancelled(run *Run, runMu *sync.Mutex, index int, message string) {
-	runMu.Lock()
-	defer runMu.Unlock()
-	if run.Tasks[index].Status != TaskStatusPending && run.Tasks[index].Status != TaskStatusRunning {
-		return
-	}
-	now := time.Now().UTC()
-	run.Tasks[index].Status = TaskStatusCancelled
-	run.Tasks[index].FinishedAt = &now
-	run.Tasks[index].Error = message
 	_ = r.store.SaveRun(run)
 }
 

@@ -1,8 +1,17 @@
 {{- if and .Values.batchRunner.enabled .Values.batchRunner.persistence.enabled (not .Values.batchRunner.persistence.existingClaim) -}}
+{{- $claimName := printf "%s-batch-runner" (include "travigo-data-importer.fullname" .) -}}
+{{- $existingClaim := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $claimName -}}
+{{- $requestedSize := .Values.batchRunner.persistence.size -}}
+{{- if $existingClaim -}}
+{{- $currentRequest := index $existingClaim.spec.resources.requests "storage" -}}
+{{- if $currentRequest -}}
+{{- $requestedSize = $currentRequest -}}
+{{- end -}}
+{{- end -}}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "travigo-data-importer.fullname" . }}-batch-runner
+  name: {{ $claimName }}
   labels:
     {{- include "travigo-data-importer.labels" . | nindent 4 }}
     app.kubernetes.io/component: batch-runner
@@ -11,7 +20,7 @@ spec:
     {{- toYaml .Values.batchRunner.persistence.accessModes | nindent 4 }}
   resources:
     requests:
-      storage: {{ .Values.batchRunner.persistence.size }}
+      storage: {{ $requestedSize }}
   {{- with .Values.batchRunner.persistence.storageClassName }}
   storageClassName: {{ . | quote }}
   {{- end }}

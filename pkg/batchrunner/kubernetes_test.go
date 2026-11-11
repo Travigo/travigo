@@ -3,11 +3,13 @@ package batchrunner
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -206,6 +208,78 @@ func TestRecoveringExecutorReconcilesCompletedJob(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "completed output") {
 		t.Fatalf("log = %q", data)
+	}
+}
+
+func TestRecoveringExecutorWaitsForStagedJobWithoutRunningPod(t *testing.T) {
+	jobReads := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/apis/batch/v1/namespaces/default/jobs/staged-job":
+			jobReads++
+			if jobReads == 1 {
+				_, _ = io.WriteString(w, `{"status":{"active":1}}`)
+			} else {
+				_, _ = io.WriteString(w, `{"status":{"conditions":[{"type":"Complete","status":"True"}]}}`)
+			}
+		case "/api/v1/namespaces/default/pods":
+			_, _ = io.WriteString(w, `{"items":[]}`)
+		case "/apis/policy/v1/namespaces/default/poddisruptionbudgets",
+			"/apis/policy/v1/namespaces/default/poddisruptionbudgets/staged-job":
+			_, _ = io.WriteString(w, `{}`)
+		default:
+			t.Errorf("unexpected recovery request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+
+	executor := &KubernetesExecutor{
+		config: Config{Namespace: "default"},
+		client: &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()},
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	task := &Task{ID: "task", JobName: "staged-job", ArtifactToken: "staged-token"}
+	exitCode, err := executor.RunTask(ctx, "run", task, filepath.Join(t.TempDir(), "task.log"), true, nil)
+	if err != nil || exitCode != 0 {
+		t.Fatalf("staged Job recovery returned exit code %d, error %v", exitCode, err)
+	}
+}
+
+func TestDeleteJobWaitsForOwnedPods(t *testing.T) {
+	var podReads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/apis/batch/v1/namespaces/default/jobs/import-job":
+			if r.Method == http.MethodDelete {
+				if r.URL.Query().Get("propagationPolicy") != "Foreground" {
+					t.Error("expected foreground Job deletion")
+				}
+				_, _ = io.WriteString(w, `{}`)
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		case "/api/v1/namespaces/default/pods":
+			if podReads.Add(1) == 1 {
+				_, _ = io.WriteString(w, `{"items":[{"status":{"phase":"Running"}}]}`)
+			} else {
+				_, _ = io.WriteString(w, `{"items":[]}`)
+			}
+		default:
+			t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	executor := &KubernetesExecutor{client: &kubernetesClient{namespace: "default", baseURL: server.URL, http: server.Client()}}
+	if err := executor.DeleteJob(ctx, "import-job"); err != nil {
+		t.Fatal(err)
+	}
+	if podReads.Load() != 2 {
+		t.Fatalf("deletion returned before the running pod disappeared: %d pod reads", podReads.Load())
 	}
 }
 

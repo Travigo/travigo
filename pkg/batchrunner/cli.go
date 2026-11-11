@@ -2,12 +2,15 @@ package batchrunner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -34,18 +37,39 @@ func RegisterCLI() *cli.Command {
 					if err != nil {
 						return err
 					}
+					cleanupStore := func() {
+						if err := store.Cleanup(time.Now()); err != nil {
+							log.Error().Err(err).Msg("Batch runner storage cleanup failed")
+						}
+					}
+					cleanupStore()
+					cleanupContext, cancelCleanup := context.WithCancel(c.Context)
+					defer cancelCleanup()
+					go runStoreCleanup(cleanupContext, cleanupStore)
 					executor, err := NewKubernetesExecutor(config)
 					if err != nil {
 						return err
 					}
 
 					runner := NewRunner(config, store, executor)
+					if config.ArtifactBaseURL != "" {
+						artifactListener, err := net.Listen("tcp", config.ArtifactAddress)
+						if err != nil {
+							return fmt.Errorf("start required batch artifact listener: %w", err)
+						}
+						defer artifactListener.Close()
+						go func() {
+							if err := http.Serve(artifactListener, store.ArtifactHandler()); err != nil && !errors.Is(err, net.ErrClosed) {
+								log.Error().Err(err).Msg("Batch artifact listener stopped")
+							}
+						}()
+					}
 					if err := runner.ResumeRuns(); err != nil {
 						return err
 					}
 					server := NewServer(store, runner)
 
-					log.Info().Str("address", config.Address).Str("storage", config.StoragePath).Msg("Starting batch runner")
+					log.Info().Str("address", config.Address).Str("artifact_address", config.ArtifactAddress).Str("storage", config.StoragePath).Msg("Starting batch runner")
 					return http.ListenAndServe(config.Address, server.Handler())
 				},
 			},
@@ -67,6 +91,7 @@ func RegisterCLI() *cli.Command {
 					&cli.BoolFlag{Name: "force", Usage: "Force dataset imports"},
 					&cli.IntFlag{Name: "max-active-tasks", Value: 1, Usage: "Maximum child jobs to run concurrently"},
 					&cli.BoolFlag{Name: "continue-on-failure", Value: true, Usage: "Continue later stages after failures"},
+					&cli.BoolFlag{Name: "smart-mode", Usage: "Skip unchanged datasets using stored artifacts"},
 				},
 				Action: func(c *cli.Context) error {
 					taskIDs := c.StringSlice("task")
@@ -76,11 +101,25 @@ func RegisterCLI() *cli.Command {
 						ForceImport:       c.Bool("force"),
 						MaxActiveTasks:    c.Int("max-active-tasks"),
 						ContinueOnFailure: c.Bool("continue-on-failure"),
+						SmartMode:         c.Bool("smart-mode"),
 					}
 					return triggerRun(c.String("server"), options)
 				},
 			},
 		},
+	}
+}
+
+func runStoreCleanup(ctx context.Context, cleanup func()) {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cleanup()
+		}
 	}
 }
 
