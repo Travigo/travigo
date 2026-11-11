@@ -200,6 +200,7 @@ func (v *VSTPMessage) processCancellation() {
 			Text:       "Journey cancelled by rail operator", MatchedIdentifiers: identifiers,
 			ValidFrom: now.Add(-time.Second), ValidUntil: endDate.Add(48 * time.Hour),
 		}
+		alert.StripHTML()
 		_, err = database.GetCollection("service_alerts").UpdateOne(context.Background(), bson.M{"primaryidentifier": alert.PrimaryIdentifier}, bson.M{"$set": alert}, options.Update().SetUpsert(true))
 		if err != nil {
 			log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to save VSTP cancellation alert")

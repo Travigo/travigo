@@ -143,6 +143,7 @@ func (d *ModeDisruptionTracker) GetDisruptions() {
 			serviceAlert.ValidFrom = validFrom
 			serviceAlert.ValidUntil = validUntil
 		}
+		serviceAlert.StripHTML()
 
 		bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
 		updateModel := mongo.NewUpdateOneModel()
@@ -322,6 +323,7 @@ func (d *ModeDisruptionTracker) GetLineStatuses() {
 				serviceAlert.ValidFrom = validFrom
 				serviceAlert.ValidUntil = validUntil
 			}
+			serviceAlert.StripHTML()
 
 			bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
 			updateModel := mongo.NewUpdateOneModel()

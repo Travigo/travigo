@@ -190,11 +190,13 @@ func (w *ServiceAlertsWatch) Run() {
 		}
 
 		log.Info().Str("id", data.FullDocument.PrimaryIdentifier).Str("operation", data.OperationType).Msg("ServiceAlert changed")
+		document := *data.FullDocument
+		document.StripHTML()
 
 		eventBytes, _ := json.Marshal(ctdf.Event{
 			Type:      ctdf.EventTypeServiceAlertCreated,
 			Timestamp: time.Now(),
-			Body:      data.FullDocument,
+			Body:      document,
 		})
 		w.EventQueue.PublishBytes(eventBytes)
 	}

@@ -10,6 +10,7 @@ import (
 )
 
 func CreateServiceAlert(serviceAlert ctdf.ServiceAlert) {
+	serviceAlert.StripHTML()
 	serviceAlertCollection := database.GetCollection("service_alerts")
 
 	filter := bson.M{"primaryidentifier": serviceAlert.PrimaryIdentifier}

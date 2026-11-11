@@ -27,6 +27,7 @@ func (consumer *BatchConsumer) updateServiceAlert(matchedIdentifiers []string, v
 		ValidFrom:            vehicleUpdateEvent.ServiceAlertUpdate.ValidFrom,
 		ValidUntil:           vehicleUpdateEvent.ServiceAlertUpdate.ValidUntil,
 	}
+	serviceAlert.StripHTML()
 
 	bsonRep, _ := bson.Marshal(bson.M{"$set": serviceAlert})
 	updateModel := mongo.NewUpdateOneModel()

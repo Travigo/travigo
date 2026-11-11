@@ -22,6 +22,7 @@ func filterIdenticalServiceAlerts(serviceAlerts []*ctdf.ServiceAlert) []*ctdf.Se
 	uniqueMap := make(map[string]bool)
 
 	for _, serviceAlert := range serviceAlerts {
+		serviceAlert.StripHTML()
 		hash := sha256.New()
 
 		hash.Write([]byte(serviceAlert.AlertType))
