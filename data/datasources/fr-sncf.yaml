@@ -1,0 +1,29 @@
+identifier: fr-sncf
+region: fr
+provider:
+  name: SNCF Voyageurs
+  website: "https://transport.data.gouv.fr/datasets/horaires-sncf"
+datasets:
+- identifier: gtfs-schedule
+  format: gtfs-schedule
+  source: "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip"
+  datasetsize: large
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+- identifier: gtfs-realtime-trip-updates
+  format: gtfs-realtime
+  source: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-trip-updates"
+  linkeddataset: fr-sncf-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    realtimejourneys: true
+- identifier: gtfs-realtime-service-alerts
+  format: gtfs-realtime
+  source: "https://proxy.transport.data.gouv.fr/resource/sncf-gtfs-rt-service-alerts"
+  linkeddataset: fr-sncf-gtfs-schedule
+  importdestination: realtime-queue
+  supportedobjects:
+    servicealerts: true
