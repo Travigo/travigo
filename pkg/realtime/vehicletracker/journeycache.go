@@ -12,15 +12,23 @@ import (
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/singleflight"
 )
 
-// Performance Review [Set J] [PR148] [P2] (tracker): This limit is per consumer: five independent
-// caches per process can retain the same journeys, stops, services, and geometry,
-// with no affinity routing to keep updates on a warm cache. Share immutable static
-// records within a process, coalesce concurrent misses, and cache reusable tracks
-// by TrackRef. Bound retained bytes as well as entry count, and invalidate/version
-// timetable data; keep mutable realtime state outside the shared cache.
-const trackedJourneyCacheMaxEntries = 1000
+// Performance Review [Set J] [PR148] [P2] (tracker): Consumers now share static
+// journeys and coalesce loads. Retained-byte limits and timetable revision
+// invalidation remain follow-up work; mutable realtime state stays outside this cache.
+// Preserve the former aggregate capacity of the per-consumer caches.
+const trackedJourneyCacheMaxEntries = numConsumers * 1000
+
+var processTrackedJourneyCache = &trackedJourneyCache{}
+
+type trackedJourneyCache struct {
+	journeyCacheMu                     sync.Mutex
+	journeyCache                       map[string]*cachedTrackedJourney
+	journeyCacheHead, journeyCacheTail *cachedTrackedJourney
+	loads                              singleflight.Group
+}
 
 type cachedTrackedJourney struct {
 	Journey         *ctdf.Journey
@@ -34,57 +42,73 @@ type cachedTrackedJourney struct {
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
+	cache := consumer.trackedJourneyCache
+	if cache == nil {
+		cache = processTrackedJourneyCache
+	}
+	return cache.getCachedTrackedJourney(journeyID, now)
+}
+
+func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
 	started := time.Now()
 	defer func() { telemetry.Observe(telemetry.Cache, time.Since(started)) }()
-	consumer.journeyCacheMu.Lock()
-	cachedJourney := consumer.journeyCache[journeyID]
+	cache.journeyCacheMu.Lock()
+	cachedJourney := cache.journeyCache[journeyID]
 	if cachedJourney != nil {
 		telemetry.Add(telemetry.CacheHit, 1)
-		consumer.touchJourneyCacheLocked(cachedJourney)
-		consumer.journeyCacheMu.Unlock()
+		cache.touchJourneyCacheLocked(cachedJourney)
+		cache.journeyCacheMu.Unlock()
 		return cachedJourney, nil
 	}
-	consumer.journeyCacheMu.Unlock()
+	cache.journeyCacheMu.Unlock()
 
 	telemetry.Add(telemetry.CacheMiss, 1)
-	journey, err := loadTrackedJourney(journeyID)
+	value, err, _ := cache.loads.Do(journeyID, func() (interface{}, error) {
+		// A previous load may have completed between the first lookup and Do.
+		cache.journeyCacheMu.Lock()
+		existing := cache.journeyCache[journeyID]
+		if existing != nil {
+			cache.touchJourneyCacheLocked(existing)
+		}
+		cache.journeyCacheMu.Unlock()
+		if existing != nil {
+			return existing, nil
+		}
+
+		journey, err := loadTrackedJourney(journeyID)
+		if err != nil {
+			return nil, err
+		}
+		if journey == nil || len(journey.Path) == 0 {
+			return nil, fmt.Errorf("tracked journey %q has no path", journeyID)
+		}
+		for _, path := range journey.Path {
+			if path == nil {
+				return nil, fmt.Errorf("tracked journey %q contains a nil path item", journeyID)
+			}
+		}
+		journey.GetService()
+		entry := &cachedTrackedJourney{
+			Journey:         journey,
+			StopOccurrences: journeyStopOccurrences(journey),
+			StopKeys:        journeyDestinationKeys(journey),
+			LastUsed:        now,
+			journeyID:       journeyID,
+		}
+		cache.journeyCacheMu.Lock()
+		if cache.journeyCache == nil {
+			cache.journeyCache = map[string]*cachedTrackedJourney{}
+		}
+		cache.journeyCache[journeyID] = entry
+		cache.touchJourneyCacheLocked(entry)
+		cache.pruneJourneyCacheLocked()
+		cache.journeyCacheMu.Unlock()
+		return entry, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if journey == nil || len(journey.Path) == 0 {
-		return nil, fmt.Errorf("tracked journey %q has no path", journeyID)
-	}
-	for _, path := range journey.Path {
-		if path == nil {
-			return nil, fmt.Errorf("tracked journey %q contains a nil path item", journeyID)
-		}
-	}
-
-	journey.GetService()
-
-	cachedJourney = &cachedTrackedJourney{
-		Journey:         journey,
-		StopOccurrences: journeyStopOccurrences(journey),
-		StopKeys:        journeyDestinationKeys(journey),
-		LastUsed:        now,
-		journeyID:       journeyID,
-	}
-
-	consumer.journeyCacheMu.Lock()
-	if consumer.journeyCache == nil {
-		consumer.journeyCache = map[string]*cachedTrackedJourney{}
-	}
-	if existing := consumer.journeyCache[journeyID]; existing != nil {
-		consumer.touchJourneyCacheLocked(existing)
-		consumer.journeyCacheMu.Unlock()
-		return existing, nil
-	}
-	consumer.journeyCache[journeyID] = cachedJourney
-	consumer.touchJourneyCacheLocked(cachedJourney)
-	consumer.pruneJourneyCacheLocked()
-	consumer.journeyCacheMu.Unlock()
-
-	return cachedJourney, nil
+	return value.(*cachedTrackedJourney), nil
 }
 
 func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
@@ -260,7 +284,7 @@ func (consumer *BatchConsumer) loadLocation(name string) *time.Location {
 }
 
 // Access order is independent of feed timestamps, which may arrive out of order.
-func (consumer *BatchConsumer) touchJourneyCacheLocked(entry *cachedTrackedJourney) {
+func (consumer *trackedJourneyCache) touchJourneyCacheLocked(entry *cachedTrackedJourney) {
 	if consumer.journeyCacheHead == entry {
 		return
 	}
@@ -283,7 +307,7 @@ func (consumer *BatchConsumer) touchJourneyCacheLocked(entry *cachedTrackedJourn
 	consumer.journeyCacheHead = entry
 }
 
-func (consumer *BatchConsumer) pruneJourneyCacheLocked() {
+func (consumer *trackedJourneyCache) pruneJourneyCacheLocked() {
 	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries {
 		entry := consumer.journeyCacheTail
 		delete(consumer.journeyCache, entry.journeyID)

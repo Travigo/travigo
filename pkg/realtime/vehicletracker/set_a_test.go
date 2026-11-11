@@ -40,14 +40,15 @@ func TestFutureStopsNeedRebuild(t *testing.T) {
 }
 
 func TestJourneyCacheUsesAccessOrder(t *testing.T) {
-	c := &BatchConsumer{journeyCache: map[string]*cachedTrackedJourney{}}
+	c := &BatchConsumer{trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{}}}
 	for i := 0; i < trackedJourneyCacheMaxEntries; i++ {
 		e := &cachedTrackedJourney{journeyID: fmt.Sprint(i)}
 		c.journeyCache[e.journeyID] = e
 		c.touchJourneyCacheLocked(e)
 	}
 	// A feed timestamp older than every entry must still refresh access order.
-	if _, err := c.getCachedTrackedJourney("0", time.Unix(0, 0)); err != nil {
+	other := &BatchConsumer{trackedJourneyCache: c.trackedJourneyCache}
+	if _, err := other.getCachedTrackedJourney("0", time.Unix(0, 0)); err != nil {
 		t.Fatal(err)
 	}
 	e := &cachedTrackedJourney{journeyID: "new"}

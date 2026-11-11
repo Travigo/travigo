@@ -43,13 +43,13 @@ func TestTrackerUpdatePersistsLocationAndUsesTrackForHistory(t *testing.T) {
 				Path:              []*ctdf.JourneyPathItem{leg},
 			}
 			consumer := &BatchConsumer{
-				journeyCache: map[string]*cachedTrackedJourney{
+				trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{
 					journey.PrimaryIdentifier: {
 						Journey:   journey,
 						StopKeys:  journeyDestinationKeys(journey),
 						journeyID: journey.PrimaryIdentifier,
 					},
-				},
+				}},
 			}
 			event := &VehicleUpdateEvent{
 				RecordedAt: recordedAt,
@@ -184,13 +184,13 @@ func TestTrackerSavesPredictionsWithoutRequiringPastStops(t *testing.T) {
 					point,
 				}
 			}
-			consumer := &BatchConsumer{journeyCache: map[string]*cachedTrackedJourney{
+			consumer := &BatchConsumer{trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{
 				journey.PrimaryIdentifier: {
 					Journey: journey, journeyID: journey.PrimaryIdentifier,
 					StopOccurrences: journeyStopOccurrences(journey),
 					StopKeys:        journeyDestinationKeys(journey),
 				},
-			}}
+			}}}
 			event := &VehicleUpdateEvent{
 				RecordedAt:            day.Add(time.Duration(tc.observedHour)*time.Hour + time.Duration(tc.observedMin)*time.Minute),
 				VehicleLocationUpdate: &VehicleLocationUpdate{Timeframe: day.Format("2006-01-02")},
@@ -258,9 +258,9 @@ func TestTrackerRejectsInvalidTimeframeAndEmptyPath(t *testing.T) {
 	for _, timeframe := range []string{"invalid", "2026-11-10"} {
 		t.Run(timeframe, func(t *testing.T) {
 			setupIdentificationTestRedis(t)
-			consumer := &BatchConsumer{journeyCache: map[string]*cachedTrackedJourney{
+			consumer := &BatchConsumer{trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{
 				"schedule": {Journey: &ctdf.Journey{}, journeyID: "schedule"},
-			}}
+			}}}
 			event := &VehicleUpdateEvent{VehicleLocationUpdate: &VehicleLocationUpdate{
 				Timeframe:   timeframe,
 				StopUpdates: []VehicleLocationEventStopUpdate{{StopID: "a"}},
