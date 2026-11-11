@@ -16,7 +16,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
 )
 
-const smartPreparationBatchSize = 6
+const smartPreparationBatchSize = 10
 
 type Runner struct {
 	config   Config
@@ -301,7 +301,7 @@ func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, 
 }
 
 // executeSmartStage preflights dataset sources in bounded waves. Each wave
-// checks at most six sources at once; only changed sources and legacy fallbacks
+// checks at most ten sources at once; only changed sources and legacy fallbacks
 // become child jobs, and those jobs still obey MaxActiveTasks.
 func (r *Runner) executeSmartStage(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int) bool {
 	type preparation struct {

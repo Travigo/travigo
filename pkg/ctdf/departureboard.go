@@ -275,7 +275,8 @@ func boardClockTimeOnServiceDate(journey *Journey, serviceDate, clock time.Time)
 	// CIF-style schedules provide local wall-clock values. Preserve that local
 	// clock on the service date; adding an elapsed duration from the GTFS
 	// service-day origin would shift calls across a DST transition.
-	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, clock.Location())
+	// Stored Darwin amendments also use year 1 for their date-less clocks.
+	encodedStart := time.Date(clock.Year(), time.January, 1, 0, 0, 0, 0, clock.Location())
 	dayOffset := int(clock.Sub(encodedStart) / (24 * time.Hour))
 	localDate := serviceDate.AddDate(0, 0, dayOffset)
 	return time.Date(localDate.Year(), localDate.Month(), localDate.Day(), clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(), serviceDate.Location())

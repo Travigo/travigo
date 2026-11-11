@@ -63,17 +63,14 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
-	// Performance Review [Set J] [PR113] [P2] (realtime): After resolving Redis state, each movement
-	// with a scheduled-journey reference reads the full MongoDB Journey, although the
-	// stored runtime path already has stop references. Use that compact path where
-	// sufficient, or cache immutable static paths/occurrence indices by timetable version.
-	// Refresh on VSTP changes and fetch only missing fields; measure static reads per
-	// accepted movement. Synthetic journeys already skip this static read.
-	realtimestore.LoadStaticJourney(context.Background(), realtimeJourney)
-
 	if realtimeJourney.Journey == nil {
 		log.Error().Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).Msg("Somehow realtime journey had no journey attached?")
 		return
+	}
+	// The stored path includes Darwin amendments and uses the same occurrence
+	// indexes as the realtime stop records. Only hydrate older runs without a path.
+	if len(realtimeJourney.Journey.Path) == 0 {
+		realtimestore.LoadStaticJourney(context.Background(), realtimeJourney)
 	}
 
 	realtimeJourney.ModificationDateTime = now

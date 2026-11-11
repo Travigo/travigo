@@ -25,7 +25,7 @@ func scheduleClock(public, working string) time.Time {
 		raw = strings.TrimSuffix(strings.TrimSpace(raw), "H")
 		for _, layout := range []string{"15:04:05", "15:04", "1504"} {
 			if clock, err := time.Parse(layout, raw); err == nil {
-				return clock
+				return clock.AddDate(-1, 0, 0)
 			}
 		}
 	}

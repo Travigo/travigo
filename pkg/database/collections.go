@@ -24,10 +24,40 @@ func createIndexes() {
 	createJourneysIndexes()
 	createSavedObjectsIndexes()
 	createDatasetImportReportIndexes()
+	EnsureDatasetRetirementIndexes(context.Background())
 	createUserNotificationSubscriptionsIndexes()
 	createUserCommutesIndexes()
 	if err := EnsureTDMappingsIndex(context.Background()); err != nil {
 		log.Error().Err(err).Msg("Creating rail TD mappings index")
+	}
+}
+
+// EnsureDatasetRetirementIndexes covers ownership deletes, track reference
+// cleanup, and the stop search rebuild that follows retirement.
+func EnsureDatasetRetirementIndexes(ctx context.Context) {
+	datasetID := mongo.IndexModel{Keys: bson.D{{Key: "datasource.datasetid", Value: 1}}}
+	trackReferences := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "trackref", Value: 1}}, Options: options.Index().SetSparse(true)},
+		{Keys: bson.D{{Key: "path.trackref", Value: 1}}, Options: options.Index().SetSparse(true)},
+	}
+	for _, collection := range []struct {
+		name    string
+		indexes []mongo.IndexModel
+	}{
+		{"dataset_versions", []mongo.IndexModel{{Keys: bson.D{{Key: "dataset", Value: 1}}}}},
+		{"stop_transfers", []mongo.IndexModel{datasetID}},
+		{"stops_raw", []mongo.IndexModel{datasetID}},
+		{"stop_groups", []mongo.IndexModel{datasetID}},
+		{"operators", []mongo.IndexModel{datasetID}},
+		{"operator_groups", []mongo.IndexModel{datasetID}},
+		{"services_raw", []mongo.IndexModel{datasetID}},
+		{"stops", []mongo.IndexModel{datasetID}},
+		{JourneysRawCollectionName, trackReferences},
+		{JourneysCollectionName, trackReferences},
+	} {
+		if _, err := GetCollection(collection.name).Indexes().CreateMany(ctx, collection.indexes); err != nil {
+			log.Error().Err(err).Str("collection", collection.name).Msg("Creating dataset retirement indexes")
+		}
 	}
 }
 
@@ -162,11 +192,9 @@ func createOSMStopIndexes() {
 
 func createStopsIndexes() {
 	// Stops
-	// Performance Review [Set N] [PR026] [P2] (indexing): indexStopsFromMongo scans by
-	// datasource.datasetid, but the declared stop indexes do not support that filter.
-	// Check explain on a full rebuild and consider a dataset/active index together
-	// with filtering inactive stops in Mongo and projecting only search/enrichment
-	// fields; otherwise each dataset can trigger another full stop collection scan.
+	// Performance Review [Set N] [PR026] [P2] (indexing): EnsureDatasetRetirementIndexes
+	// adds the dataset ID index. The stop indexer still filters inactive stops
+	// in Go and reads full stop documents.
 	stopsCollection := GetCollection("stops")
 	stopsIndex := []mongo.IndexModel{
 		{

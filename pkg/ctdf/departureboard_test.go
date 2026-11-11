@@ -5,6 +5,38 @@ import (
 	"time"
 )
 
+func TestBoardUsesServiceDateForStoredDarwinAmendmentClocks(t *testing.T) {
+	serviceDate := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	journey := &Journey{
+		PrimaryIdentifier: "amended-train",
+		Availability:      &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}},
+		Path: []*JourneyPathItem{{
+			OriginStopRef:          "cambridge-south",
+			OriginDepartureTime:    time.Date(1, 1, 1, 19, 29, 0, 0, time.UTC),
+			DestinationStopRef:     "cambridge",
+			DestinationArrivalTime: time.Date(1, 1, 2, 0, 5, 0, 0, time.UTC),
+		}},
+	}
+	for _, test := range []struct {
+		boardType BoardType
+		stopRef   string
+		want      time.Time
+	}{
+		{BoardTypeDeparture, "cambridge-south", serviceDate.Add(19*time.Hour + 29*time.Minute)},
+		{BoardTypeArrival, "cambridge", serviceDate.Add(24*time.Hour + 5*time.Minute)},
+	} {
+		t.Run(string(test.boardType), func(t *testing.T) {
+			entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{test.stopRef}, serviceDate, serviceDate, false, nil, test.boardType)
+			if len(entries) != 1 {
+				t.Fatalf("got %d board entries, want one", len(entries))
+			}
+			if !entries[0].Time.Equal(test.want) {
+				t.Fatalf("board time = %v, want %v", entries[0].Time, test.want)
+			}
+		})
+	}
+}
+
 func TestBoardRealtimeMatchesServiceDate(t *testing.T) {
 	london, err := time.LoadLocation("Europe/London")
 	if err != nil {

@@ -59,6 +59,9 @@ func removeRetiredDatasets(ctx context.Context) error {
 		return err
 	}
 
+	// Smart mode can skip every static importer job, including its index setup.
+	database.EnsureDatasetRetirementIndexes(ctx)
+
 	ids := make([]string, 0, len(retired))
 	for id := range retired {
 		ids = append(ids, id)
