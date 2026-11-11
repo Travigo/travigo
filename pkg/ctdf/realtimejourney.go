@@ -142,20 +142,17 @@ func (r *RealtimeJourney) IsActive() bool {
 
 	now := time.Now()
 	lastPathItemArrival := lastPathItem.DestinationArrivalTime
-	if lastPathItemArrival.Year() <= 1 {
-		// Scheduled path times are service-day clocks. Anchor them to the
-		// realtime run date so an overnight call such as 25:30 remains on the
-		// calendar day after the train was activated. Using today's date and
-		// only the clock fields can make a previous-day run appear finished
-		// around midnight even while it is still in progress.
+	if lastPathItemArrival.IsZero() {
+		lastPathItemArrival = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	} else if r.Journey != nil {
 		serviceDate := now
 		if !r.JourneyRunDate.IsZero() {
-			runDate := r.JourneyRunDate.In(now.Location())
+			// JourneyRunDate is a service-date label, so keep its calendar fields
+			// while using the process location for schedule-time conversion.
+			runDate := r.JourneyRunDate
 			serviceDate = time.Date(runDate.Year(), runDate.Month(), runDate.Day(), 0, 0, 0, 0, now.Location())
 		}
-		lastPathItemArrival = serviceTimeOnDate(serviceDate, lastPathItemArrival)
-	} else {
-		lastPathItemArrival = lastPathItemArrival.In(now.Location())
+		lastPathItemArrival = boardScheduledTimeOnServiceDate(r.Journey, len(r.Journey.Path)-1, serviceDate, BoardTypeArrival)
 	}
 	timeFromlastPathItemArrival := lastPathItemArrival.Sub(now).Minutes()
 

@@ -255,10 +255,79 @@ func absoluteDuration(duration time.Duration) time.Duration {
 // serviceTimeOnDate converts a GTFS service-day time into a real date without
 // discarding the service-day overflow represented by times such as 25:30:00.
 func serviceTimeOnDate(dateTime time.Time, serviceTime time.Time) time.Time {
-	// Service clocks use noon minus 12 elapsed hours as their day origin.
+	// GTFS service clocks use noon minus 12 elapsed hours as their day origin.
 	serviceDayStart := time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 12, 0, 0, 0, dateTime.Location()).Add(-12 * time.Hour)
 	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, serviceTime.Location())
 	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
+}
+
+func boardClockTimeOnServiceDate(journey *Journey, serviceDate, clock time.Time) time.Time {
+	if clock.IsZero() {
+		return time.Time{}
+	}
+	if clock.Year() > 1 {
+		return clock.In(serviceDate.Location())
+	}
+	if journey != nil && journey.DataSource != nil && journey.DataSource.OriginalFormat == "gtfs-schedule" {
+		return serviceTimeOnDate(serviceDate, clock)
+	}
+
+	// CIF-style schedules provide local wall-clock values. Preserve that local
+	// clock on the service date; adding an elapsed duration from the GTFS
+	// service-day origin would shift calls across a DST transition.
+	encodedStart := time.Date(0, time.January, 1, 0, 0, 0, 0, clock.Location())
+	dayOffset := int(clock.Sub(encodedStart) / (24 * time.Hour))
+	localDate := serviceDate.AddDate(0, 0, dayOffset)
+	return time.Date(localDate.Year(), localDate.Month(), localDate.Day(), clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(), serviceDate.Location())
+}
+
+// boardScheduledTimeOnServiceDate resolves path times that are stored as
+// clock times and may wrap at midnight even when the feed did not encode the
+// following day as an hour value above 24. Keep the path's clock sequence
+// monotonic so an after-midnight call belongs to the date the train started.
+func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDate time.Time, boardType BoardType) time.Time {
+	if journey == nil || pathIndex < 0 || pathIndex >= len(journey.Path) {
+		return time.Time{}
+	}
+
+	target := time.Time{}
+	previous := time.Time{}
+	for index, path := range journey.Path[:pathIndex+1] {
+		if path == nil {
+			continue
+		}
+		for _, event := range []struct {
+			clock  time.Time
+			target bool
+		}{
+			{clock: path.OriginArrivalTime},
+			{clock: path.OriginDepartureTime, target: index == pathIndex && !boardType.IsArrival()},
+			{clock: path.DestinationArrivalTime, target: index == pathIndex && boardType.IsArrival()},
+		} {
+			if event.clock.IsZero() {
+				continue
+			}
+			at := boardClockTimeOnServiceDate(journey, serviceDate, event.clock)
+			for !previous.IsZero() && at.Before(previous) {
+				if event.clock.Year() > 1 {
+					break
+				}
+				if journey != nil && journey.DataSource != nil && journey.DataSource.OriginalFormat == "gtfs-schedule" {
+					at = at.Add(24 * time.Hour)
+				} else {
+					at = time.Date(at.Year(), at.Month(), at.Day()+1, event.clock.Hour(), event.clock.Minute(), event.clock.Second(), event.clock.Nanosecond(), at.Location())
+				}
+			}
+			previous = at
+			if event.target {
+				target = at
+			}
+		}
+	}
+	if !target.IsZero() {
+		return target
+	}
+	return boardClockTimeOnServiceDate(journey, serviceDate, boardPathTime(journey.Path[pathIndex], boardType))
 }
 
 // BoardDestinationDisplay returns the service destination for departures and
@@ -431,7 +500,7 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 
 					if journey.Availability.MatchDate(dateTime) {
 						availabilityMatchedCount.Add(1)
-						scheduledStopTime = serviceTimeOnDate(dateTime, boardPathTime(occurrencePath, boardType))
+						scheduledStopTime = boardScheduledTimeOnServiceDate(journey, occurrenceIndex, dateTime, boardType)
 						if startTime.Sub(scheduledStopTime) > 4*time.Hour {
 							tooOldSkippedCount.Add(1)
 							return nil
