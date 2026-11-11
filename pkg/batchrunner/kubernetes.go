@@ -256,19 +256,20 @@ func (c *kubernetesClient) createJob(ctx context.Context, config Config, jobName
 	// 	}}
 	// }
 
+	labels := jobLabels(runID, task.ID)
 	body := map[string]any{
 		"apiVersion": "batch/v1",
 		"kind":       "Job",
 		"metadata": map[string]any{
 			"name":   jobName,
-			"labels": jobLabels(runID, task.ID),
+			"labels": labels,
 		},
 		"spec": map[string]any{
 			"backoffLimit":            config.JobBackoffLimit,
 			"ttlSecondsAfterFinished": config.JobTTLSeconds,
 			"template": map[string]any{
 				"metadata": map[string]any{
-					"labels":      jobLabels(runID, task.ID),
+					"labels":      labels,
 					"annotations": map[string]string{"cluster-autoscaler.kubernetes.io/safe-to-evict": "false"},
 				},
 				"spec": podSpec,
@@ -751,9 +752,22 @@ func dnsNamePart(value string) string {
 func jobLabels(runID string, taskID string) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name": "travigo-batch-runner",
-		"travigo.io/batch-run":   sanitizePathPart(runID),
-		"travigo.io/batch-task":  sanitizePathPart(taskID),
+		"travigo.io/batch-run":   jobLabelValue(runID),
+		"travigo.io/batch-task":  jobLabelValue(taskID),
 	}
+}
+
+func jobLabelValue(id string) string {
+	const maxLength = 63
+	value := strings.Trim(sanitizePathPart(id), "-_.")
+	if len(value) <= maxLength {
+		return value
+	}
+
+	sum := sha1.Sum([]byte(id))
+	suffix := hex.EncodeToString(sum[:4])
+	prefix := strings.TrimRight(value[:maxLength-len(suffix)-1], "-_.")
+	return prefix + "-" + suffix
 }
 
 func childJobEnv(config Config) []map[string]any {

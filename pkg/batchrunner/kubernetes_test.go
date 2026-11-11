@@ -8,11 +8,34 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestJobLabelsWithLongIDs(t *testing.T) {
+	const taskID = "fr-agregat-des-reseaux-urbains-et-interurbains-en-region-grand-est-gtfs-schedule-83634"
+	const taskLabel = "travigo.io/batch-task"
+	const runLabel = "travigo.io/batch-run"
+	runID := strings.Repeat("run-", 20) + "1"
+	labels := jobLabels(runID, taskID)
+
+	validLabel := regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?$`)
+	for _, key := range []string{runLabel, taskLabel} {
+		if value := labels[key]; !validLabel.MatchString(value) {
+			t.Errorf("%s = %q is not a valid Kubernetes label value", key, value)
+		}
+	}
+	if labels[taskLabel] == jobLabels(runID, taskID+"5")[taskLabel] {
+		t.Error("long task IDs sharing a prefix produced the same label")
+	}
+	shortTaskID := strings.Repeat("a", 63)
+	if got := jobLabels(runID, shortTaskID)[taskLabel]; got != shortTaskID {
+		t.Errorf("label for a valid 63-byte task ID = %q, want %q", got, shortTaskID)
+	}
+}
 
 func TestEnsureJobReusesExistingJob(t *testing.T) {
 	requests := 0
