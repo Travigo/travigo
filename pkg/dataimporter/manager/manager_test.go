@@ -1,16 +1,85 @@
 package manager
 
 import (
+	"archive/zip"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
+
+func TestImportScheduleSkipsMatchingPublisherVersion(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, test := range []struct {
+		name          string
+		storedVersion string
+		version       string
+		force         bool
+		skip          bool
+	}{
+		{name: "same version and different archive hash", storedVersion: "v2", version: "v2", skip: true},
+		{name: "changed version", storedVersion: "v2", version: "v3"},
+		{name: "missing version"},
+		{name: "forced import", storedVersion: "v2", version: "v2", force: true},
+	} {
+		mt.Run(test.name, func(mt *mtest.T) {
+			previousDB := database.Instance
+			database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+			mt.Cleanup(func() { database.Instance = previousDB })
+
+			dir := mt.TempDir()
+			mt.Setenv("TMPDIR", dir)
+			source := filepath.Join(dir, "feed.zip")
+			file, err := os.Create(source)
+			if err != nil {
+				mt.Fatal(err)
+			}
+			archive := zip.NewWriter(file)
+			info, err := archive.Create("feed_info.txt")
+			if err != nil {
+				mt.Fatal(err)
+			}
+			if _, err := io.WriteString(info, "\uFEFFfeed_publisher_name,feed_version\r\n\"Test, Transit\",\""+test.version+"\"\r\n"); err != nil {
+				mt.Fatal(err)
+			}
+			if err := archive.Close(); err != nil {
+				mt.Fatal(err)
+			}
+			if err := file.Close(); err != nil {
+				mt.Fatal(err)
+			}
+
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".dataset_versions", mtest.FirstBatch, bson.D{
+				{Key: "dataset", Value: "test-feed"},
+				{Key: "hash", Value: "previous-archive-hash"},
+				{Key: "datasetprovidedversion", Value: test.storedVersion},
+			}))
+			err = ImportDataset(&datasets.DataSet{
+				Identifier: "test-feed",
+				Format:     datasets.DataSetFormatGTFSSchedule,
+				Source:     source,
+			}, test.force, false)
+			// This ZIP contains only metadata, so attempting a schedule import fails.
+			if (err == nil) != test.skip {
+				mt.Fatalf("ImportDataset() error = %v, want skip = %t", err, test.skip)
+			}
+			events := mt.GetAllStartedEvents()
+			if len(events) != 1 || events[0].CommandName != "find" {
+				mt.Fatalf("expected only the dataset version lookup, got %v", events)
+			}
+		})
+	}
+}
 
 func TestFilterImportReportOnlyIncludesSupportedObjects(t *testing.T) {
 	report := filterImportReport(datasets.DataImportReport{

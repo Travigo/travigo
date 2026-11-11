@@ -213,11 +213,15 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	// for parsing. Keep conditional HTTP requests and the local-file hash path, and
 	// reject read errors instead of treating a partial digest as a valid version.
 	f, err := os.Open(source)
+	if err != nil {
+		return err
+	}
 	defer f.Close()
 
 	hash := sha256.New()
-	if _, err := io.Copy(hash, f); err != nil {
-		log.Error().Err(err).Msg("Calculating hash")
+	sourceSize, err := io.Copy(hash, f)
+	if err != nil {
+		return fmt.Errorf("calculate file hash: %w", err)
 	}
 	sourceFileHash := hex.EncodeToString(hash.Sum(nil))
 
@@ -225,6 +229,19 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	if existingDatasetVersion != nil && existingDatasetVersion.Hash == sourceFileHash && !forceImport {
 		log.Info().Str("dataset", dataset.Identifier).Msg("File hash is not new, skipping processing")
 		return nil
+	}
+
+	var datasetProvidedVersion string
+	if dataset.Format == datasets.DataSetFormatGTFSSchedule &&
+		(dataset.UnpackBundle == "" || dataset.UnpackBundle == datasets.BundleFormatNone) {
+		datasetProvidedVersion = gtfs.ReadScheduleFeedVersion(f, sourceSize)
+		if !forceImport && existingDatasetVersion != nil && datasetProvidedVersion != "" &&
+			datasetProvidedVersion == existingDatasetVersion.DatasetProvidedVersion {
+			log.Info().Str("dataset", dataset.Identifier).
+				Str("dataset_provided_version", datasetProvidedVersion).
+				Msg("GTFS feed version is unchanged, skipping processing")
+			return nil
+		}
 	}
 
 	// Parse the file
@@ -333,19 +350,23 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	// full reimport or expose a partially written dataset as complete.
 	if dataset.ImportDestination != datasets.ImportDestinationRealtimeQueue {
 		datasetVersion := ctdf.DatasetVersion{
-			Dataset:      dataset.Identifier,
-			Hash:         sourceFileHash,
-			ETag:         etag,
-			LastModified: time.Now(),
+			Dataset:                dataset.Identifier,
+			Hash:                   sourceFileHash,
+			ETag:                   etag,
+			LastModified:           time.Now(),
+			DatasetProvidedVersion: datasetProvidedVersion,
 		}
 
-		err = datasetversion.Upsert(context.Background(), datasetVersion)
+		if err := datasetversion.Upsert(context.Background(), datasetVersion); err != nil {
+			return err
+		}
 
 		// Aggregate the import report
 		importReport := datasets.DataImportReport{
-			DatasetIdentifier: dataset.Identifier,
-			CreationDateTime:  time.Now(),
-			RunTime:           time.Since(importStartedAt),
+			DatasetIdentifier:      dataset.Identifier,
+			DatasetProvidedVersion: datasetProvidedVersion,
+			CreationDateTime:       time.Now(),
+			RunTime:                time.Since(importStartedAt),
 		}
 
 		for _, report := range importReports {
@@ -360,7 +381,8 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			importReport.ImportedOperationGroups += report.ImportedOperationGroups
 		}
 
-		_, err = datasetImportReportCollection.InsertOne(context.Background(), importReport)
+		_, err := datasetImportReportCollection.InsertOne(context.Background(), importReport)
+		return err
 	}
 
 	return nil

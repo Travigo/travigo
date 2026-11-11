@@ -3,7 +3,8 @@ package datasets
 import "time"
 
 type DataImportReport struct {
-	DatasetIdentifier string
+	DatasetIdentifier      string
+	DatasetProvidedVersion string `bson:",omitempty"`
 
 	CreationDateTime time.Time     `groups:"web-import-report"`
 	RunTime          time.Duration `groups:"web-import-report"`
