@@ -110,4 +110,22 @@ func TestMongoStaticDatasetContributions(t *testing.T) {
 	if count, err := BuildPending(ctx, db); err != nil || count != 0 {
 		t.Fatalf("unchanged refresh: got count=%d err=%v", count, err)
 	}
+
+	// Simulate a retirement retry after the previous process deleted journeys
+	// and exited without finishing its writer marker.
+	if _, err := BeginSourceWrite(ctx, db, "feed-b"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Collection("journeys").DeleteMany(ctx, bson.M{"datasource.datasetid": "feed-b"}); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := RetireDatasets(ctx, db, []string{"feed-b"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertRefs(map[string][]string{"shared": {}, "b-stop": {}})
+	if err := Build(ctx, db); err != nil {
+		t.Fatalf("retired writer still blocks full refresh: %v", err)
+	}
 }

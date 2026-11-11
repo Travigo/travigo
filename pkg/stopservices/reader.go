@@ -11,6 +11,30 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// IsCurrent reports whether the published static view covers the latest
+// completed source writes.
+func IsCurrent(ctx context.Context, db *mongo.Database) (bool, error) {
+	state, err := readState(ctx, db)
+	if errors.Is(err, ErrUnbuilt) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !state.Initialized || state.FullActiveWriters != 0 || state.FullRevision != state.FullPublishedRevision {
+		return false, nil
+	}
+	for _, source := range state.Sources {
+		if source.Dataset == "" || excluded(source.Dataset) {
+			continue
+		}
+		if source.Generation == "" || source.ActiveWriters != 0 || source.Revision != source.PublishedRevision {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // BatchForStops resolves the published raw service references for a set of
 // primary, alias, and platform stop references. It reads one manifest snapshot
 // and queries only the generations named by that snapshot. Every requested

@@ -27,6 +27,7 @@ type fixedTaskDefinition struct {
 
 var postProcessingTaskDefinitions = []fixedTaskDefinition{
 	{id: "import-td-mappings", name: "Import Network Rail SMART reporting points", kind: TaskKindTDMappings, args: []string{"data-importer", "td-mappings"}, group: journeyEnrichmentGroup},
+	{id: "remove-retired-datasets", name: "Remove retired datasets", kind: TaskKindRemoveRetiredDatasets, args: []string{"data-linker", "remove-retired-datasets"}, group: postProcessingGroup},
 	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}, group: postProcessingGroup},
 	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}, group: postProcessingGroup},
 	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}, group: postProcessingGroup},

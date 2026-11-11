@@ -15,9 +15,74 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/elastic_client"
+	"github.com/travigo/travigo/pkg/stopservices"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
+
+func TestRetiredStopIndexRebuildWaitsForPublication(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, test := range []struct {
+		name         string
+		linkers      bson.A
+		services     bson.D
+		wantCommands int
+		wantError    string
+	}{
+		{
+			name: "link failed", linkers: bson.A{"linker-services", "linker-journeys"},
+			wantCommands: 2, wantError: "link stops, services and journeys",
+		},
+		{
+			name: "stop services stale", linkers: bson.A{"linker-stops", "linker-services", "linker-journeys"},
+			services:     bson.D{{Key: "initialized", Value: true}, {Key: "fullRevision", Value: 2}, {Key: "fullPublishedRevision", Value: 1}},
+			wantCommands: 3, wantError: "refresh stop services",
+		},
+		{
+			name: "ready", linkers: bson.A{"linker-stops", "linker-services", "linker-journeys"},
+			services: bson.D{{Key: "initialized", Value: true}}, wantCommands: 5,
+		},
+	} {
+		mt.Run(test.name, func(mt *mtest.T) {
+			previousDB := database.Instance
+			database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+			mt.Cleanup(func() { database.Instance = previousDB })
+
+			rebuildAfter := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+			mt.AddMockResponses(
+				mtest.CreateCursorResponse(0, mt.DB.Name()+".dataset_versions", mtest.FirstBatch,
+					bson.D{{Key: "stopindexrebuildafter", Value: rebuildAfter}}),
+				mtest.CreateSuccessResponse(bson.E{Key: "values", Value: test.linkers}),
+			)
+			if test.services != nil {
+				mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+stopservices.StateCollectionName,
+					mtest.FirstBatch, test.services))
+			}
+			if test.wantError == "" {
+				success := mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 1})
+				mt.AddMockResponses(success, success)
+			}
+			err := invalidateRetiredStopIndexes(mt.Context(), mt.DB.Collection("dataset_versions"))
+			if test.wantError == "" && err != nil ||
+				test.wantError != "" && (err == nil || !strings.Contains(err.Error(), test.wantError)) {
+				mt.Fatalf("unexpected readiness result: %v", err)
+			}
+			events := mt.GetAllStartedEvents()
+			if len(events) != test.wantCommands {
+				mt.Fatalf("got %d commands, want %d", len(events), test.wantCommands)
+			}
+			if test.wantError == "" {
+				checkpoints := events[3].Command.Lookup("updates", "0", "u").Document()
+				request := events[4].Command.Lookup("updates", "0").Document()
+				if checkpoints.Lookup("$unset", "indexedstopsversion").Type == 0 ||
+					!request.Lookup("q", "stopindexrebuildafter").Time().Equal(rebuildAfter) ||
+					request.Lookup("u", "$unset", "stopindexrebuildafter").Type == 0 {
+					mt.Fatalf("expected invalidation followed by clearing the same request, got %s then %s", checkpoints, request)
+				}
+			}
+		})
+	}
+}
 
 func TestStopDatasetIndexingResumesAfterBulkFailure(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))

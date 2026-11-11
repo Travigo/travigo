@@ -29,8 +29,11 @@ func TestBuildRunTasksDatasetSelection(t *testing.T) {
 	}
 
 	allTasks := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
-	if len(allTasks) != 8 {
-		t.Fatalf("expected all plan tasks to produce 8 tasks, got %d", len(allTasks))
+	if len(allTasks) != 9 {
+		t.Fatalf("expected all plan tasks to produce 9 tasks, got %d", len(allTasks))
+	}
+	if allTasks[2].Kind != TaskKindRemoveRetiredDatasets || allTasks[3].Kind != TaskKindLinkStops {
+		t.Fatalf("expected retired dataset cleanup after imports and before relinking, got %+v", allTasks)
 	}
 
 	selectedTasks := BuildRunTasks(plan, RunOptions{TaskIDs: []string{"medium-a", "link-stops"}})

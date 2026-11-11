@@ -237,6 +237,7 @@ func BuildDatasetWithOptions(ctx context.Context, db *mongo.Database, dataset st
 	filter := bson.M{
 		"_id":                               stateDocumentID,
 		"fullRevision":                      state.FullRevision,
+		"catalogRevision":                   state.CatalogRevision,
 		"fullActiveWriters":                 int64(0),
 		"sources." + key + ".dataset":       dataset,
 		"sources." + key + ".revision":      source.Revision,
@@ -342,6 +343,19 @@ func BuildPending(ctx context.Context, db *mongo.Database) (int, error) {
 		return built, errors.Join(append(errs, err)...)
 	} else if fullPending {
 		return count, nil
+	}
+	// A retirement can leave generations to prune even if nothing needs building.
+	if built == 0 {
+		for _, retired := range state.Retired {
+			if time.Since(retired.RetiredAt) >= GenerationGrace {
+				lease, err := acquireBuildLease(ctx, db)
+				if err != nil {
+					return built, errors.Join(append(errs, err)...)
+				}
+				pruneErr := pruneExpiredGenerations(lease.ctx, db, lease.token)
+				return built, errors.Join(append(errs, pruneErr, lease.release(db))...)
+			}
+		}
 	}
 	return built, errors.Join(errs...)
 }

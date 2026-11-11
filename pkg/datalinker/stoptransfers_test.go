@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/datasetversion"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 func TestBuildNearbyWalkTransfersCapsNearestPerStop(t *testing.T) {
@@ -86,6 +91,69 @@ func TestStaleStopTransferDeletesAreBatched(t *testing.T) {
 	}
 	if batches[0][0] != "stop-00000" || batches[1][0] != fmt.Sprintf("stop-%05d", stopTransferStaleDeleteBatchSize) {
 		t.Fatalf("stale-delete batches are not deterministic: first=%q last=%q", batches[0][0], batches[1][0])
+	}
+}
+
+func TestStopTransferRetirementRebuild(t *testing.T) {
+	requestedAt := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, linked := range []bool{false, true} {
+		mt.Run(fmt.Sprintf("relinked=%t", linked), func(mt *mtest.T) {
+			previousDB := database.Instance
+			database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+			mt.Cleanup(func() { database.Instance = previousDB })
+
+			linkedAt := requestedAt.Add(-time.Minute)
+			if linked {
+				linkedAt = requestedAt.Add(time.Minute)
+			}
+			namespace := mt.DB.Name() + ".dataset_versions"
+			mt.AddMockResponses(
+				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{{Key: "rebuildafter", Value: requestedAt}}),
+				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{{Key: "lastmodified", Value: linkedAt}}),
+			)
+			if linked {
+				success := mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 1})
+				stop := func(id string, latitude float64) bson.D {
+					return bson.D{
+						{Key: "primaryidentifier", Value: id},
+						{Key: "location", Value: bson.M{"type": "Point", "coordinates": bson.A{0.0, latitude}}},
+					}
+				}
+				mt.AddMockResponses(
+					mtest.CreateCursorResponse(0, mt.DB.Name()+".stops", mtest.FirstBatch,
+						stop("retained-a", 51.5), stop("retained-b", 51.5001)),
+					success, success, success,
+				)
+			}
+			err := BuildStopTransfers(StopTransferBuildConfig{})
+			events := mt.GetAllStartedEvents()
+			if !linked {
+				if err == nil || len(events) != 2 {
+					mt.Fatalf("expected rebuild to wait for relinking, got %v and %d commands", err, len(events))
+				}
+				return
+			}
+			if err != nil {
+				mt.Fatal(err)
+			}
+			if len(events) != 6 || events[3].CommandName != "update" || events[4].CommandName != "delete" || events[5].CommandName != "update" {
+				mt.Fatalf("expected transfer upsert, stale-transfer delete, then checkpoint, got %v", events)
+			}
+			transfer := events[3].Command.Lookup("updates", "0", "u").Document()
+			filter := events[4].Command.Lookup("deletes", "0", "q").Document()
+			if filter.Lookup("datasource.originalformat").StringValue() != stopTransferGeneratorFormat ||
+				filter.Lookup("modificationdatetime", "$lt").DateTime() != transfer.Lookup("modificationdatetime").DateTime() ||
+				filter.Lookup("$or").Type != 0 {
+				mt.Fatalf("expected age-based pruning of all generated transfers, got %s", filter)
+			}
+			checkpoint := events[5].Command.Lookup("updates", "0").Document()
+			if checkpoint.Lookup("q", "dataset").StringValue() != datasetversion.StopTransfersDataset ||
+				!checkpoint.Lookup("q", "rebuildafter").Time().Equal(requestedAt) ||
+				checkpoint.Lookup("u", "$unset", "rebuildafter").Type == 0 {
+				mt.Fatalf("expected checkpoint for the completed request, got %s", checkpoint)
+			}
+		})
 	}
 }
 

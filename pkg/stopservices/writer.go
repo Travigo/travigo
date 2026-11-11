@@ -160,6 +160,58 @@ func cleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 }
 
+// RetireDatasets withdraws contributions after their published journeys have
+// been deleted. Retiring an absent source is a no-op, and retries can withdraw
+// a source even if its journeys or an earlier writer are already gone.
+func RetireDatasets(ctx context.Context, db *mongo.Database, datasets []string) error {
+	state, err := readState(ctx, db)
+	if errors.Is(err, ErrUnbuilt) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	filter := bson.M{"_id": stateDocumentID, "eventRevision": state.EventRevision}
+	unset := bson.M{}
+	var retired []retiredGeneration
+	now := time.Now().UTC()
+	for _, dataset := range datasets {
+		key := sourceKey(dataset)
+		source, exists := state.Sources[key]
+		if !exists {
+			continue
+		}
+		path := "sources." + key
+		unset[path] = ""
+		if source.Generation != "" {
+			filter[path+".generation"] = source.Generation
+			retired = append(retired, retiredGeneration{
+				Dataset: dataset, Generation: source.Generation, RetiredAt: now,
+			})
+		} else {
+			filter[path+".generation"] = bson.M{"$in": bson.A{nil, ""}}
+		}
+	}
+	if len(unset) == 0 {
+		return nil
+	}
+	update := bson.M{
+		"$unset": unset,
+		"$inc":   bson.M{"eventRevision": 1, "catalogRevision": 1},
+	}
+	if len(retired) != 0 {
+		update["$push"] = bson.M{"retired": bson.M{"$each": retired}}
+	}
+	result, err := db.Collection(StateCollectionName).UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount != 1 {
+		return ErrSourceChanged
+	}
+	return nil
+}
+
 // RecoverSourceWriters is an explicit operator action after confirming no
 // journey publisher is still running. It resets crash-stuck counters and
 // increments revisions so every affected dataset remains pending for rebuild.

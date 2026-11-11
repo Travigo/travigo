@@ -27,6 +27,16 @@ func RegisterCLI() *cli.Command {
 		Usage: "Link & merge data objects that reference the same thing",
 		Subcommands: []*cli.Command{
 			{
+				Name:  "remove-retired-datasets",
+				Usage: "Remove imported data for dataset IDs absent from the datasource registry",
+				Action: func(c *cli.Context) error {
+					if err := database.Connect(); err != nil {
+						return err
+					}
+					return removeRetiredDatasets(c.Context)
+				},
+			},
+			{
 				Name:  "stop-services",
 				Usage: "Build the materialized stop-services collection",
 				Subcommands: []*cli.Command{

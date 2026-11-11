@@ -2,6 +2,7 @@ package datalinker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"runtime"
@@ -27,6 +28,7 @@ const (
 	defaultStopTransferBatchSize                = 10000
 	defaultStopTransferMaxNearbyTransfers       = 24
 	stopTransferStaleDeleteBatchSize            = 10000
+	stopTransferGeneratorFormat                 = "travigo-stop-transfer-generator"
 	metresPerDegree                             = 111320.0
 )
 
@@ -116,13 +118,34 @@ func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 
 func BuildStopTransfers(config StopTransferBuildConfig) error {
 	ctx := context.Background()
-	changedDatasets, err := datasetversion.ChangedDatasets(ctx, datasetversion.StopTransfersDataset, stopProvidingDatasetIDs())
-	if err != nil {
-		return err
+	versions := database.GetCollection("dataset_versions")
+	filter := bson.M{"dataset": datasetversion.StopTransfersDataset}
+	var version struct {
+		RebuildAfter time.Time `bson:"rebuildafter"`
 	}
-	if len(changedDatasets) == 0 {
-		log.Info().Msg("Stop transfer datasets are unchanged; skipping build")
-		return nil
+	err := versions.FindOne(ctx, filter).Decode(&version)
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("load stop-transfer rebuild checkpoint: %w", err)
+	}
+	var changedDatasets []string
+	if version.RebuildAfter.IsZero() {
+		changedDatasets, err = datasetversion.ChangedDatasets(ctx, datasetversion.StopTransfersDataset, stopProvidingDatasetIDs())
+		if err != nil {
+			return err
+		}
+		if len(changedDatasets) == 0 {
+			log.Info().Msg("Stop transfer datasets are unchanged; skipping build")
+			return nil
+		}
+	} else {
+		var linked ctdf.DatasetVersion
+		err := versions.FindOne(ctx, bson.M{"dataset": datasetversion.LinkerDataset("stop")}).Decode(&linked)
+		if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("load linked stops checkpoint: %w", err)
+		}
+		if !linked.LastModified.After(version.RebuildAfter) {
+			return fmt.Errorf("link stops after dataset retirement before rebuilding stop transfers")
+		}
 	}
 
 	config = config.withDefaults()
@@ -135,23 +158,26 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 	}
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: load stops")
 
-	changedStopIDs := changedStopIdentifiers(stops, changedDatasets)
+	var changedStopIDs []map[string]struct{}
+	if version.RebuildAfter.IsZero() {
+		changedStopIDs = append(changedStopIDs, changedStopIdentifiers(stops, changedDatasets))
+	}
 	transfers := make(map[transferKey]transferCandidate)
 
 	phaseStart = time.Now()
-	buildSameStopGroupTransfers(stops, transfers, config, changedStopIDs)
+	buildSameStopGroupTransfers(stops, transfers, config, changedStopIDs...)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: same stop groups")
 
 	phaseStart = time.Now()
-	buildPlatformAliasTransfers(stops, transfers, config, changedStopIDs)
+	buildPlatformAliasTransfers(stops, transfers, config, changedStopIDs...)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: platform aliases")
 
 	phaseStart = time.Now()
-	buildNearbyWalkTransfers(stops, transfers, config, changedStopIDs)
+	buildNearbyWalkTransfers(stops, transfers, config, changedStopIDs...)
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: nearby walk scan")
 
 	phaseStart = time.Now()
-	if err := writeStopTransfers(ctx, transfers, config, changedStopIDs); err != nil {
+	if err := writeStopTransfers(ctx, transfers, config, changedStopIDs...); err != nil {
 		return err
 	}
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: write transfers")
@@ -167,10 +193,35 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 		Dur("duration", time.Since(start)).
 		Msg("Built Stop Transfers")
 
+	if !version.RebuildAfter.IsZero() {
+		filter["rebuildafter"] = version.RebuildAfter
+		result, err := versions.UpdateOne(ctx, filter, bson.M{
+			"$set":   bson.M{"lastmodified": time.Now()},
+			"$unset": bson.M{"rebuildafter": ""},
+		})
+		if err != nil {
+			return fmt.Errorf("save stop-transfer rebuild checkpoint: %w", err)
+		}
+		if result.MatchedCount != 1 {
+			return fmt.Errorf("stop-transfer rebuild request changed during build")
+		}
+		return nil
+	}
 	return datasetversion.Upsert(ctx, ctdf.DatasetVersion{
 		Dataset:      datasetversion.StopTransfersDataset,
 		LastModified: time.Now(),
 	})
+}
+
+func requestStopTransferRebuild(ctx context.Context) error {
+	_, err := database.GetCollection("dataset_versions").UpdateOne(ctx,
+		bson.M{"dataset": datasetversion.StopTransfersDataset},
+		bson.M{"$max": bson.M{"rebuildafter": time.Now()}},
+		options.Update().SetUpsert(true))
+	if err != nil {
+		return fmt.Errorf("request stop-transfer rebuild: %w", err)
+	}
+	return nil
 }
 
 func stopProvidingDatasetIDs() []string {
@@ -553,7 +604,7 @@ func nearbyCandidateLess(a nearbyTransferCandidate, b nearbyTransferCandidate, s
 	return a.distanceMetres < b.distanceMetres
 }
 
-func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs map[string]struct{}) error {
+func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferCandidate, config StopTransferBuildConfig, changedStopIDs ...map[string]struct{}) error {
 	stopTransfersCollection := database.GetCollection("stop_transfers")
 
 	keys := make([]transferKey, 0, len(transfers))
@@ -573,7 +624,7 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	// `now`, which only holds if the stored value has no sub-millisecond part.
 	now := time.Now().Truncate(time.Millisecond)
 	datasource := &ctdf.DataSourceReference{
-		OriginalFormat: "travigo-stop-transfer-generator",
+		OriginalFormat: stopTransferGeneratorFormat,
 		ProviderName:   "Travigo",
 		ProviderID:     "travigo",
 		DatasetID:      "travigo-stop-transfers",
@@ -581,11 +632,6 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	}
 
 	for _, key := range keys {
-		if _, changed := changedStopIDs[key.from]; !changed {
-			if _, changed = changedStopIDs[key.to]; !changed {
-				continue
-			}
-		}
 		candidate := transfers[key]
 		identifier := fmt.Sprintf("generated-"+ctdf.StopTransferIDFormat, candidate.key.from, candidate.key.to)
 		transfer := ctdf.StopTransfer{
@@ -628,15 +674,21 @@ func writeStopTransfers(ctx context.Context, transfers map[transferKey]transferC
 	// populated throughout the rebuild, so concurrent readers (the journey
 	// planner) never see an empty transfers set.
 	var deletedCount int64
-	if len(changedStopIDs) > 0 {
-		for _, stopIDs := range staleStopTransferDeleteBatches(changedStopIDs) {
-			staleQuery := bson.M{
-				"datasource.originalformat": "travigo-stop-transfer-generator",
-				"modificationdatetime":      bson.M{"$lt": now},
-				"$or": bson.A{
-					bson.M{"fromstopref": bson.M{"$in": stopIDs}},
-					bson.M{"tostopref": bson.M{"$in": stopIDs}},
-				},
+	staleQuery := bson.M{
+		"datasource.originalformat": stopTransferGeneratorFormat,
+		"modificationdatetime":      bson.M{"$lt": now},
+	}
+	if len(changedStopIDs) == 0 {
+		deleted, err := stopTransfersCollection.DeleteMany(ctx, staleQuery)
+		if err != nil {
+			return err
+		}
+		deletedCount = deleted.DeletedCount
+	} else {
+		for _, stopIDs := range staleStopTransferDeleteBatches(changedStopIDs[0]) {
+			staleQuery["$or"] = bson.A{
+				bson.M{"fromstopref": bson.M{"$in": stopIDs}},
+				bson.M{"tostopref": bson.M{"$in": stopIDs}},
 			}
 			deleted, err := stopTransfersCollection.DeleteMany(ctx, staleQuery)
 			if err != nil {

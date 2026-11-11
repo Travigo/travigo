@@ -16,10 +16,13 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/manager"
+	"github.com/travigo/travigo/pkg/datasetversion"
+	"github.com/travigo/travigo/pkg/stopservices"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
@@ -30,6 +33,9 @@ import (
 
 func IndexStops(ctx context.Context) error {
 	versions := database.GetCollection("dataset_versions")
+	if err := invalidateRetiredStopIndexes(ctx, versions); err != nil {
+		return err
+	}
 	for _, dataset := range manager.GetRegisteredDataSets() {
 		if !dataset.SupportedObjects.Stops ||
 			dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue ||
@@ -39,6 +45,69 @@ func IndexStops(ctx context.Context) error {
 		if err := indexStopDataset(ctx, versions, dataset.Identifier); err != nil {
 			return fmt.Errorf("index stop dataset %s: %w", dataset.Identifier, err)
 		}
+	}
+	return nil
+}
+
+// RequestStopIndexRebuild records that retired data can affect the search
+// documents of retained feeds.
+func RequestStopIndexRebuild(ctx context.Context) error {
+	_, err := database.GetCollection("dataset_versions").UpdateOne(ctx,
+		bson.M{"dataset": datasetversion.LinkerDataset("stop")},
+		bson.M{"$max": bson.M{"stopindexrebuildafter": time.Now()}},
+		options.Update().SetUpsert(true))
+	if err != nil {
+		return fmt.Errorf("request stop index rebuild: %w", err)
+	}
+	return nil
+}
+
+func invalidateRetiredStopIndexes(ctx context.Context, versions *mongo.Collection) error {
+	filter := bson.M{"dataset": datasetversion.LinkerDataset("stop")}
+	var pending struct {
+		RebuildAfter time.Time `bson:"stopindexrebuildafter"`
+	}
+	err := versions.FindOne(ctx, filter).Decode(&pending)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load stop index rebuild request: %w", err)
+	}
+	if pending.RebuildAfter.IsZero() {
+		return nil
+	}
+	linkers := []string{datasetversion.LinkerDataset("stop"), datasetversion.LinkerDataset("service"), datasetversion.LinkerDataset("journey")}
+	published, err := versions.Distinct(ctx, "dataset", bson.M{
+		"dataset": bson.M{"$in": linkers}, "lastmodified": bson.M{"$gt": pending.RebuildAfter},
+	})
+	if err != nil {
+		return fmt.Errorf("check retirement relinking: %w", err)
+	}
+	if len(published) != len(linkers) {
+		return errors.New("link stops, services and journeys after dataset retirement before indexing stops")
+	}
+	current, err := stopservices.IsCurrent(ctx, database.Instance.Database)
+	if err != nil {
+		return fmt.Errorf("check stop-services freshness: %w", err)
+	}
+	if !current {
+		return errors.New("refresh stop services after dataset retirement before indexing stops")
+	}
+
+	// Clear the request after invalidating the checkpoints. A failed index build
+	// then resumes using the usual per-dataset checkpoints.
+	if _, err := versions.UpdateMany(ctx, bson.M{"indexedstopsversion": bson.M{"$exists": true}},
+		bson.M{"$unset": bson.M{"indexedstopsversion": ""}}); err != nil {
+		return fmt.Errorf("invalidate stop index checkpoints: %w", err)
+	}
+	filter["stopindexrebuildafter"] = pending.RebuildAfter
+	result, err := versions.UpdateOne(ctx, filter, bson.M{"$unset": bson.M{"stopindexrebuildafter": ""}})
+	if err != nil {
+		return fmt.Errorf("clear stop index rebuild request: %w", err)
+	}
+	if result.MatchedCount != 1 {
+		return errors.New("stop index rebuild request changed during invalidation")
 	}
 	return nil
 }
@@ -90,6 +159,14 @@ func indexStopDataset(ctx context.Context, versions *mongo.Collection, datasetID
 
 func stopDatasetIndexName(dataset string) string {
 	return fmt.Sprintf("travigo-stops-%s", dataset)
+}
+
+// DeleteStopDatasetIndex removes the search index of a retired stop dataset.
+func DeleteStopDatasetIndex(ctx context.Context, datasetID string) error {
+	if datasetID == "" || strings.ContainsAny(datasetID, "*,?/%\\") {
+		return fmt.Errorf("invalid dataset ID for stop index deletion: %q", datasetID)
+	}
+	return deleteIndex(ctx, stopDatasetIndexName(datasetID))
 }
 
 func indexExists(ctx context.Context, indexName string) (bool, error) {

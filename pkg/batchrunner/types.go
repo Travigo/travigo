@@ -5,14 +5,15 @@ import "time"
 type TaskKind string
 
 const (
-	TaskKindDataset       TaskKind = "dataset"
-	TaskKindTDMappings    TaskKind = "td-mappings"
-	TaskKindLinkStops     TaskKind = "link-stops"
-	TaskKindLinkTransfers TaskKind = "link-stop-transfers"
-	TaskKindLinkServices  TaskKind = "link-services"
-	TaskKindLinkJourneys  TaskKind = "link-journeys"
-	TaskKindStopServices  TaskKind = "stop-services"
-	TaskKindIndexStops    TaskKind = "index-stops"
+	TaskKindDataset               TaskKind = "dataset"
+	TaskKindRemoveRetiredDatasets TaskKind = "remove-retired-datasets"
+	TaskKindTDMappings            TaskKind = "td-mappings"
+	TaskKindLinkStops             TaskKind = "link-stops"
+	TaskKindLinkTransfers         TaskKind = "link-stop-transfers"
+	TaskKindLinkServices          TaskKind = "link-services"
+	TaskKindLinkJourneys          TaskKind = "link-journeys"
+	TaskKindStopServices          TaskKind = "stop-services"
+	TaskKindIndexStops            TaskKind = "index-stops"
 )
 
 type TaskStatus string
