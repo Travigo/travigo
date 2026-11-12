@@ -37,7 +37,7 @@ runner:
       cpu: 100m
       memory: 250Mi
     limits:
-      memory: 4Gi
+      memory: 6Gi
 
 image:
   repository: ghcr.io/travigo/travigo

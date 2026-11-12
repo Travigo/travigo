@@ -19,7 +19,7 @@ import (
 // journeys and coalesce loads. Retained-byte limits and timetable revision
 // invalidation remain follow-up work; mutable realtime state stays outside this cache.
 // Preserve the former aggregate capacity of the per-consumer caches.
-const trackedJourneyCacheMaxEntries = numConsumers * 10000
+const trackedJourneyCacheMaxEntries = numConsumers * 5000
 
 var processTrackedJourneyCache = &trackedJourneyCache{}
 

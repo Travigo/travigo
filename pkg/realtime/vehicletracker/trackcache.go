@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	journeyTrackCacheMaxEntries = 4096
+	journeyTrackCacheMaxEntries = 1024
 	journeyTrackCacheMaxBytes   = 64 << 20
 	journeyTrackCacheTTL        = 5 * time.Minute
 	journeyTrackMissCacheTTL    = 15 * time.Second
