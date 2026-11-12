@@ -106,6 +106,38 @@ overrides:
       set:
         colour: "#1e1e50"
         secondarycolour: "#32bef0"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-LE]  # Greater Anglia
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#D70428"
+        secondarycolour: "#495965"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-XC]  # Cross Country
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#ca123f"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-CC]  # c2c
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#bc0087"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-TP]  # TransPennine Express
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#00a6e6"
+    - datasets: ["gb-nationalrail-toc"] 
+      operators: [gb-toc-VT]  # Avanti West Coast
+      transporttypes: [Rail]
+      fallback: true
+      set:
+        colour: "#004652"
+        secondarycolour: "#E42900"
 datasets:
 - identifier: toc
   format: gb-nationalrailtoc
