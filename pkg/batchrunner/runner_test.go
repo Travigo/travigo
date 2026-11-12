@@ -199,16 +199,41 @@ func TestSmartPreparationFailureIsTerminalAndDoesNotCreateJob(t *testing.T) {
 	}
 }
 
-func TestSmartPreparationBatchesAtSix(t *testing.T) {
+func TestStageConcurrency(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options RunOptions
+		task    Task
+		want    int
+	}{
+		{"small", RunOptions{SmartMode: true, MaxActiveTasks: 1}, Task{Kind: TaskKindDataset, Size: "small"}, 3},
+		{"medium", RunOptions{SmartMode: true, MaxActiveTasks: 4}, Task{Kind: TaskKindDataset, Size: "medium"}, 2},
+		{"large", RunOptions{SmartMode: true, MaxActiveTasks: 4}, Task{Kind: TaskKindDataset, Size: "large"}, 1},
+		{"enrichment dataset", RunOptions{SmartMode: true}, Task{Kind: TaskKindDataset, Size: journeyEnrichmentGroup}, 1},
+		{"post-processing", RunOptions{SmartMode: true, MaxActiveTasks: 4}, Task{Kind: TaskKindLinkStops}, 1},
+		{"regular mode", RunOptions{MaxActiveTasks: 4}, Task{Kind: TaskKindDataset, Size: "large"}, 4},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := stageConcurrency(tc.options, tc.task); got != tc.want {
+				t.Errorf("stage concurrency = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSmartPreparationUsesBoundedBatches(t *testing.T) {
 	store, err := NewStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	executor := &recordingExecutor{tasks: make(chan Task, 8), recovering: make(chan bool, 8)}
+	taskCount := smartPreparationBatchSize + 2
+	executor := &recordingExecutor{tasks: make(chan Task, taskCount), recovering: make(chan bool, taskCount)}
 	runner := NewRunner(Config{ArtifactBaseURL: "http://runner:8081"}, store, executor)
 	datasetsByID := map[string]datasets.DataSet{}
-	tasks := make([]Task, 8)
+	tasks := make([]Task, taskCount)
+	indexes := make([]int, taskCount)
 	for i := range tasks {
+		indexes[i] = i
 		id := fmt.Sprintf("feed-%d", i)
 		datasetsByID[id] = datasets.DataSet{Identifier: id}
 		tasks[i] = Task{ID: id, DatasetID: id, Kind: TaskKindDataset, Status: TaskStatusPending}
@@ -232,14 +257,14 @@ func TestSmartPreparationBatchesAtSix(t *testing.T) {
 	defer cancel()
 	done := make(chan bool, 1)
 	go func() {
-		done <- runner.executeSmartStage(ctx, run, &sync.Mutex{}, []int{0, 1, 2, 3, 4, 5, 6, 7})
+		done <- runner.executeSmartStage(ctx, run, &sync.Mutex{}, indexes)
 	}()
 	for range smartPreparationBatchSize {
 		select {
 		case <-started:
 		case <-ctx.Done():
 			<-done
-			t.Fatal("six downloads did not start concurrently")
+			t.Fatalf("%d downloads did not start concurrently", smartPreparationBatchSize)
 		}
 	}
 	visible, err := store.LoadRun(run.ID)
@@ -259,7 +284,7 @@ func TestSmartPreparationBatchesAtSix(t *testing.T) {
 	case <-started:
 		cancel()
 		<-done
-		t.Fatal("a seventh download started before the first batch finished")
+		t.Fatal("a download from the next batch started before the first batch finished")
 	default:
 	}
 	close(release)

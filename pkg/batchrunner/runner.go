@@ -297,12 +297,12 @@ func (r *Runner) executeStage(ctx context.Context, run *Run, runMu *sync.Mutex, 
 		}
 		ready = append(ready, index)
 	}
-	return r.executeIndexes(ctx, run, runMu, ready, run.Options.MaxActiveTasks) || failed
+	return r.executeIndexes(ctx, run, runMu, ready) || failed
 }
 
 // executeSmartStage preflights dataset sources in bounded waves. Each wave
 // checks at most ten sources at once; only changed sources and legacy fallbacks
-// become child jobs, and those jobs still obey MaxActiveTasks.
+// become child jobs, which use the Smart mode limit for their stage.
 func (r *Runner) executeSmartStage(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int) bool {
 	type preparation struct {
 		index   int
@@ -423,7 +423,7 @@ func (r *Runner) executeSmartStage(ctx context.Context, run *Run, runMu *sync.Mu
 			}
 			runMu.Unlock()
 		}
-		if r.executeIndexes(ctx, run, runMu, ready, run.Options.MaxActiveTasks) {
+		if r.executeIndexes(ctx, run, runMu, ready) {
 			failed = true
 		}
 	}
@@ -461,16 +461,26 @@ func clearStagedSource(task *Task) {
 	task.PodStatus = ""
 }
 
-func (r *Runner) executeIndexes(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int, maxActive int) bool {
+func stageConcurrency(options RunOptions, task Task) int {
+	if !options.SmartMode {
+		return max(1, options.MaxActiveTasks)
+	}
+	if task.Kind == TaskKindDataset {
+		switch task.Size {
+		case "", "small":
+			return 3
+		case "medium":
+			return 2
+		}
+	}
+	return 1
+}
+
+func (r *Runner) executeIndexes(ctx context.Context, run *Run, runMu *sync.Mutex, indexes []int) bool {
 	if len(indexes) == 0 {
 		return false
 	}
-	if maxActive < 1 {
-		maxActive = 1
-	}
-	if len(indexes) == 1 {
-		maxActive = 1
-	}
+	maxActive := min(len(indexes), stageConcurrency(run.Options, run.Tasks[indexes[0]]))
 	jobs := make(chan int)
 	var wg sync.WaitGroup
 	var failedMu sync.Mutex

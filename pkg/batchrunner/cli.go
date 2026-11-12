@@ -89,7 +89,7 @@ func RegisterCLI() *cli.Command {
 					&cli.StringFlag{Name: "server", Value: "http://travigo-data-importer-batch-runner:8080", Usage: "Batch runner API base URL"},
 					&cli.StringSliceFlag{Name: "task", Usage: "Plan task ID to run; repeat for multiple tasks. Defaults to all tasks."},
 					&cli.BoolFlag{Name: "force", Usage: "Force dataset imports"},
-					&cli.IntFlag{Name: "max-active-tasks", Value: 1, Usage: "Maximum child jobs to run concurrently"},
+					&cli.IntFlag{Name: "max-active-tasks", Value: 1, Usage: "Maximum concurrent child jobs when Smart mode is disabled"},
 					&cli.BoolFlag{Name: "continue-on-failure", Value: true, Usage: "Continue later stages after failures"},
 					&cli.BoolFlag{Name: "smart-mode", Usage: "Skip unchanged datasets using stored artifacts"},
 				},
