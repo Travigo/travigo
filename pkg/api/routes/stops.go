@@ -314,6 +314,14 @@ func getStopBoard(c *fiber.Ctx, boardType ctdf.BoardType) error {
 	})
 	departureLookupDuration := time.Since(departureLookupStart)
 	if err != nil {
+		log.Error().
+			Err(err).
+			Str("stop", stopIdentifier).
+			Str("board_type", string(boardType)).
+			Int("count", count).
+			Time("start_datetime", startDateTime).
+			Dur("board_lookup_duration", departureLookupDuration).
+			Msg("Stop board lookup failed")
 		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
 	}
 	if departureBoard == nil {
