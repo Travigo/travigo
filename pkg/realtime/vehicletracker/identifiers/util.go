@@ -39,7 +39,7 @@ func findPrimaryIdentifiers(collection *mongo.Collection, query bson.M, limit in
 	return identifiers, cursor.Err()
 }
 
-func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M) []*ctdf.Journey {
+func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, limit int64) ([]*ctdf.Journey, int, error) {
 	var journeys []*ctdf.Journey
 
 	// Keep precisely the fields consumed by availability, functional hashing,
@@ -56,15 +56,17 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "path.originarrivaltime", Value: 1},
 		{Key: "path.origindeparturetime", Value: 1},
 		{Key: "path.destinationarrivaltime", Value: 1},
-	})
+	}).SetLimit(limit)
 	cursor, err := journeysCollection.Find(context.Background(), query, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to find available journeys")
-		return journeys
+		return nil, 0, err
 	}
 	defer cursor.Close(context.Background())
 
+	candidates := 0
 	for cursor.Next(context.Background()) {
+		candidates++
 		var journey *ctdf.Journey
 		err := cursor.Decode(&journey)
 		if err != nil {
@@ -78,5 +80,5 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		}
 	}
 
-	return journeys
+	return journeys, candidates, cursor.Err()
 }

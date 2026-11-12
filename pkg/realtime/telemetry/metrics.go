@@ -17,17 +17,21 @@ const (
 	Ack
 	Batch
 	Redis
+	SiriServices
 	stageCount
 )
 
-var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis"}
+var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis", "siri_services"}
 
 type measurement struct{ count, total, max atomic.Int64 }
 
 var stages [stageCount]measurement
 
 func Observe(stage Stage, d time.Duration) {
-	m := &stages[stage]
+	observe(&stages[stage], d)
+}
+
+func observe(m *measurement, d time.Duration) {
 	m.count.Add(1)
 	m.total.Add(int64(d))
 	maximum(&m.max, int64(d))
@@ -97,11 +101,12 @@ type Timing struct {
 func timing(m *measurement) Timing { return Timing{m.count.Load(), m.total.Load(), m.max.Load()} }
 
 type Report struct {
-	Stages            map[string]Timing `json:"stages"`
-	Counters          map[string]int64  `json:"counters"`
-	CommittedEventAge AgeTiming         `json:"committed_event_age"`
-	HandledEventAge   AgeTiming         `json:"handled_event_age"`
-	LastHandledUnixMS int64             `json:"last_handled_unix_ms"`
+	Stages            map[string]Timing             `json:"stages"`
+	Counters          map[string]int64              `json:"counters"`
+	CommittedEventAge AgeTiming                     `json:"committed_event_age"`
+	HandledEventAge   AgeTiming                     `json:"handled_event_age"`
+	LastHandledUnixMS int64                         `json:"last_handled_unix_ms"`
+	SiriMatching      map[string]SiriFallbackReport `json:"siri_matching"`
 }
 
 func Snapshot() Report {
@@ -111,6 +116,14 @@ func Snapshot() Report {
 	}
 	for i, name := range counterNames {
 		r.Counters[name] = counters[i].Load()
+	}
+	r.SiriMatching = make(map[string]SiriFallbackReport, len(siriFallbackNames))
+	for i, name := range siriFallbackNames {
+		m := &siriFallbacks[i]
+		r.SiriMatching[name] = SiriFallbackReport{
+			Lookup: timing(&m.lookup), Narrowing: timing(&m.narrowing),
+			Candidates: m.candidates.Load(), Available: m.available.Load(), Matches: m.matches.Load(),
+		}
 	}
 	return r
 }

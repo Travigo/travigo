@@ -1,7 +1,6 @@
 package siri_vm
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -29,7 +28,7 @@ type SiriVMVehicleIdentificationEvent struct {
 	ResponseTime    time.Time
 }
 
-func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) bool {
+func vehicleUpdate(vehicle *VehicleActivity, dataset datasets.DataSet, datasource *ctdf.DataSourceReference) *vehicletracker.VehicleUpdateEvent {
 	datasource.OriginalFormat = "siri-vm"
 
 	currentTime := time.Now()
@@ -41,7 +40,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 
 		// Skip any records that haven't been updated in over 20 minutes
 		if recordedAtDifference.Minutes() > 20 {
-			return false
+			return nil
 		}
 	}
 
@@ -147,26 +146,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		}
 	}
 
-	locationEvent.SubmittedAt = time.Now()
-	locationEventJson, err := json.Marshal(locationEvent)
-	if err != nil {
-		log.Error().Err(err).Str("localID", localJourneyID).Msg("Failed to marshal SIRI-VM location event, skipping")
-		return false
-	}
-
-	// TODO(high-risk): a pooled *bytes.Buffer + json.NewEncoder from a sync.Pool
-	// would cut per-vehicle buffer allocations, but json.Encoder.Encode appends a trailing
-	// newline whereas json.Marshal does not. Downstream consumers parse these bytes, so
-	// byte-identical output cannot be guaranteed without trimming/extra handling; deferred to
-	// avoid any risk of altering the published payload.
-	// Performance Review [Set M] [PR052] [P1] (realtime): Publish errors are ignored and true still
-	// increments the submitted count. Return a retryable failure on a failed enqueue;
-	// batch publication in Import by bounded count/bytes to reduce Redis round trips.
-	// Advance source-version deduplication only after successful enqueue and retain
-	// per-journey ordering, so retrying a partially published feed remains safe.
-	queue.PublishBytes(locationEventJson)
-
-	return true
+	return &locationEvent
 }
 
 func (s *SiriVM) SetupRealtimeQueue(queue rmq.Queue) {
@@ -185,51 +165,50 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 	}
 
 	var retrievedRecords int64
-	var submittedRecords int64
+	observations := observationBatch{latest: make(map[observationRun]int)}
 
 	d := xml.NewDecoder(s.reader)
 	d.CharsetReader = charset.NewReaderLabel
 	for {
 		tok, err := d.Token()
-		// Performance Review [Set L] [PR053] [P1] (realtime): A decoder error may have tok == nil,
-		// so truncated responses reach the success report despite an incomplete feed.
-		// Check non-EOF errors first and return DecodeElement failures instead of
-		// exiting. Track partial publication explicitly and retry idempotently with
-		// a bounded policy; otherwise interrupted downloads silently lose the tail.
-		if tok == nil || err == io.EOF {
-			// EOF means we're done.
+		if err == io.EOF {
 			break
-		} else if err != nil {
-			log.Fatal().Msgf("Error decoding token: %s", err)
-			return datasets.DataImportReport{}, err
 		}
-
-		switch ty := tok.(type) {
-		case xml.StartElement:
-			if ty.Name.Local == "VehicleActivity" {
-				var vehicleActivity VehicleActivity
-
-				if err = d.DecodeElement(&vehicleActivity, &ty); err != nil {
-					log.Fatal().Msgf("Error decoding item: %s", err)
-				} else {
-					retrievedRecords += 1
-
-					successfullyPublished := SubmitToProcessQueue(s.queue, &vehicleActivity, dataset, datasource)
-
-					if successfullyPublished {
-						submittedRecords += 1
-					}
-				}
+		if err != nil {
+			return datasets.DataImportReport{}, fmt.Errorf("decode SIRI-VM: %w", err)
+		}
+		element, ok := tok.(xml.StartElement)
+		if !ok || element.Name.Local != "VehicleActivity" {
+			continue
+		}
+		var activity VehicleActivity
+		if err := d.DecodeElement(&activity, &element); err != nil {
+			return datasets.DataImportReport{}, fmt.Errorf("decode SIRI-VM vehicle: %w", err)
+		}
+		retrievedRecords++
+		if event := vehicleUpdate(&activity, dataset, datasource); event != nil {
+			if err := observations.add(event); err != nil {
+				log.Error().Err(err).Str("localID", event.LocalID).Msg("Failed to encode SIRI-VM location, skipping")
 			}
 		}
+		if retrievedRecords%observationBatchSize == 0 {
+			if err := observations.flush(s.queue); err != nil {
+				return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
+			}
+		}
+	}
+	if err := observations.flush(s.queue); err != nil {
+		return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
 	}
 
 	log.Info().
 		Str("dataset", dataset.Identifier).
-		Int64("withtrip", submittedRecords).
-		Int64("withlocation", submittedRecords).
-		Int64("submitted", submittedRecords).
+		Int64("withtrip", observations.submitted).
+		Int64("withlocation", observations.submitted).
+		Int64("submitted", observations.submitted).
 		Int64("total", retrievedRecords).
+		Int64("repeated_observations", observations.repeated).
+		Int64("superseded_observations", observations.replaced).
 		Msg("Submitted vehicle updates")
 
 	// Wait for queue to empty

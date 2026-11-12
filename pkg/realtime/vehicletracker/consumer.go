@@ -28,6 +28,7 @@ const numConsumers = 10
 const batchSize = 200
 const identificationCacheTTL = 90 * time.Minute
 const suppressedSiriMatchTTL = 5 * time.Minute
+const siriLocationRetryTTL = 30 * time.Second
 const gtfsJourneyOwnershipTTL = 8 * time.Hour
 const maxSubmittedEventAge = 5 * time.Minute
 
@@ -328,6 +329,9 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 				IdentifyingInformation: identifyingInformation,
 				CurrentTime:            vehicleUpdateEvent.RecordedAt,
 			}
+			if vehicleUpdateEvent.DataSource != nil {
+				journeyIdentifier.SourceDataset = vehicleUpdateEvent.DataSource.DatasetID
+			}
 			journey, err = journeyIdentifier.IdentifyJourney()
 
 			// TODO yet another special TfL only thing that shouldn't be here
@@ -361,15 +365,13 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 				return locationJourneyID
 			}
 
-			// Performance Review [Set J] [PR143] [P2] (tracker): The same 90-minute negative cache covers
-			// missing timetable data, ambiguous matches, and dependency failures returned
-			// by identification; subsequent observations skip identification entirely.
-			// Separate transient failures from confirmed no-match results, using short,
-			// jittered retry windows and timetable-version invalidation for the latter.
-			// Coalesce retries so recovery does not create a database stampede, and avoid
-			// trading lower query counts for vehicles disappearing after brief failures.
-			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt, identificationCacheTTL)
+			// The Redis miss marker limits retries for this vehicle run. SIRI
+			// uses a shorter window so GPS can recover as the vehicle moves.
+			ttl := identificationCacheTTL
+			if sourceType == "siri-vm" {
+				ttl = siriLocationRetryTTL
+			}
+			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt, ttl)
 
 			// Set cross dataset ID
 			if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {

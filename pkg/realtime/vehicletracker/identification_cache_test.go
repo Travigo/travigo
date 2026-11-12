@@ -84,23 +84,25 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
 		mt.Cleanup(func() { database.Instance = oldDatabase })
 
+		operatorRef := mt.Name() + time.Now().String()
+		mt.AddMockResponses(
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".operators", mtest.FirstBatch,
+				bson.D{{Key: "primaryidentifier", Value: operatorRef}}),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".services", mtest.FirstBatch,
+				bson.D{{Key: "primaryidentifier", Value: "service"}, {Key: "servicename", Value: "1"}}),
+		)
 		mockMatch := func(journeyID string) {
-			mt.AddMockResponses(
-				mtest.CreateCursorResponse(0, mt.DB.Name()+".operators", mtest.FirstBatch,
-					bson.D{{Key: "primaryidentifier", Value: "operator"}}),
-				mtest.CreateCursorResponse(0, mt.DB.Name()+".services", mtest.FirstBatch,
-					bson.D{{Key: "primaryidentifier", Value: "service"}, {Key: "servicename", Value: "1"}}),
-				mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
-					{Key: "primaryidentifier", Value: journeyID},
-					{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
-				}),
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
+				{Key: "primaryidentifier", Value: journeyID},
+				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+			}),
 			)
 		}
 
 		ctx := context.Background()
 		consumer := &BatchConsumer{}
 		info := map[string]string{
-			"OperatorRef": "operator", "PublishedLineName": "1", "VehicleJourneyRef": "trip-a",
+			"OperatorRef": operatorRef, "PublishedLineName": "1", "VehicleJourneyRef": "trip-a",
 			"FramedVehicleJourneyDate": "2026-11-10", "LinkedDataset": "schedule",
 		}
 		event := &VehicleUpdateEvent{
@@ -141,10 +143,9 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 		server.FastForward(time.Minute + time.Second)
 		event.LocalID = "siri-trip-a"
 		info["VehicleJourneyRef"] = "trip-a"
-		mockMatch("journey-a")
 		identify("journey-a")
-		if got := len(mt.GetAllStartedEvents()); got != 9 {
-			mt.Fatalf("expected three timetable searches across key change and expiry, got %d Mongo commands", got)
+		if got := len(mt.GetAllStartedEvents()); got != 4 {
+			mt.Fatalf("expected shared service and timetable results to avoid redundant Mongo commands, got %d", got)
 		}
 	})
 }
