@@ -174,20 +174,22 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
 			}
 		} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeServiceAlert {
+			telemetry.Add(telemetry.ServiceAlerts, 1)
+			telemetry.Add(telemetry.ServiceAlertReferences, int64(len(vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation)))
+
 			var matchedIdentifiers []string
 			for _, identifyingInformation := range vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation {
-				identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, identifyingInformation)
-				identifiedStopID := consumer.identifyStop(vehicleUpdateEvent.SourceType, identifyingInformation)
-				identifiedServiceID := consumer.identifyService(vehicleUpdateEvent.SourceType, identifyingInformation)
-
-				if identifiedJourneyID != "" {
-					matchedIdentifiers = append(matchedIdentifiers, identifiedJourneyID)
+				if vehicleUpdateEvent.SourceType == "GTFS-RT" && identifyingInformation["TripID"] != "" {
+					telemetry.Add(telemetry.ServiceAlertJourneyLookups, 1)
+					if journeyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, identifyingInformation); journeyID != "" {
+						matchedIdentifiers = append(matchedIdentifiers, journeyID)
+					}
 				}
-				if identifiedStopID != "" {
-					matchedIdentifiers = append(matchedIdentifiers, identifiedStopID)
+				if stopID := consumer.identifyStop(vehicleUpdateEvent.SourceType, identifyingInformation); stopID != "" {
+					matchedIdentifiers = append(matchedIdentifiers, stopID)
 				}
-				if identifiedServiceID != "" {
-					matchedIdentifiers = append(matchedIdentifiers, identifiedServiceID)
+				if serviceID := consumer.identifyService(vehicleUpdateEvent.SourceType, identifyingInformation); serviceID != "" {
+					matchedIdentifiers = append(matchedIdentifiers, serviceID)
 				}
 			}
 

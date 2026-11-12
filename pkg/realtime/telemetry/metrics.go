@@ -55,12 +55,16 @@ const (
 	RedisErrors
 	SiriGTFSSuppressedFresh
 	SiriGTFSSuppressedCached
+	ServiceAlerts
+	ServiceAlertReferences
+	ServiceAlertJourneyLookups
 	counterCount
 )
 
 var counterNames = [counterCount]string{
 	"received", "handled", "update_failed", "malformed", "stale", "cache_hit", "cache_miss", "cache_evicted",
 	"redis_commands", "redis_errors", "siri_gtfs_suppressed_fresh", "siri_gtfs_suppressed_cached",
+	"service_alerts", "service_alert_references", "service_alert_journey_lookups",
 }
 var counters [counterCount]atomic.Int64
 
