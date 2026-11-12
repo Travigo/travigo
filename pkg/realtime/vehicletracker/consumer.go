@@ -24,7 +24,7 @@ import (
 
 var identificationCache *cache.Cache[string]
 
-const numConsumers = 5
+const numConsumers = 10
 const batchSize = 200
 const identificationCacheTTL = 90 * time.Minute
 const gtfsJourneyOwnershipTTL = 8 * time.Hour
