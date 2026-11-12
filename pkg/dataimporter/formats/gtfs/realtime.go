@@ -192,6 +192,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					RecordedAt: recordedAtTime,
 				}
 
+				updateEvent.SubmittedAt = time.Now()
 				updateEventJson, _ := json.Marshal(updateEvent)
 				r.queue.PublishBytes(updateEventJson)
 
@@ -330,6 +331,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				withTripUpdate += 1
 			}
 
+			locationEvent.SubmittedAt = time.Now()
 			locationEventJson, _ := json.Marshal(locationEvent)
 
 			// Performance Review [Set M] [PR034] [P1] (realtime): Each submitted vehicle update uses

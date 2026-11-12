@@ -147,6 +147,7 @@ func SubmitToProcessQueue(queue rmq.Queue, vehicle *VehicleActivity, dataset dat
 		}
 	}
 
+	locationEvent.SubmittedAt = time.Now()
 	locationEventJson, err := json.Marshal(locationEvent)
 	if err != nil {
 		log.Error().Err(err).Str("localID", localJourneyID).Msg("Failed to marshal SIRI-VM location event, skipping")

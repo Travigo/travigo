@@ -29,6 +29,7 @@ const batchSize = 200
 const identificationCacheTTL = 90 * time.Minute
 const suppressedSiriMatchTTL = 5 * time.Minute
 const gtfsJourneyOwnershipTTL = 8 * time.Hour
+const maxSubmittedEventAge = 5 * time.Minute
 
 var touchIdentificationMapping = redis.NewScript(`
 local mapping = redis.call("HMGET", KEYS[1], "journey_id", "last_updated", "fixed_expiry")
@@ -142,6 +143,13 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			// non-expiring rejected list only leaks Redis memory.
 			telemetry.Add(telemetry.Malformed, 1)
 			log.Warn().Err(err).Msg("Discarding malformed realtime event")
+			continue
+		}
+		// Legacy queue payloads have no submission time, so discard them with stale
+		// events to let pre-upgrade backlog drain promptly.
+		if vehicleUpdateEvent.SubmittedAt.IsZero() || time.Since(vehicleUpdateEvent.SubmittedAt) > maxSubmittedEventAge {
+			telemetry.Add(telemetry.Stale, 1)
+			log.Debug().Time("submitted_at", vehicleUpdateEvent.SubmittedAt).Msg("Discarding stale realtime event")
 			continue
 		}
 

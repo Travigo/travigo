@@ -169,6 +169,7 @@ func SubmitToProcessQueue(queue rmq.Queue, situationElement *SituationElement, d
 		RecordedAt: versionedAtTime,
 	}
 
+	updateEvent.SubmittedAt = time.Now()
 	updateEventJson, marshalErr := json.Marshal(updateEvent)
 	if marshalErr != nil {
 		log.Error().Err(marshalErr).Str("localID", updateEvent.LocalID).Msg("Failed to marshal SIRI-SX update event, skipping")
