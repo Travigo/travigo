@@ -7,6 +7,7 @@ import (
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
@@ -102,6 +103,66 @@ func TestSameServiceNameDoesNotMatchDifferentRoutes(t *testing.T) {
 	if sameServiceName("25", "26") {
 		t.Fatal("different service names matched")
 	}
+}
+
+func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("both stops", func(mt *mtest.T) {
+		namespace := mt.DB.Name() + "." + mt.Coll.Name()
+		id := primitive.NewObjectID()
+		idRow := func(id primitive.ObjectID) bson.D { return bson.D{{Key: "_id", Value: id}} }
+		mt.AddMockResponses(
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, idRow(id), idRow(primitive.NewObjectID())),
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, idRow(primitive.NewObjectID()), idRow(id)),
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
+				{Key: "primaryidentifier", Value: "journey"},
+				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+			}),
+		)
+
+		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "path.originstopref": "a", "path.destinationstopref": "c"}
+		got, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{})
+		if err != nil || len(got.available) != 1 || got.available[0].PrimaryIdentifier != "journey" {
+			mt.Fatalf("unexpected candidates: %+v, %v", got, err)
+		}
+		commands := mt.GetAllStartedEvents()
+		if len(commands) != 3 {
+			mt.Fatalf("sent %d commands, want two ID scans and one fetch", len(commands))
+		}
+		for n, branch := range []struct{ field, stop, index string }{
+			{"path.originstopref", "a", database.JourneySiriOriginIDsIndex},
+			{"path.destinationstopref", "c", database.JourneySiriDestinationIDsIndex},
+		} {
+			command := commands[n].Command
+			filter := command.Lookup("filter").Document()
+			projection, err := command.Lookup("projection").Document().Elements()
+			if filter.Lookup(branch.field).StringValue() != branch.stop || command.Lookup("hint").StringValue() != branch.index ||
+				err != nil || len(projection) != 1 || projection[0].Key() != "_id" || projection[0].Value().Int32() != 1 {
+				mt.Fatalf("unexpected stop ID lookup: %v", command)
+			}
+		}
+		fetch := commands[2].Command
+		filter := fetch.Lookup("filter").Document()
+		values, err := filter.Lookup("_id", "$in").Array().Values()
+		if err != nil || len(values) != 1 || values[0].ObjectID() != id || fetch.Lookup("hint").StringValue() != "_id_" ||
+			filter.Lookup("path.originstopref").StringValue() != "a" || filter.Lookup("path.destinationstopref").StringValue() != "c" {
+			mt.Fatalf("unexpected candidate fetch: %v", fetch)
+		}
+	})
+	mt.Run("index missing", func(mt *mtest.T) {
+		mt.AddMockResponses(
+			mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 2, Message: "hint provided does not correspond to an existing index"}),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch),
+		)
+		query := bson.M{"serviceref": "service", "path.originstopref": "a", "path.destinationstopref": "c"}
+		if _, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}); err != nil {
+			mt.Fatal(err)
+		}
+		fallback := mt.GetAllStartedEvents()[1].Command
+		if _, err := fallback.LookupErr("hint"); err == nil {
+			mt.Fatalf("fallback still requires a hint: %v", fallback)
+		}
+	})
 }
 
 func TestSiriReferenceMissesAreReusedAcrossUpdates(t *testing.T) {

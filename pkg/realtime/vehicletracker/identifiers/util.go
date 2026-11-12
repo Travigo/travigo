@@ -45,7 +45,7 @@ type siriJourneyCandidates struct {
 	exactCount int
 }
 
-func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time) (siriJourneyCandidates, error) {
+func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time, findOpts ...*options.FindOptions) (siriJourneyCandidates, error) {
 	var candidates siriJourneyCandidates
 
 	// Keep precisely the fields consumed by availability, functional hashing,
@@ -63,7 +63,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "path.origindeparturetime", Value: 1},
 		{Key: "path.destinationarrivaltime", Value: 1},
 	})
-	cursor, err := journeysCollection.Find(context.Background(), query, opts)
+	cursor, err := journeysCollection.Find(context.Background(), query, append(findOpts, opts)...)
 	if err != nil {
 		return candidates, err
 	}

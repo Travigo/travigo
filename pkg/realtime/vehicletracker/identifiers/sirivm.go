@@ -240,7 +240,7 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate, exactDeparture time.Time)
 	}
 	query["serviceref"] = bson.M{"$in": services}
 	started := time.Now()
-	candidates, lookupErr := getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, query, exactDeparture)
+	candidates, lookupErr := getSiriStopJourneys(journeysCollection, framedVehicleJourneyDate, query, exactDeparture)
 	identifiedJourney, err := i.selectJourney(telemetry.SiriStops, time.Since(started), candidates, lookupErr, exactDeparture)
 
 	if err != nil {

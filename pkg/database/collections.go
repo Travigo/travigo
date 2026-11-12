@@ -10,10 +10,12 @@ import (
 )
 
 const (
-	TDMappingsCollectionName      = "gb_networkrail_td_mappings"
-	JourneysCollectionName        = "journeys"
-	JourneysRawCollectionName     = "journeys_raw"
-	JourneysStagingCollectionName = "journeys_staging"
+	TDMappingsCollectionName       = "gb_networkrail_td_mappings"
+	JourneysCollectionName         = "journeys"
+	JourneysRawCollectionName      = "journeys_raw"
+	JourneysStagingCollectionName  = "journeys_staging"
+	JourneySiriOriginIDsIndex      = "JourneyIdentificationServiceOriginStopIDs"
+	JourneySiriDestinationIDsIndex = "JourneyIdentificationServiceDestinationStopIDs"
 )
 
 func createIndexes() {
@@ -432,6 +434,22 @@ func createJourneysIndexes() {
 			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
 				{Key: "path.destinationstopref", Value: 1},
+			},
+		},
+		{
+			Options: options.Index().SetName(JourneySiriOriginIDsIndex),
+			Keys: bson.D{
+				{Key: "serviceref", Value: 1},
+				{Key: "path.originstopref", Value: 1},
+				{Key: "_id", Value: 1},
+			},
+		},
+		{
+			Options: options.Index().SetName(JourneySiriDestinationIDsIndex),
+			Keys: bson.D{
+				{Key: "serviceref", Value: 1},
+				{Key: "path.destinationstopref", Value: 1},
+				{Key: "_id", Value: 1},
 			},
 		},
 		{
