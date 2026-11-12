@@ -14,7 +14,7 @@ datasets:
   - identifier: gtfs-schedule-82386
     format: gtfs-schedule
     source: "https://ssl.renfe.com/gtransit/Fichero_AV_INT/Renfe_AVE_Int.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -50,7 +50,7 @@ datasets:
   - identifier: gtfs-schedule-52605
     format: gtfs-schedule
     source: "https://drive.google.com/uc?export=download&id=1VXd01yQl2Mb67C9bkrx0P8sqNIL532_o"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -129,7 +129,7 @@ datasets:
   - identifier: gtfs-schedule-81653
     format: gtfs-schedule
     source: "https://thello.axelor.com/public/gtfs/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -160,7 +160,7 @@ datasets:
   - identifier: gtfs-schedule-80921
     format: gtfs-schedule
     source: "https://eu.ftp.opendatasoft.com/stif/GTFS/IDFM-gtfs.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -192,7 +192,7 @@ datasets:
   - identifier: gtfs-schedule-8201
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=reseau-titus"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -270,7 +270,7 @@ datasets:
   - identifier: gtfs-schedule-83112
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=CARS_REGION_EXPRESS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -283,7 +283,7 @@ datasets:
   - identifier: gtfs-schedule-82729
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=TRANSALTITUDE&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -339,7 +339,7 @@ datasets:
   - identifier: gtfs-schedule-80964
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=HAUTE_SAVOIE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -352,7 +352,7 @@ datasets:
   - identifier: gtfs-schedule-83114
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=CARS_REGION_LOIRE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -365,7 +365,7 @@ datasets:
   - identifier: gtfs-schedule-83113
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=CARS_REGION_AIN&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -378,7 +378,7 @@ datasets:
   - identifier: gtfs-schedule-38888
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=PUY_DE_DOME&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -391,7 +391,7 @@ datasets:
   - identifier: gtfs-schedule-80960
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=DROME&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -404,7 +404,7 @@ datasets:
   - identifier: gtfs-schedule-81244
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=SAVOIE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -415,7 +415,7 @@ datasets:
   - identifier: gtfs-schedule-84247
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=CARS_REGION_73_TOURISME&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -428,7 +428,7 @@ datasets:
   - identifier: gtfs-schedule-38889
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=ALLIER&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -441,7 +441,7 @@ datasets:
   - identifier: gtfs-schedule-80961
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=ARDECHE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -454,7 +454,7 @@ datasets:
   - identifier: gtfs-schedule-38881
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=HAUTE_LOIRE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -467,7 +467,7 @@ datasets:
   - identifier: gtfs-schedule-81245
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=CAR_REGION_CANTAL&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -480,7 +480,7 @@ datasets:
   - identifier: gtfs-schedule-84281
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/flux-gtfs-realtime-des-lignes-cars-region-loire-l19-et-l32-fournis-par-pysae/20260506-125234/lignes-l19-l32-11-2025.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -508,7 +508,7 @@ datasets:
   - identifier: gtfs-schedule-82321
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/naq-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -572,7 +572,7 @@ datasets:
   - identifier: gtfs-schedule-83620
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/HDF_TER_GTFS_J___90_jours.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -585,7 +585,7 @@ datasets:
   - identifier: gtfs-schedule-81828
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_59_P1.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -596,7 +596,7 @@ datasets:
   - identifier: gtfs-schedule-81829
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_59_P2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -607,7 +607,7 @@ datasets:
   - identifier: gtfs-schedule-81830
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_59_P3A.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -618,7 +618,7 @@ datasets:
   - identifier: gtfs-schedule-81832
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_59_P4.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -631,7 +631,7 @@ datasets:
   - identifier: gtfs-schedule-82169
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_62.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -644,7 +644,7 @@ datasets:
   - identifier: gtfs-schedule-81833
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_SCO_62.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -657,7 +657,7 @@ datasets:
   - identifier: gtfs-schedule-81822
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_60_P3.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -668,7 +668,7 @@ datasets:
   - identifier: gtfs-schedule-81821
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_60_P2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -679,7 +679,7 @@ datasets:
   - identifier: gtfs-schedule-81820
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_60_P1.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -690,7 +690,7 @@ datasets:
   - identifier: gtfs-schedule-81823
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_SCO_60_P4.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -703,7 +703,7 @@ datasets:
   - identifier: gtfs-schedule-82277
     format: gtfs-schedule
     source: "https://sig.hautsdefrance.fr/ext/opendata/Transport/GTFS/80/RHDF_GTFS_COM_80.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -716,7 +716,7 @@ datasets:
   - identifier: gtfs-schedule-84110
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_SCO_80.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -729,7 +729,7 @@ datasets:
   - identifier: gtfs-schedule-82170
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_COM_02.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -742,7 +742,7 @@ datasets:
   - identifier: gtfs-schedule-82276
     format: gtfs-schedule
     source: "https://geocatalogue.hautsdefrance.fr/gtfs/RHDF_GTFS_SCO_02.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -760,7 +760,7 @@ datasets:
   - identifier: gtfs-schedule-83634
     format: gtfs-schedule
     source: "https://tsi.grandest2.cityway.fr/ftp/opendata/REGION_GRANDEST.gtfs.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -803,7 +803,7 @@ datasets:
   - identifier: gtfs-schedule-80417
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CG67"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -816,7 +816,7 @@ datasets:
   - identifier: gtfs-schedule-80427
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TIM"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -829,7 +829,7 @@ datasets:
   - identifier: gtfs-schedule-80419
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CG68"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -870,7 +870,7 @@ datasets:
   - identifier: gtfs-schedule-80423
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TED"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -883,7 +883,7 @@ datasets:
   - identifier: gtfs-schedule-80421
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=C51"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -896,7 +896,7 @@ datasets:
   - identifier: gtfs-schedule-80429
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LIVO"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -909,7 +909,7 @@ datasets:
   - identifier: gtfs-schedule-80415
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=AUBE"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -922,7 +922,7 @@ datasets:
   - identifier: gtfs-schedule-80413
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=ARDENNES"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -935,7 +935,7 @@ datasets:
   - identifier: gtfs-schedule-80425
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=RITM"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -948,7 +948,7 @@ datasets:
   - identifier: gtfs-schedule-81989
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=C52"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -972,7 +972,7 @@ datasets:
   - identifier: gtfs-schedule-82137
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/3745/resource/5016/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1089,7 +1089,7 @@ datasets:
   - identifier: gtfs-schedule-83448
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/fr/datasets/r/30782be6-90aa-40bb-940a-cb881a95ad26"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1116,7 +1116,7 @@ datasets:
   - identifier: gtfs-schedule-79818
     format: gtfs-schedule
     source: "https://mobi-iti-pdl.okina.fr/static/mobiiti_technique/gtfs_global.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1183,7 +1183,7 @@ datasets:
   - identifier: gtfs-schedule-81559
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/KORRIGOBRET.gtfs.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1206,7 +1206,7 @@ datasets:
   - identifier: gtfs-schedule-81464
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_CAR_56.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1217,7 +1217,7 @@ datasets:
   - identifier: gtfs-schedule-81463
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_CAR_35.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1228,7 +1228,7 @@ datasets:
   - identifier: gtfs-schedule-81462
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_CAR_29.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1239,7 +1239,7 @@ datasets:
   - identifier: gtfs-schedule-81461
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_CAR_22.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1272,7 +1272,7 @@ datasets:
   - identifier: gtfs-schedule-81474
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_TER.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1285,7 +1285,7 @@ datasets:
   - identifier: gtfs-schedule-81486
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_CAR_35.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1298,7 +1298,7 @@ datasets:
   - identifier: gtfs-schedule-81478
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_BATEAU_ARZ.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1309,7 +1309,7 @@ datasets:
   - identifier: gtfs-schedule-81479
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_BATEAU_BREHAT.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1320,7 +1320,7 @@ datasets:
   - identifier: gtfs-schedule-81481
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_BATEAU_56.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1331,7 +1331,7 @@ datasets:
   - identifier: gtfs-schedule-81480
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/BREIZHGO_BATEAU_29.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1388,7 +1388,7 @@ datasets:
   - identifier: gtfs-schedule-82317
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/nomad-car-region-normandie/20260820-122844/pt-th-offer-nomad-gtfs-20260820-816-opendata-1-.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1401,7 +1401,7 @@ datasets:
   - identifier: gtfs-schedule-82308
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/bacs-de-seine-departement-seine-maritime/20261014-070256/pt-th-offer-seinemaritime76-gtfs-20261009-309-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1419,7 +1419,7 @@ datasets:
   - identifier: gtfs-schedule-83931
     format: gtfs-schedule
     source: "https://www.viamobigo.fr/ftp/zipopendata/ut.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1430,7 +1430,7 @@ datasets:
   - identifier: gtfs-schedule-84074
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1441,7 +1441,7 @@ datasets:
   - identifier: gtfs-schedule-84078
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1452,7 +1452,7 @@ datasets:
   - identifier: gtfs-schedule-84075
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1463,7 +1463,7 @@ datasets:
   - identifier: gtfs-schedule-84076
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1474,7 +1474,7 @@ datasets:
   - identifier: gtfs-schedule-84072
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1485,7 +1485,7 @@ datasets:
   - identifier: gtfs-schedule-84077
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1496,7 +1496,7 @@ datasets:
   - identifier: gtfs-schedule-84073
     format: gtfs-schedule
     source: "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1514,7 +1514,7 @@ datasets:
   - identifier: gtfs-schedule-83521
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AGREGE/JVMALIN.zip"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1608,7 +1608,7 @@ datasets:
   - identifier: gtfs-schedule-80736
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/304e9bce-2f14-417f-a02e-3b3827de8d5f"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1619,7 +1619,7 @@ datasets:
   - identifier: gtfs-schedule-39599
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/2316529b-3075-4013-8b85-46777fefd56e"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1630,7 +1630,7 @@ datasets:
   - identifier: gtfs-schedule-39597
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/c671fcc9-fe50-4bee-bed0-78e6443c1010"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1641,7 +1641,7 @@ datasets:
   - identifier: gtfs-schedule-39594
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/d61403a1-7694-4a04-a229-044a43aff5c7"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1652,7 +1652,7 @@ datasets:
   - identifier: gtfs-schedule-81969
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/0d9a808a-9a9b-4fa1-b04f-339bbf2cfeb1"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1663,7 +1663,7 @@ datasets:
   - identifier: gtfs-schedule-39598
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/cde22673-d7e4-4cbd-837f-3c8bd9fb2f9b"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1696,7 +1696,7 @@ datasets:
   - identifier: gtfs-schedule-39596
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/05c200aa-798d-4660-bae7-3bf77e551c4c"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1707,7 +1707,7 @@ datasets:
   - identifier: gtfs-schedule-39603
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/9b44cd04-63b5-46e7-a1f8-d5c1c9151d5a"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1729,7 +1729,7 @@ datasets:
   - identifier: gtfs-schedule-39593
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/42b6ba26-f817-455b-8ba2-fa30c100fff4"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1740,7 +1740,7 @@ datasets:
   - identifier: gtfs-schedule-39592
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/3fc0ab9d-e7a3-4728-ac2b-be55d927e757"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1751,7 +1751,7 @@ datasets:
   - identifier: gtfs-schedule-39602
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/10e025a1-9048-4c19-925a-466b2a79232f"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1882,7 +1882,7 @@ datasets:
   - identifier: gtfs-schedule-81943
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/abebedc6-28cf-4e2e-9c64-db57a40156f8"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -1933,7 +1933,7 @@ datasets:
   - identifier: gtfs-schedule-82338
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/gironde-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1946,7 +1946,7 @@ datasets:
   - identifier: gtfs-schedule-82382
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/bac_gironde-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1959,7 +1959,7 @@ datasets:
   - identifier: gtfs-schedule-82346
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/pyrenees_atlantiques-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1972,7 +1972,7 @@ datasets:
   - identifier: gtfs-schedule-82326
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/charente_maritime-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1985,7 +1985,7 @@ datasets:
   - identifier: gtfs-schedule-82332
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/vienne-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -1998,7 +1998,7 @@ datasets:
   - identifier: gtfs-schedule-82342
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/landes-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2011,7 +2011,7 @@ datasets:
   - identifier: gtfs-schedule-82336
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/dordogne-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2028,7 +2028,7 @@ datasets:
   - identifier: gtfs-schedule-82334
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/deux_sevres-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2041,7 +2041,7 @@ datasets:
   - identifier: gtfs-schedule-82340
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/haute_vienne-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2054,7 +2054,7 @@ datasets:
   - identifier: gtfs-schedule-82324
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/charente-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2067,7 +2067,7 @@ datasets:
   - identifier: gtfs-schedule-82344
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/lot_et_garonne-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2080,7 +2080,7 @@ datasets:
   - identifier: gtfs-schedule-82328
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/correze-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2093,7 +2093,7 @@ datasets:
   - identifier: gtfs-schedule-82330
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/creuse-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2111,7 +2111,7 @@ datasets:
   - identifier: gtfs-schedule-84261
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/flibco-lille-airport-gtfs/20261020-094203/lille-v6.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2157,7 +2157,7 @@ datasets:
   - identifier: gtfs-schedule-82872
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/FINISTAIR.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2175,7 +2175,7 @@ datasets:
   - identifier: gtfs-schedule-80934
     format: gtfs-schedule
     source: "https://pysae.com/api/v2/groups/car-jaune/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2284,7 +2284,7 @@ datasets:
   - identifier: gtfs-schedule-84275
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/lignes-totoom-1/20261102-165443/gtfs-totoom-l1-l5-sas-totoom-20261102.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2302,7 +2302,7 @@ datasets:
   - identifier: gtfs-schedule-84101
     format: gtfs-schedule
     source: "https://data.nantesmetropole.fr/explore/dataset/244400404_transports_commun_naolib_nantes_metropole_gtfs/files/0cc0469a72de54ee045cb66d1a21de9e/download/"
-    datasetsize: medium
+    datasetsize: large
     supportedobjects:
       stops: true
       services: true
@@ -2372,7 +2372,7 @@ datasets:
   - identifier: gtfs-schedule-81618
     format: gtfs-schedule
     source: "https://data.mobilites-m.fr/api/gtfs/BUL"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2385,7 +2385,7 @@ datasets:
   - identifier: gtfs-schedule-81794
     format: gtfs-schedule
     source: "https://data.mobilites-m.fr/api/gtfs/GSV"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2398,7 +2398,7 @@ datasets:
   - identifier: gtfs-schedule-83462
     format: gtfs-schedule
     source: "https://data.mobilites-m.fr/api/gtfs/TPV"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2777,7 +2777,7 @@ datasets:
   - identifier: gtfs-schedule-83739
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/telepherique-du-mont-faron/20260828-131706/tel-a-to-n.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2795,7 +2795,7 @@ datasets:
   - identifier: gtfs-schedule-83427
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-des-traversees-brittany-ferries/20261104-223127/gtfs-brittanyferries.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2847,7 +2847,7 @@ datasets:
   - identifier: gtfs-schedule-82139
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-du-reseau-maritime-de-martinique/20251218-214039/gtfs-maritime-bluelines.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2860,7 +2860,7 @@ datasets:
   - identifier: gtfs-schedule-82289
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-du-transport-scolaire-en-martinique/20250905-181503/gtfs-scolaire-mt.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2913,7 +2913,7 @@ datasets:
   - identifier: gtfs-schedule-79897
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-urbain-de-la-zone-sud/20260623-142336/gtfssudsudlib.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2924,7 +2924,7 @@ datasets:
   - identifier: gtfs-schedule-81193
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-urbain-de-la-zone-sud/20230821-030926/gtfs-maritime-martinique.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2947,7 +2947,7 @@ datasets:
   - identifier: gtfs-schedule-80606
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-urbain-de-la-zone-nord-cap-nord/20261009-200258/gtfsnordrtm.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -2992,7 +2992,7 @@ datasets:
   - identifier: gtfs-schedule-80431
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LESUB"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3093,7 +3093,7 @@ datasets:
   - identifier: gtfs-schedule-83200
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-via-strada/20260707-125009/via-strada.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3116,7 +3116,7 @@ datasets:
   - identifier: gtfs-schedule-83882
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-horaires-chemins-de-fer-corse-1/20260303-151209/chemin-de-fer-de-la-corse.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3129,7 +3129,7 @@ datasets:
   - identifier: gtfs-schedule-82998
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-via-corsica-corte-a-la-vallee-de-la-restonica-ligne-c13/20260727-120808/via-corsica-restonica.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3147,7 +3147,7 @@ datasets:
   - identifier: gtfs-schedule-81996
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/programme-des-rotations-corsica-ferries/20251226-152616/gtfs-updated.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3183,7 +3183,7 @@ datasets:
   - identifier: gtfs-schedule-10230
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=bordeaux-navettes-aeroport"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3275,7 +3275,7 @@ datasets:
   - identifier: gtfs-schedule-80459
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CITELINE"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3347,7 +3347,7 @@ datasets:
   - identifier: gtfs-schedule-80594
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=REI"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3374,7 +3374,7 @@ datasets:
   - identifier: gtfs-schedule-83465
     format: gtfs-schedule
     source: "https://opendata.clermontmetropole.eu/api/v2/catalog/datasets/gtfs-smtc/alternative_exports/gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3428,7 +3428,7 @@ datasets:
   - identifier: gtfs-schedule-83784
     format: gtfs-schedule
     source: "https://data.orleans-metropole.fr/api/v2/catalog/datasets/om-mobilite-tao-tad-gtfsflex/alternative_exports/gtfs_flex_tao_012026_062026_zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3457,7 +3457,7 @@ datasets:
   - identifier: gtfs-schedule-83734
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-sankeo/20261026-132315/gtfssankeo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3885,7 +3885,7 @@ datasets:
   - identifier: gtfs-schedule-81116
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-karouest/20260817-142540/gtfs-koa1808.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3919,7 +3919,7 @@ datasets:
   - identifier: gtfs-schedule-82880
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/citalis-telepherique-papang/20251229-113508/pap1-gtfs-2025-12-02-2028-03-01.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3937,7 +3937,7 @@ datasets:
   - identifier: gtfs-schedule-43286
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/bibus/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -3987,7 +3987,7 @@ datasets:
   - identifier: gtfs-schedule-80100
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-sibra-a-annecy-gtfs/20261106-075925/gtfs-sibra.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4016,7 +4016,7 @@ datasets:
   - identifier: gtfs-schedule-84233
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/c9bb5f5a-5310-4544-a26a-754ac9889afb"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4061,7 +4061,7 @@ datasets:
   - identifier: gtfs-schedule-80611
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/rdla-lorient/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4099,7 +4099,7 @@ datasets:
   - identifier: gtfs-schedule-82348
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_limoges_metropole-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4139,7 +4139,7 @@ datasets:
   - identifier: gtfs-schedule-84115
     format: gtfs-schedule
     source: "https://api.maas-fr.cityway.fr/dataflow/offre-tc/download?provider=ORIZO&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4177,7 +4177,7 @@ datasets:
   - identifier: gtfs-schedule-83389
     format: gtfs-schedule
     source: "https://data.grandpoitiers.fr/data-fair/api/v1/datasets/offre-de-transport-du-reseau-vitalis/metadata-attachments/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4205,7 +4205,7 @@ datasets:
   - identifier: gtfs-schedule-82683
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-reseau-dk-bus-de-la-communaute-urbaine-de-dunkerque-gtfs/20261020-103010/gtfs-au-201026-dkbus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4299,7 +4299,7 @@ datasets:
   - identifier: gtfs-schedule-80223
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ametis/20261102-092623/gtfs-prod.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4310,7 +4310,7 @@ datasets:
   - identifier: gtfs-schedule-80705
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ametis/20261105-092130/sae-20261105-1003.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4384,7 +4384,7 @@ datasets:
   - identifier: gtfs-schedule-82350
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_la_rochelle-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4406,7 +4406,7 @@ datasets:
   - identifier: gtfs-schedule-79831
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-et-en-temps-reel-des-bus-et-autocars-circulant-sur-le-reseau-cap-cotentin/20261105-133233/gtfs-capcotentin-051126-au-27062027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4433,7 +4433,7 @@ datasets:
   - identifier: gtfs-schedule-82553
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-kiceo/20261110-153114/gtfs-20261110-162843-kiceo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4488,7 +4488,7 @@ datasets:
   - identifier: gtfs-schedule-79847
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-tcat-troyes-champagne-metropole-1/20261026-142704/gtfsnavineo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4537,7 +4537,7 @@ datasets:
   - identifier: gtfs-schedule-83631
     format: gtfs-schedule
     source: "https://opendata.idelis.fr/?file=GTFS_Scolaris/Data.GTFS.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4550,7 +4550,7 @@ datasets:
   - identifier: gtfs-schedule-83632
     format: gtfs-schedule
     source: "https://opendata.idelis.fr/?file=GTFS_MultiRoutes/Data.GTFS.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4572,7 +4572,7 @@ datasets:
   - identifier: gtfs-schedule-82727
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/syndicat-mixte-des-transports-du-petit-cul-de-sac-marin/20260102-170300/karulis-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4594,7 +4594,7 @@ datasets:
   - identifier: gtfs-schedule-82305
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-maritime-via-mare/20260707-130622/via-mare.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4607,7 +4607,7 @@ datasets:
   - identifier: gtfs-schedule-82995
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-horaires-des-lignes-de-la-communaute-de-communes-corse-du-sud-a-berlina/20260707-092242/a-berlina.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4620,7 +4620,7 @@ datasets:
   - identifier: gtfs-schedule-81252
     format: gtfs-schedule
     source: "https://pysae.com/api/v2/groups/porto-vecchio/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4693,7 +4693,7 @@ datasets:
   - identifier: gtfs-schedule-67655
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-du-reseau-de-transports-publics-de-saint-brieuc-armor-agglomeration/20261110-141934/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4711,7 +4711,7 @@ datasets:
   - identifier: gtfs-schedule-83781
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/agence-agglobus/20261019-063627/gtfs-toutes-lignes-2026-09-23.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4722,7 +4722,7 @@ datasets:
   - identifier: gtfs-schedule-83304
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/agence-agglobus/20261019-051047/gtfsligne7et8-1.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4760,7 +4760,7 @@ datasets:
   - identifier: gtfs-schedule-75062
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-des-lignes-urbaines-et-interurbaines-sur-le-reseau-alesy-gtfs/20261102-092556/gtfs-is-20261102.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4796,7 +4796,7 @@ datasets:
   - identifier: gtfs-schedule-79544
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/eveole-douai-reseau-bus-du-syndicat-mixte-des-transports-du-douaisis-smtd/20261013-124602/version-7-du-1409-au-03012027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4877,7 +4877,7 @@ datasets:
   - identifier: gtfs-schedule-81944
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/evolity-horaires-theoriques-de-transport-public/20260709-133238/2026-07-13-au-2027-06-11-gtfs-mpm-rs-v2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4933,7 +4933,7 @@ datasets:
   - identifier: gtfs-schedule-84244
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/rubis-grand-bourg-mobilites-offre-de-transport-theorique-et-temps-reel/20260827-075517/gtfs-standard-20260825-175057-oskar-paragon-is-prod-du-250826-au-311227.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4944,7 +4944,7 @@ datasets:
   - identifier: gtfs-schedule-84267
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/rubis-grand-bourg-mobilites-offre-de-transport-theorique-et-temps-reel/20261021-151926/gtfs-saeiv-21102026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4976,7 +4976,7 @@ datasets:
   - identifier: gtfs-schedule-80147
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=RUBIS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -4994,7 +4994,7 @@ datasets:
   - identifier: gtfs-schedule-80586
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-illygo/20261029-105249/gtfs-20261029-104658-illygo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5022,7 +5022,7 @@ datasets:
   - identifier: gtfs-schedule-81183
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/referentiel-topologique-reseau-carsud/20261104-235714/gtfs-carsud-04112026v3.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5086,7 +5086,7 @@ datasets:
   - identifier: gtfs-schedule-83368
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/rdbm/exports/gtfs-pour-le-pan.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5122,7 +5122,7 @@ datasets:
   - identifier: gtfs-schedule-83881
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/a1867718-7921-42a6-b672-c53b8c583aa3"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5140,7 +5140,7 @@ datasets:
   - identifier: gtfs-schedule-81575
     format: gtfs-schedule
     source: "https://drive.google.com/uc?export=download&id=1PUISUlg0tpVFTdr7NOzJ2w9KthNXpQNn"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5186,7 +5186,7 @@ datasets:
   - identifier: gtfs-schedule-83774
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/jeu-de-donnee-spl-estival-2025/20260127-034956/gtfs-esti-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5204,7 +5204,7 @@ datasets:
   - identifier: gtfs-schedule-83134
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-du-reseau-tarbes-lourdes-tlp-mobilites-gtfs/20261104-084214/ktlp-gtfs-291026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5231,7 +5231,7 @@ datasets:
   - identifier: gtfs-schedule-82352
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_du_niortais-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5249,7 +5249,7 @@ datasets:
   - identifier: gtfs-schedule-84240
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/lot-gtfs-stibus/20260930-095550/google-transit.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5267,7 +5267,7 @@ datasets:
   - identifier: gtfs-schedule-82294
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/1224/resource/4791/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5294,7 +5294,7 @@ datasets:
   - identifier: gtfs-schedule-80451
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CHM"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5321,7 +5321,7 @@ datasets:
   - identifier: gtfs-schedule-83529
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AO/DREUX.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5348,7 +5348,7 @@ datasets:
   - identifier: gtfs-schedule-81018
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/rd-laval/exports/pan.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5366,7 +5366,7 @@ datasets:
   - identifier: gtfs-schedule-81876
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-rtca/20261102-085142/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5411,7 +5411,7 @@ datasets:
   - identifier: gtfs-schedule-80479
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CAC"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5432,7 +5432,7 @@ datasets:
   - identifier: gtfs-schedule-84251
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/4953/resource/7234/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5445,7 +5445,7 @@ datasets:
   - identifier: gtfs-schedule-81907
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/1760/resource/2210/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5473,7 +5473,7 @@ datasets:
   - identifier: gtfs-schedule-82664
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseauzoom-horaires-theoriques/20251229-092806/gtfs-20251217-143039-stac-gc.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5491,7 +5491,7 @@ datasets:
   - identifier: gtfs-schedule-51449
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/boulogne/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5531,7 +5531,7 @@ datasets:
   - identifier: gtfs-schedule-80613
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transurbain-evreux-portes-de-normandie/20260903-072711/pt-th-offer-transurbain-gtfs-20260901-305-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5577,7 +5577,7 @@ datasets:
   - identifier: gtfs-schedule-83519
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AO/BOURGES-GTFS.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5627,7 +5627,7 @@ datasets:
   - identifier: gtfs-schedule-80461
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=IMAGINE"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5654,7 +5654,7 @@ datasets:
   - identifier: gtfs-schedule-83372
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transport-artis/20260918-084320/gtfs-18-09-26.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5692,7 +5692,7 @@ datasets:
   - identifier: gtfs-schedule-82355
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_bassin_de_brive-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5710,7 +5710,7 @@ datasets:
   - identifier: gtfs-schedule-83526
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AO/BLOIS.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5751,7 +5751,7 @@ datasets:
   - identifier: gtfs-schedule-82357
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_grand_perigueux-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5769,7 +5769,7 @@ datasets:
   - identifier: gtfs-schedule-81585
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transports-publics-urbains-sur-le-territoire-de-la-ca-du-pays-de-gex-1/20260227-090024/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5787,7 +5787,7 @@ datasets:
   - identifier: gtfs-schedule-79352
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-reseau-choletbus/20260928-084113/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5824,7 +5824,7 @@ datasets:
   - identifier: gtfs-schedule-83807
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=sitac-calais-rt&src=true"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5851,7 +5851,7 @@ datasets:
   - identifier: gtfs-schedule-83988
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transports-en-commun-audomarois-1/20260424-185310/20-04-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5862,7 +5862,7 @@ datasets:
   - identifier: gtfs-schedule-83987
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transports-en-commun-audomarois-1/20260430-132927/mouveo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5900,7 +5900,7 @@ datasets:
   - identifier: gtfs-schedule-79545
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-dinamo/20260821-140452/gtfs-20260821-092934-dinamo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5921,7 +5921,7 @@ datasets:
   - identifier: gtfs-schedule-81650
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=COROLIS_INT&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5932,7 +5932,7 @@ datasets:
   - identifier: gtfs-schedule-81138
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=COROLIS_INT&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -5976,7 +5976,7 @@ datasets:
   - identifier: gtfs-schedule-81074
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=COROLIS_URB&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6025,7 +6025,7 @@ datasets:
   - identifier: gtfs-schedule-83429
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/1311/resource/5230/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6043,7 +6043,7 @@ datasets:
   - identifier: gtfs-schedule-81338
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/semo-val-de-reuil-louviers-seine-eure-agglo/20260903-140015/pt-th-offer-semo-gtfs-20260903-911-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6089,7 +6089,7 @@ datasets:
   - identifier: gtfs-schedule-83408
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/qbo/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6134,7 +6134,7 @@ datasets:
   - identifier: gtfs-schedule-83202
     format: gtfs-schedule
     source: "https://gtfs-rt.infra-hubup.fr/hopbus/current/revision/gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6162,7 +6162,7 @@ datasets:
   - identifier: gtfs-schedule-79822
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/lignes-regulieres-de-transports-sillages-en-pays-de-grasse-urbain-et-scolaire/20260907-140608/2026-gtfs-urbain.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6173,7 +6173,7 @@ datasets:
   - identifier: gtfs-schedule-79821
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/lignes-regulieres-de-transports-sillages-en-pays-de-grasse-urbain-et-scolaire/20260907-140548/2026-gtfs-scolaire.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6191,7 +6191,7 @@ datasets:
   - identifier: gtfs-schedule-79861
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=STAR&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6219,7 +6219,7 @@ datasets:
   - identifier: gtfs-schedule-80245
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/agen-gtfs-urbain/20261110-085827/gtfs-agen-pvs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6247,7 +6247,7 @@ datasets:
   - identifier: gtfs-schedule-79374
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/arrets-circuits-et-horaires-du-reseau-optymo-de-belfort/20261022-093716/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6265,7 +6265,7 @@ datasets:
   - identifier: gtfs-schedule-81770
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/TILT.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6296,7 +6296,7 @@ datasets:
   - identifier: gtfs-schedule-79014
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=haguenau"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6318,7 +6318,7 @@ datasets:
   - identifier: gtfs-schedule-80449
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=Haguenau"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6336,7 +6336,7 @@ datasets:
   - identifier: gtfs-schedule-79520
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/impulsyon/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6363,7 +6363,7 @@ datasets:
   - identifier: gtfs-schedule-81416
     format: gtfs-schedule
     source: "https://mobi-iti-pdl.okina.fr/static/mobiiti_saumur_val_de_loire/gtfs_imported-id_saumur.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6381,7 +6381,7 @@ datasets:
   - identifier: gtfs-schedule-76779
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/tp2a/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6488,7 +6488,7 @@ datasets:
   - identifier: gtfs-schedule-82359
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_du_libournais-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6510,7 +6510,7 @@ datasets:
   - identifier: gtfs-schedule-83146
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/andemu-gtfs-2025/20250529-153656/andemu-gtfs-2025.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6528,7 +6528,7 @@ datasets:
   - identifier: gtfs-schedule-83836
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/information-sur-les-transports-en-commun/20260210-131528/gtfs-capa-27.01.2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6546,7 +6546,7 @@ datasets:
   - identifier: gtfs-schedule-83300
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-glazgo/20260929-080256/gtfs-20260928-115800-glazgo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6574,7 +6574,7 @@ datasets:
   - identifier: gtfs-schedule-82999
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/arrets-horaires-et-parcours-theoriques-du-reseau-monrezo-cucm-gtfs-1/20261002-133801/gtfs-20260928-101048-open-data-cmt.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6592,7 +6592,7 @@ datasets:
   - identifier: gtfs-schedule-81072
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=AXO&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6603,7 +6603,7 @@ datasets:
   - identifier: gtfs-schedule-81645
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=AXO&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6683,7 +6683,7 @@ datasets:
   - identifier: gtfs-schedule-82361
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_royan_atlantique-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6696,7 +6696,7 @@ datasets:
   - identifier: gtfs-schedule-79499
     format: gtfs-schedule
     source: "https://data.agglo-royan.fr/dataset/9b761974-a195-4e33-91b7-ecee3b368016/resource/d4915904-ebd0-43cf-9b35-fbfc04ce91fd/download/gtfs_20260824_115703_tdra.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6714,7 +6714,7 @@ datasets:
   - identifier: gtfs-schedule-82662
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-statiques-et-temps-reels-reseau-envia/20261027-075204/gtfs-envia-20261027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6759,7 +6759,7 @@ datasets:
   - identifier: gtfs-schedule-84137
     format: gtfs-schedule
     source: "https://h36.hanoverdisplays.com/keolis_vichy/gtfs/prod/GTFS_Prod_keolis_vichy.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6795,7 +6795,7 @@ datasets:
   - identifier: gtfs-schedule-79687
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-du-grand-albigeois-gtfs/20260918-083539/libea-reseau-urbain.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6806,7 +6806,7 @@ datasets:
   - identifier: gtfs-schedule-81522
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-du-grand-albigeois-gtfs/20260813-074150/libea-reseau-periurbain.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6817,7 +6817,7 @@ datasets:
   - identifier: gtfs-schedule-79728
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-du-grand-albigeois-gtfs/20260622-084755/libea-reseau-navettes.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6835,7 +6835,7 @@ datasets:
   - identifier: gtfs-schedule-80437
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CC3F"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6866,7 +6866,7 @@ datasets:
   - identifier: gtfs-schedule-81146
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=TIC_INT&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6910,7 +6910,7 @@ datasets:
   - identifier: gtfs-schedule-81066
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=TIC_URB&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6954,7 +6954,7 @@ datasets:
   - identifier: gtfs-schedule-81158
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=ALLOTIC&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -6975,7 +6975,7 @@ datasets:
   - identifier: gtfs-schedule-80655
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/sngo-vernon-les-andelys-seine-normandie-agglo/20261021-143741/pt-th-offer-sngo-gtfs-20261021-862-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7006,7 +7006,7 @@ datasets:
   - identifier: gtfs-schedule-81177
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/giverny-vernon-gare-sncf/20260324-112032/pt-th-offer-sngonavettegiverny-gtfs-20260323-840-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7034,7 +7034,7 @@ datasets:
   - identifier: gtfs-schedule-82166
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-tac-reseau-de-transport-de-grand-chatellerault-2025/20251020-100448/gtfs-tac-20102025-05072026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7062,7 +7062,7 @@ datasets:
   - identifier: gtfs-schedule-84269
     format: gtfs-schedule
     source: "https://gtfs.bus-tracker.fr/vitre.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7073,7 +7073,7 @@ datasets:
   - identifier: gtfs-schedule-84289
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/mova-ensemble-de-loffre-de-transport-collectif/20261105-130701/gtfs-prod-05-11-2026-03-27.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7100,7 +7100,7 @@ datasets:
   - identifier: gtfs-schedule-79865
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=TAM&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7177,7 +7177,7 @@ datasets:
   - identifier: gtfs-schedule-64163
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=agdecapbus68429531"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7205,7 +7205,7 @@ datasets:
   - identifier: gtfs-schedule-84120
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-de-la-societe-de-transport-urbain-du-grand-montauban-semtm/20260831-145529/gtfs-202627-v3.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7227,7 +7227,7 @@ datasets:
   - identifier: gtfs-schedule-82154
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transports-urbains-soissonnais-tus/20260623-072534/transports-urbains-soissonnais-tus-v01-2025-gtfs-2026-06-23-09-23-03.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7253,7 +7253,7 @@ datasets:
   - identifier: gtfs-schedule-83821
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-scolaire-scoltus/20260623-075055/scol-tus-scoltus-v11-gtfs-2026-06-23-09-49-54.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7271,7 +7271,7 @@ datasets:
   - identifier: gtfs-schedule-80751
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-tuc-communaute-dagglomeration-de-cambrai/20260903-092503/rhdf-gtfs-cac-tuc-03092026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7289,7 +7289,7 @@ datasets:
   - identifier: gtfs-schedule-71223
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/ctlb-aix-les-bains/exports/pan.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7325,7 +7325,7 @@ datasets:
   - identifier: gtfs-schedule-84156
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-trema-gtfs/20260821-115049/trema-gtfs-2026-08-21.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7343,7 +7343,7 @@ datasets:
   - identifier: gtfs-schedule-82704
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/bus-pastel-saint-quentin/20251230-130818/gtfs-20251204-171737-sqm.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7361,7 +7361,7 @@ datasets:
   - identifier: gtfs-schedule-79508
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-libellus-gtfs/20260108-095309/08012026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7379,7 +7379,7 @@ datasets:
   - identifier: gtfs-schedule-80457
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CEC"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7406,7 +7406,7 @@ datasets:
   - identifier: gtfs-schedule-83783
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/caux-seine-agglo/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7434,7 +7434,7 @@ datasets:
   - identifier: gtfs-schedule-83762
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-scolaire-lila/20261109-080836/gtfs-20261106-164532-capatlantique.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7512,7 +7512,7 @@ datasets:
   - identifier: gtfs-schedule-82196
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-le-passe-pont-communes-de-couffouleux-et-de-rabastens/20260831-123610/gtfs-passe-pont.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7525,7 +7525,7 @@ datasets:
   - identifier: gtfs-schedule-82583
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-la-navette-commune-de-gaillac/20260831-123430/gtfs-gaillac.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7538,7 +7538,7 @@ datasets:
   - identifier: gtfs-schedule-82584
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-la-navette-commune-de-graulhet/20260831-123536/gtfs-graulhet.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7551,7 +7551,7 @@ datasets:
   - identifier: gtfs-schedule-81535
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-lislenbus-commune-de-lisle-sur-tarn/20260924-144426/gtfs-lisle2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7569,7 +7569,7 @@ datasets:
   - identifier: gtfs-schedule-80445
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LEFIL"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7587,7 +7587,7 @@ datasets:
   - identifier: gtfs-schedule-83042
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-transport-2024/20261013-095421/gtfs-uggo-gtfs-25092026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7615,7 +7615,7 @@ datasets:
   - identifier: gtfs-schedule-80467
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=FORBUS"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7651,7 +7651,7 @@ datasets:
   - identifier: gtfs-schedule-83511
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnee-statistiques-transport/20260828-061127/trans-sud-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7669,7 +7669,7 @@ datasets:
   - identifier: gtfs-schedule-82363
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_bocage_bressuirais-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7691,7 +7691,7 @@ datasets:
   - identifier: gtfs-schedule-72361
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-scolaire-guingamp-paimpol-mobilite/20260827-162143/gpmobi-gtfs-nouveau-reseau-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7727,7 +7727,7 @@ datasets:
   - identifier: gtfs-schedule-80453
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=DEOBUS"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7764,7 +7764,7 @@ datasets:
   - identifier: gtfs-schedule-82155
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/coban-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7782,7 +7782,7 @@ datasets:
   - identifier: gtfs-schedule-82140
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/astrobus-lisieux-normandie/20260914-133425/pt-th-offer-astrobus-gtfs-20260912-304-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7818,7 +7818,7 @@ datasets:
   - identifier: gtfs-schedule-81365
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-bus-urbain-horizon/20231109-153356/gtfs-20231109-115706.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7829,7 +7829,7 @@ datasets:
   - identifier: gtfs-schedule-84169
     format: gtfs-schedule
     source: "https://data.chateauroux-metropole.fr/api/v2/catalog/datasets/reseau-de-bus-urbain_horizon/alternative_exports/gtfs_20260901_zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7847,7 +7847,7 @@ datasets:
   - identifier: gtfs-schedule-79559
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-reseau-zest/20261028-085140/gtfs-prod-28102026-0804.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7883,7 +7883,7 @@ datasets:
   - identifier: gtfs-schedule-84237
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/2268/resource/7220/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7901,7 +7901,7 @@ datasets:
   - identifier: gtfs-schedule-83416
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-yego-macs/20260629-072927/gtfs-yego-ete-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7919,7 +7919,7 @@ datasets:
   - identifier: gtfs-schedule-83725
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=PEAGE_ROUSSILLON&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7937,7 +7937,7 @@ datasets:
   - identifier: gtfs-schedule-82319
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/cobas-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7955,7 +7955,7 @@ datasets:
   - identifier: gtfs-schedule-84185
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navette-estivale-saison-2026/20260819-100745/navettes-ete-2026-v6.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -7973,7 +7973,7 @@ datasets:
   - identifier: gtfs-schedule-79528
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-distribus/20260821-140550/gtfs-20260821-102840-distribus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8009,7 +8009,7 @@ datasets:
   - identifier: gtfs-schedule-82365
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_grand_cognac-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8027,7 +8027,7 @@ datasets:
   - identifier: gtfs-schedule-82545
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-montelibus/20261105-145318/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8063,7 +8063,7 @@ datasets:
   - identifier: gtfs-schedule-82547
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-rlv-mobilites/20260819-074157/gtfs-19-08-2026-05-45.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8099,7 +8099,7 @@ datasets:
   - identifier: gtfs-schedule-78934
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transports-en-commun-de-la-communaute-dagglomeration-de-lauxerrois/20260706-062350/gtfs-mdma.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8136,7 +8136,7 @@ datasets:
   - identifier: gtfs-schedule-81227
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/versions-des-horaires-theoriques-des-lignes-du-reseau-de-bus-au-format-gtfs/20260907-053329/gtfs-2026-09-v2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8157,7 +8157,7 @@ datasets:
   - identifier: gtfs-schedule-83126
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-scolaire-redon-agglomeration-format-gtfs/20261002-085210/gtfs-20260830220846z.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8170,7 +8170,7 @@ datasets:
   - identifier: gtfs-schedule-83512
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-de-redon-agglomeration/20251017-090411/518-20251014.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8188,7 +8188,7 @@ datasets:
   - identifier: gtfs-schedule-82291
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/LINEOTIM_Complet.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8206,7 +8206,7 @@ datasets:
   - identifier: gtfs-schedule-83893
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/4682/resource/6530/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8224,7 +8224,7 @@ datasets:
   - identifier: gtfs-schedule-83315
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-ca2bm-a-compter-du-1er-juin-2025/20260715-075301/ca2bm-lignes-regulieres-v32-ter-modif-gtfs-gtfs-2026-07-15-09-48-30.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8242,7 +8242,7 @@ datasets:
   - identifier: gtfs-schedule-82367
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_rochefort_ocean-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8264,7 +8264,7 @@ datasets:
   - identifier: gtfs-schedule-83839
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/moulins/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8292,7 +8292,7 @@ datasets:
   - identifier: gtfs-schedule-83789
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transport-en-commun-trans-agglo-de-dlva/20260107-075252/gtfs-695e0e00e75be-0701.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8303,7 +8303,7 @@ datasets:
   - identifier: gtfs-schedule-83291
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/3941/resource/5123/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8321,7 +8321,7 @@ datasets:
   - identifier: gtfs-schedule-84112
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=OYONNAX&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8339,7 +8339,7 @@ datasets:
   - identifier: gtfs-schedule-84148
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-du-reseau-tgl/20260813-140904/septembre-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8376,7 +8376,7 @@ datasets:
   - identifier: gtfs-schedule-83396
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-arc-en-ciel-secteur-nord-perimetre-caudresis-catesis/20260907-063629/rhdf-gtfs-com-sco-59-p3b.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8394,7 +8394,7 @@ datasets:
   - identifier: gtfs-schedule-80469
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CABUS"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8412,7 +8412,7 @@ datasets:
   - identifier: gtfs-schedule-83326
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-urbain-du-reseau-amelys-gtfs/20260817-092242/gtfs-standard-06-07-2026-04-07-2027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8430,7 +8430,7 @@ datasets:
   - identifier: gtfs-schedule-83962
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/via-bastia-1/20260925-065602/viabastia-viabastia-v8-7-gtfs-2026-09-24-15-47-48.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8448,7 +8448,7 @@ datasets:
   - identifier: gtfs-schedule-84135
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=ARLYSERE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8466,7 +8466,7 @@ datasets:
   - identifier: gtfs-schedule-81648
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=PASSTHELLE&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8477,7 +8477,7 @@ datasets:
   - identifier: gtfs-schedule-81068
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=PASSTHELLE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8526,7 +8526,7 @@ datasets:
   - identifier: gtfs-schedule-82373
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_bergeracoise-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8544,7 +8544,7 @@ datasets:
   - identifier: gtfs-schedule-82370
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_val_de_garonne-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8569,7 +8569,7 @@ datasets:
   - identifier: gtfs-schedule-12601
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=buss-cdasaintes"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8591,7 +8591,7 @@ datasets:
   - identifier: gtfs-schedule-82375
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_saintes-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8609,7 +8609,7 @@ datasets:
   - identifier: gtfs-schedule-84230
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-topaz/20261106-080234/gtfs-20261106a-topostudio.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8627,7 +8627,7 @@ datasets:
   - identifier: gtfs-schedule-81898
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-du-reseau-de-bus-intercom-3/20260916-151944/gtfs-20260916-171451-open-data.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8645,7 +8645,7 @@ datasets:
   - identifier: gtfs-schedule-84114
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-et-reel-du-reseau-maelis-montlucon-communaute-gtfs/20260903-080657/gtfs-2026-08-31-au-2027-01-03.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8692,7 +8692,7 @@ datasets:
   - identifier: gtfs-schedule-84226
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=TAIN_TOURNON&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8710,7 +8710,7 @@ datasets:
   - identifier: gtfs-schedule-84043
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/uba-horaires-navettes-maritimes/20260522-125551/uniondes-arcachon-fr-3-.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8728,7 +8728,7 @@ datasets:
   - identifier: gtfs-schedule-81421
     format: gtfs-schedule
     source: "https://mobi-iti-pdl.okina.fr/static/mobiiti_les_sables_d_olonne/gtfs_imported-id_oleane.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8746,7 +8746,7 @@ datasets:
   - identifier: gtfs-schedule-83418
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-couralin-grand-dax-1/20260629-073939/gtfs-dax-couralin.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8764,7 +8764,7 @@ datasets:
   - identifier: gtfs-schedule-80671
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/tbk/exports/export-pan.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8800,7 +8800,7 @@ datasets:
   - identifier: gtfs-schedule-83020
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-transport-urbain-du-nord-grande-terre-1/20260128-152453/urbaincangtv7-v73-gtfs-20260127.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8818,7 +8818,7 @@ datasets:
   - identifier: gtfs-schedule-81643
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/cherpa-horaires-lignes-regulieres/20251218-155013/gtfs-cherpa-20251215-au-20260831.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8845,7 +8845,7 @@ datasets:
   - identifier: gtfs-schedule-81175
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-du-reseau-urbain-agglobus-et-de-transports-scolaires-gtfs/20260828-083337/gtfs-rodezagglo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8863,7 +8863,7 @@ datasets:
   - identifier: gtfs-schedule-64280
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-surf/20260921-083431/gtfs-20260921-103347-surf.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8899,7 +8899,7 @@ datasets:
   - identifier: gtfs-schedule-82377
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_du_marsan-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8917,7 +8917,7 @@ datasets:
   - identifier: gtfs-schedule-80477
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=SDZ"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8935,7 +8935,7 @@ datasets:
   - identifier: gtfs-schedule-81058
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=CYPRE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -8984,7 +8984,7 @@ datasets:
   - identifier: gtfs-schedule-83394
     format: gtfs-schedule
     source: "https://app.pysae.com/api/v2/groups/cavaillon/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9012,7 +9012,7 @@ datasets:
   - identifier: gtfs-schedule-81254
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transport-du-grand-dole/20260902-113949/gtfs-dole.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9048,7 +9048,7 @@ datasets:
   - identifier: gtfs-schedule-80221
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-du-reseau-lyneo/20261016-144048/gtfs-reseau-lyneo-16-10-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9066,7 +9066,7 @@ datasets:
   - identifier: gtfs-schedule-84161
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-transport-urbain-de-bernay/20260828-125028/gtfs-ibus-2026-2027-v2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9077,7 +9077,7 @@ datasets:
   - identifier: gtfs-schedule-83775
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-transport-urbain-de-bernay/20251114-113532/horaires-ibus-2025-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9104,7 +9104,7 @@ datasets:
   - identifier: gtfs-schedule-84136
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=AURILLAC&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9122,7 +9122,7 @@ datasets:
   - identifier: gtfs-schedule-83793
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-fablio-lignes-regulieres/20260108-145743/gtfs-2026-fablio.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9140,7 +9140,7 @@ datasets:
   - identifier: gtfs-schedule-82097
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain/20261105-154222/tu-v2.4-15062026-31082027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9158,7 +9158,7 @@ datasets:
   - identifier: gtfs-schedule-83277
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=RIV"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9188,7 +9188,7 @@ datasets:
   - identifier: gtfs-schedule-82094
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-nemus/20260722-100829/gtfs-au-100726.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9219,7 +9219,7 @@ datasets:
   - identifier: gtfs-schedule-83782
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-theoriques-du-reseau-urbain-de-flers-agglo-au-format-gtfs/20260414-121512/nemus-gtfs-du-01-01-26-au-31-12-26.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9255,7 +9255,7 @@ datasets:
   - identifier: gtfs-schedule-82832
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/vendome/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9283,7 +9283,7 @@ datasets:
   - identifier: gtfs-schedule-81476
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/CORALIE.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9301,7 +9301,7 @@ datasets:
   - identifier: gtfs-schedule-83852
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-et-gtfs-rt/20260913-175023/gtfs-lunel-agglo-reseau-ole-2026-vseptembre.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9339,7 +9339,7 @@ datasets:
   - identifier: gtfs-schedule-82413
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TRANSAVOLD"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9369,7 +9369,7 @@ datasets:
   - identifier: gtfs-schedule-84186
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/4680/resource/6527/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9382,7 +9382,7 @@ datasets:
   - identifier: gtfs-schedule-84187
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/4681/resource/6528/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9400,7 +9400,7 @@ datasets:
   - identifier: gtfs-schedule-81547
     format: gtfs-schedule
     source: "https://gtfs-rt.infra-hubup.fr/cagtd/current/gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9442,7 +9442,7 @@ datasets:
   - identifier: gtfs-schedule-82660
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transport-de-la-c-a-beaune-cote-sud-gtfs/20251230-134445/gtfs-30-12-2025-04-15.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9482,7 +9482,7 @@ datasets:
   - identifier: gtfs-schedule-83872
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-scolaire-coqueligo-annonay-rhone-agglo/20260831-123340/coqueligo-coqueligo-scolaire-2026-2027-v1-test-gtfs-2026-08-31-14-32-27.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9495,7 +9495,7 @@ datasets:
   - identifier: gtfs-schedule-83716
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-transport-urbain-coqueligo/20261012-142943/gtfs071026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9526,7 +9526,7 @@ datasets:
   - identifier: gtfs-schedule-83891
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-de-transport-tmco-3co-mayotte/20260306-070138/gtfs-tmco-3co-2026-02-01-v2.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9544,7 +9544,7 @@ datasets:
   - identifier: gtfs-schedule-81459
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/ARBUS.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9572,7 +9572,7 @@ datasets:
   - identifier: gtfs-schedule-81367
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transport-urbains-dignois/20240603-092831/rtud-v8-gtfs-2024-06-03-11-20-05.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9583,7 +9583,7 @@ datasets:
   - identifier: gtfs-schedule-83915
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transport-urbains-dignois/20260317-131818/rtud-v16-gtfs-2026-03-17-14-14-15.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9601,7 +9601,7 @@ datasets:
   - identifier: gtfs-schedule-84205
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ligne-reguliere-du-parc-dactivites-du-val-drouette-pem/20260921-131312/ligne-regu-pem-ccpeif-210926.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9619,7 +9619,7 @@ datasets:
   - identifier: gtfs-schedule-82189
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/elios-transports-urbains-du-grand-villeneuvois/20260902-071802/gtfs-20260826-144746-vsl.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9655,7 +9655,7 @@ datasets:
   - identifier: gtfs-schedule-82312
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/cosibus-coutances-mer-et-bocage/20260825-072316/pt-th-offer-cosibus-gtfs-20260619-696-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9673,7 +9673,7 @@ datasets:
   - identifier: gtfs-schedule-81555
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/montesquieu-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9691,7 +9691,7 @@ datasets:
   - identifier: gtfs-schedule-83578
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-rentree/20261012-161539/gtfs-26-27-arvi.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9709,7 +9709,7 @@ datasets:
   - identifier: gtfs-schedule-80443
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=EPY"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9736,7 +9736,7 @@ datasets:
   - identifier: gtfs-schedule-80680
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/deepmob-dieppe-maritime/20261021-122019/pt-th-offer-deepmob-gtfs-20261021-304-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9776,7 +9776,7 @@ datasets:
   - identifier: gtfs-schedule-83769
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/tiva-scolaire-secondaires-intravire-intercom-de-la-vire-au-noireau-2025-2026/20251217-180553/sco.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9789,7 +9789,7 @@ datasets:
   - identifier: gtfs-schedule-83846
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/tiva-urbain-reseau-urbain-a-vire-intercom-de-la-vire-au-noireau-2025-2026/20260102-153237/urbain.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9802,7 +9802,7 @@ datasets:
   - identifier: gtfs-schedule-83770
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/tiva-a-la-demande-service-de-transport-a-la-demande-intercom-de-la-vire-au-noireau-2025-2026/20251208-170106/tiva-a-la-demande.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9820,7 +9820,7 @@ datasets:
   - identifier: gtfs-schedule-81179
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-pondibus/20260831-063718/gtfs-20260828-174753-pondibus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9851,7 +9851,7 @@ datasets:
   - identifier: gtfs-schedule-82874
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/le-taco-1/20260901-091118/gtfs-le-taco-28082026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9874,7 +9874,7 @@ datasets:
   - identifier: gtfs-schedule-84190
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/lr-coeurduvar/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9902,7 +9902,7 @@ datasets:
   - identifier: gtfs-schedule-79551
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-transport-en-commun-du-reseau-transpor-gtfs/20220701-115247/transp-or-ete-v1-gtfs-2022-06-30-17-38-32.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9913,7 +9913,7 @@ datasets:
   - identifier: gtfs-schedule-84099
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-transport-en-commun-du-reseau-transpor-gtfs/20260831-193302/transp-or-hiver-2026-2027-v2-enchainement-l3-gtfs-2026-08-31-21-32-35.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9950,7 +9950,7 @@ datasets:
   - identifier: gtfs-schedule-82721
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/neva-granville-terre-et-mer/20261028-100224/neva.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -9996,7 +9996,7 @@ datasets:
   - identifier: gtfs-schedule-82715
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-tcvo/20260819-133020/gtfs-20260819-151006-tcvo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10032,7 +10032,7 @@ datasets:
   - identifier: gtfs-schedule-80447
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=ISIBUS"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10050,7 +10050,7 @@ datasets:
   - identifier: gtfs-schedule-81042
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=CCAC&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10099,7 +10099,7 @@ datasets:
   - identifier: gtfs-schedule-84105
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/cbus-5/20260908-065922/cbus-current.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10117,7 +10117,7 @@ datasets:
   - identifier: gtfs-schedule-80463
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=MOVIA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10144,7 +10144,7 @@ datasets:
   - identifier: gtfs-schedule-79274
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-interurbain-et-scolaire-de-la-communaute-dagglomeration-privas-centre-ardeche/20240830-054117/t-cap-dsp24-gtfs-2024-08-30-07-35-58.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10155,7 +10155,7 @@ datasets:
   - identifier: gtfs-schedule-81342
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-interurbain-et-scolaire-de-la-communaute-dagglomeration-privas-centre-ardeche/20260918-122939/gtfs-scolaire-v1-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10166,7 +10166,7 @@ datasets:
   - identifier: gtfs-schedule-79272
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-interurbain-et-scolaire-de-la-communaute-dagglomeration-privas-centre-ardeche/20260918-123000/gtfs-dsp-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10184,7 +10184,7 @@ datasets:
   - identifier: gtfs-schedule-80403
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LAN"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10202,7 +10202,7 @@ datasets:
   - identifier: gtfs-schedule-80410
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CHT"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10220,7 +10220,7 @@ datasets:
   - identifier: gtfs-schedule-82379
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/ca_tulle-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10242,7 +10242,7 @@ datasets:
   - identifier: gtfs-schedule-83746
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-du-reseau-evad-1/20251209-123614/gtfs-scolaire.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10253,7 +10253,7 @@ datasets:
   - identifier: gtfs-schedule-80973
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-du-reseau-evad-1/20261110-115534/20261106-gtfs-evad.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10281,7 +10281,7 @@ datasets:
   - identifier: gtfs-schedule-84278
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-gtfs-du-reseau-de-transports-public-du-grand-cahors/20261102-074644/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10299,7 +10299,7 @@ datasets:
   - identifier: gtfs-schedule-80707
     format: gtfs-schedule
     source: "https://s3.eu-west-1.amazonaws.com/files.orchestra.ratpdev.com/networks/tul-gares/exports/medias.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10317,7 +10317,7 @@ datasets:
   - identifier: gtfs-schedule-79859
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=SAONIBUS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10345,7 +10345,7 @@ datasets:
   - identifier: gtfs-schedule-81255
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/e91ff63e-2c15-4c86-8e69-499ceec7bd97"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10373,7 +10373,7 @@ datasets:
   - identifier: gtfs-schedule-83509
     format: gtfs-schedule
     source: "https://app.pysae.com/api/v2/groups/luneo/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10401,7 +10401,7 @@ datasets:
   - identifier: gtfs-schedule-80465
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LEBUS"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10428,7 +10428,7 @@ datasets:
   - identifier: gtfs-schedule-84235
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ligne-de-bus-obc/20260928-125845/gtfs-obc1-hiver-2026-2027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10446,7 +10446,7 @@ datasets:
   - identifier: gtfs-schedule-83853
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/cc_sud_gironde-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10468,7 +10468,7 @@ datasets:
   - identifier: gtfs-schedule-80475
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=LESIT"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10486,7 +10486,7 @@ datasets:
   - identifier: gtfs-schedule-84228
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=auch-alliance"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10514,7 +10514,7 @@ datasets:
   - identifier: gtfs-schedule-84245
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/bus-plm/20260922-120359/plm.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10532,7 +10532,7 @@ datasets:
   - identifier: gtfs-schedule-83756
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-3/20261020-040031/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10550,7 +10550,7 @@ datasets:
   - identifier: gtfs-schedule-81651
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=SABLONS&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10561,7 +10561,7 @@ datasets:
   - identifier: gtfs-schedule-81070
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=SABLONS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10610,7 +10610,7 @@ datasets:
   - identifier: gtfs-schedule-82311
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ficibus-fecamp-caux-littoral/20260820-084152/pt-th-offer-ficibus-gtfs-20260819-833-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10664,7 +10664,7 @@ datasets:
   - identifier: gtfs-schedule-82554
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-le-vib/20260806-083754/gtfs-20260805-151415-levib-hb-pan-du-01-08-26-au-31-07-27.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10709,7 +10709,7 @@ datasets:
   - identifier: gtfs-schedule-81056
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=LEBUS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10720,7 +10720,7 @@ datasets:
   - identifier: gtfs-schedule-81652
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=LEBUS&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10772,7 +10772,7 @@ datasets:
   - identifier: gtfs-schedule-84277
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navespace/20261030-125359/gtfs-navespace.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10785,7 +10785,7 @@ datasets:
   - identifier: gtfs-schedule-84276
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/montbus-transport-bus-montmelian/20261030-124634/gtfs-montbus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10803,7 +10803,7 @@ datasets:
   - identifier: gtfs-schedule-80401
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=CCSelestat"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10830,7 +10830,7 @@ datasets:
   - identifier: gtfs-schedule-84032
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=THIERS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10848,7 +10848,7 @@ datasets:
   - identifier: gtfs-schedule-83533
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/cc_du_thouarsais-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10870,7 +10870,7 @@ datasets:
   - identifier: gtfs-schedule-83383
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/arrets-lignes-regulieres-reseau-de-transport-urbain-a-autun/20251030-071946/ligne-a-autun-ca-roule.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10888,7 +10888,7 @@ datasets:
   - identifier: gtfs-schedule-81034
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=TOHM&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10937,7 +10937,7 @@ datasets:
   - identifier: gtfs-schedule-82415
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/ecla-lons-agglo-mobilites/20250507-095356/gtfs-ecla-l1-l2-l3-l4-07-05-2025.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10955,7 +10955,7 @@ datasets:
   - identifier: gtfs-schedule-80441
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TUB"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -10982,7 +10982,7 @@ datasets:
   - identifier: gtfs-schedule-82315
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/argentanbus-argentan-intercom/20261013-130328/pt-th-offer-argentanbus-gtfs-20261013-303-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11000,7 +11000,7 @@ datasets:
   - identifier: gtfs-schedule-80092
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/offre-de-transports-jybus-a-rumilly/20260807-132033/gtfs-jybus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11046,7 +11046,7 @@ datasets:
   - identifier: gtfs-schedule-84024
     format: gtfs-schedule
     source: "https://data.loire-atlantique.fr/api/v2/catalog/datasets/224400028_horaires-bacs-loire-en-loire-atlantique-gtfs/alternative_exports/gtfs_bac_loire2026_zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11064,7 +11064,7 @@ datasets:
   - identifier: gtfs-schedule-82310
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/le-bus-pont-audemer-val-de-risle/20250819-074312/pt-th-offer-lebus-gtfs-20250812-817-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11082,7 +11082,7 @@ datasets:
   - identifier: gtfs-schedule-25381
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-lagglo-bus-de-lagglo-foix-varilhes/20251217-143135/gtfs-1er-decembre2025.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11100,7 +11100,7 @@ datasets:
   - identifier: gtfs-schedule-83982
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/cc_aunis_atlantique-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11118,7 +11118,7 @@ datasets:
   - identifier: gtfs-schedule-81222
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-du-reseau-moova-communaute-dagglomeration-de-vesoul-gtfs/20260827-074354/gtfs-moova.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11154,7 +11154,7 @@ datasets:
   - identifier: gtfs-schedule-81557
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/jalle_eau_bourde-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11172,7 +11172,7 @@ datasets:
   - identifier: gtfs-schedule-81054
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=LIBBUS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11221,7 +11221,7 @@ datasets:
   - identifier: gtfs-schedule-81539
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navettes-de-loire-forez-agglomeration/20260825-065034/navettes-urbaines-lfa.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11239,7 +11239,7 @@ datasets:
   - identifier: gtfs-schedule-79151
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-brevibus/20260818-131256/gtfs-20260724-163855-brevibus-hors-bord-ete26hiver2627.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11267,7 +11267,7 @@ datasets:
   - identifier: gtfs-schedule-83311
     format: gtfs-schedule
     source: "https://maxime-siret.github.io/gtfs-sailcoop/latest.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11285,7 +11285,7 @@ datasets:
   - identifier: gtfs-schedule-84279
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=filbussaintmaixent"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11313,7 +11313,7 @@ datasets:
   - identifier: gtfs-schedule-83978
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/fiches-horaires-reseau-urbain-mio-ccmillaugrandscausses/20260414-150442/gtfs-mio-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11331,7 +11331,7 @@ datasets:
   - identifier: gtfs-schedule-82689
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-de-mobilite/20260107-150213/gtfs-20260105-090453-villeo.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11349,7 +11349,7 @@ datasets:
   - identifier: gtfs-schedule-82907
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=SELVERM"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11385,7 +11385,7 @@ datasets:
   - identifier: gtfs-schedule-83981
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transmanche-ferries/20260416-090353/pt-th-offer-transmanche-gtfs-20260401-727-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11403,7 +11403,7 @@ datasets:
   - identifier: gtfs-schedule-79483
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/agglobus/20260821-085940/260821.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11421,7 +11421,7 @@ datasets:
   - identifier: gtfs-schedule-83155
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/tad-arrens-marsous-lourdes/20260224-074253/gtfs-ccpvg-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11439,7 +11439,7 @@ datasets:
   - identifier: gtfs-schedule-79537
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-reso/20261029-105320/gtfs-20261029-104515-reso.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11467,7 +11467,7 @@ datasets:
   - identifier: gtfs-schedule-82388
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TMM"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11485,7 +11485,7 @@ datasets:
   - identifier: gtfs-schedule-80772
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=TIV"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11512,7 +11512,7 @@ datasets:
   - identifier: gtfs-schedule-82711
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/hobus-honfleur/20261020-121314/pt-th-offer-hobus-gtfs-20261019-945-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11558,7 +11558,7 @@ datasets:
   - identifier: gtfs-schedule-81975
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/vikibus-yvetot-normandie/20261013-130530/pt-th-offer-vikibus-gtfs-20261013-859-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11604,7 +11604,7 @@ datasets:
   - identifier: gtfs-schedule-79864
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=MONTLUEL&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11622,7 +11622,7 @@ datasets:
   - identifier: gtfs-schedule-83859
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/coeur-de-loire/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11650,7 +11650,7 @@ datasets:
   - identifier: gtfs-schedule-79810
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=COLIBRI&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11678,7 +11678,7 @@ datasets:
   - identifier: gtfs-schedule-82309
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/moca-communaute-de-communes-caux-austreberthe/20261012-072433/pt-th-offer-moca-gtfs-20261008-615-opendata.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11734,7 +11734,7 @@ datasets:
   - identifier: gtfs-schedule-83921
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?provider=LELIBELLULE&dataFormat=gtfs"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11745,7 +11745,7 @@ datasets:
   - identifier: gtfs-schedule-83922
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=LELIBELLULE&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11802,7 +11802,7 @@ datasets:
   - identifier: gtfs-schedule-82150
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-cvlmobilite-plan-de-transport-theorique-ligne-a-format-gtfs/20260830-074645/cvlm-lignea-31082026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11833,7 +11833,7 @@ datasets:
   - identifier: gtfs-schedule-83189
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-cvlmobilite-plan-de-transport-theorique-la-navette-lete-a-chinon-format-gtfs/20260522-144310/lanavette-leteachinon-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11861,7 +11861,7 @@ datasets:
   - identifier: gtfs-schedule-79814
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/horaires-theoriques-du-reseau-neobus-communaute-de-communes-de-louest-vosgien-gtfs/20251231-083603/gtfs-sadap-neobus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11879,7 +11879,7 @@ datasets:
   - identifier: gtfs-schedule-80439
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=Obernai"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11906,7 +11906,7 @@ datasets:
   - identifier: gtfs-schedule-81455
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-de-transport-en-commun-reseau-altigo-communaute-de-communes-du-brianconnais-format-gtfs/20260929-154029/gtfs-altigo-rentre-26-27-v7.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11924,7 +11924,7 @@ datasets:
   - identifier: gtfs-schedule-83531
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AO/ISSOUDUN.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11953,7 +11953,7 @@ datasets:
   - identifier: gtfs-schedule-84055
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/aravis-bus-hiver-2025-2026/20260605-061348/export-gtfs-aravis-ete-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11971,7 +11971,7 @@ datasets:
   - identifier: gtfs-schedule-81927
     format: gtfs-schedule
     source: "https://www.korrigo.bzh/ftp/OPENDATA/TUDBUS.gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -11989,7 +11989,7 @@ datasets:
   - identifier: gtfs-schedule-81519
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/offre-tc/download?provider=HOPLA&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12000,7 +12000,7 @@ datasets:
   - identifier: gtfs-schedule-81649
     format: gtfs-schedule
     source: "https://api.oisemob.cityway.fr/dataflow/tad/download?Provider=HOPLA&dataFormat=gtfs&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12049,7 +12049,7 @@ datasets:
   - identifier: gtfs-schedule-80253
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain-du-bassin/20230102-111115/transports-urbains-du-bassin-version-2-4-gtfs-2023-01-02-10-36-49.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12060,7 +12060,7 @@ datasets:
   - identifier: gtfs-schedule-22408
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain-du-bassin/20200805-161154/transports-urbains-du-bassin-version-1-3-gtfs-2020-07-30-17-59-13.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12071,7 +12071,7 @@ datasets:
   - identifier: gtfs-schedule-11492
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain-du-bassin/20250217-154406/transports-urbains-du-bassin-version-2-6-gtfs-2024-12-16-11-39-36.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12089,7 +12089,7 @@ datasets:
   - identifier: gtfs-schedule-8597
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=iledere75923021"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12119,7 +12119,7 @@ datasets:
   - identifier: gtfs-schedule-84030
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navette-chorges-chanteloube-ete-2026-reseau-vai/20260515-073127/navette-vai-chorges-baie-de-chanteloube-ete-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12132,7 +12132,7 @@ datasets:
   - identifier: gtfs-schedule-84175
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-vai-embrun/20260818-144546/transports-vai-embrun-2026-2027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12150,7 +12150,7 @@ datasets:
   - identifier: gtfs-schedule-83736
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navettes-stations-hiver-2025-2026-reseau-vai/20251230-085133/navettes-stations-vai-hiver-2025-2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12168,7 +12168,7 @@ datasets:
   - identifier: gtfs-schedule-83633
     format: gtfs-schedule
     source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=MOBIVALS&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12186,7 +12186,7 @@ datasets:
   - identifier: gtfs-schedule-83203
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/biscabus/20260629-080019/gtfs-biscabus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12204,7 +12204,7 @@ datasets:
   - identifier: gtfs-schedule-83258
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain-3cma-bus/20260630-183023/2026-07-01-3cmabus.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12222,7 +12222,7 @@ datasets:
   - identifier: gtfs-schedule-82663
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-reseau-chamonix-mobilite/20260924-142752/gtfsautomnechx2026.2026.08.07.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12250,7 +12250,7 @@ datasets:
   - identifier: gtfs-schedule-83528
     format: gtfs-schedule
     source: "https://fr.ftp.opendatasoft.com/centrevaldeloire/OKINAGTFS/GTFS_AO/AMBOISE.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12268,7 +12268,7 @@ datasets:
   - identifier: gtfs-schedule-12608
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=maybus"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12298,7 +12298,7 @@ datasets:
   - identifier: gtfs-schedule-83312
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-digo-cote-landes-nature/20250805-083958/gtfs-cote-landes-nature.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12311,7 +12311,7 @@ datasets:
   - identifier: gtfs-schedule-83870
     format: gtfs-schedule
     source: "https://www.pigma.org/public/opendata/nouvelle_aquitaine_mobilites/publication/digo-aggregated-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12329,7 +12329,7 @@ datasets:
   - identifier: gtfs-schedule-8487
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=MAX"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12365,7 +12365,7 @@ datasets:
   - identifier: gtfs-schedule-81867
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/keolis-hH93/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12388,7 +12388,7 @@ datasets:
   - identifier: gtfs-schedule-81870
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/cavalaire-h/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12411,7 +12411,7 @@ datasets:
   - identifier: gtfs-schedule-81873
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/cavalaire-h/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12434,7 +12434,7 @@ datasets:
   - identifier: gtfs-schedule-81866
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/suma-22ua/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12457,7 +12457,7 @@ datasets:
   - identifier: gtfs-schedule-81863
     format: gtfs-schedule
     source: "https://pysae.com/api/v2/groups/croix-valmer/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12480,7 +12480,7 @@ datasets:
   - identifier: gtfs-schedule-81773
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/st-tropez/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12503,7 +12503,7 @@ datasets:
   - identifier: gtfs-schedule-81772
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/keolis-yr25/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12526,7 +12526,7 @@ datasets:
   - identifier: gtfs-schedule-81858
     format: gtfs-schedule
     source: "https://pysae.com/api/v2/groups/rayol-canadel/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12559,7 +12559,7 @@ datasets:
   - identifier: gtfs-schedule-80471
     format: gtfs-schedule
     source: "https://api.grandest2.cityway.fr/exs/GTFS?Key=OPENDATA&OperatorCode=SMD"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12577,7 +12577,7 @@ datasets:
   - identifier: gtfs-schedule-84234
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-villefranche-de-rouergue/20261009-132108/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12595,7 +12595,7 @@ datasets:
   - identifier: gtfs-schedule-82997
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-transport-horaires-des-lignes-de-la-communaute-dile-rousse-balagne-a-balanina/20250627-205558/a-balanina.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12616,7 +12616,7 @@ datasets:
   - identifier: gtfs-schedule-84087
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=lavaur"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12639,7 +12639,7 @@ datasets:
   - identifier: gtfs-schedule-84089
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=saint-sulpice-la-pointe"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12667,7 +12667,7 @@ datasets:
   - identifier: gtfs-schedule-34265
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=oloron"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12694,7 +12694,7 @@ datasets:
   - identifier: gtfs-schedule-82619
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/parthenay/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12723,7 +12723,7 @@ datasets:
   - identifier: gtfs-schedule-11725
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=figeac"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12750,7 +12750,7 @@ datasets:
   - identifier: gtfs-schedule-79576
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-urbain-nosbus/20260720-151436/gtfs-nosbus-20260720-85-a-bord-hors-bord.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12778,7 +12778,7 @@ datasets:
   - identifier: gtfs-schedule-84176
     format: gtfs-schedule
     source: "https://api.pysae.com/api/v4/groups/noirmoutiers/gtfs/pub"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12806,7 +12806,7 @@ datasets:
   - identifier: gtfs-schedule-79992
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=Sarlat"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12833,7 +12833,7 @@ datasets:
   - identifier: gtfs-schedule-14652
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=bigorre-mongie"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12860,7 +12860,7 @@ datasets:
   - identifier: gtfs-schedule-82604
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/reseau-de-transports-collectifs-de-la-ccgq/20260817-083208/gtfsv1.7.4.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12878,7 +12878,7 @@ datasets:
   - identifier: gtfs-schedule-84068
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=speluncaliamone"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12912,7 +12912,7 @@ datasets:
   - identifier: gtfs-schedule-83848
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/funiculaire-des-arcs/20261013-070047/gtfs-22-09-2026-funiculaire-ads.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12925,7 +12925,7 @@ datasets:
   - identifier: gtfs-schedule-84133
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navettes-la-rosiere/20260703-071037/gtfs-navettes-la-rosiere-ete2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12938,7 +12938,7 @@ datasets:
   - identifier: gtfs-schedule-83626
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navettes-bourg-saint-maurice/20260908-133753/gtfs-07-09-2026-08-00.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12951,7 +12951,7 @@ datasets:
   - identifier: gtfs-schedule-83627
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=tignes"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -12973,7 +12973,7 @@ datasets:
   - identifier: gtfs-schedule-83629
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=valdisere"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13000,7 +13000,7 @@ datasets:
   - identifier: gtfs-schedule-83467
     format: gtfs-schedule
     source: "https://www.datasud.fr/fr/dataset/datasets/4311/resource/5843/download/"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13028,7 +13028,7 @@ datasets:
   - identifier: gtfs-schedule-81549
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/les-navettes-du-giffre-horaires-hiver-2023-2024/20240119-105247/gtfs-les-navettes-du-giffre-2024-v1-valide-pan.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13046,7 +13046,7 @@ datasets:
   - identifier: gtfs-schedule-82641
     format: gtfs-schedule
     source: "https://www.data.gouv.fr/api/1/datasets/r/b57c66f2-ecaf-4934-a530-753bcb8aad04"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13064,7 +13064,7 @@ datasets:
   - identifier: gtfs-schedule-83642
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navette-pontorson-le-mont-saint-michel/20261109-142453/montstmichelmaj.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13082,7 +13082,7 @@ datasets:
   - identifier: gtfs-schedule-83787
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/skibus-vallee-des-belleville/20260701-134857/gtfs-prod-28062026-0322-4.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13100,7 +13100,7 @@ datasets:
   - identifier: gtfs-schedule-84102
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/skibus-courchevel-hiver/20260703-154441/gtfs-prod-03072026-1051-1.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13118,7 +13118,7 @@ datasets:
   - identifier: gtfs-schedule-84204
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/remontees-mecaniques-courchevel/20260615-062405/gtfs-remontees-au-depart-courchevel-ete2026.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13136,7 +13136,7 @@ datasets:
   - identifier: gtfs-schedule-83744
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/transport-urbain-par-cable-hiver-2025-26/20251211-092237/rmu-courchevel-20251210.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13154,7 +13154,7 @@ datasets:
   - identifier: gtfs-schedule-83989
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-les-2alpes-saison-hiver-2025-2026/20260427-083045/gtfs-2-alpes-intersaison-jack.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13165,7 +13165,7 @@ datasets:
   - identifier: gtfs-schedule-83810
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/gtfs-les-2alpes-saison-hiver-2025-2026/20260602-132501/gtfs-navette-annuelle-2-alpes.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13183,7 +13183,7 @@ datasets:
   - identifier: gtfs-schedule-82682
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/meribus-hiver/20260619-102403/gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13201,7 +13201,7 @@ datasets:
   - identifier: gtfs-schedule-78387
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=alpe-huez"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13228,7 +13228,7 @@ datasets:
   - identifier: gtfs-schedule-83994
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/telecabine-eau-dolle-express-allemond-oz/20260831-084938/gtfs-telecabine-eau-dolle-express-hiver-2026-avril-2027.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13246,7 +13246,7 @@ datasets:
   - identifier: gtfs-schedule-84203
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/navette-colette-savoie-les-saisies/20260609-175152/colette-gtfs.zip"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true
@@ -13264,7 +13264,7 @@ datasets:
   - identifier: gtfs-schedule-12616
     format: gtfs-schedule
     source: "https://zenbus.net/gtfs/static/download.zip?dataset=valmorel"
-    datasetsize: medium
+    datasetsize: small
     supportedobjects:
       stops: true
       services: true

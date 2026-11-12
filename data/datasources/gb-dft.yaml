@@ -124805,13 +124805,14 @@ datasets:
 - identifier: naptan
   format: gb-naptan
   source: "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
+  datasetsize: large
   supportedobjects:
     stops: true
     stopgroups: true
 - identifier: bods-gtfs-schedule-east-anglia
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_anglia/"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     services: true
     journeys: true
@@ -124825,7 +124826,7 @@ datasets:
 - identifier: bods-gtfs-schedule-east-midlands
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/east_midlands/"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     services: true
     journeys: true
@@ -124853,7 +124854,7 @@ datasets:
 - identifier: bods-gtfs-schedule-north-east
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/north_east/"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     services: true
     journeys: true
@@ -124923,7 +124924,7 @@ datasets:
 - identifier: bods-gtfs-schedule-wales
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/wales/"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     services: true
     journeys: true
@@ -124952,7 +124953,7 @@ datasets:
   format: gtfs-schedule
   source: "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/yorkshire/"
   # source: "/Users/aaronclaydon/Downloads/itm_yorkshire_gtfs.zip"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     services: true
     journeys: true

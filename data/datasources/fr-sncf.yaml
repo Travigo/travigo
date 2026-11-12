@@ -7,7 +7,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://eu.ftp.opendatasoft.com/sncf/plandata/Export_OpenData_SNCF_GTFS_NewTripId.zip"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     stops: true
     services: true

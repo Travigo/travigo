@@ -8,7 +8,7 @@ datasets:
 - identifier: gtfs-schedule
   format: gtfs-schedule
   source: "https://gtfs-static.translink.ca/gtfs/google_transit.zip"
-  datasetsize: large
+  datasetsize: medium
   supportedobjects:
     stops: true
     services: true

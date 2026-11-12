@@ -7,6 +7,7 @@ datasets:
 - identifier: corpus
   format: gb-networkrailcorpus
   source: "https://publicdatafeeds.networkrail.co.uk/ntrod/SupportingFileAuthenticate?type=CORPUS"
+  datasetsize: medium
   sourceauthentication:
     basic:
       username: TRAVIGO_NETWORKRAIL_USERNAME

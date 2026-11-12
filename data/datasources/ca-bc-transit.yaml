@@ -7,7 +7,7 @@ datasets:
 - identifier: gtfs-schedule-100-mile-house
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=34"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -39,7 +39,7 @@ datasets:
 - identifier: gtfs-schedule-ashcroft-cache-creek-clinton
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=38"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -71,7 +71,7 @@ datasets:
 - identifier: gtfs-schedule-clearwater
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=35"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -103,7 +103,7 @@ datasets:
 - identifier: gtfs-schedule-east-kootenay-region
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=21"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -135,7 +135,7 @@ datasets:
 - identifier: gtfs-schedule-fraser-valley-region
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=13"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -167,7 +167,7 @@ datasets:
 - identifier: gtfs-schedule-hazeltons
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=26"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -199,7 +199,7 @@ datasets:
 - identifier: gtfs-schedule-merritt
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=37"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -231,7 +231,7 @@ datasets:
 - identifier: gtfs-schedule-mount-waddington
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=17"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -263,7 +263,7 @@ datasets:
 - identifier: gtfs-schedule-north-okanagan-region
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=14"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -295,7 +295,7 @@ datasets:
 - identifier: gtfs-schedule-pemberton-valley
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=50"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -327,7 +327,7 @@ datasets:
 - identifier: gtfs-schedule-port-alberni
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=11"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -359,7 +359,7 @@ datasets:
 - identifier: gtfs-schedule-powell-river
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=29"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -391,7 +391,7 @@ datasets:
 - identifier: gtfs-schedule-prince-rupert
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=23"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -423,7 +423,7 @@ datasets:
 - identifier: gtfs-schedule-quesnel
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=32"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -455,7 +455,7 @@ datasets:
 - identifier: gtfs-schedule-revelstoke
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=36"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -487,7 +487,7 @@ datasets:
 - identifier: gtfs-schedule-salt-spring-island
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=39"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -519,7 +519,7 @@ datasets:
 - identifier: gtfs-schedule-smithers
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=31"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -551,7 +551,7 @@ datasets:
 - identifier: gtfs-schedule-south-okanagan-similkameen
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=15"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -583,7 +583,7 @@ datasets:
 - identifier: gtfs-schedule-west-coast
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=51"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -615,7 +615,7 @@ datasets:
 - identifier: gtfs-schedule-williams-lake
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=33"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -647,7 +647,7 @@ datasets:
 - identifier: gtfs-schedule-campbellrivertransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=12"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -679,7 +679,7 @@ datasets:
 - identifier: gtfs-schedule-rdntransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=41"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -711,7 +711,7 @@ datasets:
 - identifier: gtfs-schedule-comoxvalleytransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=45"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -743,7 +743,7 @@ datasets:
 - identifier: gtfs-schedule-cowichanvalleyregionaltransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=10"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -775,7 +775,7 @@ datasets:
 - identifier: gtfs-schedule-creston
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=16"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -839,7 +839,7 @@ datasets:
 - identifier: gtfs-schedule-sunshinecoasttransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=18"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -871,7 +871,7 @@ datasets:
 - identifier: gtfs-schedule-squamishtransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=43"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -903,7 +903,7 @@ datasets:
 - identifier: gtfs-schedule-whistlertransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=44"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -935,7 +935,7 @@ datasets:
 - identifier: gtfs-schedule-kelownaregionaltransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=47"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -967,7 +967,7 @@ datasets:
 - identifier: gtfs-schedule-westkootenaytransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=20"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -999,7 +999,7 @@ datasets:
 - identifier: gtfs-schedule-kamloopstransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=46"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -1031,7 +1031,7 @@ datasets:
 - identifier: gtfs-schedule-princegeorgetransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=22"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -1063,7 +1063,7 @@ datasets:
 - identifier: gtfs-schedule-fortstjohntransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=28"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
@@ -1095,7 +1095,7 @@ datasets:
 - identifier: gtfs-schedule-dawsoncreektransitsystem
   format: gtfs-schedule
   source: "https://bct.tmix.se/Tmix.Cap.TdExport.WebApi/gtfs/?operatorIds=27"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true

@@ -17,7 +17,7 @@ datasets:
 - identifier: lirr-gtfs-schedule
   format: gtfs-schedule
   source: "https://rrgtfsfeeds.s3.amazonaws.com/gtfslirr.zip"
-  datasetsize: medium
+  datasetsize: small
   supportedobjects:
     stops: true
     services: true
