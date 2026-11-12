@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -45,10 +46,7 @@ func (i *SiriVM) IdentifyServices() ([]string, error) {
 	defer func() { telemetry.Observe(telemetry.SiriServices, time.Since(started)) }()
 
 	info := i.IdentifyingInformation
-	serviceName := info["PublishedLineName"]
-	if serviceName == "" {
-		serviceName = info["ServiceNameRef"]
-	}
+	serviceName := i.serviceName()
 	key := siriCacheKey(info["LinkedDataset"], info["OperatorRef"], serviceName)
 	return siriServices.get(key, func() ([]string, error) {
 		operator, err := siriOperators.get(info["OperatorRef"], func() (*ctdf.Operator, error) {
@@ -59,6 +57,13 @@ func (i *SiriVM) IdentifyServices() ([]string, error) {
 		}
 		return getSiriServices(operator, serviceName)
 	})
+}
+
+func (i *SiriVM) serviceName() string {
+	if name := i.IdentifyingInformation["PublishedLineName"]; name != "" {
+		return name
+	}
+	return i.IdentifyingInformation["ServiceNameRef"]
 }
 
 func getSiriOperator(operatorRef string) (*ctdf.Operator, error) {
@@ -119,6 +124,7 @@ func getSiriServices(operator *ctdf.Operator, serviceName string) ([]string, err
 	if len(services) == 0 {
 		return nil, errSiriService
 	}
+	slices.Sort(services)
 	return services, nil
 }
 
@@ -165,17 +171,26 @@ func (i *SiriVM) IdentifyJourney() (string, error) {
 	}
 
 	info := i.IdentifyingInformation
-	aimed, _ := time.Parse(ctdf.XSDDateTimeFormat, info["OriginAimedDepartureTime"])
+	aimed, aimedErr := time.Parse(ctdf.XSDDateTimeFormat, info["OriginAimedDepartureTime"])
+	aimed = aimed.In(i.CurrentTime.Location())
+	aimedClock := aimed.Format("15:04")
+	var exactDeparture time.Time
+	if aimedErr != nil {
+		aimedClock = "invalid:" + aimedClock
+	} else if aimedClock != "00:00" {
+		// A missing timetable departure decodes as midnight.
+		exactDeparture = aimed
+	}
 	key := siriCacheKey(i.SourceDataset, info["LinkedDataset"], framedVehicleJourneyDate.Format(ctdf.YearMonthDayFormat),
-		info["OperatorRef"], info["ServiceNameRef"], info["PublishedLineName"], info["VehicleJourneyRef"],
+		info["OperatorRef"], i.serviceName(), info["VehicleJourneyRef"],
 		info["BlockRef"], info["OriginRef"], info["DestinationRef"], info["DirectionRef"],
-		aimed.In(i.CurrentTime.Location()).Format("15:04"))
+		aimedClock)
 	return siriJourneys.get(key, func() (string, error) {
-		return i.findJourney(framedVehicleJourneyDate)
+		return i.findJourney(framedVehicleJourneyDate, exactDeparture)
 	})
 }
 
-func (i *SiriVM) findJourney(framedVehicleJourneyDate time.Time) (string, error) {
+func (i *SiriVM) findJourney(framedVehicleJourneyDate, exactDeparture time.Time) (string, error) {
 	services, err := i.IdentifyServices()
 	if err != nil {
 		return "", err
@@ -187,15 +202,7 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate time.Time) (string, error)
 	// Providers use VehicleJourneyRef inconsistently: in BODS it may be a
 	// GTFS trip ID, while legacy SIRI feeds commonly expose a ticket-machine ID.
 	if vehicleJourneyRef != "" {
-		identifiedJourney, err := i.findAndNarrowJourneys(journeysCollection, framedVehicleJourneyDate, telemetry.SiriJourneyRef, bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"$or": bson.A{
-					bson.M{"otheridentifiers.GTFS-TripID": vehicleJourneyRef},
-					bson.M{"otheridentifiers.TicketMachineJourneyCode": vehicleJourneyRef},
-				}},
-			},
-		})
+		identifiedJourney, err := i.findReferencedJourney(journeysCollection, framedVehicleJourneyDate, services, vehicleJourneyRef)
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -206,12 +213,12 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate time.Time) (string, error)
 
 	// Fallback to Block Ref (incorrect usage of block ref but it kinda works)
 	if blockRef != "" {
-		identifiedJourney, err := i.findAndNarrowJourneys(journeysCollection, framedVehicleJourneyDate, telemetry.SiriBlockRef, bson.M{
-			"$and": bson.A{
-				bson.M{"serviceref": bson.M{"$in": services}},
-				bson.M{"otheridentifiers.BlockNumber": blockRef},
-			},
-		})
+		started := time.Now()
+		candidates, lookupErr := getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, bson.M{
+			"serviceref":                   bson.M{"$in": services},
+			"otheridentifiers.BlockNumber": blockRef,
+		}, time.Time{})
+		identifiedJourney, err := i.selectJourney(telemetry.SiriBlockRef, time.Since(started), candidates, lookupErr, time.Time{})
 		if err == nil {
 			return identifiedJourney.PrimaryIdentifier, nil
 		}
@@ -221,26 +228,20 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate time.Time) (string, error)
 	}
 
 	// If we fail with the ID codes then use both endpoints whenever supplied.
-	endpointQuery := bson.A{}
+	query := bson.M{}
 	if originRef := i.IdentifyingInformation["OriginRef"]; originRef != "" {
-		endpointQuery = append(endpointQuery, bson.M{"path.originstopref": originRef})
+		query["path.originstopref"] = originRef
 	}
 	if destinationRef := i.IdentifyingInformation["DestinationRef"]; destinationRef != "" {
-		endpointQuery = append(endpointQuery, bson.M{"path.destinationstopref": destinationRef})
+		query["path.destinationstopref"] = destinationRef
 	}
-	if len(endpointQuery) == 0 {
+	if len(query) == 0 {
 		return "", errSiriMissing
 	}
-	query := bson.M{
-		"$and": bson.A{
-			bson.M{"serviceref": bson.M{"$in": services}},
-			bson.M{"$and": endpointQuery},
-		},
-	}
-	if id := i.findExactDeparture(journeysCollection, framedVehicleJourneyDate, query); id != "" {
-		return id, nil
-	}
-	identifiedJourney, err := i.findAndNarrowJourneys(journeysCollection, framedVehicleJourneyDate, telemetry.SiriStops, query)
+	query["serviceref"] = bson.M{"$in": services}
+	started := time.Now()
+	candidates, lookupErr := getAvailableJourneys(journeysCollection, framedVehicleJourneyDate, query, exactDeparture)
+	identifiedJourney, err := i.selectJourney(telemetry.SiriStops, time.Since(started), candidates, lookupErr, exactDeparture)
 
 	if err != nil {
 		return "", err
@@ -248,62 +249,72 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate time.Time) (string, error)
 	return identifiedJourney.PrimaryIdentifier, nil
 }
 
-func (i *SiriVM) findAndNarrowJourneys(collection *mongo.Collection, date time.Time, fallback telemetry.SiriFallback, query bson.M) (*ctdf.Journey, error) {
-	started := time.Now()
-	journeys, candidates, lookupErr := getAvailableJourneys(collection, date, query, 0)
-	lookup := time.Since(started)
+func (i *SiriVM) findReferencedJourney(collection *mongo.Collection, date time.Time, services []string, ref string) (*ctdf.Journey, error) {
+	key := siriCacheKey(append([]string{ref}, services...)...)
+	if _, ok := siriReferenceMisses.lookup(key); ok {
+		return nil, errSiriJourney
+	}
 
-	started = time.Now()
+	// Query each indexed field independently, then consider both sets together.
+	// A unique GTFS match alone cannot rule out a conflicting ticket-machine match.
+	started := time.Now()
+	var combined siriJourneyCandidates
+	var lookupErr error
+	for _, field := range []string{"otheridentifiers.GTFS-TripID", "otheridentifiers.TicketMachineJourneyCode"} {
+		candidates, err := getAvailableJourneys(collection, date, bson.M{
+			"serviceref": bson.M{"$in": services},
+			field:        ref,
+		}, time.Time{})
+		combined.count += candidates.count
+		combined.available = append(combined.available, candidates.available...)
+		if err != nil {
+			lookupErr = err
+			break
+		}
+	}
+	if lookupErr == nil && combined.count == 0 {
+		siriReferenceMisses.store(key, struct{}{}, nil)
+	}
+	return i.selectJourney(telemetry.SiriJourneyRef, time.Since(started), combined, lookupErr, time.Time{})
+}
+
+func (i *SiriVM) selectJourney(fallback telemetry.SiriFallback, lookup time.Duration, candidates siriJourneyCandidates, lookupErr error, exactDeparture time.Time) (*ctdf.Journey, error) {
+	started := time.Now()
 	if lookupErr != nil {
-		telemetry.ObserveSiriFallback(fallback, lookup, 0, candidates, len(journeys), false)
+		telemetry.ObserveSiriFallback(fallback, lookup, 0, candidates.count, len(candidates.available), false)
 		return nil, lookupErr
 	}
-	journey, err := i.narrowJourneys(journeys, true)
-	telemetry.ObserveSiriFallback(fallback, lookup, time.Since(started), candidates, len(journeys), err == nil)
+	journey := i.exactDepartureMatch(candidates, exactDeparture)
+	var err error
+	if journey == nil {
+		journey, err = i.narrowJourneys(candidates.available, true)
+	}
+	telemetry.ObserveSiriFallback(fallback, lookup, time.Since(started), candidates.count, len(candidates.available), err == nil)
 	return journey, err
 }
 
-func (i *SiriVM) findExactDeparture(collection *mongo.Collection, date time.Time, stopQuery bson.M) string {
-	aimed, err := time.Parse(ctdf.XSDDateTimeFormat, i.IdentifyingInformation["OriginAimedDepartureTime"])
-	if err != nil {
-		return ""
-	}
-	clock := aimed.In(i.CurrentTime.Location()).Format("15:04")
-	// A missing departure decodes as midnight in the broad search.
-	if clock == "00:00" {
-		return ""
-	}
-	query := bson.M{"$and": bson.A{stopQuery, bson.M{"$expr": bson.M{"$eq": bson.A{
-		bson.M{"$dateToString": bson.M{"format": "%H:%M", "date": "$departuretime"}},
-		clock,
-	}}}}}
-	// Comparing the UTC clock preserves the existing comparison for GTFS
-	// times past 24:00, which are stored on a later BSON date.
+func (i *SiriVM) exactDepartureMatch(candidates siriJourneyCandidates, aimed time.Time) *ctdf.Journey {
 	const candidateLimit = 16
-	started := time.Now()
-	journeys, candidates, err := getAvailableJourneys(collection, date, query, candidateLimit)
-	lookup := time.Since(started)
-
-	started = time.Now()
-	var match string
-	if err == nil && candidates < candidateLimit {
-		direction := i.IdentifyingInformation["DirectionRef"]
-		for _, journey := range journeys {
-			if journey.DepartureTime.Format("15:04") != clock || journey.PrimaryIdentifier == "" {
-				match = ""
-				break
-			}
-			if direction != "" && !strings.EqualFold(journey.Direction, direction) {
-				continue
-			}
-			if match != "" {
-				match = ""
-				break
-			}
-			match = journey.PrimaryIdentifier
-		}
+	if candidates.exactCount == 0 || candidates.exactCount >= candidateLimit {
+		return nil
 	}
-	telemetry.ObserveSiriFallback(telemetry.SiriStopsExactTime, lookup, time.Since(started), candidates, len(journeys), match != "")
+	var match *ctdf.Journey
+	direction := i.IdentifyingInformation["DirectionRef"]
+	for _, journey := range candidates.available {
+		if !sameDepartureMinute(journey.DepartureTime.UTC(), aimed) {
+			continue
+		}
+		if !sameDepartureMinute(journey.DepartureTime, aimed) || journey.PrimaryIdentifier == "" {
+			return nil
+		}
+		if direction != "" && !strings.EqualFold(journey.Direction, direction) {
+			continue
+		}
+		if match != nil {
+			return nil
+		}
+		match = journey
+	}
 	return match
 }
 
@@ -338,7 +349,7 @@ func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCon
 
 		// Filter based on exact time
 		for _, journey := range journeys {
-			if journey.DepartureTime.Hour() == originAimedDepartureTime.Hour() && journey.DepartureTime.Minute() == originAimedDepartureTime.Minute() {
+			if sameDepartureMinute(journey.DepartureTime, originAimedDepartureTime) {
 				timeFilteredJourneys = append(timeFilteredJourneys, journey)
 			}
 		}

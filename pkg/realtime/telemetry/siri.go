@@ -11,7 +11,7 @@ const (
 	SiriJourneyRef SiriFallback = iota
 	SiriBlockRef
 	SiriStops
-	SiriStopsExactTime
+	SiriStopsExactTime // Retained in reports for compatibility. Stops now use one query.
 	siriFallbackCount
 )
 

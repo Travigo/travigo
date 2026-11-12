@@ -92,10 +92,13 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 				bson.D{{Key: "primaryidentifier", Value: "service"}, {Key: "servicename", Value: "1"}}),
 		)
 		mockMatch := func(journeyID string) {
-			mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
-				{Key: "primaryidentifier", Value: journeyID},
-				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
-			}),
+			namespace := mt.DB.Name() + ".journeys"
+			mt.AddMockResponses(
+				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
+					{Key: "primaryidentifier", Value: journeyID},
+					{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				}),
+				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch),
 			)
 		}
 
@@ -126,7 +129,7 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 		identify("")
 		server.FastForward(4 * time.Minute)
 		identify("")
-		if got := len(mt.GetAllStartedEvents()); got != 3 {
+		if got := len(mt.GetAllStartedEvents()); got != 4 {
 			mt.Fatalf("cached suppression ran another timetable search: %d Mongo commands", got)
 		}
 
@@ -144,7 +147,7 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 		event.LocalID = "siri-trip-a"
 		info["VehicleJourneyRef"] = "trip-a"
 		identify("journey-a")
-		if got := len(mt.GetAllStartedEvents()); got != 4 {
+		if got := len(mt.GetAllStartedEvents()); got != 6 {
 			mt.Fatalf("expected shared service and timetable results to avoid redundant Mongo commands, got %d", got)
 		}
 	})

@@ -32,6 +32,7 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 		available := bson.D{
 			{Key: "primaryidentifier", Value: "available"},
 			{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+			{Key: "direction", Value: "outbound"},
 		}
 		unavailable := bson.D{{Key: "primaryidentifier", Value: "unavailable"}}
 		wrongDirection := bson.D{
@@ -47,8 +48,8 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 				bson.D{{Key: "primaryidentifier", Value: "service"}, {Key: "servicename", Value: "1"}}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, unavailable),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch),
-			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, wrongDirection),
-			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, available, unavailable),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, wrongDirection, available, unavailable),
 		)
 
 		before := telemetry.Snapshot().SiriMatching
@@ -62,10 +63,9 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 		}
 		after := telemetry.Snapshot().SiriMatching
 		for name, want := range map[string][3]int64{
-			"journey_ref":      {1, 0, 0},
-			"block_ref":        {0, 0, 0},
-			"stops":            {2, 1, 1},
-			"stops_exact_time": {1, 1, 0},
+			"journey_ref": {1, 0, 0},
+			"block_ref":   {0, 0, 0},
+			"stops":       {3, 2, 1},
 		} {
 			a, b := before[name], after[name]
 			if b.Lookup.Count-a.Lookup.Count != 1 || b.Narrowing.Count-a.Narrowing.Count != 1 {
@@ -74,6 +74,26 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 			if got := [3]int64{b.Candidates - a.Candidates, b.Available - a.Available, b.Matches - a.Matches}; got != want {
 				mt.Errorf("%s candidates, available and matches = %v, want %v", name, got, want)
 			}
+		}
+		commands := mt.GetAllStartedEvents()
+		if len(commands) != 6 {
+			mt.Fatalf("sent %d MongoDB commands, want 6", len(commands))
+		}
+		for n, field := range []string{"otheridentifiers.GTFS-TripID", "otheridentifiers.TicketMachineJourneyCode"} {
+			filter := commands[n+2].Command.Lookup("filter").Document()
+			if filter.Lookup(field).StringValue() != "trip" || filter.Lookup("serviceref", "$in", "0").StringValue() != "service" {
+				mt.Fatalf("unexpected reference filter %v", filter)
+			}
+		}
+		filter := commands[5].Command.Lookup("filter").Document()
+		if filter.Lookup("path.originstopref").StringValue() != "origin" {
+			mt.Fatalf("unexpected stop filter %v", filter)
+		}
+		if _, err := filter.LookupErr("$expr"); err == nil {
+			mt.Fatalf("stop lookup still has a departure-time expression: %v", filter)
+		}
+		if got, err := identifier.IdentifyJourney(); err != nil || got != "available" || len(mt.GetAllStartedEvents()) != len(commands) {
+			mt.Fatalf("repeat lookup did not reuse the match: %q, %v", got, err)
 		}
 	})
 }
@@ -84,10 +104,62 @@ func TestSameServiceNameDoesNotMatchDifferentRoutes(t *testing.T) {
 	}
 }
 
+func TestSiriReferenceMissesAreReusedAcrossUpdates(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("empty reference", func(mt *mtest.T) {
+		day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+		services := []string{mt.Name() + time.Now().String()}
+		identifier := SiriVM{CurrentTime: day}
+		namespace := mt.DB.Name() + "." + mt.Coll.Name()
+		empty := mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch)
+		mt.AddMockResponses(empty, mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 50}), empty, empty)
+		if _, err := identifier.findReferencedJourney(mt.Coll, day, services, "reference"); err == nil || isSiriNoMatch(err) {
+			mt.Fatalf("failed reference query returned %v, want database error", err)
+		}
+		if _, err := identifier.findReferencedJourney(mt.Coll, day, services, "reference"); err != errSiriJourney {
+			mt.Fatalf("retry returned %v, want no match", err)
+		}
+		identifier.IdentifyingInformation = map[string]string{"DirectionRef": "inbound"}
+		if _, err := identifier.findReferencedJourney(mt.Coll, day.AddDate(0, 0, 1), services, "reference"); err != errSiriJourney {
+			mt.Fatalf("repeat reference returned %v, want cached miss", err)
+		}
+		if got := len(mt.GetAllStartedEvents()); got != 4 {
+			mt.Fatalf("sent %d commands, want two queries per uncached attempt", got)
+		}
+	})
+}
+
+func TestSiriReferenceMatchesAreNarrowedTogether(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("reference fields", func(mt *mtest.T) {
+		day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+		identifier := SiriVM{CurrentTime: day, IdentifyingInformation: map[string]string{
+			"OriginAimedDepartureTime": "2026-11-10T10:00:00+00:00",
+		}}
+		candidate := func(id string, hour int) bson.D {
+			return bson.D{
+				{Key: "primaryidentifier", Value: id},
+				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				{Key: "departuretime", Value: time.Date(0, 1, 1, hour, 0, 0, 0, time.UTC)},
+			}
+		}
+		namespace := mt.DB.Name() + "." + mt.Coll.Name()
+		mt.AddMockResponses(
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, candidate("gtfs", 9)),
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, candidate("ticket-machine", 10)),
+		)
+		journey, err := identifier.findReferencedJourney(mt.Coll, day, []string{mt.Name()}, "reference")
+		if err != nil || journey == nil || journey.PrimaryIdentifier != "ticket-machine" {
+			mt.Fatalf("got %v, %v, want the ticket-machine candidate at 10:00", journey, err)
+		}
+	})
+}
+
 func TestSiriExactDepartureAcceptsOvernightClockAndRejectsAmbiguity(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	mt.Run("overnight departure", func(mt *mtest.T) {
 		day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+		aimed := day.Add(90 * time.Minute)
 		identifier := SiriVM{CurrentTime: day, IdentifyingInformation: map[string]string{
 			"OriginAimedDepartureTime": "2026-11-11T01:30:00+00:00", "DirectionRef": "OUTBOUND",
 		}}
@@ -105,16 +177,19 @@ func TestSiriExactDepartureAcceptsOvernightClockAndRejectsAmbiguity(t *testing.T
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, candidate("trip"), candidate("other")),
 		)
 		query := bson.M{"serviceref": "route", "path.originstopref": "stop"}
-		if got := identifier.findExactDeparture(mt.Coll, day, query); got != "trip" {
-			mt.Fatalf("exact departure got %q, want overnight trip", got)
+		candidates, err := getAvailableJourneys(mt.Coll, day, query, aimed)
+		if err != nil {
+			mt.Fatal(err)
 		}
-		if got := identifier.findExactDeparture(mt.Coll, day, query); got != "" {
-			mt.Fatalf("ambiguous departure selected %q instead of allowing the broad fallback", got)
+		if got := identifier.exactDepartureMatch(candidates, aimed); got == nil || got.PrimaryIdentifier != "trip" {
+			mt.Fatalf("exact departure got %v, want overnight trip", got)
 		}
-		filter := mt.GetAllStartedEvents()[0].Command.Lookup("filter").Document()
-		clock := filter.Lookup("$and", "1", "$expr", "$eq", "1").StringValue()
-		if clock != "01:30" {
-			mt.Fatalf("lookup clock = %q, want 01:30", clock)
+		candidates, err = getAvailableJourneys(mt.Coll, day, query, aimed)
+		if err != nil {
+			mt.Fatal(err)
+		}
+		if got := identifier.exactDepartureMatch(candidates, aimed); got != nil {
+			mt.Fatalf("ambiguous departure selected %q instead of allowing the broad fallback", got.PrimaryIdentifier)
 		}
 	})
 }
@@ -139,10 +214,11 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 			}
 		}
 		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch, candidate("wanted", 10), candidate("other", 11)))
-		candidates, _, err := getAvailableJourneys(mt.Coll, day, bson.M{"serviceref": "service"}, 0)
+		loaded, err := getAvailableJourneys(mt.Coll, day, bson.M{"serviceref": "service"}, time.Time{})
 		if err != nil {
 			mt.Fatal(err)
 		}
+		candidates := loaded.available
 		projection := mt.GetStartedEvent().Command.Lookup("projection").Document()
 		for _, field := range []string{
 			"primaryidentifier", "serviceref", "direction", "departuretime", "availability",

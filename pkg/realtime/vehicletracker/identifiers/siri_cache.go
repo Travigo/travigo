@@ -1,6 +1,7 @@
 package identifiers
 
 import (
+	"container/list"
 	"encoding/json"
 	"sync"
 	"time"
@@ -12,10 +13,13 @@ import (
 var (
 	siriOperators = siriLookupCache[*ctdf.Operator]{limit: 512, ttl: 5 * time.Minute}
 	siriServices  = siriLookupCache[[]string]{limit: 2048, ttl: 5 * time.Minute}
-	siriJourneys  = siriLookupCache[string]{limit: 8192, ttl: 2 * time.Minute}
+	siriJourneys  = siriLookupCache[string]{limit: 8192, ttl: 5 * time.Minute, missTTL: 2 * time.Minute}
+	// Cache empty reference lookups, without retaining candidate journey paths.
+	siriReferenceMisses = siriLookupCache[struct{}]{limit: 8192, ttl: 2 * time.Minute}
 )
 
 type siriCacheEntry[T any] struct {
+	key   string
 	value T
 	err   error
 	until time.Time
@@ -23,10 +27,12 @@ type siriCacheEntry[T any] struct {
 
 type siriLookupCache[T any] struct {
 	mu      sync.Mutex
-	entries map[string]siriCacheEntry[T]
+	entries map[string]*list.Element
+	recent  list.List
 	loads   singleflight.Group
 	limit   int
 	ttl     time.Duration
+	missTTL time.Duration
 }
 
 func siriCacheKey(parts ...string) string {
@@ -46,24 +52,7 @@ func (c *siriLookupCache[T]) get(key string, load func() (T, error)) (T, error) 
 		if err != nil && !isSiriNoMatch(err) {
 			return nil, err
 		}
-		ttl := c.ttl
-		if err != nil {
-			ttl = time.Minute
-		}
-		entry := siriCacheEntry[T]{value: value, err: err, until: time.Now().Add(ttl)}
-		c.mu.Lock()
-		if c.entries == nil {
-			c.entries = make(map[string]siriCacheEntry[T])
-		}
-		if len(c.entries) >= c.limit {
-			for oldKey := range c.entries {
-				delete(c.entries, oldKey)
-				break
-			}
-		}
-		c.entries[key] = entry
-		c.mu.Unlock()
-		return entry, nil
+		return c.store(key, value, err), nil
 	})
 	if err != nil {
 		var zero T
@@ -73,13 +62,44 @@ func (c *siriLookupCache[T]) get(key string, load func() (T, error)) (T, error) 
 	return entry.value, entry.err
 }
 
+func (c *siriLookupCache[T]) store(key string, value T, err error) siriCacheEntry[T] {
+	ttl := c.ttl
+	if err != nil {
+		ttl = c.missTTL
+		if ttl == 0 {
+			ttl = time.Minute
+		}
+	}
+	entry := siriCacheEntry[T]{key: key, value: value, err: err, until: time.Now().Add(ttl)}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.entries == nil {
+		c.entries = make(map[string]*list.Element)
+	}
+	if previous, ok := c.entries[key]; ok {
+		c.recent.Remove(previous)
+	} else if len(c.entries) >= c.limit {
+		oldest := c.recent.Back()
+		delete(c.entries, oldest.Value.(siriCacheEntry[T]).key)
+		c.recent.Remove(oldest)
+	}
+	c.entries[key] = c.recent.PushFront(entry)
+	return entry
+}
+
 func (c *siriLookupCache[T]) lookup(key string) (siriCacheEntry[T], bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	entry, ok := c.entries[key]
-	if ok && !entry.until.After(time.Now()) {
-		delete(c.entries, key)
-		ok = false
+	element, ok := c.entries[key]
+	if !ok {
+		return siriCacheEntry[T]{}, false
 	}
-	return entry, ok
+	entry := element.Value.(siriCacheEntry[T])
+	if !entry.until.After(time.Now()) {
+		delete(c.entries, key)
+		c.recent.Remove(element)
+		return siriCacheEntry[T]{}, false
+	}
+	c.recent.MoveToFront(element)
+	return entry, true
 }

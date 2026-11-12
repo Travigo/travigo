@@ -39,8 +39,14 @@ func findPrimaryIdentifiers(collection *mongo.Collection, query bson.M, limit in
 	return identifiers, cursor.Err()
 }
 
-func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, limit int64) ([]*ctdf.Journey, int, error) {
-	var journeys []*ctdf.Journey
+type siriJourneyCandidates struct {
+	available  []*ctdf.Journey
+	count      int
+	exactCount int
+}
+
+func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time) (siriJourneyCandidates, error) {
+	var candidates siriJourneyCandidates
 
 	// Keep precisely the fields consumed by availability, functional hashing,
 	// direction, endpoint and departure-time matching.
@@ -56,29 +62,33 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "path.originarrivaltime", Value: 1},
 		{Key: "path.origindeparturetime", Value: 1},
 		{Key: "path.destinationarrivaltime", Value: 1},
-	}).SetLimit(limit)
+	})
 	cursor, err := journeysCollection.Find(context.Background(), query, opts)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to find available journeys")
-		return nil, 0, err
+		return candidates, err
 	}
 	defer cursor.Close(context.Background())
 
-	candidates := 0
 	for cursor.Next(context.Background()) {
-		candidates++
-		var journey *ctdf.Journey
-		err := cursor.Decode(&journey)
-		if err != nil {
+		candidates.count++
+		var journey ctdf.Journey
+		if err := cursor.Decode(&journey); err != nil {
 			log.Error().Err(err).Msg("Failed to decode journey")
 			continue
+		}
+		if !exactDeparture.IsZero() && sameDepartureMinute(journey.DepartureTime.UTC(), exactDeparture) {
+			candidates.exactCount++
 		}
 
 		// if it has no availability then we'll just ignore it
 		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
-			journeys = append(journeys, journey)
+			candidates.available = append(candidates.available, &journey)
 		}
 	}
 
-	return journeys, candidates, cursor.Err()
+	return candidates, cursor.Err()
+}
+
+func sameDepartureMinute(left, right time.Time) bool {
+	return left.Hour() == right.Hour() && left.Minute() == right.Minute()
 }
