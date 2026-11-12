@@ -52,10 +52,15 @@ const (
 	CacheEvicted
 	RedisCommands
 	RedisErrors
+	SiriGTFSSuppressedFresh
+	SiriGTFSSuppressedCached
 	counterCount
 )
 
-var counterNames = [counterCount]string{"received", "handled", "update_failed", "malformed", "cache_hit", "cache_miss", "cache_evicted", "redis_commands", "redis_errors"}
+var counterNames = [counterCount]string{
+	"received", "handled", "update_failed", "malformed", "cache_hit", "cache_miss", "cache_evicted",
+	"redis_commands", "redis_errors", "siri_gtfs_suppressed_fresh", "siri_gtfs_suppressed_cached",
+}
 var counters [counterCount]atomic.Int64
 
 func Add(c Counter, n int64) { counters[c].Add(n) }

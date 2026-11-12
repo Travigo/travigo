@@ -27,10 +27,12 @@ var identificationCache *cache.Cache[string]
 const numConsumers = 10
 const batchSize = 200
 const identificationCacheTTL = 90 * time.Minute
+const suppressedSiriMatchTTL = 5 * time.Minute
 const gtfsJourneyOwnershipTTL = 8 * time.Hour
 
 var touchIdentificationMapping = redis.NewScript(`
-local journey_id = redis.call("HGET", KEYS[1], "journey_id")
+local mapping = redis.call("HMGET", KEYS[1], "journey_id", "last_updated", "fixed_expiry")
+local journey_id = mapping[1]
 if not journey_id then
   return {"", "missing"}
 end
@@ -38,15 +40,28 @@ if journey_id == "N/A" then
   return {"", "suppressed"}
 end
 
-local last_updated = tonumber(redis.call("HGET", KEYS[1], "last_updated")) or 0
+local last_updated = tonumber(mapping[2]) or 0
 local incoming_updated = tonumber(ARGV[1])
 if incoming_updated <= last_updated then
   return {"", "stale"}
 end
 
 redis.call("HSET", KEYS[1], "last_updated", ARGV[1])
-redis.call("PEXPIRE", KEYS[1], ARGV[2])
+if mapping[3] ~= "1" then
+  redis.call("PEXPIRE", KEYS[1], ARGV[2])
+end
 return {journey_id, "updated"}
+`)
+
+var writeIdentificationMapping = redis.NewScript(`
+-- A lookup that started on a miss must not replace a mapping another worker
+-- has since populated, or restart an existing fixed expiry.
+if ARGV[4] == "1" and redis.call("EXISTS", KEYS[1]) == 1 then
+  return 0
+end
+redis.call("HSET", KEYS[1], "journey_id", ARGV[1], "last_updated", ARGV[2], "fixed_expiry", ARGV[4])
+redis.call("PEXPIRE", KEYS[1], ARGV[3])
+return 1
 `)
 
 func CreateIdentificationCache() {
@@ -284,6 +299,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 	}
 	if mappingFound {
 		if sourceType == "siri-vm" && journeyID != "" && consumer.gtfsOwnsJourney(vehicleUpdateEvent, identifyingInformation, journeyID) {
+			telemetry.Add(telemetry.SiriGTFSSuppressedCached, 1)
 			consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs_same_journey")
 			return ""
 		}
@@ -330,7 +346,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 		if err != nil {
 			if locationJourneyID := consumer.identifyJourneyFromLocation(vehicleUpdateEvent, sourceType, identifyingInformation); locationJourneyID != "" {
-				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, locationJourneyID, vehicleUpdateEvent.RecordedAt)
+				storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, locationJourneyID, vehicleUpdateEvent.RecordedAt, identificationCacheTTL)
 				consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, true, "location_matched")
 				return locationJourneyID
 			}
@@ -343,7 +359,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 			// Coalesce retries so recovery does not create a database stampede, and avoid
 			// trading lower query counts for vehicles disappearing after brief failures.
 			// Save a cache value of N/A to stop us from constantly rechecking for journeys we cant identify
-			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt)
+			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, "N/A", vehicleUpdateEvent.RecordedAt, identificationCacheTTL)
 
 			// Set cross dataset ID
 			if vehicleUpdateEvent.VehicleLocationUpdate != nil && vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier != "" {
@@ -391,13 +407,14 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 		}
 		journeyID = journey
 		if sourceType == "siri-vm" && consumer.gtfsOwnsJourney(vehicleUpdateEvent, identifyingInformation, journeyID) {
-			// Deliberately do not cache this as N/A: the vehicle may turn onto a
-			// different journey while the GTFS ownership marker remains valid.
+			// Reuse the match while continuing to check current GTFS ownership.
+			storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, journeyID, vehicleUpdateEvent.RecordedAt, suppressedSiriMatchTTL)
+			telemetry.Add(telemetry.SiriGTFSSuppressedFresh, 1)
 			consumer.recordSiriIdentificationOutcome(vehicleUpdateEvent, identifyingInformation, false, "suppressed_by_gtfs_same_journey")
 			return ""
 		}
 
-		storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, journeyID, vehicleUpdateEvent.RecordedAt)
+		storeIdentificationMapping(context.Background(), vehicleUpdateEvent.LocalID, journeyID, vehicleUpdateEvent.RecordedAt, identificationCacheTTL)
 
 		if sourceType == "GTFS-RT" {
 			storeGTFSJourneyOwnership(context.Background(), vehicleUpdateEvent, identifyingInformation, journeyID)
@@ -497,15 +514,10 @@ func touchExistingIdentificationMapping(ctx context.Context, localID string, rec
 	return result[0], result[1] != "missing", nil
 }
 
-func storeIdentificationMapping(ctx context.Context, localID string, journeyID string, recordedAt time.Time) {
-	_, err := redis_client.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		pipe.HSet(ctx, realtimeIdentificationMappingKey(localID), map[string]interface{}{
-			"journey_id":   journeyID,
-			"last_updated": recordedAt.UnixNano(),
-		})
-		pipe.Expire(ctx, realtimeIdentificationMappingKey(localID), identificationCacheTTL)
-		return nil
-	})
+func storeIdentificationMapping(ctx context.Context, localID string, journeyID string, recordedAt time.Time, ttl time.Duration) {
+	err := writeIdentificationMapping.Run(ctx, redis_client.Client, []string{realtimeIdentificationMappingKey(localID)},
+		journeyID, recordedAt.UnixNano(), ttl.Milliseconds(), ttl == suppressedSiriMatchTTL,
+	).Err()
 	if err != nil {
 		log.Warn().Err(err).Str("local_id", localID).Msg("Failed to store realtime identification mapping")
 	}
