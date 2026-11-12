@@ -80,7 +80,10 @@ func BatchForStops(ctx context.Context, db *mongo.Database, stopRefs []string) (
 			continue
 		}
 		if source.Generation == "" {
-			return nil, fmt.Errorf("dataset %s: %w", source.Dataset, ErrUnbuilt)
+			// A full backfill can publish dataset generations incrementally.
+			// Keep serving contributions that are ready while this dataset is
+			// still unbuilt; one missing contribution must not block every stop.
+			continue
 		}
 		generations = append(generations, generationRef{dataset: source.Dataset, generation: source.Generation})
 	}

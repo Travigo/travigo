@@ -4,9 +4,11 @@ The stop-services builder maintains a materialized view of static timetable
 services by stop. Journey publishers record durable source changes, while a
 separate command builds the view outside the journey publication path. Service
 endpoints and stop indexing always read this materialized view; they require an
-initial full backfill and do not fall back to journey scans. A failed build
-before manifest publication leaves the last published view available and keeps
-the source change eligible for retry.
+initial full backfill for complete coverage and do not fall back to journey
+scans. While a full backfill is publishing dataset generations, readers use
+the generations already available and omit datasets that are not built yet.
+A failed build before manifest publication leaves the last published view
+available and keeps the source change eligible for retry.
 
 The view covers static timetable datasets. It intentionally excludes
 `gb-networkrail-vstp` and `gb-nationalrail-darwin-amendment`.
@@ -17,7 +19,8 @@ Upgrade every static journey publisher first so live timetable publishes
 update the durable dirty marker. Run the importer batch plan with
 `refresh-stop-services` after journey publication. That task builds the full
 view on its first run and refreshes dirty datasets on later runs. The always-on
-API and stop-indexer readers require the view to have been built successfully.
+API serves contributions already built during the initial backfill. Stop
+indexing waits until the complete view is current.
 
 The same task can be run manually against the production database before
 deploying the always-on readers:
