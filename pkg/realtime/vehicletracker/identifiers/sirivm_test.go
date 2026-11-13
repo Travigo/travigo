@@ -130,8 +130,8 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mt.Fatalf("sent %d commands, want two ID scans and one fetch", len(commands))
 		}
 		for n, branch := range []struct{ field, stop, index string }{
-			{"path.originstopref", "a", database.JourneySiriOriginIDsIndex},
-			{"path.destinationstopref", "c", database.JourneySiriDestinationIDsIndex},
+			{"path.originstopref", "a", database.JourneyOriginStopServiceIDsIndex},
+			{"path.destinationstopref", "c", database.JourneyDestinationStopServiceIDsIndex},
 		} {
 			command := commands[n].Command
 			filter := command.Lookup("filter").Document()

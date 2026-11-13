@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	TDMappingsCollectionName       = "gb_networkrail_td_mappings"
-	JourneysCollectionName         = "journeys"
-	JourneysRawCollectionName      = "journeys_raw"
-	JourneysStagingCollectionName  = "journeys_staging"
-	JourneySiriOriginIDsIndex      = "JourneyIdentificationServiceOriginStopIDs"
-	JourneySiriDestinationIDsIndex = "JourneyIdentificationServiceDestinationStopIDs"
+	TDMappingsCollectionName              = "gb_networkrail_td_mappings"
+	JourneysCollectionName                = "journeys"
+	JourneysRawCollectionName             = "journeys_raw"
+	JourneysStagingCollectionName         = "journeys_staging"
+	JourneyOriginStopServiceIDsIndex      = "JourneyOriginStopServiceIDs"
+	JourneyDestinationStopServiceIDsIndex = "JourneyDestinationStopServiceIDs"
 )
 
 func createIndexes() {
@@ -391,8 +391,6 @@ func createJourneysIndexes() {
 	// Journeys
 	journeysCollection := GetCollection(JourneysCollectionName)
 
-	journeyIdentificationServiceOriginStopsIndexName := "JourneyIdentificationServiceOriginStops"
-	journeyIdentificationServiceDestinationStopsIndexName := "JourneyIdentificationServiceDestinationStops"
 	// Partial identifier indexes use new names so existing full indexes do not
 	// conflict during creation. Retire the old indexes separately after checking usage.
 	journeyIdentificationServiceTicketMachineJourneycodeIndexName := "JourneyIdentificationServiceTicketMachineJourneyCode"
@@ -406,49 +404,26 @@ func createJourneysIndexes() {
 			Keys: bson.D{{Key: "serviceref", Value: 1}},
 		},
 		{
-			Keys: bson.D{{Key: "path.originstopref", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "path.destinationstopref", Value: 1}},
-		},
-		{
 			Keys:    bson.D{{Key: "amendmentstoprefs", Value: 1}},
 			Options: options.Index().SetSparse(true),
 		},
 		{
 			Keys: bson.D{{Key: "datasource.datasetid", Value: 1}},
 		},
+		// Boards can seek by stop alone. SIRI adds service and projects _id.
 		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceOriginStopsIndexName,
-			},
+			Options: options.Index().SetName(JourneyOriginStopServiceIDsIndex),
 			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
 				{Key: "path.originstopref", Value: 1},
-			},
-		},
-		{
-			Options: &options.IndexOptions{
-				Name: &journeyIdentificationServiceDestinationStopsIndexName,
-			},
-			Keys: bson.D{
 				{Key: "serviceref", Value: 1},
-				{Key: "path.destinationstopref", Value: 1},
-			},
-		},
-		{
-			Options: options.Index().SetName(JourneySiriOriginIDsIndex),
-			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
-				{Key: "path.originstopref", Value: 1},
 				{Key: "_id", Value: 1},
 			},
 		},
 		{
-			Options: options.Index().SetName(JourneySiriDestinationIDsIndex),
+			Options: options.Index().SetName(JourneyDestinationStopServiceIDsIndex),
 			Keys: bson.D{
-				{Key: "serviceref", Value: 1},
 				{Key: "path.destinationstopref", Value: 1},
+				{Key: "serviceref", Value: 1},
 				{Key: "_id", Value: 1},
 			},
 		},

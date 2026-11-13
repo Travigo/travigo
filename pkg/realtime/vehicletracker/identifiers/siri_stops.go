@@ -26,7 +26,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 	services := query["serviceref"]
 	origins, covered, err := findSiriStopIDs(collection, bson.M{
 		"serviceref": services, "path.originstopref": origin,
-	}, database.JourneySiriOriginIDsIndex)
+	}, database.JourneyOriginStopServiceIDsIndex)
 	if err != nil {
 		return siriJourneyCandidates{}, err
 	}
@@ -39,7 +39,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 
 	destinations, covered, err := findSiriStopIDs(collection, bson.M{
 		"serviceref": services, "path.destinationstopref": destination,
-	}, database.JourneySiriDestinationIDsIndex)
+	}, database.JourneyDestinationStopServiceIDsIndex)
 	if err != nil {
 		return siriJourneyCandidates{}, err
 	}
