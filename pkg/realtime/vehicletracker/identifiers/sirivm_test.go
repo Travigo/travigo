@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
@@ -374,6 +375,69 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 			}
 			if match(got) != match(baseline) || len(got.available) != len(baseline.available) {
 				mt.Fatalf("probe result differs from baseline: %v vs %v", got, baseline)
+			}
+		})
+	}
+}
+
+func TestSiriStopProbeUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourney(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, scenario := range []struct {
+		name      string
+		preferred string
+		active    bool
+		want      string
+	}{
+		{name: "GTFS boolean direction", want: "exact"},
+		{name: "inactive preferred direction", preferred: "1", want: "exact"},
+		{name: "active off-time preferred direction", preferred: "1", active: true, want: "preferred"},
+	} {
+		mt.Run(scenario.name, func(mt *mtest.T) {
+			ns := mt.DB.Name() + "." + mt.Coll.Name()
+			ids := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "_id", Value: primitive.NewObjectID()}})
+			day := time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC)
+			aimed := day.Add(9*time.Hour + 30*time.Minute)
+			row := func(id, direction string, departure time.Time, available bool) bson.D {
+				fields := bson.D{{Key: "primaryidentifier", Value: id}, {Key: "direction", Value: direction}, {Key: "departuretime", Value: departure}}
+				if available {
+					fields = append(fields, bson.E{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}})
+				}
+				return fields
+			}
+			rows := []bson.D{row("exact", "false", aimed, true)}
+			if scenario.preferred != "" {
+				rows = append(rows, row("preferred", scenario.preferred, aimed.Add(time.Minute), scenario.active))
+			}
+			response := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
+			mt.AddMockResponses(ids, ids, response, response, response)
+			query := bson.M{"serviceref": "service", "path.originstopref": "a", "path.destinationstopref": "b"}
+			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "1")
+			if err != nil {
+				mt.Fatal(err)
+			}
+			commands := mt.GetAllStartedEvents()
+			wantQueries := 3
+			if scenario.active {
+				wantQueries = 4
+			}
+			if len(commands) != wantQueries {
+				mt.Fatalf("got %d queries, want %d", len(commands), wantQueries)
+			}
+			if _, err := commands[2].Command.LookupErr("filter", "$expr", "$or"); err != nil {
+				mt.Fatal("probe must include off-time journeys in the preferred direction")
+			}
+			baseline, err := getAvailableJourneys(mt.Coll, day, query, aimed)
+			if err != nil {
+				mt.Fatal(err)
+			}
+			matcher := SiriVM{CurrentTime: day, IdentifyingInformation: map[string]string{
+				"DirectionRef": "1", "OriginAimedDepartureTime": aimed.Format(ctdf.XSDDateTimeFormat),
+			}}
+			for _, candidates := range []siriJourneyCandidates{got, baseline} {
+				match, err := matcher.selectJourney(telemetry.SiriStops, 0, candidates, nil, aimed)
+				if err != nil || match.PrimaryIdentifier != scenario.want {
+					mt.Fatalf("match = %v, error = %v, want %q", match, err, scenario.want)
+				}
 			}
 		})
 	}

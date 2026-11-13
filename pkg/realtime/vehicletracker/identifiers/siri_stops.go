@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
 	"time"
 
+	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
@@ -76,7 +78,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 		probe := maps.Clone(fetch)
 		// Timetable BSON dates can encode overnight times on a later day.
 		// Compare the UTC clock, as the existing candidate selector does.
-		probe["$expr"] = bson.M{"$cond": bson.A{
+		exactClock := bson.M{"$cond": bson.A{
 			bson.M{"$eq": bson.A{bson.M{"$type": "$departuretime"}, "date"}},
 			bson.M{"$and": bson.A{
 				bson.M{"$eq": bson.A{bson.M{"$hour": "$departuretime"}, exactDeparture.Hour()}},
@@ -84,13 +86,33 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 			}},
 			false,
 		}}
+		probe["$expr"] = exactClock
+		numericDirection := direction == "1" || direction == "2"
+		if numericDirection {
+			// Include off-time journeys in the preferred direction. The full
+			// matcher only ignores direction if none are active that day.
+			probe["$expr"] = bson.M{"$or": bson.A{
+				exactClock, bson.M{"$eq": bson.A{"$direction", direction}},
+			}}
+		}
 		candidates, err := readSiriCandidates(collection, date, probe, exactDeparture, telemetry.SiriExactProbeDocuments,
 			options.Find().SetHint("_id_").SetLimit(siriExactCandidateLimit).SetProjection(bson.M{
 				"_id": 0, "primaryidentifier": 1, "departuretime": 1, "direction": 1, "availability": 1,
 			}))
-		if err == nil && candidates.count < siriExactCandidateLimit && exactSiriDepartureMatch(candidates, exactDeparture, direction) != nil {
-			telemetry.Add(telemetry.SiriExactMatches, 1)
-			return candidates, nil
+		if err == nil && candidates.count < siriExactCandidateLimit {
+			candidates.exactMatch = exactSiriDepartureMatch(candidates, exactDeparture, direction)
+			if candidates.exactMatch == nil && numericDirection {
+				hasPreferredDirection := slices.ContainsFunc(candidates.available, func(journey *ctdf.Journey) bool {
+					return journey.Direction == direction
+				})
+				if !hasPreferredDirection {
+					candidates.exactMatch = exactSiriDepartureMatch(candidates, exactDeparture, "")
+				}
+			}
+			if candidates.exactMatch != nil {
+				telemetry.Add(telemetry.SiriExactMatches, 1)
+				return candidates, nil
+			}
 		}
 	}
 	return getAvailableJourneys(collection, date, fetch, exactDeparture, options.Find().SetHint("_id_"))

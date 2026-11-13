@@ -284,7 +284,10 @@ func (i *SiriVM) selectJourney(fallback telemetry.SiriFallback, lookup time.Dura
 		telemetry.ObserveSiriFallback(fallback, lookup, 0, candidates.count, len(candidates.available), false)
 		return nil, lookupErr
 	}
-	journey := i.exactDepartureMatch(candidates, exactDeparture)
+	journey := candidates.exactMatch
+	if journey == nil {
+		journey = i.exactDepartureMatch(candidates, exactDeparture)
+	}
 	var err error
 	if journey == nil {
 		journey, err = i.narrowJourneys(candidates.available, true)

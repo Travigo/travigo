@@ -44,6 +44,7 @@ type siriJourneyCandidates struct {
 	available  []*ctdf.Journey
 	count      int
 	exactCount int
+	exactMatch *ctdf.Journey
 }
 
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time, findOpts ...*options.FindOptions) (siriJourneyCandidates, error) {
