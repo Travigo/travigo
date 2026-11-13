@@ -158,6 +158,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			identifiedJourneyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation)
 
 			if identifiedJourneyID != "" {
+				updateStarted := time.Now()
 				if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeTrip {
 					err := consumer.updateRealtimeJourney(identifiedJourneyID, vehicleUpdateEvent)
 					if err != nil {
@@ -171,20 +172,44 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 						log.Error().Err(err).Msg("Failed to update realtime journey location only")
 					}
 				}
+				switch vehicleUpdateEvent.SourceType {
+				case "siri-vm":
+					telemetry.Observe(telemetry.SiriTripUpdate, time.Since(updateStarted))
+				case "GTFS-RT":
+					telemetry.Observe(telemetry.GTFSTripUpdate, time.Since(updateStarted))
+				}
 			} else {
 				log.Debug().Interface("event", vehicleUpdateEvent.VehicleLocationUpdate.IdentifyingInformation).Msg("Couldnt identify journey")
 			}
 		} else if vehicleUpdateEvent.MessageType == VehicleUpdateEventTypeServiceAlert {
+			alertStarted := time.Now()
 			telemetry.Add(telemetry.ServiceAlerts, 1)
 			telemetry.Add(telemetry.ServiceAlertReferences, int64(len(vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation)))
 
-			var matchedIdentifiers []string
-			for _, identifyingInformation := range vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation {
-				if vehicleUpdateEvent.SourceType == "GTFS-RT" && identifyingInformation["TripID"] != "" {
-					telemetry.Add(telemetry.ServiceAlertJourneyLookups, 1)
-					if journeyID := consumer.identifyVehicle(vehicleUpdateEvent, vehicleUpdateEvent.SourceType, identifyingInformation); journeyID != "" {
-						matchedIdentifiers = append(matchedIdentifiers, journeyID)
+			references := vehicleUpdateEvent.ServiceAlertUpdate.IdentifyingInformation
+			var tripMatches []string
+			if vehicleUpdateEvent.SourceType == "GTFS-RT" {
+				for _, ref := range references {
+					if ref["TripID"] != "" {
+						telemetry.Add(telemetry.ServiceAlertJourneyLookups, 1)
 					}
+				}
+				var err error
+				tripMatches, err = identifiers.ResolveAlertTrips(references)
+				if err != nil {
+					// Leave the stored alert intact. The next feed refresh can
+					// resolve the failed trips without replacing it with a partial match.
+					log.Warn().Err(err).Msg("Failed to resolve service alert trips")
+					telemetry.Observe(telemetry.AlertProcessing, time.Since(alertStarted))
+					telemetry.HandledEvent(vehicleUpdateEvent.RecordedAt)
+					continue
+				}
+			}
+
+			var matchedIdentifiers []string
+			for i, identifyingInformation := range references {
+				if len(tripMatches) > 0 && tripMatches[i] != "" {
+					matchedIdentifiers = append(matchedIdentifiers, tripMatches[i])
 				}
 				if stopID := consumer.identifyStop(vehicleUpdateEvent.SourceType, identifyingInformation); stopID != "" {
 					matchedIdentifiers = append(matchedIdentifiers, stopID)
@@ -198,6 +223,7 @@ func (consumer *BatchConsumer) Consume(batch rmq.Deliveries) {
 			if writeModel != nil {
 				serviceAlertOperations = append(serviceAlertOperations, writeModel)
 			}
+			telemetry.Observe(telemetry.AlertProcessing, time.Since(alertStarted))
 		}
 		telemetry.HandledEvent(vehicleUpdateEvent.RecordedAt)
 	}
@@ -290,7 +316,16 @@ func (consumer *BatchConsumer) identifyService(sourceType string, identifyingInf
 
 func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdateEvent, sourceType string, identifyingInformation map[string]string) string {
 	started := time.Now()
-	defer func() { telemetry.Observe(telemetry.Identification, time.Since(started)) }()
+	defer func() {
+		elapsed := time.Since(started)
+		telemetry.Observe(telemetry.Identification, elapsed)
+		switch sourceType {
+		case "siri-vm":
+			telemetry.Observe(telemetry.SiriTripIdentification, elapsed)
+		case "GTFS-RT":
+			telemetry.Observe(telemetry.GTFSTripIdentification, elapsed)
+		}
+	}()
 	currentTime := time.Now()
 	yearNumber, weekNumber := currentTime.ISOWeek()
 	identifyEventsIndexName := fmt.Sprintf("realtime-identify-events-%d-%d", yearNumber, weekNumber)

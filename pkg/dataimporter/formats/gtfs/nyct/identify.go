@@ -12,17 +12,31 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var (
+	ErrTripNotFound  = errors.New("Could not find referenced trip")
+	ErrInvalidTrip   = errors.New("Invalid NYC subway trip ID or service date")
+	ErrAmbiguousTrip = errors.New("Ambiguous NYC subway trip")
+)
+
 // IdentifyJourney resolves a subway trip against the active static schedule,
 // preferring its full path and rejecting ambiguous shortened matches.
 func IdentifyJourney(tripID, startDate string) (string, error) {
+	return IdentifyJourneyWithQueryObserver(tripID, startDate, nil)
+}
+
+func IdentifyJourneyWithQueryObserver(tripID, startDate string, observe func(time.Duration)) (string, error) {
 	tripID = TripID(tripID)
 	key := TripKey(tripID)
 	date, err := time.Parse("20060102", startDate)
 	if key == "" || err != nil {
-		return "", errors.New("Invalid NYC subway trip ID or service date")
+		return "", ErrInvalidTrip
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if observe != nil {
+		started := time.Now()
+		defer func() { observe(time.Since(started)) }()
+	}
 	cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{
 		"datasource.datasetid":         SubwayDataset,
 		"otheridentifiers.GTFS-TripID": bson.M{"$regex": "^" + regexp.QuoteMeta(key) + "[A-Za-z0-9]*$"},
@@ -57,10 +71,10 @@ func IdentifyJourney(tripID, startDate string) (string, error) {
 		return exact, nil
 	}
 	if exactMatches > 1 || matches > 1 {
-		return "", errors.New("Ambiguous NYC subway trip")
+		return "", ErrAmbiguousTrip
 	}
 	if matches == 0 {
-		return "", errors.New("Could not find referenced trip")
+		return "", ErrTripNotFound
 	}
 	return matched, nil
 }

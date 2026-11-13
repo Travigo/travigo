@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -46,7 +47,6 @@ type siriJourneyCandidates struct {
 }
 
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time, findOpts ...*options.FindOptions) (siriJourneyCandidates, error) {
-	var candidates siriJourneyCandidates
 
 	// Keep precisely the fields consumed by availability, functional hashing,
 	// direction, endpoint and departure-time matching.
@@ -63,7 +63,15 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "path.origindeparturetime", Value: 1},
 		{Key: "path.destinationarrivaltime", Value: 1},
 	})
-	cursor, err := journeysCollection.Find(context.Background(), query, append(findOpts, opts)...)
+	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, append(findOpts, opts)...)
+}
+
+func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, documents telemetry.Counter, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.SiriCandidateQuery, time.Since(started)) }()
+	var candidates siriJourneyCandidates
+	defer func() { telemetry.Add(documents, int64(candidates.count)) }()
+	cursor, err := collection.Find(context.Background(), query, opts...)
 	if err != nil {
 		return candidates, err
 	}
@@ -81,7 +89,7 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		}
 
 		// if it has no availability then we'll just ignore it
-		if journey.Availability != nil && journey.Availability.MatchDate(framedVehicleJourneyDate) {
+		if journey.Availability != nil && journey.Availability.MatchDate(date) {
 			candidates.available = append(candidates.available, &journey)
 		}
 	}

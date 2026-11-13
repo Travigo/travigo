@@ -121,7 +121,7 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 		)
 
 		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "path.originstopref": "a", "path.destinationstopref": "c"}
-		got, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{})
+		got, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, "")
 		if err != nil || len(got.available) != 1 || got.available[0].PrimaryIdentifier != "journey" {
 			mt.Fatalf("unexpected candidates: %+v, %v", got, err)
 		}
@@ -155,7 +155,7 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch),
 		)
 		query := bson.M{"serviceref": "service", "path.originstopref": "a", "path.destinationstopref": "c"}
-		if _, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}); err != nil {
+		if _, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, ""); err != nil {
 			mt.Fatal(err)
 		}
 		fallback := mt.GetAllStartedEvents()[1].Command
@@ -311,4 +311,70 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 			mt.Fatal("candidate projection lost functional hash inputs")
 		}
 	})
+}
+
+func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	for _, scenario := range []struct {
+		name      string
+		ambiguous bool
+	}{
+		{name: "unique"},
+		{name: "ambiguous", ambiguous: true},
+	} {
+		mt.Run(scenario.name, func(mt *mtest.T) {
+			ns := mt.DB.Name() + "." + mt.Coll.Name()
+			id := primitive.NewObjectID()
+			ids := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, bson.D{{Key: "_id", Value: id}})
+			day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+			aimed := day.Add(90 * time.Minute)
+			row := func(id string) bson.D {
+				return bson.D{
+					{Key: "primaryidentifier", Value: id},
+					{Key: "direction", Value: "outbound"},
+					{Key: "departuretime", Value: time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)},
+					{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				}
+			}
+			rows := []bson.D{row("trip")}
+			if scenario.ambiguous {
+				rows = append(rows, row("other"))
+			}
+			candidates := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
+			mt.AddMockResponses(ids, ids, candidates, candidates, candidates)
+			query := bson.M{"serviceref": "route", "path.originstopref": "a", "path.destinationstopref": "b"}
+			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "OUTBOUND")
+			if err != nil {
+				mt.Fatal(err)
+			}
+			wantCommands := 3
+			if scenario.ambiguous {
+				wantCommands++
+			}
+			commands := mt.GetAllStartedEvents()
+			if len(commands) != wantCommands {
+				mt.Fatalf("got %d commands, want %d", len(commands), wantCommands)
+			}
+			probe := commands[2].Command
+			if _, err := probe.LookupErr("projection", "path.originstopref"); err == nil {
+				mt.Fatal("exact probe fetched path fields")
+			}
+			if _, err := probe.LookupErr("filter", "$expr"); err != nil {
+				mt.Fatal("exact probe did not constrain departure time")
+			}
+			baseline, err := getAvailableJourneys(mt.Coll, day, query, aimed)
+			if err != nil {
+				mt.Fatal(err)
+			}
+			match := func(c siriJourneyCandidates) string {
+				if j := exactSiriDepartureMatch(c, aimed, "OUTBOUND"); j != nil {
+					return j.PrimaryIdentifier
+				}
+				return ""
+			}
+			if match(got) != match(baseline) || len(got.available) != len(baseline.available) {
+				mt.Fatalf("probe result differs from baseline: %v vs %v", got, baseline)
+			}
+		})
+	}
 }

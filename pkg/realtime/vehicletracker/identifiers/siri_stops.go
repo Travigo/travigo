@@ -3,9 +3,11 @@ package identifiers
 import (
 	"context"
 	"errors"
+	"maps"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +18,7 @@ import (
 // endpoint sets the original cursor can stream results without an ID list.
 const siriStopIDLimit = 1024
 
-func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time) (siriJourneyCandidates, error) {
+func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, direction string) (siriJourneyCandidates, error) {
 	origin, hasOrigin := query["path.originstopref"]
 	destination, hasDestination := query["path.destinationstopref"]
 	if !hasOrigin || !hasDestination {
@@ -64,15 +66,39 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 
 	// Recheck both stops in case a timetable import updated a journey between
 	// reads. The _id hint keeps this fetch limited to the intersected documents.
-	return getAvailableJourneys(collection, date, bson.M{
+	fetch := bson.M{
 		"_id":                     bson.M{"$in": matches},
 		"serviceref":              services,
 		"path.originstopref":      origin,
 		"path.destinationstopref": destination,
-	}, exactDeparture, options.Find().SetHint("_id_"))
+	}
+	if !exactDeparture.IsZero() {
+		probe := maps.Clone(fetch)
+		// Timetable BSON dates can encode overnight times on a later day.
+		// Compare the UTC clock, as the existing candidate selector does.
+		probe["$expr"] = bson.M{"$cond": bson.A{
+			bson.M{"$eq": bson.A{bson.M{"$type": "$departuretime"}, "date"}},
+			bson.M{"$and": bson.A{
+				bson.M{"$eq": bson.A{bson.M{"$hour": "$departuretime"}, exactDeparture.Hour()}},
+				bson.M{"$eq": bson.A{bson.M{"$minute": "$departuretime"}, exactDeparture.Minute()}},
+			}},
+			false,
+		}}
+		candidates, err := readSiriCandidates(collection, date, probe, exactDeparture, telemetry.SiriExactProbeDocuments,
+			options.Find().SetHint("_id_").SetLimit(siriExactCandidateLimit).SetProjection(bson.M{
+				"_id": 0, "primaryidentifier": 1, "departuretime": 1, "direction": 1, "availability": 1,
+			}))
+		if err == nil && candidates.count < siriExactCandidateLimit && exactSiriDepartureMatch(candidates, exactDeparture, direction) != nil {
+			telemetry.Add(telemetry.SiriExactMatches, 1)
+			return candidates, nil
+		}
+	}
+	return getAvailableJourneys(collection, date, fetch, exactDeparture, options.Find().SetHint("_id_"))
 }
 
 func findSiriStopIDs(collection *mongo.Collection, query bson.M, index string) ([]primitive.ObjectID, bool, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.SiriStopIndexQuery, time.Since(started)) }()
 	ctx := context.Background()
 	opts := options.Find().SetHint(index).SetProjection(bson.D{{Key: "_id", Value: 1}}).SetLimit(siriStopIDLimit + 1)
 	cursor, err := collection.Find(ctx, query, opts)

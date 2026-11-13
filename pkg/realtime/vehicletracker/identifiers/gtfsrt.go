@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+var errGTFSJourneyNotFound = errors.New("Could not find referenced trip")
 
 type GTFSRT struct {
 	IdentifyingInformation map[string]string
@@ -98,7 +103,10 @@ func (r *GTFSRT) IdentifyService() (string, error) {
 }
 
 func (r *GTFSRT) IdentifyJourney() (string, error) {
+	return r.identifyJourney(telemetry.GTFSJourneyQuery)
+}
 
+func (r *GTFSRT) identifyJourney(queryStage telemetry.Stage) (string, error) {
 	tripID := r.IdentifyingInformation["TripID"]
 	if tripID == "" {
 		return "", errors.New("Missing field tripid")
@@ -110,7 +118,7 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 	}
 
 	if linkedDataset == nyct.SubwayDataset {
-		return nyct.IdentifyJourney(tripID, r.IdentifyingInformation["TripStartDate"])
+		return nyct.IdentifyJourneyWithQueryObserver(tripID, r.IdentifyingInformation["TripStartDate"], func(d time.Duration) { telemetry.Observe(queryStage, d) })
 	}
 
 	journeysCollection := database.GetCollection("journeys")
@@ -130,7 +138,7 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 		}
 		frequencyQuery["otheridentifiers.GTFS-TripStartTime"] = tripStartTime
 
-		potentialJourneys, err := findPrimaryIdentifiers(journeysCollection, frequencyQuery, 2)
+		potentialJourneys, err := findGTFSJourneyIdentifiers(journeysCollection, frequencyQuery, queryStage)
 		if err != nil {
 			return "", err
 		}
@@ -138,22 +146,25 @@ func (r *GTFSRT) IdentifyJourney() (string, error) {
 			return potentialJourneys[0], nil
 		}
 		if len(potentialJourneys) > 1 {
-			return "", errors.New("Could not find referenced trip")
+			return "", errGTFSJourneyNotFound
 		}
 	}
 
-	potentialJourneys, err := findPrimaryIdentifiers(journeysCollection, journeysQuery, 2)
+	potentialJourneys, err := findGTFSJourneyIdentifiers(journeysCollection, journeysQuery, queryStage)
 	if err != nil {
 		return "", err
 	}
 
-	if len(potentialJourneys) == 0 {
-		return "", errors.New("Could not find referenced trip")
-	} else if len(potentialJourneys) == 1 {
-		return potentialJourneys[0], nil
-	} else {
-		return "", errors.New("Could not find referenced trip")
+	if len(potentialJourneys) != 1 {
+		return "", errGTFSJourneyNotFound
 	}
+	return potentialJourneys[0], nil
+}
+
+func findGTFSJourneyIdentifiers(collection *mongo.Collection, query bson.M, stage telemetry.Stage) ([]string, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(stage, time.Since(started)) }()
+	return findPrimaryIdentifiers(collection, query, 2)
 }
 
 func datasetIDFilter(linkedDataset string) any {

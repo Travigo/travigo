@@ -47,7 +47,7 @@ func (i *SiriVM) IdentifyServices() ([]string, error) {
 
 	info := i.IdentifyingInformation
 	serviceName := i.serviceName()
-	key := siriCacheKey(info["LinkedDataset"], info["OperatorRef"], serviceName)
+	key := lookupKey(info["LinkedDataset"], info["OperatorRef"], serviceName)
 	return siriServices.get(key, func() ([]string, error) {
 		operator, err := siriOperators.get(info["OperatorRef"], func() (*ctdf.Operator, error) {
 			return getSiriOperator(info["OperatorRef"])
@@ -181,7 +181,7 @@ func (i *SiriVM) IdentifyJourney() (string, error) {
 		// A missing timetable departure decodes as midnight.
 		exactDeparture = aimed
 	}
-	key := siriCacheKey(i.SourceDataset, info["LinkedDataset"], framedVehicleJourneyDate.Format(ctdf.YearMonthDayFormat),
+	key := lookupKey(i.SourceDataset, info["LinkedDataset"], framedVehicleJourneyDate.Format(ctdf.YearMonthDayFormat),
 		info["OperatorRef"], i.serviceName(), info["VehicleJourneyRef"],
 		info["BlockRef"], info["OriginRef"], info["DestinationRef"], info["DirectionRef"],
 		aimedClock)
@@ -240,7 +240,7 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate, exactDeparture time.Time)
 	}
 	query["serviceref"] = bson.M{"$in": services}
 	started := time.Now()
-	candidates, lookupErr := getSiriStopJourneys(journeysCollection, framedVehicleJourneyDate, query, exactDeparture)
+	candidates, lookupErr := getSiriStopJourneys(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, i.IdentifyingInformation["DirectionRef"])
 	identifiedJourney, err := i.selectJourney(telemetry.SiriStops, time.Since(started), candidates, lookupErr, exactDeparture)
 
 	if err != nil {
@@ -250,7 +250,7 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate, exactDeparture time.Time)
 }
 
 func (i *SiriVM) findReferencedJourney(collection *mongo.Collection, date time.Time, services []string, ref string) (*ctdf.Journey, error) {
-	key := siriCacheKey(append([]string{ref}, services...)...)
+	key := lookupKey(append([]string{ref}, services...)...)
 	if _, ok := siriReferenceMisses.lookup(key); ok {
 		return nil, errSiriJourney
 	}
@@ -293,13 +293,17 @@ func (i *SiriVM) selectJourney(fallback telemetry.SiriFallback, lookup time.Dura
 	return journey, err
 }
 
+const siriExactCandidateLimit = 16
+
 func (i *SiriVM) exactDepartureMatch(candidates siriJourneyCandidates, aimed time.Time) *ctdf.Journey {
-	const candidateLimit = 16
-	if candidates.exactCount == 0 || candidates.exactCount >= candidateLimit {
+	return exactSiriDepartureMatch(candidates, aimed, i.IdentifyingInformation["DirectionRef"])
+}
+
+func exactSiriDepartureMatch(candidates siriJourneyCandidates, aimed time.Time, direction string) *ctdf.Journey {
+	if candidates.exactCount == 0 || candidates.exactCount >= siriExactCandidateLimit {
 		return nil
 	}
 	var match *ctdf.Journey
-	direction := i.IdentifyingInformation["DirectionRef"]
 	for _, journey := range candidates.available {
 		if !sameDepartureMinute(journey.DepartureTime.UTC(), aimed) {
 			continue

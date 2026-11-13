@@ -20,6 +20,7 @@ func TestServiceAlertsOnlyIdentifyJourneysForGTFSRefsWithTrips(t *testing.T) {
 		source       string
 		references   []map[string]string
 		collections  []string
+		queryIDs     []string
 		identifiers  []string
 		journeyCalls int64
 	}{
@@ -29,10 +30,12 @@ func TestServiceAlertsOnlyIdentifyJourneysForGTFSRefsWithTrips(t *testing.T) {
 				{"StopID": "stop", "LinkedDataset": "schedule"},
 				{"RouteID": "route", "LinkedDataset": "schedule"},
 				{"TripID": "trip", "LinkedDataset": "schedule"},
+				{"TripID": "trip-2", "LinkedDataset": "schedule"},
 			},
-			collections:  []string{"stops", "services", "journeys"},
-			identifiers:  []string{"matched-stop", "matched-service", "matched-journey"},
-			journeyCalls: 1,
+			collections:  []string{"journeys", "stops", "services"},
+			queryIDs:     []string{"", "matched-stop", "matched-service"},
+			identifiers:  []string{"matched-stop", "matched-service", "matched-journey", "matched-journey-2"},
+			journeyCalls: 2,
 		},
 		{
 			source: "siri-sx",
@@ -41,6 +44,7 @@ func TestServiceAlertsOnlyIdentifyJourneysForGTFSRefsWithTrips(t *testing.T) {
 				{"LineRef": "route", "OperatorRef": "operator", "LinkedDataset": "schedule"},
 			},
 			collections: []string{"stops", "services"},
+			queryIDs:    []string{"matched-stop", "matched-service"},
 			identifiers: []string{"matched-stop", "matched-service"},
 		},
 	} {
@@ -50,8 +54,15 @@ func TestServiceAlertsOnlyIdentifyJourneysForGTFSRefsWithTrips(t *testing.T) {
 			database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
 			mt.Cleanup(func() { database.Instance = previousDatabase })
 			for i, collection := range tc.collections {
-				mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+collection, mtest.FirstBatch,
-					bson.D{{Key: "primaryidentifier", Value: tc.identifiers[i]}}))
+				namespace := mt.DB.Name() + "." + collection
+				if collection == "journeys" {
+					mt.AddMockResponses(mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch,
+						bson.D{{Key: "primaryidentifier", Value: "matched-journey"}, {Key: "otheridentifiers", Value: bson.M{"GTFS-TripID": "trip"}}},
+						bson.D{{Key: "primaryidentifier", Value: "matched-journey-2"}, {Key: "otheridentifiers", Value: bson.M{"GTFS-TripID": "trip-2"}}}))
+				} else {
+					mt.AddMockResponses(mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch,
+						bson.D{{Key: "primaryidentifier", Value: tc.queryIDs[i]}}))
+				}
 			}
 			mt.AddMockResponses(mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 1}))
 
@@ -80,8 +91,12 @@ func TestServiceAlertsOnlyIdentifyJourneysForGTFSRefsWithTrips(t *testing.T) {
 					mt.Errorf("%s = %d, want %d", name, got, want)
 				}
 			}
-			if got := after.Stages["identification"].Count - before.Stages["identification"].Count; got != tc.journeyCalls {
-				mt.Errorf("journey identification ran %d times, want %d", got, tc.journeyCalls)
+			wantQueries := int64(0)
+			if tc.journeyCalls > 0 {
+				wantQueries = 1
+			}
+			if got := after.Stages["alert_journey_query"].Count - before.Stages["alert_journey_query"].Count; got != wantQueries {
+				mt.Errorf("alert trip resolver ran %d queries, want %d", got, wantQueries)
 			}
 			events := mt.GetAllStartedEvents()
 			if len(events) != len(tc.collections)+1 || events[len(events)-1].CommandName != "update" {

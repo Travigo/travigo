@@ -9,7 +9,7 @@ import (
 )
 
 func TestSiriCacheSharesSuccessfulLookupsAndRetriesDatabaseErrors(t *testing.T) {
-	cache := siriLookupCache[string]{limit: 2, ttl: time.Minute}
+	cache := lookupCache[string]{limit: 2, ttl: time.Minute}
 	databaseError := errors.New("database unavailable")
 	if _, err := cache.get("run", func() (string, error) { return "", databaseError }); !errors.Is(err, databaseError) {
 		t.Fatalf("got %v, want database error", err)
@@ -40,7 +40,7 @@ func TestSiriCacheSharesSuccessfulLookupsAndRetriesDatabaseErrors(t *testing.T) 
 }
 
 func TestSiriCacheReusesMissesAndKeepsRecentlyUsedEntries(t *testing.T) {
-	cache := siriLookupCache[string]{limit: 2, ttl: time.Minute}
+	cache := lookupCache[string]{limit: 2, ttl: time.Minute}
 	cache.store("miss", "", errSiriJourney)
 	cache.store("old", "journey", nil)
 

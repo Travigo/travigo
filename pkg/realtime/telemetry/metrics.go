@@ -18,10 +18,23 @@ const (
 	Batch
 	Redis
 	SiriServices
+	SiriCandidateQuery
+	SiriStopIndexQuery
+	TrackedJourneyQuery
+	GTFSJourneyQuery
+	AlertJourneyQuery
+	SiriTripIdentification
+	GTFSTripIdentification
+	SiriTripUpdate
+	GTFSTripUpdate
+	AlertProcessing
 	stageCount
 )
 
-var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis", "siri_services"}
+var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis", "siri_services",
+	"siri_candidate_query", "siri_stop_index_query", "tracked_journey_query", "gtfs_journey_query", "alert_journey_query",
+	"siri_trip_identification", "gtfs_trip_identification", "siri_trip_update", "gtfs_trip_update", "alert_processing",
+}
 
 type measurement struct{ count, total, max atomic.Int64 }
 
@@ -62,6 +75,11 @@ const (
 	ServiceAlerts
 	ServiceAlertReferences
 	ServiceAlertJourneyLookups
+	SiriCandidateDocuments
+	SiriExactProbeDocuments
+	SiriExactMatches
+	AlertJourneyCacheHits
+	TrackedJourneyBytes
 	counterCount
 )
 
@@ -69,6 +87,7 @@ var counterNames = [counterCount]string{
 	"received", "handled", "update_failed", "malformed", "stale", "cache_hit", "cache_miss", "cache_evicted",
 	"redis_commands", "redis_errors", "siri_gtfs_suppressed_fresh", "siri_gtfs_suppressed_cached",
 	"service_alerts", "service_alert_references", "service_alert_journey_lookups",
+	"siri_candidate_documents", "siri_exact_probe_documents", "siri_exact_matches", "alert_journey_cache_hits", "tracked_journey_bson_bytes",
 }
 var counters [counterCount]atomic.Int64
 
@@ -101,12 +120,13 @@ type Timing struct {
 func timing(m *measurement) Timing { return Timing{m.count.Load(), m.total.Load(), m.max.Load()} }
 
 type Report struct {
-	Stages            map[string]Timing             `json:"stages"`
-	Counters          map[string]int64              `json:"counters"`
-	CommittedEventAge AgeTiming                     `json:"committed_event_age"`
-	HandledEventAge   AgeTiming                     `json:"handled_event_age"`
-	LastHandledUnixMS int64                         `json:"last_handled_unix_ms"`
-	SiriMatching      map[string]SiriFallbackReport `json:"siri_matching"`
+	Stages              map[string]Timing             `json:"stages"`
+	Counters            map[string]int64              `json:"counters"`
+	CommittedEventAge   AgeTiming                     `json:"committed_event_age"`
+	HandledEventAge     AgeTiming                     `json:"handled_event_age"`
+	LastHandledUnixMS   int64                         `json:"last_handled_unix_ms"`
+	TrackedJourneyLoads JourneyLoadSample             `json:"tracked_journey_load_sample"`
+	SiriMatching        map[string]SiriFallbackReport `json:"siri_matching"`
 }
 
 func Snapshot() Report {
@@ -117,13 +137,18 @@ func Snapshot() Report {
 	for i, name := range counterNames {
 		r.Counters[name] = counters[i].Load()
 	}
+	r.TrackedJourneyLoads = trackedJourneyLoadSample()
 	r.SiriMatching = make(map[string]SiriFallbackReport, len(siriFallbackNames))
 	for i, name := range siriFallbackNames {
 		m := &siriFallbacks[i]
-		r.SiriMatching[name] = SiriFallbackReport{
+		report := SiriFallbackReport{
 			Lookup: timing(&m.lookup), Narrowing: timing(&m.narrowing),
 			Candidates: m.candidates.Load(), Available: m.available.Load(), Matches: m.matches.Load(),
 		}
+		if SiriFallback(i) == SiriStops {
+			report.LookupBuckets = siriStopBuckets()
+		}
+		r.SiriMatching[name] = report
 	}
 	return r
 }

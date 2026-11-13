@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	siriOperators = siriLookupCache[*ctdf.Operator]{limit: 512, ttl: 5 * time.Minute}
-	siriServices  = siriLookupCache[[]string]{limit: 2048, ttl: 5 * time.Minute}
-	siriJourneys  = siriLookupCache[string]{limit: 8192, ttl: 5 * time.Minute, missTTL: 2 * time.Minute}
+	siriOperators = lookupCache[*ctdf.Operator]{limit: 512, ttl: 5 * time.Minute}
+	siriServices  = lookupCache[[]string]{limit: 2048, ttl: 5 * time.Minute}
+	siriJourneys  = lookupCache[string]{limit: 8192, ttl: 5 * time.Minute, missTTL: 2 * time.Minute}
 	// Cache empty reference lookups, without retaining candidate journey paths.
-	siriReferenceMisses = siriLookupCache[struct{}]{limit: 8192, ttl: 2 * time.Minute}
+	siriReferenceMisses = lookupCache[struct{}]{limit: 8192, ttl: 2 * time.Minute}
 )
 
 type siriCacheEntry[T any] struct {
@@ -25,7 +25,7 @@ type siriCacheEntry[T any] struct {
 	until time.Time
 }
 
-type siriLookupCache[T any] struct {
+type lookupCache[T any] struct {
 	mu      sync.Mutex
 	entries map[string]*list.Element
 	recent  list.List
@@ -35,12 +35,12 @@ type siriLookupCache[T any] struct {
 	missTTL time.Duration
 }
 
-func siriCacheKey(parts ...string) string {
+func lookupKey(parts ...string) string {
 	key, _ := json.Marshal(parts)
 	return string(key)
 }
 
-func (c *siriLookupCache[T]) get(key string, load func() (T, error)) (T, error) {
+func (c *lookupCache[T]) get(key string, load func() (T, error)) (T, error) {
 	if entry, ok := c.lookup(key); ok {
 		return entry.value, entry.err
 	}
@@ -62,7 +62,7 @@ func (c *siriLookupCache[T]) get(key string, load func() (T, error)) (T, error) 
 	return entry.value, entry.err
 }
 
-func (c *siriLookupCache[T]) store(key string, value T, err error) siriCacheEntry[T] {
+func (c *lookupCache[T]) store(key string, value T, err error) siriCacheEntry[T] {
 	ttl := c.ttl
 	if err != nil {
 		ttl = c.missTTL
@@ -87,7 +87,7 @@ func (c *siriLookupCache[T]) store(key string, value T, err error) siriCacheEntr
 	return entry
 }
 
-func (c *siriLookupCache[T]) lookup(key string) (siriCacheEntry[T], bool) {
+func (c *lookupCache[T]) lookup(key string) (siriCacheEntry[T], bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	element, ok := c.entries[key]

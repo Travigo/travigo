@@ -126,7 +126,23 @@ func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
 func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
 	var journey *ctdf.Journey
 	journeysCollection := database.GetCollection("journeys")
-	err := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}).Decode(&journey)
+	// Preserve geometry, embedded stops, timetable times and passenger-facing
+	// fields used by realtime storage and notifications. Matching availability
+	// and importer identifiers are used by the identifiers' own queries.
+	projection := options.FindOne().SetProjection(bson.M{
+		"_id": 0, "primaryidentifier": 1, "modificationdatetime": 1,
+		"serviceref": 1, "operatorref": 1, "departuretime": 1, "departuretimezone": 1,
+		"destinationdisplay": 1, "replacesjourneyrefs": 1, "path": 1,
+		"track": 1, "trackref": 1,
+	})
+	started := time.Now()
+	result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}, projection)
+	raw, err := result.Raw()
+	if err == nil {
+		err = result.Decode(&journey)
+		telemetry.Add(telemetry.TrackedJourneyBytes, int64(len(raw)))
+	}
+	telemetry.ObserveTrackedJourneyLoad(journeyID, time.Since(started))
 
 	return journey, err
 }
