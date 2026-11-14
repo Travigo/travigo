@@ -164,7 +164,7 @@ func repairMissingJourneyTimes(journey *ctdf.Journey) error {
 		return ctdf.InterpolateMissingJourneyTimes(journey)
 	}
 	for origin, destination := range journey.LegCalls() {
-		if origin.Departure.IsZero() || destination.ArrivalTime().IsZero() {
+		if origin.Departure.IsZero() || destination.Arrival.IsZero() {
 			return ctdf.InterpolateMissingJourneyTimes(journey)
 		}
 	}
@@ -224,10 +224,7 @@ func departureGraphFindOptions() *options.FindOptions {
 		{Key: "calls.arrival", Value: 1},
 		{Key: "calls.departure", Value: 1},
 		{Key: "calls.platform", Value: 1},
-		{Key: "calls.incomingarrival", Value: 1},
-		{Key: "calls.incomingplatform", Value: 1},
-		{Key: "calls.originactivity", Value: 1},
-		{Key: "calls.destinationactivity", Value: 1},
+		{Key: "calls.activity", Value: 1},
 		{Key: "calls.outgoing.destinationdisplay", Value: 1},
 	})
 }

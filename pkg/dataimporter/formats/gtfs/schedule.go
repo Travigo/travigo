@@ -22,7 +22,6 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -845,24 +844,15 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				stopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
 			}
 			call := ctdf.JourneyCall{
-				StopRef:             stopRef,
-				Arrival:             arrivalTime,
-				Departure:           departureTime,
-				OriginActivity:      make([]ctdf.JourneyPathItemActivity, 0, 2),
-				DestinationActivity: make([]ctdf.JourneyPathItemActivity, 0, 2),
-				Start:               index == 0,
-				End:                 index == len(stopTimes)-1,
+				StopRef:   stopRef,
+				Arrival:   arrivalTime,
+				Departure: departureTime,
+				Activity:  gtfsStopTimeActivity(stopTime),
+				Start:     index == 0,
+				End:       index == len(stopTimes)-1,
 			}
 			if index+1 < len(stopTimes) && stopTimes[index+1].StopHeadsign != "" {
 				call.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: stopTimes[index+1].StopHeadsign}
-			}
-			if stopTime.DropOffType == 0 {
-				call.OriginActivity = append(call.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
-				call.DestinationActivity = append(call.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
-			}
-			if stopTime.PickupType == 0 {
-				call.OriginActivity = append(call.OriginActivity, ctdf.JourneyPathItemActivityPickup)
-				call.DestinationActivity = append(call.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
 			}
 			journey.Calls[index] = call
 			if index == 0 {
@@ -1083,6 +1073,21 @@ func convertTransportType(intType int) ctdf.TransportType {
 	}
 }
 
+func gtfsStopTimeActivity(stopTime StopTime) []ctdf.JourneyPathItemActivity {
+	// Type 1 forbids the action. Types 2 and 3 still allow it by arrangement.
+	activity := make([]ctdf.JourneyPathItemActivity, 0, 2)
+	if stopTime.DropOffType != 1 {
+		activity = append(activity, ctdf.JourneyPathItemActivitySetdown)
+	}
+	if stopTime.PickupType != 1 {
+		activity = append(activity, ctdf.JourneyPathItemActivityPickup)
+	}
+	if len(activity) == 0 {
+		activity = append(activity, ctdf.JourneyPathItemActivityPass)
+	}
+	return activity
+}
+
 func parseOptionalGTFSTime(timestamp string) (time.Time, error) {
 	if strings.TrimSpace(timestamp) == "" {
 		return time.Time{}, nil
@@ -1196,17 +1201,6 @@ func cloneJourneyWithTimeShift(journey *ctdf.Journey, offset time.Duration) *ctd
 			}
 			if !callClone.Departure.IsZero() {
 				callClone.Departure = callClone.Departure.Add(offset)
-			}
-			if call.IncomingArrival != nil {
-				incomingArrival := *call.IncomingArrival
-				if !incomingArrival.Time().IsZero() {
-					incomingArrival = primitive.NewDateTimeFromTime(incomingArrival.Time().Add(offset))
-				}
-				callClone.IncomingArrival = &incomingArrival
-			}
-			if call.IncomingPlatform != nil {
-				incomingPlatform := *call.IncomingPlatform
-				callClone.IncomingPlatform = &incomingPlatform
 			}
 			if call.Outgoing != nil {
 				outgoing := *call.Outgoing

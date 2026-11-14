@@ -54,7 +54,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if boardType == "" {
 		boardType = ctdf.BoardTypeDeparture
 	}
-	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v4/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
+	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v5/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
 	stopField := "originstoprefs"
 	if boardType.IsArrival() {
 		stopField = "destinationstoprefs"
@@ -430,6 +430,9 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		if err := cursor.Decode(&journey); err != nil {
 			return nil, fmt.Errorf("decode board journey: %w", err)
 		}
+		if err := journey.ValidatePath(); err != nil {
+			return nil, fmt.Errorf("validate board journey: %w", err)
+		}
 		if journey.Availability == nil {
 			log.Warn().Str("journey", journey.PrimaryIdentifier).Msg("Skipping board journey without availability")
 			continue
@@ -490,6 +493,9 @@ func loadDynamicJourneys(filter bson.M) ([]*ctdf.Journey, error) {
 		var journey ctdf.Journey
 		if err := cursor.Decode(&journey); err != nil {
 			return nil, fmt.Errorf("decode dynamic journey: %w", err)
+		}
+		if err := journey.ValidatePath(); err != nil {
+			return nil, fmt.Errorf("validate dynamic board journey: %w", err)
 		}
 		journeys = append(journeys, &journey)
 	}

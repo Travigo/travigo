@@ -20,8 +20,12 @@ const journeyPathUpdateBatchSize = 1000
 
 type serviceJourneyStats struct {
 	Scanned int
-	Updated int
 	Batches int
+	// One model can target both the live and raw collections. These counts
+	// represent document writes across both collections.
+	Modified  int64
+	Unmatched int64
+	Unchanged int64
 }
 
 // ApplyDataset replaces track references previously owned by datasetID and
@@ -87,8 +91,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 		return err
 	}
 	log.Info().Int("services", len(services)).Int("routes", len(routes)).Msg("Loaded journey track enrichment inputs")
-	totalScanned := 0
-	totalUpdated := 0
+	var total serviceJourneyStats
 	changedRawDatasets := map[string]struct{}{}
 	for serviceIndex, service := range services {
 		candidates := append([]Route{}, routesByServiceName[serviceKey(service.TransportType, service.LineName())]...)
@@ -104,14 +107,18 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 		if err != nil {
 			return err
 		}
-		totalScanned += stats.Scanned
-		totalUpdated += stats.Updated
+		total.Scanned += stats.Scanned
+		total.Modified += stats.Modified
+		total.Unmatched += stats.Unmatched
+		total.Unchanged += stats.Unchanged
 		log.Info().
 			Int("service", serviceIndex+1).
 			Int("services", len(services)).
 			Str("service_ref", service.PrimaryIdentifier).
 			Int("journeys_scanned", stats.Scanned).
-			Int("journeys_updated", stats.Updated).
+			Int64("journey_documents_modified", stats.Modified).
+			Int64("journey_writes_unmatched", stats.Unmatched).
+			Int64("journey_writes_unchanged", stats.Unchanged).
 			Int("write_batches", stats.Batches).
 			Dur("elapsed", time.Since(startedAt)).
 			Msg("Applied journey tracks for service")
@@ -131,7 +138,13 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 			return fmt.Errorf("mark enriched raw journey datasets for publication: %w", err)
 		}
 	}
-	log.Info().Int("services", len(services)).Int("journeys_scanned", totalScanned).Int("journeys_updated", totalUpdated).Msg("Completed journey track enrichment")
+	log.Info().
+		Int("services", len(services)).
+		Int("journeys_scanned", total.Scanned).
+		Int64("journey_documents_modified", total.Modified).
+		Int64("journey_writes_unmatched", total.Unmatched).
+		Int64("journey_writes_unchanged", total.Unchanged).
+		Msg("Completed journey track enrichment")
 	return nil
 }
 
@@ -251,8 +264,14 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 		if len(models) == 0 {
 			return nil
 		}
-		if err := bulkWriteJourneyPaths(ctx, models, writeCollectionNames); err != nil {
-			return err
+		for _, collectionName := range writeCollectionNames {
+			result, err := database.GetCollection(collectionName).BulkWrite(ctx, models)
+			if err != nil {
+				return fmt.Errorf("update journey paths in %s: %w", collectionName, err)
+			}
+			stats.Modified += result.ModifiedCount
+			stats.Unmatched += int64(len(models)) - result.MatchedCount
+			stats.Unchanged += result.MatchedCount - result.ModifiedCount
 		}
 		stats.Batches++
 		models = models[:0]
@@ -284,7 +303,6 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 				return stats, err
 			}
 			models = append(models, model)
-			stats.Updated++
 			if len(models) == journeyPathUpdateBatchSize {
 				if err := flush(); err != nil {
 					return stats, err
@@ -292,7 +310,14 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 			}
 		}
 		if stats.Scanned%100000 == 0 {
-			log.Info().Int("journeys_scanned", stats.Scanned).Int("journeys_updated", stats.Updated).Int("write_batches", stats.Batches).Dur("elapsed", time.Since(startedAt)).Msg("Journey track service progress")
+			log.Info().
+				Int("journeys_scanned", stats.Scanned).
+				Int64("journey_documents_modified", stats.Modified).
+				Int64("journey_writes_unmatched", stats.Unmatched).
+				Int64("journey_writes_unchanged", stats.Unchanged).
+				Int("write_batches", stats.Batches).
+				Dur("elapsed", time.Since(startedAt)).
+				Msg("Journey track service progress")
 		}
 	}
 	if err := cursor.Err(); err != nil {
@@ -356,15 +381,6 @@ func applyOSMRailRoutes(ctx context.Context, journey *ctdf.Journey, candidates m
 		changed = changed || updated
 	}
 	return changed, nil
-}
-
-func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, collectionNames []string) error {
-	for _, collectionName := range collectionNames {
-		if _, err := database.GetCollection(collectionName).BulkWrite(ctx, models); err != nil {
-			return fmt.Errorf("update journey paths in %s: %w", collectionName, err)
-		}
-	}
-	return nil
 }
 
 var enrichmentJourneyProjection = bson.M{

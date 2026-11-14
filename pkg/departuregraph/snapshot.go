@@ -332,7 +332,7 @@ func (g *Graph) restore(path string) error {
 				record := restored.Journeys[journey]
 				for pathIndex := uint32(0); pathIndex < record.PathCount; pathIndex++ {
 					path := restored.Paths[record.PathStart+pathIndex]
-					if path.OriginStopRef == 0 || path.OriginActivity == activitySetdown {
+					if path.OriginStopRef == 0 || !canBoardAt(path.OriginActivity) {
 						continue
 					}
 					if entry, ok := packDepartureEntry(journey, pathIndex, path.OriginDeparture); ok {
@@ -441,7 +441,7 @@ func (d *graphData) repairLegacySnapshotTimes() error {
 		for origin, destination := range journey.LegCalls() {
 			stored := &d.Paths[int(record.PathStart)+offset]
 			stored.OriginDeparture = serviceSeconds(origin.Departure)
-			stored.DestinationArrival = serviceSeconds(destination.ArrivalTime())
+			stored.DestinationArrival = serviceSeconds(destination.Arrival)
 			if _, ok := packDepartureEntry(0, 0, stored.OriginDeparture); !ok {
 				return fmt.Errorf("snapshot journey time remains out of bounds")
 			}
@@ -474,7 +474,7 @@ func (d *graphData) repairLegacySnapshotTimes() error {
 			record := d.Journeys[id]
 			for index := uint32(0); index < record.PathCount; index++ {
 				path := d.Paths[record.PathStart+index]
-				if path.OriginStopRef == 0 || path.OriginActivity == activitySetdown {
+				if path.OriginStopRef == 0 || !canBoardAt(path.OriginActivity) {
 					continue
 				}
 				entry, _ := packDepartureEntry(id, index, path.OriginDeparture)

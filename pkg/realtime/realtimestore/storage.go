@@ -9,7 +9,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type storedRealtimeJourney struct {
@@ -57,20 +56,17 @@ type storedJourney struct {
 // Realtime snapshots keep timetable calls and track refs without hydrated
 // stops, track coordinates or request-only data.
 type storedJourneyCall struct {
-	StopRef             string                         `json:"s"`
-	Arrival             *time.Time                     `json:"a,omitempty"`
-	Departure           *time.Time                     `json:"d,omitempty"`
-	Platform            string                         `json:"p,omitempty"`
-	IncomingArrival     *primitive.DateTime            `json:"ia,omitempty"`
-	IncomingPlatform    *string                        `json:"ip,omitempty"`
-	OriginActivity      []ctdf.JourneyPathItemActivity `json:"ox,omitempty"`
-	DestinationActivity []ctdf.JourneyPathItemActivity `json:"dx,omitempty"`
-	Start               bool                           `json:"start,omitempty"`
-	End                 bool                           `json:"end,omitempty"`
-	Distance            int                            `json:"di,omitempty"`
-	DestinationDisplay  string                         `json:"dd,omitempty"`
-	TrackRef            string                         `json:"tr,omitempty"`
-	PassingPath         []string                       `json:"pp,omitempty"`
+	StopRef            string                         `json:"s"`
+	Arrival            *time.Time                     `json:"a,omitempty"`
+	Departure          *time.Time                     `json:"d,omitempty"`
+	Platform           string                         `json:"p,omitempty"`
+	Activity           []ctdf.JourneyPathItemActivity `json:"x,omitempty"`
+	Start              bool                           `json:"start,omitempty"`
+	End                bool                           `json:"end,omitempty"`
+	Distance           int                            `json:"di,omitempty"`
+	DestinationDisplay string                         `json:"dd,omitempty"`
+	TrackRef           string                         `json:"tr,omitempty"`
+	PassingPath        []string                       `json:"pp,omitempty"`
 }
 
 type storedService struct {
@@ -190,10 +186,7 @@ func storedJourneyCallsFromCTDF(calls []ctdf.JourneyCall) []storedJourneyCall {
 			item.Departure = &call.Departure
 		}
 		item.Platform = call.Platform
-		item.IncomingArrival = call.IncomingArrival
-		item.IncomingPlatform = call.IncomingPlatform
-		item.OriginActivity = call.OriginActivity
-		item.DestinationActivity = call.DestinationActivity
+		item.Activity = call.Activity
 		item.Start, item.End = call.Start, call.End
 		if leg := call.Outgoing; leg != nil {
 			item.Distance = leg.Distance
@@ -348,10 +341,7 @@ func (stored *storedJourney) calls() []ctdf.JourneyCall {
 			call.Departure = *item.Departure
 		}
 		call.Platform = item.Platform
-		call.IncomingArrival = item.IncomingArrival
-		call.IncomingPlatform = item.IncomingPlatform
-		call.OriginActivity = item.OriginActivity
-		call.DestinationActivity = item.DestinationActivity
+		call.Activity = item.Activity
 		call.Start, call.End = item.Start, item.End
 		if item.Distance != 0 || item.DestinationDisplay != "" || item.TrackRef != "" || len(item.PassingPath) != 0 {
 			call.Outgoing = &ctdf.JourneyLeg{

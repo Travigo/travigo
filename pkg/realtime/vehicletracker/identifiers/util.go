@@ -65,7 +65,6 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "calls.end", Value: 1},
 		{Key: "calls.arrival", Value: 1},
 		{Key: "calls.departure", Value: 1},
-		{Key: "calls.incomingarrival", Value: 1},
 	})
 	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, true, append(findOpts, opts)...)
 }

@@ -3,9 +3,8 @@ package ctdf
 import (
 	"fmt"
 	"iter"
+	"slices"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // JourneyCall represents one visit to a stop. At a gap the previous segment
@@ -17,16 +16,10 @@ type JourneyCall struct {
 	Departure time.Time `bson:"departure,omitempty" groups:"basic,departureboard-cache,web-journey"`
 	Platform  string    `bson:"platform,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
 
-	// Some timing links describe the incoming side differently from the
-	// outgoing side of the same visit, including an explicitly missing value.
-	IncomingArrival  *primitive.DateTime `bson:"incomingarrival,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
-	IncomingPlatform *string             `bson:"incomingplatform,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
-
-	OriginActivity      []JourneyPathItemActivity `bson:"originactivity" groups:"basic,departureboard-cache,web-journey"`
-	DestinationActivity []JourneyPathItemActivity `bson:"destinationactivity" groups:"basic,departureboard-cache,web-journey"`
-	Start               bool                      `bson:"start,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
-	End                 bool                      `bson:"end,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
-	Outgoing            *JourneyLeg               `bson:"outgoing,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
+	Activity []JourneyPathItemActivity `bson:"activity" groups:"basic,departureboard-cache,web-journey"`
+	Start    bool                      `bson:"start,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
+	End      bool                      `bson:"end,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
+	Outgoing *JourneyLeg               `bson:"outgoing,omitempty" json:",omitempty" groups:"basic,departureboard-cache,web-journey"`
 }
 
 // JourneyLeg holds metadata for the connection to the next call. Its
@@ -38,20 +31,6 @@ type JourneyLeg struct {
 	PassingPath        []string             `bson:"passingpath,omitempty" json:"-"`
 	Track              []Location           `bson:"-" json:",omitempty" groups:"basic,web-journey"`
 	TrackDataSource    *DataSourceReference `bson:"-" json:",omitempty" groups:"basic,web-journey"`
-}
-
-func (c JourneyCall) ArrivalTime() time.Time {
-	if c.IncomingArrival != nil {
-		return c.IncomingArrival.Time().UTC()
-	}
-	return c.Arrival
-}
-
-func (c JourneyCall) ArrivalPlatform() string {
-	if c.IncomingPlatform != nil {
-		return *c.IncomingPlatform
-	}
-	return c.Platform
 }
 
 // LegCalls yields the endpoints of each leg in order, skipping gaps.
@@ -195,7 +174,7 @@ func journeyCallsFromLegs(legs []*JourneyPathItem) ([]JourneyCall, error) {
 		call := JourneyCall{
 			StopRef: leg.OriginStopRef, Stop: leg.OriginStop,
 			Arrival: leg.OriginArrivalTime, Departure: leg.OriginDepartureTime,
-			Platform: leg.OriginPlatform, OriginActivity: leg.OriginActivity,
+			Platform: leg.OriginPlatform, Activity: leg.OriginActivity,
 		}
 		if leg.Distance != 0 || leg.DestinationDisplay != "" || leg.TrackRef != "" ||
 			len(leg.PassingPath) != 0 || len(leg.Track) != 0 || leg.TrackDataSource != nil {
@@ -214,14 +193,13 @@ func journeyCallsFromLegs(legs []*JourneyPathItem) ([]JourneyCall, error) {
 				if call.Stop == nil {
 					call.Stop = incoming.DestinationStop
 				}
-				if !incoming.DestinationArrivalTime.Equal(call.Arrival) {
-					arrival := primitive.NewDateTimeFromTime(incoming.DestinationArrivalTime)
-					call.IncomingArrival = &arrival
+				if !incoming.DestinationArrivalTime.IsZero() {
+					call.Arrival = incoming.DestinationArrivalTime
 				}
-				if incoming.DestinationPlatform != call.Platform {
-					call.IncomingPlatform = &incoming.DestinationPlatform
+				if call.Platform == "" {
+					call.Platform = incoming.DestinationPlatform
 				}
-				call.DestinationActivity = incoming.DestinationActivity
+				call.Activity = mergeJourneyCallActivity(incoming.DestinationActivity, leg.OriginActivity)
 			} else {
 				calls = append(calls, journeySegmentEnd(incoming))
 				call.Start = true
@@ -235,11 +213,35 @@ func journeyCallsFromLegs(legs []*JourneyPathItem) ([]JourneyCall, error) {
 	return calls, nil
 }
 
+// Timing-link feeds can disagree about activity at the same visit. The
+// incoming link governs alighting and the outgoing link governs boarding.
+func mergeJourneyCallActivity(incoming, outgoing []JourneyPathItemActivity) []JourneyPathItemActivity {
+	if len(incoming) == 0 && len(outgoing) == 0 {
+		return outgoing
+	}
+	pickup := journeyActivityAllows(outgoing, JourneyPathItemActivityPickup)
+	setdown := journeyActivityAllows(incoming, JourneyPathItemActivitySetdown)
+	switch {
+	case pickup && setdown:
+		return []JourneyPathItemActivity{JourneyPathItemActivityPickup, JourneyPathItemActivitySetdown}
+	case pickup:
+		return []JourneyPathItemActivity{JourneyPathItemActivityPickup}
+	case setdown:
+		return []JourneyPathItemActivity{JourneyPathItemActivitySetdown}
+	default:
+		return []JourneyPathItemActivity{JourneyPathItemActivityPass}
+	}
+}
+
+func journeyActivityAllows(activity []JourneyPathItemActivity, permission JourneyPathItemActivity) bool {
+	return len(activity) == 0 || slices.Contains(activity, permission)
+}
+
 func journeySegmentEnd(incoming *JourneyPathItem) JourneyCall {
 	return JourneyCall{
 		StopRef: incoming.DestinationStopRef, Stop: incoming.DestinationStop,
 		Arrival: incoming.DestinationArrivalTime, Platform: incoming.DestinationPlatform,
-		DestinationActivity: incoming.DestinationActivity, End: true,
+		Activity: incoming.DestinationActivity, End: true,
 	}
 }
 
@@ -271,10 +273,10 @@ func journeyPathItem(origin, destination *JourneyCall) JourneyPathItem {
 	item := JourneyPathItem{
 		OriginStopRef: origin.StopRef, OriginStop: origin.Stop,
 		OriginArrivalTime: origin.Arrival, OriginDepartureTime: origin.Departure,
-		OriginPlatform: origin.Platform, OriginActivity: origin.OriginActivity,
+		OriginPlatform: origin.Platform, OriginActivity: origin.Activity,
 		DestinationStopRef: destination.StopRef, DestinationStop: destination.Stop,
-		DestinationArrivalTime: destination.ArrivalTime(),
-		DestinationPlatform:    destination.ArrivalPlatform(), DestinationActivity: destination.DestinationActivity,
+		DestinationArrivalTime: destination.Arrival,
+		DestinationPlatform:    destination.Platform, DestinationActivity: destination.Activity,
 	}
 	if origin.Outgoing != nil {
 		item.Distance = origin.Outgoing.Distance

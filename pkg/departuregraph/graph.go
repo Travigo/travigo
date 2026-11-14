@@ -907,6 +907,14 @@ const (
 	activityPass
 )
 
+func canBoardAt(activity uint8) bool {
+	return activity == 0 || activity&activityPickup != 0
+}
+
+func canAlightAt(activity uint8) bool {
+	return activity == 0 || activity&activitySetdown != 0
+}
+
 func packActivities(values []ctdf.JourneyPathItemActivity) uint8 {
 	var result uint8
 	for _, value := range values {
@@ -1022,7 +1030,7 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 	firstOrigin := &journey.Calls[0]
 	index := 0
 	for origin, destination := range journey.LegCalls() {
-		if origin == nil || destination == nil || origin.Departure.IsZero() || destination.ArrivalTime().IsZero() {
+		if origin == nil || destination == nil || origin.Departure.IsZero() || destination.Arrival.IsZero() {
 			d.rejectedJourneyDays++
 			return false
 		}
@@ -1030,7 +1038,7 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 			d.rejectedJourneyDays++
 			return false
 		}
-		if _, ok := packDepartureEntry(0, 0, serviceSeconds(destination.ArrivalTime())); !ok {
+		if _, ok := packDepartureEntry(0, 0, serviceSeconds(destination.Arrival)); !ok {
 			d.rejectedJourneyDays++
 			return false
 		}
@@ -1091,9 +1099,9 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 				OriginPlatform:      d.intern(origin.Platform),
 				DestinationDisplay:  d.intern(outgoingDisplay(origin)),
 				OriginDeparture:     serviceSeconds(origin.Departure),
-				DestinationArrival:  serviceSeconds(destination.ArrivalTime()),
-				OriginActivity:      packActivities(origin.OriginActivity),
-				DestinationActivity: packActivities(destination.DestinationActivity),
+				DestinationArrival:  serviceSeconds(destination.Arrival),
+				OriginActivity:      packActivities(origin.Activity),
+				DestinationActivity: packActivities(destination.Activity),
 			})
 		}
 
@@ -1111,7 +1119,7 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 	record := d.Journeys[id]
 	for index := uint32(0); index < record.PathCount; index++ {
 		path := d.Paths[record.PathStart+index]
-		if d.stringValue(path.OriginStopRef) != "" && path.OriginActivity != activitySetdown {
+		if d.stringValue(path.OriginStopRef) != "" && canBoardAt(path.OriginActivity) {
 			key := bucketKey{Day: day, StopRef: path.OriginStopRef}
 			if entry, ok := packDepartureEntry(id, index, path.OriginDeparture); ok {
 				d.Departures[key] = append(d.Departures[key], entry)
@@ -1244,11 +1252,11 @@ func filterJourneyWindow(journeys []*ctdf.Journey, stopRefs []string, serviceDat
 			if _, exists := requested[origin.StopRef]; !exists {
 				continue
 			}
-			// Performance Review [Set G] [PR080] [P2] (boards): Cold-fill filtering counts setdown-only
-			// calls toward limit, unlike the stored departure index. With limit=1 an
-			// earlier setdown call displaces the next boardable journey, so cold and
-			// warm requests differ. Apply the same activity/occurrence eligibility
-			// before truncation in both paths and test their result parity.
+			if !canBoardAt(packActivities(origin.Activity)) {
+				continue
+			}
+			// Keep cold-fill eligibility aligned with the stored departure index
+			// before applying the candidate limit.
 			departureSeconds := serviceSeconds(origin.Departure)
 			if hasThreshold && departureSeconds < threshold {
 				continue
@@ -1349,14 +1357,14 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 		}
 		origin.Departure = serviceTime(path.OriginDeparture)
 		origin.Platform = d.stringValue(path.OriginPlatform)
-		origin.OriginActivity = unpackActivities(path.OriginActivity)
+		origin.Activity = unpackActivities(path.OriginActivity)
 		display := d.stringValue(path.DestinationDisplay)
 		if display != "" {
 			origin.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: display}
 		}
 		journey.Calls = append(journey.Calls, ctdf.JourneyCall{
 			StopRef: destinationRef, Arrival: serviceTime(path.DestinationArrival),
-			DestinationActivity: unpackActivities(path.DestinationActivity),
+			Activity: unpackActivities(path.DestinationActivity),
 		})
 		if index+1 == record.PathCount || d.stringValue(d.Paths[record.PathStart+index+1].OriginStopRef) != destinationRef {
 			journey.Calls[len(journey.Calls)-1].End = true

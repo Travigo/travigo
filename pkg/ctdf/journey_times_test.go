@@ -44,43 +44,6 @@ func TestInterpolateMissingJourneyTimesPreservesKnownDwell(t *testing.T) {
 	}
 }
 
-func TestInterpolateMissingJourneyTimesPreservesArrivalSides(t *testing.T) {
-	start := time.Date(0, 1, 1, 8, 0, 0, 0, time.UTC)
-	journey := &Journey{Calls: JourneyCallsFromLegs(
-		&JourneyPathItem{
-			OriginStopRef: "a", DestinationStopRef: "b",
-			OriginDepartureTime: start, DestinationArrivalTime: start.Add(5 * time.Minute),
-		},
-		&JourneyPathItem{
-			OriginStopRef: "b", DestinationStopRef: "c",
-			OriginArrivalTime: start.Add(7 * time.Minute), OriginDepartureTime: start.Add(8 * time.Minute),
-			DestinationArrivalTime: start.Add(12 * time.Minute),
-		},
-	)}
-
-	call := &journey.Calls[1]
-	if call.IncomingArrival == nil {
-		t.Fatal("fixture did not preserve the incoming arrival")
-	}
-	if err := InterpolateMissingJourneyTimes(journey); err != nil {
-		t.Fatal(err)
-	}
-	if !call.Arrival.Equal(start.Add(7*time.Minute)) || !call.ArrivalTime().Equal(start.Add(5*time.Minute)) {
-		t.Fatalf("interpolation changed the call's arrival sides: %#v", *call)
-	}
-
-	journey.Calls[1] = JourneyCallsFromLegs(
-		&JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", OriginDepartureTime: start},
-		&JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "c", OriginArrivalTime: start.Add(7 * time.Minute), OriginDepartureTime: start.Add(8 * time.Minute)},
-	)[1]
-	if err := InterpolateMissingJourneyTimes(journey); err != nil {
-		t.Fatal(err)
-	}
-	if !call.ArrivalTime().Equal(start.Add(7*time.Minute)) || !call.Arrival.Equal(start.Add(7*time.Minute)) {
-		t.Fatalf("failed to repair the missing incoming arrival: %#v", *call)
-	}
-}
-
 func TestInterpolateMissingJourneyTimesRejectsUnresolvableTrips(t *testing.T) {
 	start := time.Date(0, 1, 1, 8, 0, 0, 0, time.UTC)
 	for name, journey := range map[string]*Journey{

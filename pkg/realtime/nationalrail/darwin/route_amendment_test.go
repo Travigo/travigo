@@ -35,12 +35,12 @@ func TestBuildDarwinCallsPreservesRepeatedStopsAndTimingSides(t *testing.T) {
 	if got, want := calls[1].Departure, base.AddDate(0, 0, 1).Add(6*time.Minute); !got.Equal(want) {
 		t.Fatalf("middle departure = %s, want %s", got, want)
 	}
-	if calls[1].Platform != "2" || len(calls[1].OriginActivity) != 1 || len(calls[1].DestinationActivity) != 1 {
-		t.Fatalf("middle call sides were lost: %+v", calls[1])
+	if calls[1].Platform != "2" || len(calls[1].Activity) != 1 || calls[1].Activity[0] != ctdf.JourneyPathItemActivitySetdown {
+		t.Fatalf("middle call activity was lost: %+v", calls[1])
 	}
-	if len(calls[0].OriginActivity) != 1 || len(calls[0].DestinationActivity) != 0 ||
-		len(calls[2].OriginActivity) != 0 || len(calls[2].DestinationActivity) != 1 {
-		t.Fatalf("start/end activity sides were wrong: first=%+v terminal=%+v", calls[0], calls[2])
+	if len(calls[0].Activity) != 1 || calls[0].Activity[0] != ctdf.JourneyPathItemActivityPickup ||
+		len(calls[2].Activity) != 1 || calls[2].Activity[0] != ctdf.JourneyPathItemActivityPickup {
+		t.Fatalf("start/end activity was wrong: first=%+v terminal=%+v", calls[0], calls[2])
 	}
 	if calls[0].Outgoing == nil || calls[0].Outgoing.DestinationDisplay != "Central" || calls[2].Outgoing != nil {
 		t.Fatalf("outgoing metadata = %+v, %+v", calls[0].Outgoing, calls[2].Outgoing)

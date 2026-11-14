@@ -422,12 +422,13 @@ func TestFindRealtimePlatformSelectsRepeatedStopVisit(t *testing.T) {
 	}
 }
 
-func TestFindJourneyStopVisitPrefersIncomingPlatform(t *testing.T) {
+func TestFindJourneyStopVisitUsesCanonicalPlatform(t *testing.T) {
 	stop := &ctdf.Stop{PrimaryIdentifier: "middle"}
-	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(
-		&ctdf.JourneyPathItem{OriginStopRef: "start", DestinationStopRef: "middle", DestinationPlatform: "2"},
-		&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "end", OriginPlatform: "3"},
-	)}
+	journey := &ctdf.Journey{Calls: []ctdf.JourneyCall{
+		{StopRef: "start", Start: true, Platform: "1"},
+		{StopRef: "middle", Platform: "2"},
+		{StopRef: "end", End: true, Platform: "3"},
+	}}
 
 	visit, err := findJourneyStopVisit(journey, stop, 1)
 	if err != nil {
@@ -437,7 +438,7 @@ func TestFindJourneyStopVisitPrefersIncomingPlatform(t *testing.T) {
 		t.Fatalf("unexpected adjacent stops: %#v", visit)
 	}
 	if visit.scheduledPlatform != "2" {
-		t.Fatalf("expected incoming platform 2, got %q", visit.scheduledPlatform)
+		t.Fatalf("scheduled platform = %q, want canonical platform 2", visit.scheduledPlatform)
 	}
 }
 

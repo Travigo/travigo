@@ -176,16 +176,14 @@ func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber in
 			continue
 		}
 
-		visit := journeyStopVisit{stopRef: stopRef, journeyStopIndex: journeyCallRealtimeIndex(journey, index)}
+		visit := journeyStopVisit{
+			stopRef: stopRef, journeyStopIndex: journeyCallRealtimeIndex(journey, index), scheduledPlatform: call.Platform,
+		}
 		if index > 0 && !call.Start {
 			visit.previousStopRef = journey.Calls[index-1].StopRef
-			visit.scheduledPlatform = call.ArrivalPlatform()
 		}
 		if index+1 < len(journey.Calls) && !call.End {
 			visit.nextStopRef = journey.Calls[index+1].StopRef
-			if visit.scheduledPlatform == "" {
-				visit.scheduledPlatform = call.Platform
-			}
 		}
 		return visit, nil
 	}

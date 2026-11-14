@@ -238,6 +238,12 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 	if stored.Journey == nil || len(stored.Journey.Calls) != 2 {
 		t.Fatalf("call count = %d, want 2", len(stored.Journey.Calls))
 	}
+	if got, want := stored.Journey.Calls[0].Activity, []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}; len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("origin call activity = %v, want %v", got, want)
+	}
+	if got, want := stored.Journey.Calls[1].Activity, []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown}; len(got) != 1 || got[0] != want[0] {
+		t.Fatalf("destination call activity = %v, want %v", got, want)
+	}
 
 	pathItem := stored.Journey.Leg(0)
 	if got, want := pathItem.OriginStopRef, "gb-atco-origin"; got != want {

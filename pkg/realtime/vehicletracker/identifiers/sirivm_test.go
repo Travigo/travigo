@@ -297,7 +297,7 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 		projection := mt.GetStartedEvent().Command.Lookup("projection").Document()
 		for _, field := range []string{
 			"primaryidentifier", "serviceref", "direction", "departuretime", "availability",
-			"calls.stopref", "calls.start", "calls.end", "calls.arrival", "calls.departure", "calls.incomingarrival",
+			"calls.stopref", "calls.start", "calls.end", "calls.arrival", "calls.departure",
 		} {
 			if projection.Lookup(field).Int32() != 1 {
 				mt.Fatalf("candidate projection omits required field %s", field)

@@ -362,10 +362,11 @@ func TestJourneyPathTrackDefaultsMatchSheriffCompatibility(t *testing.T) {
 	arrival := time.Date(2026, time.November, 13, 9, 0, 0, 0, time.UTC)
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: "journey-1",
-		Calls: ctdf.JourneyCallsFromLegs(
-			&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "middle", DestinationArrivalTime: arrival},
-			&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "destination", OriginArrivalTime: arrival.Add(10 * time.Minute)},
-		),
+		Calls: []ctdf.JourneyCall{
+			{StopRef: "origin", Departure: arrival.Add(-time.Minute), Platform: "1", Activity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}, Start: true},
+			{StopRef: "middle", Arrival: arrival, Departure: arrival.Add(10 * time.Minute), Platform: "2", Activity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown, ctdf.JourneyPathItemActivityPickup}},
+			{StopRef: "destination", Arrival: arrival.Add(20 * time.Minute), Platform: "3", Activity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown}, End: true},
+		},
 	}
 
 	groups := []string{"basic", "detailed"}
@@ -388,6 +389,25 @@ func TestJourneyPathTrackDefaultsMatchSheriffCompatibility(t *testing.T) {
 	}
 	if got, ok := leg["DestinationArrivalTime"].(time.Time); !ok || !got.Equal(arrival) {
 		t.Fatalf("legacy sheriff destination arrival = %#v, want %s", leg["DestinationArrivalTime"], arrival)
+	}
+	if got := leg["DestinationPlatform"]; got != "2" {
+		t.Fatalf("legacy destination platform = %#v, want canonical platform 2", got)
+	}
+	secondLeg := path[1].(map[string]interface{})
+	if got := secondLeg["OriginPlatform"]; got != "2" {
+		t.Fatalf("legacy next origin platform = %#v, want canonical platform 2", got)
+	}
+	if got, ok := secondLeg["OriginArrivalTime"].(time.Time); !ok || !got.Equal(arrival) {
+		t.Fatalf("legacy next origin arrival = %#v, want canonical arrival %s", secondLeg["OriginArrivalTime"], arrival)
+	}
+	for _, side := range []struct {
+		leg   map[string]interface{}
+		field string
+	}{{leg, "DestinationActivity"}, {secondLeg, "OriginActivity"}} {
+		activity, err := json.Marshal(side.leg[side.field])
+		if err != nil || string(activity) != `["Setdown","Pickup"]` {
+			t.Errorf("legacy %s = %s, want canonical middle-call activity", side.field, activity)
+		}
 	}
 
 	internal, err := marshalLegacyJourney(&sheriff.Options{Groups: []string{"basic", "detailed", "internal"}}, journey)
@@ -422,4 +442,40 @@ func TestJourneyPathTrackDefaultsMatchSheriffCompatibility(t *testing.T) {
 	if trackRef, exists := legacyJSONLeg["TrackRef"]; !exists || trackRef != "" {
 		t.Fatalf("plain JSON legacy track ref = %#v, want empty string", trackRef)
 	}
+}
+
+func TestJourneyCallsFormatUsesCanonicalCallFields(t *testing.T) {
+	arrival := time.Date(2026, time.November, 13, 9, 0, 0, 0, time.UTC)
+	journey := &ctdf.Journey{Calls: []ctdf.JourneyCall{{
+		StopRef: "stop", Arrival: arrival, Departure: arrival.Add(time.Minute), Platform: "2",
+		Activity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}, Start: true,
+	}}}
+	app := fiber.New()
+	app.Get("/", func(c *fiber.Ctx) error {
+		result, err := marshalJourneyView(c, journey, []string{"basic", "detailed"}, nil)
+		if err != nil {
+			return sheriffViewError(c, err)
+		}
+		return c.JSON(result)
+	})
+	response, err := app.Test(httptest.NewRequest("GET", "/?path_format=calls", nil), int(time.Second.Milliseconds()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != fiber.StatusOK {
+		t.Fatalf("status = %d, want %d", response.StatusCode, fiber.StatusOK)
+	}
+	var result map[string]interface{}
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatal(err)
+	}
+	calls, ok := result["Calls"].([]interface{})
+	if !ok || len(calls) != 1 {
+		t.Fatalf("Calls = %#v, want one call", result["Calls"])
+	}
+	call := calls[0].(map[string]interface{})
+	requireKeys(t, call, "Arrival", "Departure", "Platform", "Activity")
+	forbidKeys(t, call, "IncomingArrival", "IncomingPlatform", "OriginActivity", "DestinationActivity")
+	forbidKeys(t, result, "Path")
 }

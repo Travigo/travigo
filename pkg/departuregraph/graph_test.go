@@ -189,6 +189,33 @@ func TestGraphWindowFiltersAndSortsByDepartureAtRequestedStop(t *testing.T) {
 	}
 }
 
+func TestColdFillWindowSkipsNonBoardableActivitiesBeforeLimit(t *testing.T) {
+	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	journeyAt := func(identifier string, departure time.Time, activity ctdf.JourneyPathItemActivity) *ctdf.Journey {
+		return &ctdf.Journey{
+			PrimaryIdentifier: identifier,
+			Availability:      &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}},
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
+				OriginStopRef:          "stop-a",
+				DestinationStopRef:     "stop-b",
+				OriginDepartureTime:    departure,
+				DestinationArrivalTime: departure.Add(30 * time.Minute),
+				OriginActivity:         []ctdf.JourneyPathItemActivity{activity},
+			}),
+		}
+	}
+	journeys := []*ctdf.Journey{
+		journeyAt("passing", serviceTime(8*60*60), ctdf.JourneyPathItemActivityPass),
+		journeyAt("setdown-only", serviceTime(8*60*60+30*60), ctdf.JourneyPathItemActivitySetdown),
+		journeyAt("boardable", serviceTime(9*60*60), ctdf.JourneyPathItemActivityPickup),
+	}
+
+	got := filterJourneyWindow(journeys, []string{"stop-a"}, serviceDate, serviceDate, 1)
+	if len(got) != 1 || got[0].PrimaryIdentifier != "boardable" {
+		t.Fatalf("cold-fill candidates = %#v, want only boardable journey", got)
+	}
+}
+
 func TestGraphSnapshotRestoresCompletedLazyFill(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
 	loader := &fakeLoader{journeys: []*ctdf.Journey{testJourney()}}
@@ -353,8 +380,8 @@ func TestCompactGraphReconstructsOriginArrivalsWithoutDestinationPlatforms(t *te
 		journey.Calls[1].Arrival != time.Date(0, time.January, 2, 1, 20, 0, 0, time.UTC) {
 		t.Fatalf("origin arrivals not reconstructed: %#v", journey.Calls)
 	}
-	if journey.Calls[1].Platform != "" {
-		t.Fatalf("unused destination platform was materialized: %q", journey.Calls[1].Platform)
+	if journey.Calls[1].Platform != "2" {
+		t.Fatalf("middle call platform = %q, want incoming fallback 2", journey.Calls[1].Platform)
 	}
 }
 
@@ -629,11 +656,36 @@ func assertMaterializedJourney(t *testing.T, journey *ctdf.Journey) {
 	if journey.LegCount() != 2 || journey.Calls[0].Departure.Hour() != 1 || journey.Calls[0].Departure.Day() != 2 {
 		t.Fatalf("service-day overflow not preserved: %#v", journey.Calls)
 	}
-	if len(journey.Calls[0].OriginActivity) != 1 || journey.Calls[0].OriginActivity[0] != ctdf.JourneyPathItemActivityPickup {
-		t.Fatalf("pickup activity not preserved: %#v", journey.Calls[0].OriginActivity)
+	if len(journey.Calls[0].Activity) != 1 || journey.Calls[0].Activity[0] != ctdf.JourneyPathItemActivityPickup {
+		t.Fatalf("pickup activity not preserved: %#v", journey.Calls[0].Activity)
 	}
 	if !journey.Availability.MatchDate(time.Now()) {
 		t.Fatal("materialized journey should be active for its already-selected service day")
+	}
+}
+
+func TestPackedCallActivityBoardingAndAlighting(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		activities []ctdf.JourneyPathItemActivity
+		board      bool
+		alight     bool
+	}{
+		{name: "unspecified", board: true, alight: true},
+		{name: "pickup", activities: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}, board: true},
+		{name: "setdown", activities: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown}, alight: true},
+		{name: "both", activities: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup, ctdf.JourneyPathItemActivitySetdown}, board: true, alight: true},
+		{name: "pass", activities: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			packed := packActivities(test.activities)
+			if got := canBoardAt(packed); got != test.board {
+				t.Fatalf("canBoardAt(%v) = %v, want %v", test.activities, got, test.board)
+			}
+			if got := canAlightAt(packed); got != test.alight {
+				t.Fatalf("canAlightAt(%v) = %v, want %v", test.activities, got, test.alight)
+			}
+		})
 	}
 }
 

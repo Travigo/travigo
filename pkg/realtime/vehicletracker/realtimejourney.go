@@ -121,7 +121,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		} else {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
 		}
-		destinationArrivalTimeWithDate := stopPredictionTime(destination.ArrivalTime(), time.Time{}, 0, serviceDate, journeyTimezone)
+		destinationArrivalTimeWithDate := stopPredictionTime(destination.Arrival, time.Time{}, 0, serviceDate, journeyTimezone)
 		originDepartureTimeWithDate := stopPredictionTime(origin.Departure, time.Time{}, 0, serviceDate, journeyTimezone)
 
 		// How long it take to travel between origin & destination
@@ -171,7 +171,6 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 			}
 			scheduledArrivalTime, scheduledDepartureTime := call.Arrival, call.Departure
 			if call.End {
-				scheduledArrivalTime = call.ArrivalTime()
 				scheduledDepartureTime = scheduledArrivalTime
 			}
 
@@ -340,7 +339,7 @@ func estimateFutureStops(journey *ctdf.Journey, startIndex int, offset time.Dura
 
 func estimatedCallTimes(journey *ctdf.Journey, callIndex int, offset *time.Duration) (arrival, departure time.Time) {
 	call := &journey.Calls[callIndex]
-	arrival = call.ArrivalTime().Add(*offset).Round(time.Minute)
+	arrival = call.Arrival.Add(*offset).Round(time.Minute)
 	if callIndex+1 < len(journey.Calls) {
 		if call.End {
 			call = &journey.Calls[callIndex+1]

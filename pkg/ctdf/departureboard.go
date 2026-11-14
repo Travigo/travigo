@@ -160,26 +160,23 @@ func boardCallStopRef(origin, destination *JourneyCall, boardType BoardType) str
 
 func boardCallTime(origin, destination *JourneyCall, boardType BoardType) time.Time {
 	if boardType.IsArrival() {
-		return destination.ArrivalTime()
+		return destination.Arrival
 	}
 	return origin.Departure
 }
 
 func boardCallPlatform(origin, destination *JourneyCall, boardType BoardType) string {
 	if boardType.IsArrival() {
-		return destination.ArrivalPlatform()
+		return destination.Platform
 	}
 	return origin.Platform
 }
 
 func boardCallIsUnavailable(origin, destination *JourneyCall, boardType BoardType) bool {
-	activity := origin.OriginActivity
-	var unavailableActivity JourneyPathItemActivity = JourneyPathItemActivitySetdown
 	if boardType.IsArrival() {
-		activity = destination.DestinationActivity
-		unavailableActivity = JourneyPathItemActivityPickup
+		return !journeyActivityAllows(destination.Activity, JourneyPathItemActivitySetdown)
 	}
-	return len(activity) == 1 && activity[0] == unavailableActivity
+	return !journeyActivityAllows(origin.Activity, JourneyPathItemActivityPickup)
 }
 
 // boardArrivalCalls keeps the destination side at each occurrence index. At a
@@ -319,7 +316,7 @@ func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDat
 		}{
 			{clock: origin.Arrival},
 			{clock: origin.Departure, target: index == pathIndex && !boardType.IsArrival()},
-			{clock: destination.ArrivalTime(), target: index == pathIndex && boardType.IsArrival()},
+			{clock: destination.Arrival, target: index == pathIndex && boardType.IsArrival()},
 		} {
 			if event.clock.IsZero() {
 				continue

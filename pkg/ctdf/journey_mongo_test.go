@@ -22,7 +22,7 @@ func TestMongoJourneyRoundTrip(t *testing.T) {
 			&JourneyPathItem{
 				OriginStopRef: "A", DestinationStopRef: "B", OriginDepartureTime: departure,
 				OriginActivity:      []JourneyPathItemActivity{JourneyPathItemActivityPickup, JourneyPathItemActivitySetdown},
-				DestinationActivity: []JourneyPathItemActivity{},
+				DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
 				TrackRef:            "leg", Track: geometry, Distance: 3, DestinationDisplay: "B",
 				PassingPath: []string{"TIPLOC-1", "TIPLOC-2"}, OriginStop: &Stop{PrimaryIdentifier: "A"},
 			},
@@ -31,13 +31,15 @@ func TestMongoJourneyRoundTrip(t *testing.T) {
 				OriginArrivalTime: arrival, OriginDepartureTime: arrival.Add(time.Minute),
 				DestinationArrivalTime: arrival.Add(2 * time.Minute),
 				OriginPlatform:         "2", DestinationPlatform: "3",
-				OriginActivity: []JourneyPathItemActivity{JourneyPathItemActivityPass},
+				OriginActivity:      []JourneyPathItemActivity{JourneyPathItemActivityPickup},
+				DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup},
 			},
 			&JourneyPathItem{
 				OriginStopRef: "B", DestinationStopRef: "A",
 				OriginArrivalTime: arrival.Add(3 * time.Minute), OriginDepartureTime: arrival.Add(3 * time.Minute),
 				DestinationArrivalTime: arrival.Add(15 * time.Minute),
 				OriginPlatform:         "4", DestinationPlatform: "5",
+				OriginActivity:      []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
 				DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
 			},
 			&JourneyPathItem{OriginStopRef: "X", DestinationStopRef: "Y"},
@@ -86,11 +88,30 @@ func TestMongoJourneyRoundTrip(t *testing.T) {
 			}
 		}
 	}
+	call := raw.Lookup("calls", "1").Document()
+	for _, field := range []string{"incomingarrival", "incomingplatform", "originactivity", "destinationactivity"} {
+		if _, err := call.LookupErr(field); err == nil {
+			t.Fatalf("unexpected field %s in stored call", field)
+		}
+	}
+	if call.Lookup("activity").Array().Index(0).Value().StringValue() != JourneyPathItemActivityPickup {
+		t.Fatal("missing stored call activity")
+	}
 	legs := decoded.Legs()
-	if len(legs) != 4 || !legs[0].DestinationArrivalTime.IsZero() ||
-		legs[0].DestinationPlatform != "" || legs[1].OriginPlatform != "2" ||
+	if len(legs) != 4 || !legs[0].DestinationArrivalTime.Equal(arrival) ||
+		legs[0].DestinationPlatform != "2" || legs[1].OriginPlatform != "2" ||
+		!legs[1].DestinationArrivalTime.Equal(arrival.Add(2*time.Minute)) ||
+		!legs[2].OriginArrivalTime.Equal(legs[1].DestinationArrivalTime) ||
+		legs[1].DestinationPlatform != "4" || legs[2].OriginPlatform != "4" ||
 		legs[2].DestinationStopRef != "A" || legs[3].OriginStopRef != "X" {
-		t.Fatalf("legacy leg conversion lost call sides or segment boundaries: %+v", legs)
+		t.Fatalf("legacy legs disagree with normalized calls or segment boundaries: %+v", legs)
+	}
+	both := []JourneyPathItemActivity{JourneyPathItemActivityPickup, JourneyPathItemActivitySetdown}
+	if !reflect.DeepEqual(legs[0].DestinationActivity, both) || !reflect.DeepEqual(legs[1].OriginActivity, both) {
+		t.Fatalf("legacy activity did not preserve boarding and alighting: %v / %v", legs[0].DestinationActivity, legs[1].OriginActivity)
+	}
+	if !reflect.DeepEqual(decoded.Calls[2].Activity, []JourneyPathItemActivity{JourneyPathItemActivityPass}) {
+		t.Fatalf("call with neither boarding nor alighting allowed = %v, want pass", decoded.Calls[2].Activity)
 	}
 }
 

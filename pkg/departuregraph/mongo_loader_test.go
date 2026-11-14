@@ -23,11 +23,10 @@ func TestMongoJourneyRepairResolvesStoredZeroTimes(t *testing.T) {
 	journey.Calls[0].Outgoing = nil
 	journey.Calls[1].Arrival = time.Time{}
 	journey.Calls[1].Departure = time.Time{}
-	journey.Calls[1].IncomingArrival = nil
 	if err := repairMissingJourneyTimes(journey); err != nil {
 		t.Fatal(err)
 	}
-	if journey.Calls[1].Departure.IsZero() || !journey.Calls[1].ArrivalTime().Equal(journey.Calls[1].Departure) {
+	if journey.Calls[1].Departure.IsZero() || !journey.Calls[1].Arrival.Equal(journey.Calls[1].Departure) {
 		t.Fatal("stored intermediate zero times were not repaired")
 	}
 	data := newGraphData()
@@ -102,12 +101,12 @@ func TestMongoLoaderScanProjectsAndDecodesOrderedCalls(t *testing.T) {
 			mt.Fatal(err)
 		}
 		if got == nil || len(got.Calls) != 2 || got.Calls[0].StopRef != "stop-a" || got.Calls[1].StopRef != "stop-b" ||
-			got.Calls[0].Platform != "1" || got.Calls[1].ArrivalPlatform() != "2" {
+			got.Calls[0].Platform != "1" || got.Calls[1].Platform != "2" {
 			mt.Fatalf("scan did not reconstruct the projected calls: %#v", got)
 		}
 		command := mt.GetStartedEvent().Command
 		projection := command.Lookup("projection").Document()
-		for _, field := range []string{"calls.stopref", "calls.start", "calls.end", "calls.arrival", "calls.departure", "calls.platform"} {
+		for _, field := range []string{"calls.stopref", "calls.start", "calls.end", "calls.arrival", "calls.departure", "calls.platform", "calls.activity"} {
 			if projection.Lookup(field).Int32() != 1 {
 				mt.Fatalf("departure graph projection omits %s", field)
 			}

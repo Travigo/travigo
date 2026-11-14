@@ -63,12 +63,7 @@ func buildDarwinCalls(calls []darwinCall) []ctdf.JourneyCall {
 			Arrival: source.arrival, Departure: source.departure, Platform: source.platform,
 			Start: index == 0, End: index == len(calls)-1,
 		}
-		if !call.End {
-			call.OriginActivity = source.activity
-		}
-		if !call.Start {
-			call.DestinationActivity = source.activity
-		}
+		call.Activity = source.activity
 		if !call.End && destination != "" {
 			call.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: destination}
 		}

@@ -116,7 +116,7 @@ func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) stri
 		hash.Write([]byte(origin.Arrival.GoString()))
 		hash.Write([]byte(origin.Departure.GoString()))
 		hash.Write([]byte(destination.StopRef))
-		hash.Write([]byte(destination.ArrivalTime().GoString()))
+		hash.Write([]byte(destination.Arrival.GoString()))
 	}
 
 	return fmt.Sprintf("%x", hash.Sum(nil))

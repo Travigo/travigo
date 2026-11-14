@@ -5,6 +5,9 @@ import (
 	"testing"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 func journeyWithLegs(legs ...*ctdf.JourneyPathItem) *ctdf.Journey {
@@ -46,6 +49,36 @@ func TestApplyBestRouteAssignsTrackReferencesToScheduledJourneyLegs(t *testing.T
 	if outgoingTrackRef(journey, 1) != "timetable-track" {
 		t.Fatalf("timetable track was overwritten: %q", outgoingTrackRef(journey, 1))
 	}
+}
+
+func TestTrackEnrichmentCountsActualWritesAcrossCollections(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("modified, unmatched and unchanged", func(mt *mtest.T) {
+		previous := database.Instance
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		mt.Cleanup(func() { database.Instance = previous })
+
+		calls := bson.A{bson.M{"stopref": "a", "start": true}, bson.M{"stopref": "b", "end": true}}
+		mt.AddMockResponses(
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch,
+				bson.D{{Key: "primaryidentifier", Value: "first"}, {Key: "calls", Value: calls}},
+				bson.D{{Key: "primaryidentifier", Value: "second"}, {Key: "calls", Value: calls}},
+			),
+			mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 1}, bson.E{Key: "nModified", Value: 1}),
+			mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 2}, bson.E{Key: "nModified", Value: 1}),
+		)
+		routes := []Route{{
+			Metadata: RouteLeg{RouteStopIdentifiers: [][]string{{"a"}, {"b"}}},
+			Legs:     map[int]ctdf.JourneyTrack{0: {PrimaryIdentifier: "a-b-track"}},
+		}}
+		stats, err := applyServiceJourneys(context.Background(), []string{"service"}, routes,
+			database.JourneysCollectionName, false, nil,
+			[]string{database.JourneysCollectionName, database.JourneysRawCollectionName}, nil)
+		want := serviceJourneyStats{Scanned: 2, Batches: 1, Modified: 2, Unmatched: 1, Unchanged: 1}
+		if err != nil || stats != want {
+			mt.Fatalf("stats = %+v, err = %v, want %+v", stats, err, want)
+		}
+	})
 }
 
 func TestIndexRoutesByEndpointsIncludesSubsequencesAndAliases(t *testing.T) {

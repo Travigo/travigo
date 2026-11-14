@@ -334,10 +334,7 @@ func departureBoardDirection(entry *ctdf.DepartureBoard, stopIDs []string, board
 		if boardType.IsArrival() {
 			stopRef = destination.StopRef
 			candidateAdjacentStopRef = origin.StopRef
-			candidateTime = destination.ArrivalTime()
-			if candidateTime.IsZero() && !destination.End {
-				candidateTime = destination.Arrival
-			}
+			candidateTime = destination.Arrival
 		}
 		if !util.ContainsString(stopIDs, stopRef) || candidateAdjacentStopRef == "" {
 			continue

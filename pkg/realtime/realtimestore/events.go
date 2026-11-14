@@ -363,7 +363,7 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 			actual    time.Time
 		}{
 			{stopRef: origin.StopRef, stopIndex: pathIndex, scheduled: origin.Departure, actual: departure(origin.StopRef, pathIndex)},
-			{stopRef: destination.StopRef, stopIndex: pathIndex + 1, scheduled: destination.ArrivalTime(), actual: arrival(destination.StopRef, pathIndex+1)},
+			{stopRef: destination.StopRef, stopIndex: pathIndex + 1, scheduled: destination.Arrival, actual: arrival(destination.StopRef, pathIndex+1)},
 		} {
 			if candidate.actual.IsZero() || candidate.scheduled.IsZero() {
 				continue

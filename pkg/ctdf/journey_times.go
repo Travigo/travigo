@@ -3,8 +3,6 @@ package ctdf
 import (
 	"fmt"
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // InterpolateMissingJourneyTimes resolves untimed intermediate calls evenly
@@ -41,11 +39,7 @@ func interpolateJourneySegment(segment []JourneyCall) error {
 	type times struct{ arrival, departure time.Time }
 	calls := make([]times, len(segment))
 	for index, call := range segment {
-		arrival := call.ArrivalTime()
-		if arrival.IsZero() && !call.End {
-			arrival = call.Arrival
-		}
-		calls[index] = times{arrival, call.Departure}
+		calls[index] = times{call.Arrival, call.Departure}
 	}
 	for index := range calls {
 		if calls[index].arrival.IsZero() {
@@ -80,11 +74,6 @@ func interpolateJourneySegment(segment []JourneyCall) error {
 		call := &segment[index]
 		if call.Arrival.IsZero() {
 			call.Arrival = calls[index].arrival
-		}
-		if call.IncomingArrival != nil && call.ArrivalTime().IsZero() {
-			// Repair a missing incoming time without replacing the outgoing time.
-			arrival := primitive.NewDateTimeFromTime(calls[index].arrival)
-			call.IncomingArrival = &arrival
 		}
 		if !call.End {
 			call.Departure = calls[index].departure

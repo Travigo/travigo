@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,9 +113,43 @@ func TestDepartureBoardCachePreservesBlockEstimationMetadata(t *testing.T) {
 	if decoded[0].DataSource == nil || decoded[0].DataSource.DatasetID != "dataset-1" {
 		t.Fatalf("dataset metadata was not preserved: %#v", decoded[0].DataSource)
 	}
-	if decoded[0].DetailedRailInformation == nil || !decoded[0].DetailedRailInformation.ReplacementBus || len(decoded[0].Calls) != 2 || !reflect.DeepEqual(decoded[0].Calls[1].DestinationActivity, journeys[0].Calls[1].DestinationActivity) {
+	if decoded[0].DetailedRailInformation == nil || !decoded[0].DetailedRailInformation.ReplacementBus || len(decoded[0].Calls) != 2 || !reflect.DeepEqual(decoded[0].Calls[1].Activity, journeys[0].Calls[1].Activity) {
 		t.Fatalf("board eligibility metadata was not preserved: %#v", decoded[0])
 	}
+}
+
+func TestBoardRejectsJourneysWithoutCalls(t *testing.T) {
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	previousRedis := redis_client.Client
+	redis_client.Client = client
+	t.Cleanup(func() { redis_client.Client = previousRedis; client.Close() })
+	cache := &cachedresults.Cache{}
+	cache.Setup()
+
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("static and dynamic reads", func(mt *mtest.T) {
+		previousDB := database.Instance
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		mt.Cleanup(func() { database.Instance = previousDB })
+		collection := mt.DB.Name() + ".journeys"
+		badJourney := bson.D{{Key: "primaryidentifier", Value: "legacy-journey"}}
+		for _, load := range []func() ([]*ctdf.Journey, error){
+			func() ([]*ctdf.Journey, error) {
+				return (Source{CachedResults: cache}).getDateJourneys("test-board", bson.M{}, time.Now())
+			},
+			func() ([]*ctdf.Journey, error) { return loadDynamicJourneys(bson.M{}) },
+		} {
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, collection, mtest.FirstBatch, badJourney))
+			got, err := load()
+			if got != nil || err == nil || !strings.Contains(err.Error(), `journey "legacy-journey" has no calls array`) {
+				mt.Fatalf("expected a schema error for the journey, got %v, %v", got, err)
+			}
+		}
+		if len(server.Keys()) != 0 {
+			mt.Fatalf("invalid board results were cached: %v", server.Keys())
+		}
+	})
 }
 
 type localGraphLoader struct {

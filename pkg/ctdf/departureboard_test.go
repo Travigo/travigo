@@ -125,18 +125,18 @@ func TestBoardPathSelectorsUseDestinationForArrivals(t *testing.T) {
 	originTime := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 	arrivalTime := originTime.Add(12 * time.Minute)
 	origin := &JourneyCall{
-		Departure:      originTime,
-		StopRef:        "origin",
-		Arrival:        originTime,
-		Platform:       "1",
-		OriginActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup},
+		Departure: originTime,
+		StopRef:   "origin",
+		Arrival:   originTime,
+		Platform:  "1",
+		Activity:  []JourneyPathItemActivity{JourneyPathItemActivityPickup},
 	}
 	destination := &JourneyCall{
-		StopRef:             "destination",
-		End:                 true,
-		Arrival:             arrivalTime,
-		Platform:            "2",
-		DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
+		StopRef:  "destination",
+		End:      true,
+		Arrival:  arrivalTime,
+		Platform: "2",
+		Activity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
 	}
 
 	if got := boardCallStopRef(origin, destination, BoardTypeArrival); got != "destination" {
@@ -157,14 +157,21 @@ func TestBoardPathSelectorsUseDestinationForArrivals(t *testing.T) {
 }
 
 func TestBoardPathSelectorsExcludeWrongSingleActivity(t *testing.T) {
-	origin := &JourneyCall{OriginActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown}}
-	destination := &JourneyCall{DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup}}
+	origin := &JourneyCall{Activity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown}}
+	destination := &JourneyCall{Activity: []JourneyPathItemActivity{JourneyPathItemActivityPickup}}
 
 	if !boardCallIsUnavailable(origin, destination, BoardTypeDeparture) {
 		t.Fatal("setdown-only origin should be excluded from departures")
 	}
 	if !boardCallIsUnavailable(origin, destination, BoardTypeArrival) {
 		t.Fatal("pickup-only destination should be excluded from arrivals")
+	}
+	pass := &JourneyCall{Activity: []JourneyPathItemActivity{JourneyPathItemActivityPass}}
+	if !boardCallIsUnavailable(pass, pass, BoardTypeDeparture) || !boardCallIsUnavailable(pass, pass, BoardTypeArrival) {
+		t.Fatal("a passing call should be excluded from both boards")
+	}
+	if boardCallIsUnavailable(&JourneyCall{}, &JourneyCall{}, BoardTypeDeparture) || boardCallIsUnavailable(&JourneyCall{}, &JourneyCall{}, BoardTypeArrival) {
+		t.Fatal("unspecified activity should retain the existing board behavior")
 	}
 }
 

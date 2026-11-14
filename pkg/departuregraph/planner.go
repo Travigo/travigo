@@ -663,7 +663,7 @@ func (d *graphData) expandPlanJourneys(queue *planQueue, best map[planState][]pl
 		departure := serviceDate.Add(time.Duration(boarding.departureSeconds()) * time.Second)
 		for index := boardingIndex; index < int(record.PathCount); index++ {
 			path := d.Paths[record.PathStart+uint32(index)]
-			if path.DestinationActivity == activityPickup {
+			if !canAlightAt(path.DestinationActivity) {
 				continue
 			}
 			stop, exists := d.stopIndexForStringID(path.DestinationStopRef)
