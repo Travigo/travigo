@@ -9,6 +9,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/auth0/go-jwt-middleware/v2 v2.3.1
 	github.com/cenkalti/backoff/v4 v4.3.0
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/eko/gocache/lib/v4 v4.4.0
 	github.com/eko/gocache/store/redis/v4 v4.2.12
 	github.com/elastic/go-elasticsearch/v8 v8.19.7
@@ -54,7 +55,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.62.0 // indirect
 	github.com/MicahParks/keyfunc v1.9.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect

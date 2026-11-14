@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"iter"
 	"runtime"
 	"sort"
 	"sync/atomic"
@@ -302,54 +303,56 @@ func boardClockTimeOnServiceDate(journey *Journey, serviceDate, clock time.Time)
 // following day as an hour value above 24. Keep the path's clock sequence
 // monotonic so an after-midnight call belongs to the date the train started.
 func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDate time.Time, boardType BoardType) time.Time {
-	if journey == nil || pathIndex < 0 || pathIndex >= journey.LegCount() {
+	if journey == nil || pathIndex < 0 {
 		return time.Time{}
 	}
-
-	target := time.Time{}
-	previous := time.Time{}
 	index := 0
-	for origin, destination := range journey.LegCalls() {
-		for _, event := range []struct {
-			clock  time.Time
-			target bool
-		}{
-			{clock: origin.Arrival},
-			{clock: origin.Departure, target: index == pathIndex && !boardType.IsArrival()},
-			{clock: destination.Arrival, target: index == pathIndex && boardType.IsArrival()},
-		} {
-			if event.clock.IsZero() {
-				continue
-			}
-			at := boardClockTimeOnServiceDate(journey, serviceDate, event.clock)
-			for !previous.IsZero() && at.Before(previous) {
-				if event.clock.Year() > 1 {
-					break
-				}
-				if journey != nil && journey.DataSource != nil && journey.DataSource.OriginalFormat == "gtfs-schedule" {
-					at = at.Add(24 * time.Hour)
-				} else {
-					at = time.Date(at.Year(), at.Month(), at.Day()+1, event.clock.Hour(), event.clock.Minute(), event.clock.Second(), event.clock.Nanosecond(), at.Location())
-				}
-			}
-			previous = at
-			if event.target {
-				target = at
-			}
-		}
+	for departure, arrival := range ScheduledLegTimesOnServiceDate(journey, serviceDate) {
 		if index == pathIndex {
-			break
+			if boardType.IsArrival() {
+				return arrival
+			}
+			return departure
 		}
 		index++
 	}
-	if !target.IsZero() {
-		return target
+	return time.Time{}
+}
+
+// ScheduledLegTimesOnServiceDate yields departure and arrival times in leg
+// order, preserving day rollovers across the whole journey.
+func ScheduledLegTimesOnServiceDate(journey *Journey, serviceDate time.Time) iter.Seq2[time.Time, time.Time] {
+	return func(yield func(time.Time, time.Time) bool) {
+		previous := time.Time{}
+		for origin, destination := range journey.LegCalls() {
+			var departure, arrival time.Time
+			for index, clock := range [3]time.Time{origin.Arrival, origin.Departure, destination.Arrival} {
+				if clock.IsZero() {
+					continue
+				}
+				at := boardClockTimeOnServiceDate(journey, serviceDate, clock)
+				for !previous.IsZero() && at.Before(previous) {
+					if clock.Year() > 1 {
+						break
+					}
+					if journey != nil && journey.DataSource != nil && journey.DataSource.OriginalFormat == "gtfs-schedule" {
+						at = at.Add(24 * time.Hour)
+					} else {
+						at = time.Date(at.Year(), at.Month(), at.Day()+1, clock.Hour(), clock.Minute(), clock.Second(), clock.Nanosecond(), at.Location())
+					}
+				}
+				previous = at
+				if index == 1 {
+					departure = at
+				} else if index == 2 {
+					arrival = at
+				}
+			}
+			if !yield(departure, arrival) {
+				return
+			}
+		}
 	}
-	origin, destination := journey.LegEndpoints(pathIndex)
-	if origin == nil || destination == nil {
-		return time.Time{}
-	}
-	return boardClockTimeOnServiceDate(journey, serviceDate, boardCallTime(origin, destination, boardType))
 }
 
 // ScheduledTimeOnServiceDate resolves a journey call's scheduled arrival or
@@ -859,14 +862,17 @@ func BlockDelayCarriesIntoTarget(blockRealtimeJourney *RealtimeJourney, target *
 	}
 
 	targetDeparture := boardScheduledTimeOnServiceDate(target.Journey, 0, serviceDate, BoardTypeDeparture)
-	lastBlockLeg := blockJourney.LegCount() - 1
-	if targetDeparture.IsZero() || lastBlockLeg < 0 {
+	lastBlockLeg := -1
+	var terminalCall *JourneyCall
+	for _, destination := range blockJourney.LegCalls() {
+		lastBlockLeg++
+		terminalCall = destination
+	}
+	if targetDeparture.IsZero() || terminalCall == nil {
 		return true
 	}
 
-	arrivalCalls := boardArrivalCalls(blockJourney)
-	terminalIndex := len(arrivalCalls) - 1
-	terminal := blockRealtimeJourney.RealtimeStop(arrivalCalls[terminalIndex].StopRef, terminalIndex)
+	terminal := blockRealtimeJourney.RealtimeStop(terminalCall.StopRef, lastBlockLeg+1)
 	var terminalArrival time.Time
 	if terminal != nil {
 		terminalArrival = terminal.ArrivalTime
@@ -897,6 +903,15 @@ func BoardDisplayReferenceFor(journey *Journey, realtime *RealtimeJourney, kind 
 		arrivalCalls = boardArrivalCalls(journey)
 	}
 	return boardDisplayReferenceForCalls(journey, realtime, kind, wholeCancelled, arrivalCalls)
+}
+
+// BoardDisplayWithRealtime computes display and hydration reference together.
+func BoardDisplayWithRealtime(journey *Journey, realtime *RealtimeJourney, fallback string, kind BoardType, wholeCancelled bool) (string, *BoardDisplayReference) {
+	var calls []*JourneyCall
+	if kind.IsArrival() || (!wholeCancelled && realtime != nil) {
+		calls = boardArrivalCalls(journey)
+	}
+	return boardDestinationDisplayWithRealtimeAndCalls(journey, realtime, fallback, kind, wholeCancelled, calls), boardDisplayReferenceForCalls(journey, realtime, kind, wholeCancelled, calls)
 }
 
 func boardDisplayReferenceForCalls(journey *Journey, realtime *RealtimeJourney, kind BoardType, wholeCancelled bool, arrivalCalls []*JourneyCall) *BoardDisplayReference {

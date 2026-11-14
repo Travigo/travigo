@@ -114,7 +114,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	// GPS can generate estimates when the feed supplies no stop predictions.
 	if len(update.StopUpdates) == 0 && positionMatched {
 		pathIndex := historyPosition.PathIndex
-		origin, destination := journey.LegEndpoints(pathIndex)
+		origin, destination := cachedJourney.legEndpoints(journey, pathIndex)
 		nextStopIndex = pathIndex + 1
 		if historyPosition.UsedGlobalTrack {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
@@ -165,7 +165,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 			nextOccurrence[stopUpdate.StopID] = occurrence + 1
 			arrivalTime := stopUpdate.ArrivalTime
 			departureTime := stopUpdate.DepartureTime
-			call := journey.StopCall(journeyStopIndex)
+			call := cachedJourney.stopCall(journey, journeyStopIndex)
 			if call == nil {
 				continue
 			}
@@ -215,7 +215,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		if nextStopIndex == 0 {
 			realtimeJourney.NextStopRef = journey.Calls[0].StopRef
 		} else {
-			origin, destination := journey.LegEndpoints(nextStopIndex - 1)
+			origin, destination := cachedJourney.legEndpoints(journey, nextStopIndex-1)
 			realtimeJourney.DepartedStopRef = origin.StopRef
 			realtimeJourney.NextStopRef = destination.StopRef
 		}

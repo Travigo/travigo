@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"iter"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -197,9 +198,11 @@ func blockRealtimeEstimate(journey *ctdf.Journey, offset time.Duration, serviceD
 		Stops:             make(map[string]*ctdf.RealtimeJourneyStops),
 	}
 	pathIndex := 0
+	times := ctdf.ScheduledLegTimesOnServiceDate(journey, serviceDate)
+	next, stop := iter.Pull2(times)
+	defer stop()
 	for origin, destination := range journey.LegCalls() {
-		departure := ctdf.ScheduledTimeOnServiceDate(journey, pathIndex, serviceDate, ctdf.BoardTypeDeparture)
-		arrival := ctdf.ScheduledTimeOnServiceDate(journey, pathIndex, serviceDate, ctdf.BoardTypeArrival)
+		departure, arrival, _ := next()
 		if !departure.IsZero() {
 			originStop := realtime.RealtimeStop(origin.StopRef, pathIndex)
 			if originStop == nil {

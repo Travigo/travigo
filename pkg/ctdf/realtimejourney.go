@@ -152,7 +152,10 @@ func (r *RealtimeJourney) IsActive() bool {
 			runDate := r.JourneyRunDate
 			serviceDate = time.Date(runDate.Year(), runDate.Month(), runDate.Day(), 0, 0, 0, 0, now.Location())
 		}
-		lastPathItemArrival = boardScheduledTimeOnServiceDate(r.Journey, r.Journey.LegCount()-1, serviceDate, BoardTypeArrival)
+		lastPathItemArrival = time.Time{}
+		for _, arrival := range ScheduledLegTimesOnServiceDate(r.Journey, serviceDate) {
+			lastPathItemArrival = arrival
+		}
 	}
 	timeFromlastPathItemArrival := lastPathItemArrival.Sub(now).Minutes()
 

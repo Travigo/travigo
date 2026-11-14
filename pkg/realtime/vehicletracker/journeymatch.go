@@ -150,14 +150,23 @@ func closestTrackPosition(location ctdf.Location, track []ctdf.Location) (float6
 	closestDistance := math.Inf(1)
 	closestAlong := 0.0
 	along := 0.0
+	lengths := cachedTrackLengths(track)
 	for index := 0; index < len(track)-1; index++ {
 		start, end := track[index], track[index+1]
 		if len(start.Coordinates) < 2 || len(end.Coordinates) < 2 {
 			continue
 		}
-		projected, fraction := projectOntoTrackSegment(location, start, end)
+		fraction := projectOntoTrackSegment(location, start, end)
+		coordinates := [2]float64{start.Coordinates[0] + fraction*(end.Coordinates[0]-start.Coordinates[0]), start.Coordinates[1] + fraction*(end.Coordinates[1]-start.Coordinates[1])}
+		projected := ctdf.Location{Coordinates: coordinates[:]}
 		distance := location.Distance(&projected)
-		segmentLength := start.Distance(&end)
+		var segmentLength float64
+		if lengths != nil {
+			along = lengths[index]
+			segmentLength = lengths[index+1] - along
+		} else {
+			segmentLength = start.Distance(&end)
+		}
 		if distance < closestDistance {
 			closestDistance = distance
 			closestAlong = along + fraction*segmentLength
@@ -170,7 +179,7 @@ func closestTrackPosition(location ctdf.Location, track []ctdf.Location) (float6
 	return closestDistance, closestAlong / along, true
 }
 
-func projectOntoTrackSegment(point, start, end ctdf.Location) (ctdf.Location, float64) {
+func projectOntoTrackSegment(point, start, end ctdf.Location) float64 {
 	meanLatitudeRadians := ((point.Coordinates[1] + start.Coordinates[1] + end.Coordinates[1]) / 3) * math.Pi / 180
 	longitudeScale := math.Cos(meanLatitudeRadians)
 	dx := (end.Coordinates[0] - start.Coordinates[0]) * longitudeScale
@@ -182,5 +191,5 @@ func projectOntoTrackSegment(point, start, end ctdf.Location) (ctdf.Location, fl
 		py := point.Coordinates[1] - start.Coordinates[1]
 		fraction = math.Max(0, math.Min(1, (px*dx+py*dy)/lengthSquared))
 	}
-	return ctdf.Location{Type: "Point", Coordinates: []float64{start.Coordinates[0] + fraction*(end.Coordinates[0]-start.Coordinates[0]), start.Coordinates[1] + fraction*(end.Coordinates[1]-start.Coordinates[1])}}, fraction
+	return fraction
 }

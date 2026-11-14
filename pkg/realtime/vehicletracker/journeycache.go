@@ -40,6 +40,40 @@ type cachedTrackedJourney struct {
 	hydrationMu     sync.Mutex
 	matching        journeyView
 	previous, next  *cachedTrackedJourney
+	offsetsOnce     sync.Once
+	stopOffsets     []int
+	legOffsets      []int
+}
+
+func (entry *cachedTrackedJourney) callOffsets() {
+	entry.offsetsOnce.Do(func() {
+		for index := range entry.Journey.Calls {
+			call := &entry.Journey.Calls[index]
+			if !call.End || index+1 == len(entry.Journey.Calls) {
+				entry.stopOffsets = append(entry.stopOffsets, index)
+			}
+			if index+1 < len(entry.Journey.Calls) && !call.End && !entry.Journey.Calls[index+1].Start {
+				entry.legOffsets = append(entry.legOffsets, index)
+			}
+		}
+	})
+}
+
+func (entry *cachedTrackedJourney) stopCall(journey *ctdf.Journey, index int) *ctdf.JourneyCall {
+	entry.callOffsets()
+	if index < 0 || index >= len(entry.stopOffsets) {
+		return nil
+	}
+	return &journey.Calls[entry.stopOffsets[index]]
+}
+
+func (entry *cachedTrackedJourney) legEndpoints(journey *ctdf.Journey, index int) (*ctdf.JourneyCall, *ctdf.JourneyCall) {
+	entry.callOffsets()
+	if index < 0 || index >= len(entry.legOffsets) {
+		return nil, nil
+	}
+	offset := entry.legOffsets[index]
+	return &journey.Calls[offset], &journey.Calls[offset+1]
 }
 
 func (consumer *BatchConsumer) getCachedTrackedJourney(journeyID string, now time.Time) (*cachedTrackedJourney, error) {
@@ -86,13 +120,19 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 		if err := journey.ValidatePath(); err != nil {
 			return nil, err
 		}
-		journey.GetService()
+		service, serviceErr := cachedTrackedService(journey.ServiceRef)
+		journey.Service = service
 		entry := &cachedTrackedJourney{
 			Journey:         journey,
 			StopOccurrences: journeyStopOccurrences(journey),
 			StopKeys:        journeyDestinationKeys(journey),
 			LastUsed:        now,
 			journeyID:       journeyID,
+		}
+		// Keep processing the current event if the service database is temporarily
+		// unavailable, but retry the lookup on the next event for this journey.
+		if serviceErr != nil {
+			return entry, nil
 		}
 		cache.journeyCacheMu.Lock()
 		if cache.journeyCache == nil {

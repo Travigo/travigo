@@ -2,11 +2,12 @@ package ctdf
 
 import (
 	"context"
-	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -89,12 +90,47 @@ func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }
 func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) string {
-	hash := sha256.New()
+	// Two independently seeded hashes keep a 128-bit fingerprint while avoiding
+	// timestamp formatting and its per-call allocations.
+	var first, second xxhash.Digest
+	first.Reset()
+	second.ResetWithSeed(1)
+	write := func(data []byte) {
+		first.Write(data)
+		second.Write(data)
+	}
+	var buffer [16]byte
+	writeString := func(value string) {
+		binary.LittleEndian.PutUint64(buffer[:8], uint64(len(value)))
+		write(buffer[:8])
+		first.WriteString(value)
+		second.WriteString(value)
+	}
+	writeTime := func(value time.Time) {
+		year, month, day := value.Date()
+		hour, minute, second := value.Clock()
+		binary.LittleEndian.PutUint64(buffer[:8], uint64(int64(year)))
+		buffer[8], buffer[9], buffer[10] = byte(month), byte(day), byte(hour)
+		buffer[11], buffer[12] = byte(minute), byte(second)
+		write(buffer[:13])
+		binary.LittleEndian.PutUint32(buffer[:4], uint32(value.Nanosecond()))
+		write(buffer[:4])
+		// GoString distinguishes the UTC and Local singleton locations from
+		// other locations, even if they have the same name.
+		buffer[0] = 0
+		if value.Location() == time.UTC {
+			buffer[0] = 1
+		} else if value.Location() == time.Local {
+			buffer[0] = 2
+		}
+		write(buffer[:1])
+		writeString(value.Location().String())
+	}
 
-	hash.Write([]byte(j.ServiceRef))
-	hash.Write([]byte(j.DestinationDisplay))
-	hash.Write([]byte(j.Direction))
-	hash.Write([]byte(j.DepartureTime.String()))
+	writeString(j.ServiceRef)
+	writeString(j.DestinationDisplay)
+	writeString(j.Direction)
+	writeString(j.DepartureTime.String())
 
 	// TODO: REVERT THE CHAGES TO THIS LINE
 	// BUT THINK ABOUT IT - WE SHOULD ALWAYS IGNORE AVAILABILITY CONDITIONS WHEN FINDING IDENTICAL JOURNEYS
@@ -104,22 +140,24 @@ func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) stri
 			j.Availability.Match, j.Availability.MatchSecondary, j.Availability.Exclude, j.Availability.Condition,
 		} {
 			for _, rule := range rules {
-				hash.Write([]byte(rule.Type))
-				hash.Write([]byte(rule.Value))
-				hash.Write([]byte(rule.Description))
+				writeString(string(rule.Type))
+				writeString(rule.Value)
+				writeString(rule.Description)
 			}
 		}
 	}
 
 	for origin, destination := range j.LegCalls() {
-		hash.Write([]byte(origin.StopRef))
-		hash.Write([]byte(origin.Arrival.GoString()))
-		hash.Write([]byte(origin.Departure.GoString()))
-		hash.Write([]byte(destination.StopRef))
-		hash.Write([]byte(destination.Arrival.GoString()))
+		writeString(origin.StopRef)
+		writeTime(origin.Arrival)
+		writeTime(origin.Departure)
+		writeString(destination.StopRef)
+		writeTime(destination.Arrival)
 	}
 
-	return fmt.Sprintf("%x", hash.Sum(nil))
+	binary.BigEndian.PutUint64(buffer[:8], first.Sum64())
+	binary.BigEndian.PutUint64(buffer[8:], second.Sum64())
+	return hex.EncodeToString(buffer[:])
 }
 func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition bool) []*Journey {
 	var filtered []*Journey

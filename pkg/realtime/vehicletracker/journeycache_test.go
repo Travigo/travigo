@@ -80,6 +80,7 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 		mt.AddMockResponses(
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
 				{Key: "primaryidentifier", Value: identifier},
+				{Key: "serviceref", Value: identifier + ":service"},
 				{Key: "calls", Value: bson.A{
 					bson.D{{Key: "stopref", Value: "origin"}, {Key: "start", Value: true}},
 					bson.D{{Key: "stopref", Value: "dest"}, {Key: "end", Value: true}},
@@ -124,6 +125,39 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 		}
 		if got := entries[0].StopOccurrences["dest"]; len(got) != 1 || got[0] != 1 {
 			mt.Fatalf("shared stop occurrences = %v", got)
+		}
+	})
+}
+
+func TestTrackedJourneyRetriesServiceAfterTemporaryFailure(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("failure then recovery", func(mt *mtest.T) {
+		oldDatabase := database.Instance
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		mt.Cleanup(func() { database.Instance = oldDatabase })
+		cache := &trackedJourneyCache{}
+		id, serviceRef := mt.Name(), mt.Name()+":service"
+		journeyResponse := func() bson.D {
+			return mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
+				{Key: "primaryidentifier", Value: id}, {Key: "serviceref", Value: serviceRef},
+				{Key: "calls", Value: bson.A{bson.D{{Key: "stopref", Value: "A"}, {Key: "start", Value: true}}, bson.D{{Key: "stopref", Value: "B"}, {Key: "end", Value: true}}}},
+			})
+		}
+		mt.AddMockResponses(journeyResponse(), mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 123, Message: "temporary failure"}), journeyResponse(), mtest.CreateCursorResponse(0, mt.DB.Name()+".services", mtest.FirstBatch, bson.D{{Key: "primaryidentifier", Value: serviceRef}}))
+		first, err := cache.getCachedTrackedJourney(id, time.Now())
+		if err != nil || first == nil || first.Journey.Service != nil {
+			mt.Fatalf("failed lookup must leave current update usable: %v", err)
+		}
+		if len(cache.journeyCache) != 0 {
+			mt.Fatal("journey with failed service lookup was cached")
+		}
+		second, err := cache.getCachedTrackedJourney(id, time.Now())
+		if err != nil || second == nil || second.Journey.Service == nil || second.Journey.Service.PrimaryIdentifier != serviceRef {
+			mt.Fatalf("service did not recover: entry=%+v error=%v", second, err)
+		}
+		third, err := cache.getCachedTrackedJourney(id, time.Now())
+		if err != nil || third != second || len(mt.GetAllStartedEvents()) != 4 {
+			mt.Fatalf("recovered journey was not cached: %v", err)
 		}
 	})
 }

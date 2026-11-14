@@ -6,6 +6,31 @@ import (
 	"time"
 )
 
+func TestScheduledLegTimesAcrossMidnightAndGap(t *testing.T) {
+	clock := func(hour, minute int) time.Time { return time.Date(1, 1, 1, hour, minute, 0, 0, time.UTC) }
+	date := time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC)
+	journey := &Journey{Calls: []JourneyCall{
+		{Start: true, Departure: clock(23, 50)},
+		{End: true, Arrival: clock(0, 5)},
+		{Start: true, Departure: clock(0, 10)},
+		{End: true, Arrival: clock(0, 25)},
+	}}
+	want := [][2]time.Time{{date.Add(23*time.Hour + 50*time.Minute), date.Add(24*time.Hour + 5*time.Minute)}, {date.Add(24*time.Hour + 10*time.Minute), date.Add(24*time.Hour + 25*time.Minute)}}
+	index := 0
+	for departure, arrival := range ScheduledLegTimesOnServiceDate(journey, date) {
+		if index >= len(want) || !departure.Equal(want[index][0]) || !arrival.Equal(want[index][1]) {
+			t.Fatalf("leg %d: got %v, %v", index, departure, arrival)
+		}
+		if !ScheduledTimeOnServiceDate(journey, index, date, BoardTypeDeparture).Equal(departure) || !ScheduledTimeOnServiceDate(journey, index, date, BoardTypeArrival).Equal(arrival) {
+			t.Fatalf("leg %d: individual times differ", index)
+		}
+		index++
+	}
+	if index != len(want) || !ScheduledTimeOnServiceDate(journey, index, date, BoardTypeArrival).IsZero() {
+		t.Fatalf("unexpected leg count or out-of-range time: %d", index)
+	}
+}
+
 func testJourneyCalls(legs ...*JourneyPathItem) []JourneyCall {
 	return JourneyCallsFromLegs(legs...)
 }

@@ -1022,12 +1022,10 @@ func (d *graphData) addJourney(day dayKey, journey *ctdf.Journey) bool {
 }
 
 func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
-	if journey == nil || journey.PrimaryIdentifier == "" || journey.Calls == nil || journey.LegCount() == 0 {
+	if journey == nil || journey.PrimaryIdentifier == "" || journey.Calls == nil {
 		return false
 	}
 	// Validate before interning or retaining any part of a corrupt journey.
-	legCount := journey.LegCount()
-	firstOrigin := &journey.Calls[0]
 	index := 0
 	for origin, destination := range journey.LegCalls() {
 		if origin == nil || destination == nil || origin.Departure.IsZero() || destination.Arrival.IsZero() {
@@ -1044,10 +1042,11 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 		}
 		index++
 	}
-	if index != legCount {
-		d.rejectedJourneyDays++
+	if index == 0 {
 		return false
 	}
+	legCount := index
+	firstOrigin := &journey.Calls[0]
 	d.ensureBuildIndexesLocked()
 	primaryID := d.intern(journey.PrimaryIdentifier)
 	key := journeyKey{PrimaryID: primaryID}
@@ -1370,7 +1369,6 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 			journey.Calls[len(journey.Calls)-1].End = true
 		}
 	}
-	journey.RefreshStopRefs()
 	return journey
 }
 
