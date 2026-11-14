@@ -256,9 +256,15 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 
 func importObject[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
 	log.Info().Str("table", tableName).Msg("Processing Table")
-	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 1*time.Second, 10*time.Second, 3000)
+	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 3000)
+	queueFinished := false
 	if toProcess {
 		processingQueue.Process()
+		defer func() {
+			if !queueFinished {
+				processingQueue.Wait()
+			}
+		}()
 	}
 
 	file, _ := os.Open(g.fileMap[fileName])
@@ -318,6 +324,7 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 
 	if toProcess {
 		processingQueue.Wait()
+		queueFinished = true
 	}
 
 	log.Info().Str("table", tableName).Msg("Finished Table")
@@ -974,7 +981,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return datasets.DataImportReport{}, err
 	}
 	if dataset.SupportedObjects.Services {
-		serviceRoutesQueue := NewDatabaseBatchProcessingQueue("services_raw", 1*time.Second, 1*time.Minute, 1000)
+		serviceRoutesQueue := NewDatabaseBatchProcessingQueue("services_raw", 1000)
 		serviceRoutesQueue.Process()
 		for _, service := range g.ctdfServices {
 			if len(service.Routes) == 0 {
