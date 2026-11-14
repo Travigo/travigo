@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,6 +15,7 @@ import (
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func JourneysRouter(router fiber.Router) {
@@ -57,6 +59,9 @@ func getJourney(c *fiber.Ctx) error {
 		if date := c.Query("date"); date != "" && journey.OtherIdentifiers["TrainUID"] != "" && realtimeJourney != nil && realtimeJourney.JourneyRunDate.Format(ctdf.YearMonthDayFormat) != date {
 			realtimeJourney = nil
 		}
+		if realtimeJourney == nil {
+			realtimeJourney = findBlockJourneyEstimate(c.UserContext(), journey, journeyServiceDate(c, journey))
+		}
 		if !realtimeOnly {
 			applyRailAmendment(c, journey, realtimeJourney)
 			hydrateJourneyReferences(journey)
@@ -92,6 +97,130 @@ func getJourney(c *fiber.Ctx) error {
 
 		return c.JSON(journeyReduced)
 	}
+}
+
+func journeyServiceDate(c *fiber.Ctx, journey *ctdf.Journey) time.Time {
+	location := time.Local
+	if journey != nil && journey.DepartureTimezone != "" {
+		if loaded, err := time.LoadLocation(journey.DepartureTimezone); err == nil {
+			location = loaded
+		}
+	}
+	if date := c.Query("date"); date != "" {
+		if parsed, err := time.ParseInLocation(ctdf.YearMonthDayFormat, date, location); err == nil {
+			return parsed
+		}
+	}
+	return time.Now().In(location)
+}
+
+// findBlockJourneyEstimate supplies journey-view stop estimates when the
+// journey itself has no realtime record but its vehicle is finishing an earlier
+// journey in the same block.
+func findBlockJourneyEstimate(ctx context.Context, journey *ctdf.Journey, serviceDate time.Time) *ctdf.RealtimeJourney {
+	if journey == nil || journey.OtherIdentifiers["BlockNumber"] == "" || journey.DepartureTime.IsZero() {
+		return nil
+	}
+	blockQuery := bson.M{
+		"otheridentifiers.BlockNumber": journey.OtherIdentifiers["BlockNumber"],
+		"departuretime":                bson.M{"$lt": journey.DepartureTime},
+	}
+	if journey.DataSource != nil && journey.DataSource.DatasetID != "" {
+		blockQuery["datasource.datasetid"] = journey.DataSource.DatasetID
+	} else {
+		blockQuery["serviceref"] = journey.ServiceRef
+	}
+	cursor, err := database.GetCollection("journeys").Find(ctx, blockQuery, options.Find().
+		SetProjection(bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "primaryidentifier", Value: 1},
+		}).SetSort(bson.D{{Key: "departuretime", Value: -1}}))
+	if err != nil {
+		log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to query preceding block journeys")
+		return nil
+	}
+	defer cursor.Close(ctx)
+
+	var preceding []struct {
+		PrimaryIdentifier string `bson:"primaryidentifier"`
+	}
+	if err := cursor.All(ctx, &preceding); err != nil {
+		log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to read preceding block journeys")
+		return nil
+	}
+	journeyIDs := make([]string, 0, len(preceding))
+	for _, previous := range preceding {
+		if previous.PrimaryIdentifier != "" {
+			journeyIDs = append(journeyIDs, previous.PrimaryIdentifier)
+		}
+	}
+	if len(journeyIDs) == 0 {
+		return nil
+	}
+	realtimeByJourneyID, err := realtimestore.FindCurrentForJourneyIDs(ctx, journeyIDs)
+	if err != nil {
+		log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Failed to query preceding block realtime journeys")
+		return nil
+	}
+	var incoming *ctdf.RealtimeJourney
+	for _, previous := range preceding {
+		if realtime := realtimeByJourneyID[previous.PrimaryIdentifier]; realtime != nil {
+			if !realtime.JourneyRunDate.IsZero() && realtime.JourneyRunDate.Format(ctdf.YearMonthDayFormat) != serviceDate.Format(ctdf.YearMonthDayFormat) {
+				continue
+			}
+			incoming = realtime
+			break
+		}
+	}
+	if incoming == nil || incoming.Offset <= 0 {
+		return nil
+	}
+	target := &ctdf.DepartureBoard{Journey: journey, ServiceDate: serviceDate.Format(ctdf.YearMonthDayFormat), Time: journey.DepartureTime}
+	if !ctdf.BlockDelayCarriesIntoTarget(incoming, target) {
+		return nil
+	}
+	return blockRealtimeEstimate(journey, incoming.Offset, serviceDate)
+}
+
+func blockRealtimeEstimate(journey *ctdf.Journey, offset time.Duration, serviceDate time.Time) *ctdf.RealtimeJourney {
+	if journey == nil || journey.LegCount() == 0 {
+		return nil
+	}
+	realtimeJourneySchedule := *journey
+	realtimeJourneySchedule.RealtimeJourney = nil
+	realtime := &ctdf.RealtimeJourney{
+		PrimaryIdentifier: fmt.Sprintf("block-estimate:%s:%s", journey.PrimaryIdentifier, serviceDate.Format(ctdf.YearMonthDayFormat)),
+		Journey:           &realtimeJourneySchedule,
+		JourneyRunDate:    serviceDate,
+		ActivelyTracked:   true,
+		Offset:            offset,
+		Stops:             make(map[string]*ctdf.RealtimeJourneyStops),
+	}
+	pathIndex := 0
+	for origin, destination := range journey.LegCalls() {
+		departure := ctdf.ScheduledTimeOnServiceDate(journey, pathIndex, serviceDate, ctdf.BoardTypeDeparture)
+		arrival := ctdf.ScheduledTimeOnServiceDate(journey, pathIndex, serviceDate, ctdf.BoardTypeArrival)
+		if !departure.IsZero() {
+			originStop := realtime.RealtimeStop(origin.StopRef, pathIndex)
+			if originStop == nil {
+				originStop = &ctdf.RealtimeJourneyStops{StopRef: origin.StopRef, JourneyStopIndex: pathIndex}
+			}
+			originStop.DepartureTime = departure.Add(offset)
+			originStop.TimeType = ctdf.RealtimeJourneyStopTimeEstimatedFuture
+			realtime.SetRealtimeStop(originStop)
+		}
+		if !arrival.IsZero() {
+			destinationStop := realtime.RealtimeStop(destination.StopRef, pathIndex+1)
+			if destinationStop == nil {
+				destinationStop = &ctdf.RealtimeJourneyStops{StopRef: destination.StopRef, JourneyStopIndex: pathIndex + 1}
+			}
+			destinationStop.ArrivalTime = arrival.Add(offset)
+			destinationStop.TimeType = ctdf.RealtimeJourneyStopTimeEstimatedFuture
+			realtime.SetRealtimeStop(destinationStop)
+		}
+		pathIndex++
+	}
+	return realtime
 }
 
 func applyJourneyServiceStopNameOverrides(journey *ctdf.Journey) {

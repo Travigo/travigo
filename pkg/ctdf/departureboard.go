@@ -352,6 +352,12 @@ func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDat
 	return boardClockTimeOnServiceDate(journey, serviceDate, boardCallTime(origin, destination, boardType))
 }
 
+// ScheduledTimeOnServiceDate resolves a journey call's scheduled arrival or
+// departure for a service date, including after-midnight clock times.
+func ScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDate time.Time, boardType BoardType) time.Time {
+	return boardScheduledTimeOnServiceDate(journey, pathIndex, serviceDate, boardType)
+}
+
 // BoardDestinationDisplay returns the service destination for departures and
 // the journey origin for arrivals. It never loads missing stop references;
 // selected API entries resolve those references in one batch.
@@ -824,14 +830,57 @@ func applyBlockRealtimeEstimates(candidates []blockEstimateCandidate, blockJourn
 
 		stats.realtimeMatched++
 		if blockRealtimeJourney.Offset > 0 {
-			candidate.entry.Time = candidate.entry.Time.Add(blockRealtimeJourney.Offset)
-			candidate.entry.Delayed = true
+			if BlockDelayCarriesIntoTarget(blockRealtimeJourney, candidate.entry) {
+				candidate.entry.Time = candidate.entry.Time.Add(blockRealtimeJourney.Offset)
+				candidate.entry.Delayed = true
+			}
 		}
 		candidate.entry.Type = DepartureBoardRecordTypeEstimated
 		stats.estimated++
 	}
 
 	return stats
+}
+
+// blockDelayCarriesIntoTarget reports whether the block vehicle is expected to
+// reach the end of its current run after the target's first scheduled departure.
+// If either schedule cannot be resolved, preserve the prior offset behavior.
+func BlockDelayCarriesIntoTarget(blockRealtimeJourney *RealtimeJourney, target *DepartureBoard) bool {
+	if blockRealtimeJourney == nil || blockRealtimeJourney.Journey == nil || target == nil || target.Journey == nil {
+		return true
+	}
+
+	blockJourney := blockRealtimeJourney.Journey
+	serviceDate := target.Time
+	if target.ServiceDate != "" {
+		if parsed, err := time.ParseInLocation(YearMonthDayFormat, target.ServiceDate, target.Time.Location()); err == nil {
+			serviceDate = parsed
+		}
+	}
+
+	targetDeparture := boardScheduledTimeOnServiceDate(target.Journey, 0, serviceDate, BoardTypeDeparture)
+	lastBlockLeg := blockJourney.LegCount() - 1
+	if targetDeparture.IsZero() || lastBlockLeg < 0 {
+		return true
+	}
+
+	arrivalCalls := boardArrivalCalls(blockJourney)
+	terminalIndex := len(arrivalCalls) - 1
+	terminal := blockRealtimeJourney.RealtimeStop(arrivalCalls[terminalIndex].StopRef, terminalIndex)
+	var terminalArrival time.Time
+	if terminal != nil {
+		terminalArrival = terminal.ArrivalTime
+	}
+	if terminalArrival.IsZero() {
+		terminalArrival = boardScheduledTimeOnServiceDate(blockJourney, lastBlockLeg, serviceDate, BoardTypeArrival)
+		if !terminalArrival.IsZero() {
+			terminalArrival = terminalArrival.Add(blockRealtimeJourney.Offset)
+		}
+	}
+	if terminalArrival.IsZero() {
+		return true
+	}
+	return terminalArrival.After(targetDeparture)
 }
 
 // BoardDisplayReference describes optional display hydration after selection.
