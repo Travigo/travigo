@@ -34,12 +34,12 @@ func TestPublishedJourneySnapshotsPreserveNotifications(t *testing.T) {
 		PrimaryIdentifier: "realtime", JourneyRunDate: day,
 		Journey: &ctdf.Journey{
 			PrimaryIdentifier: "schedule", DestinationDisplay: "London", DepartureTime: clock,
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef: "origin", DestinationStopRef: "dest",
 				OriginDepartureTime: clock, DestinationArrivalTime: clock.Add(10 * time.Minute),
 				Track:           []ctdf.Location{{Type: "Point", Coordinates: []float64{0, 51}}},
 				DestinationStop: &ctdf.Stop{PrimaryName: "Full stop document"},
-			}},
+			}),
 		},
 		Stops: map[string]*ctdf.RealtimeJourneyStops{
 			"dest@1": {StopRef: "dest", JourneyStopIndex: 1, ArrivalTime: day.Add(12*time.Hour + 10*time.Minute)},
@@ -63,7 +63,7 @@ func TestPublishedJourneySnapshotsPreserveNotifications(t *testing.T) {
 	if err := realtimestore.SaveRealtimeJourney(ctx, journey); err != nil {
 		t.Fatal(err)
 	}
-	if len(journey.Journey.Path[0].Track) == 0 || journey.Journey.Path[0].DestinationStop == nil {
+	if len(journey.Journey.Calls[0].Outgoing.Track) == 0 || journey.Journey.Calls[1].Stop == nil {
 		t.Fatal("event compaction changed the live journey")
 	}
 
@@ -74,6 +74,11 @@ func TestPublishedJourneySnapshotsPreserveNotifications(t *testing.T) {
 	var fullBody map[string]interface{}
 	if err := json.Unmarshal(fullJSON, &fullBody); err != nil {
 		t.Fatal(err)
+	}
+	fullJourney := fullBody["Journey"].(map[string]interface{})
+	delete(fullJourney, "Calls")
+	fullJourney["Path"] = []interface{}{
+		map[string]interface{}{"OriginStopRef": "origin", "DestinationStopRef": "dest"},
 	}
 	notifications := rmq.NewTestQueue("notify")
 	consumer := &EventsBatchConsumer{NotifyQueue: notifications, Subscriptions: newEventSubscriptionCache()}

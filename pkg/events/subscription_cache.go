@@ -194,10 +194,8 @@ func subscriptionsForCommutePlans(commute ctdf.UserCommute, plans []ctdf.Journey
 			values.ServiceRefs = append(values.ServiceRefs, item.Journey.ServiceRef)
 			values.PlatformStopRefs = append(values.PlatformStopRefs, item.OriginStopRef)
 			values.StopRefs = append(values.StopRefs, item.OriginStopRef, item.DestinationStopRef)
-			for _, path := range item.Journey.Path {
-				if path != nil {
-					values.StopRefs = append(values.StopRefs, path.OriginStopRef, path.DestinationStopRef)
-				}
+			for _, call := range item.Journey.Calls {
+				values.StopRefs = append(values.StopRefs, call.StopRef)
 			}
 		}
 	}

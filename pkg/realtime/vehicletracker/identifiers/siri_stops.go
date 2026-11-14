@@ -21,15 +21,15 @@ import (
 const siriStopIDLimit = 1024
 
 func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, direction string) (siriJourneyCandidates, error) {
-	origin, hasOrigin := query["path.originstopref"]
-	destination, hasDestination := query["path.destinationstopref"]
+	origin, hasOrigin := query["originstoprefs"]
+	destination, hasDestination := query["destinationstoprefs"]
 	if !hasOrigin || !hasDestination {
 		return getAvailableJourneys(collection, date, query, exactDeparture)
 	}
 
 	services := query["serviceref"]
 	origins, covered, err := findSiriStopIDs(collection, bson.M{
-		"serviceref": services, "path.originstopref": origin,
+		"serviceref": services, "originstoprefs": origin,
 	}, database.JourneyOriginStopServiceIDsIndex)
 	if err != nil {
 		return siriJourneyCandidates{}, err
@@ -42,7 +42,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 	}
 
 	destinations, covered, err := findSiriStopIDs(collection, bson.M{
-		"serviceref": services, "path.destinationstopref": destination,
+		"serviceref": services, "destinationstoprefs": destination,
 	}, database.JourneyDestinationStopServiceIDsIndex)
 	if err != nil {
 		return siriJourneyCandidates{}, err
@@ -69,10 +69,10 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 	// Recheck both stops in case a timetable import updated a journey between
 	// reads. The _id hint keeps this fetch limited to the intersected documents.
 	fetch := bson.M{
-		"_id":                     bson.M{"$in": matches},
-		"serviceref":              services,
-		"path.originstopref":      origin,
-		"path.destinationstopref": destination,
+		"_id":                 bson.M{"$in": matches},
+		"serviceref":          services,
+		"originstoprefs":      origin,
+		"destinationstoprefs": destination,
 	}
 	if !exactDeparture.IsZero() {
 		probe := maps.Clone(fetch)
@@ -95,7 +95,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 				exactClock, bson.M{"$eq": bson.A{"$direction", direction}},
 			}}
 		}
-		candidates, err := readSiriCandidates(collection, date, probe, exactDeparture, telemetry.SiriExactProbeDocuments,
+		candidates, err := readSiriCandidates(collection, date, probe, exactDeparture, telemetry.SiriExactProbeDocuments, false,
 			options.Find().SetHint("_id_").SetLimit(siriExactCandidateLimit).SetProjection(bson.M{
 				"_id": 0, "primaryidentifier": 1, "departuretime": 1, "direction": 1, "availability": 1,
 			}))

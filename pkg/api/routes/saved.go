@@ -96,10 +96,10 @@ func populateSavedObject(savedObject *ctdf.SavedObject) error {
 			return nil
 		}
 		journey.GetService()
-		if len(journey.Path) > 0 {
-			journey.Path[0].GetOriginStop()
-			if journey.Path[0].OriginStop != nil {
-				journey.OriginDisplay = journey.Path[0].OriginStop.PrimaryName
+		if len(journey.Calls) > 0 {
+			journey.Calls[0].GetStop()
+			if journey.Calls[0].Stop != nil {
+				journey.OriginDisplay = journey.Calls[0].Stop.PrimaryName
 			}
 		}
 		savedObject.Object = journey

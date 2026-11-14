@@ -17,10 +17,10 @@ func TestJourneyTrackDataSourceIsExposedWithTrack(t *testing.T) {
 	journey := &Journey{
 		Track:           []Location{{Type: "Point", Coordinates: []float64{-0.1, 51.5}}},
 		TrackDataSource: source,
-		Path: []*JourneyPathItem{{
+		Calls: JourneyCallsFromLegs(&JourneyPathItem{
 			Track:           []Location{{Type: "Point", Coordinates: []float64{-0.2, 51.6}}},
 			TrackDataSource: source,
-		}},
+		}),
 	}
 
 	reduced, err := sheriff.Marshal(&sheriff.Options{Groups: []string{"basic", "detailed"}}, journey)
@@ -29,7 +29,8 @@ func TestJourneyTrackDataSourceIsExposedWithTrack(t *testing.T) {
 	}
 	value := reduced.(map[string]interface{})
 	assertPublicTrackDataSource(t, value["TrackDataSource"])
-	path := value["Path"].([]interface{})[0].(map[string]interface{})
+	call := value["Calls"].([]interface{})[0].(map[string]interface{})
+	path := call["Outgoing"].(map[string]interface{})
 	assertPublicTrackDataSource(t, path["TrackDataSource"])
 }
 
@@ -38,7 +39,7 @@ func TestApplyJourneyTracksIncludesDataSource(t *testing.T) {
 	legSource := &DataSourceReference{DatasetID: "leg-track-source"}
 	journey := &Journey{
 		TrackRef: "whole",
-		Path:     []*JourneyPathItem{{TrackRef: "leg"}},
+		Calls:    JourneyCallsFromLegs(&JourneyPathItem{TrackRef: "leg"}),
 	}
 	applyJourneyTracks(journey, map[string]JourneyTrack{
 		"whole": {Track: []Location{{Type: "Point"}}, DataSource: journeySource},
@@ -48,8 +49,8 @@ func TestApplyJourneyTracksIncludesDataSource(t *testing.T) {
 	if len(journey.Track) != 1 || journey.TrackDataSource != journeySource {
 		t.Fatalf("journey track was not hydrated with its datasource: %#v", journey)
 	}
-	if len(journey.Path[0].Track) != 1 || journey.Path[0].TrackDataSource != legSource {
-		t.Fatalf("path track was not hydrated with its datasource: %#v", journey.Path[0])
+	if len(journey.Calls[0].Outgoing.Track) != 1 || journey.Calls[0].Outgoing.TrackDataSource != legSource {
+		t.Fatalf("path track was not hydrated with its datasource: %#v", journey.Calls[0].Outgoing)
 	}
 }
 

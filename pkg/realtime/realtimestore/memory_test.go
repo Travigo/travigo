@@ -212,7 +212,7 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 		PrimaryIdentifier: "tfl-journey",
 		Journey: &ctdf.Journey{
 			PrimaryIdentifier: "tfl-journey",
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{
 				OriginStopRef:          "gb-atco-origin",
 				DestinationStopRef:     "gb-atco-destination",
 				OriginPlatform:         "1 - Northbound",
@@ -223,7 +223,7 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 				OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
 				DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
 				TrackRef:               "realtime-tfl-route-track:test",
-			}},
+			}}...),
 		},
 	}
 
@@ -235,11 +235,11 @@ func TestSaveRealtimeJourneyPreservesJourneyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("find realtime journey: %v", err)
 	}
-	if stored.Journey == nil || len(stored.Journey.Path) != 1 {
-		t.Fatalf("path length = %d, want 1", len(stored.Journey.Path))
+	if stored.Journey == nil || len(stored.Journey.Calls) != 2 {
+		t.Fatalf("call count = %d, want 2", len(stored.Journey.Calls))
 	}
 
-	pathItem := stored.Journey.Path[0]
+	pathItem := stored.Journey.Leg(0)
 	if got, want := pathItem.OriginStopRef, "gb-atco-origin"; got != want {
 		t.Errorf("origin stop = %q, want %q", got, want)
 	}

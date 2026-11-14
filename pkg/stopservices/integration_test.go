@@ -44,9 +44,14 @@ func TestMongoStaticDatasetContributions(t *testing.T) {
 	}
 	journey := func(dataset, service, from, to string) bson.M {
 		return bson.M{
-			"datasource": bson.M{"datasetid": dataset},
-			"serviceref": service,
-			"path":       bson.A{bson.M{"originstopref": from, "destinationstopref": to}},
+			"datasource":          bson.M{"datasetid": dataset},
+			"serviceref":          service,
+			"originstoprefs":      bson.A{from},
+			"destinationstoprefs": bson.A{to},
+			"calls": bson.A{
+				bson.M{"stopref": from, "start": true, "departure": time.Date(2000, 1, 1, 9, 0, 0, 0, time.UTC), "outgoing": bson.M{}},
+				bson.M{"stopref": to, "end": true, "arrival": time.Date(2000, 1, 1, 9, 10, 0, 0, time.UTC)},
+			},
 		}
 	}
 	_, err = db.Collection("journeys").InsertMany(ctx, []any{

@@ -57,7 +57,7 @@ func TestClientGraphWindowPreservesClockChangeOrigin(t *testing.T) {
 	serviceDate := time.Date(2026, 10, 25, 0, 0, 0, 0, location)
 	clock := time.Date(0, 1, 1, 1, 30, 0, 0, time.UTC)
 	journey := testJourney()
-	journey.Path = []*ctdf.JourneyPathItem{{OriginStopRef: "stop-a", DestinationStopRef: "stop-b", OriginDepartureTime: clock, DestinationArrivalTime: clock.Add(time.Minute)}}
+	journey.Calls = ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "stop-a", DestinationStopRef: "stop-b", OriginDepartureTime: clock, DestinationArrivalTime: clock.Add(time.Minute)})
 	graph := New(&fakeLoader{journeys: []*ctdf.Journey{journey}}, Config{Enabled: true})
 	client := NewClient("http://departure-graph", &http.Client{Transport: handlerTransport{handler: NewServer(graph).Handler()}})
 	for _, test := range []struct {

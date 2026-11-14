@@ -7,7 +7,7 @@ import (
 )
 
 type CacheJourney struct {
-	Path []*ctdf.JourneyPathItem `groups:"detailed"`
+	Calls []ctdf.JourneyCall `groups:"detailed"`
 }
 
 func (j CacheJourney) MarshalBinary() ([]byte, error) {

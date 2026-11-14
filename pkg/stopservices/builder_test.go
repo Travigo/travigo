@@ -20,8 +20,8 @@ func TestNormalizeBuildOptions(t *testing.T) {
 
 func TestStopServiceAggregationGroupsRawRelationsAndExcludesDynamicDatasets(t *testing.T) {
 	pipeline := stopServiceAggregation("")
-	if len(pipeline) != 6 {
-		t.Fatalf("pipeline has %d stages, want 6", len(pipeline))
+	if len(pipeline) != 5 {
+		t.Fatalf("pipeline has %d stages, want 5", len(pipeline))
 	}
 	match, ok := pipeline[0][0].Value.(bson.M)
 	if !ok {
@@ -36,23 +36,23 @@ func TestStopServiceAggregationGroupsRawRelationsAndExcludesDynamicDatasets(t *t
 	}) {
 		t.Fatalf("dynamic exclusion = %#v", got)
 	}
-	group, ok := pipeline[5][0].Value.(bson.M)
+	group, ok := pipeline[4][0].Value.(bson.M)
 	if !ok {
-		t.Fatalf("group stage has type %T, want bson.M", pipeline[5][0].Value)
+		t.Fatalf("group stage has type %T, want bson.M", pipeline[4][0].Value)
 	}
 	groupKey, ok := group["_id"].(bson.M)
 	if !ok {
 		t.Fatalf("group key has type %T, want bson.M", group["_id"])
 	}
 	want := bson.M{
-		"dataset": "$dataset", "stopref": "$stopRefs", "serviceref": "$serviceRef",
+		"dataset": "$dataset", "stopref": "$stopRef", "serviceref": "$serviceRef",
 	}
 	if !reflect.DeepEqual(groupKey, want) {
 		t.Fatalf("group key = %#v, want %#v", groupKey, want)
 	}
-	stopRefs, ok := pipeline[2][0].Value.(bson.M)["stopRefs"].(bson.A)
-	if !ok || !reflect.DeepEqual(stopRefs, bson.A{"$path.originstopref", "$path.destinationstopref"}) {
-		t.Fatalf("projected stop refs = %#v", stopRefs)
+	projectedStopRef, ok := pipeline[2][0].Value.(bson.M)["stopRef"]
+	if !ok || projectedStopRef != "$calls.stopref" {
+		t.Fatalf("projected stop ref = %#v", projectedStopRef)
 	}
 }
 

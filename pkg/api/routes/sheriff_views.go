@@ -21,6 +21,14 @@ func validateSheriffView(c *fiber.Ctx, views sheriffViews) error {
 }
 
 func marshalWithSheriffView(c *fiber.Ctx, value interface{}, defaultGroups []string, views sheriffViews) (interface{}, error) {
+	groups, err := sheriffGroups(c, defaultGroups, views)
+	if err != nil {
+		return nil, err
+	}
+	return sheriff.Marshal(&sheriff.Options{Groups: groups}, value)
+}
+
+func sheriffGroups(c *fiber.Ctx, defaultGroups []string, views sheriffViews) ([]string, error) {
 	groups := defaultGroups
 	if view := c.Query("view"); view != "" {
 		if err := validateSheriffView(c, views); err != nil {
@@ -29,7 +37,7 @@ func marshalWithSheriffView(c *fiber.Ctx, value interface{}, defaultGroups []str
 		groups = views[view]
 	}
 
-	return sheriff.Marshal(&sheriff.Options{Groups: groups}, value)
+	return groups, nil
 }
 
 func sheriffViewError(c *fiber.Ctx, err error) error {

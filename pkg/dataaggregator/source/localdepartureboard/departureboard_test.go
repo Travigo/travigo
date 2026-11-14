@@ -22,6 +22,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
+func boardTestCalls(legs ...*ctdf.JourneyPathItem) []ctdf.JourneyCall {
+	return ctdf.JourneyCallsFromLegs(legs...)
+}
+
 func TestLegacyVSTPCancellationFallsBackOnlyWithoutDaySpecificAlert(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	mt.Run("legacy and alert-backed cancellations", func(mt *mtest.T) {
@@ -67,7 +71,7 @@ func TestBoardPreservesUnexpiredOldVSTPCancellation(t *testing.T) {
 		serviceDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		start := serviceDate.AddDate(0, 0, -1)
 		end := serviceDate.AddDate(0, 0, 1)
-		journey := &ctdf.Journey{PrimaryIdentifier: "train", Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Path: []*ctdf.JourneyPathItem{{OriginStopRef: "stop", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)}}}
+		journey := &ctdf.Journey{PrimaryIdentifier: "train", Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Calls: boardTestCalls(&ctdf.JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "terminal", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)})}
 		update := &ctdf.RealtimeJourney{PrimaryIdentifier: fmt.Sprintf("gb-nationalrail-vstp-cancellation-%s:%s:train", start.Format(ctdf.YearMonthDayFormat), end.Format(ctdf.YearMonthDayFormat)), Journey: journey, JourneyRunDate: start, Cancelled: true, ModificationDateTime: now.Add(-5 * time.Hour), TimeoutDurationMinutes: 24 * 60}
 		if err := realtimestore.SaveRealtimeJourney(context.Background(), update); err != nil {
 			mt.Fatal(err)
@@ -86,7 +90,7 @@ func TestDepartureBoardCachePreservesBlockEstimationMetadata(t *testing.T) {
 		OtherIdentifiers:        map[string]string{"BlockNumber": "block-1"},
 		DataSource:              &ctdf.DataSourceReference{DatasetID: "dataset-1"},
 		DetailedRailInformation: &ctdf.JourneyDetailedRail{ReplacementBus: true},
-		Path:                    []*ctdf.JourneyPathItem{{DestinationActivity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}}},
+		Calls:                   boardTestCalls(&ctdf.JourneyPathItem{DestinationActivity: []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup}}),
 	}}
 
 	reduced, err := sheriff.Marshal(&sheriff.Options{Groups: []string{"departureboard-cache"}}, journeys)
@@ -108,7 +112,7 @@ func TestDepartureBoardCachePreservesBlockEstimationMetadata(t *testing.T) {
 	if decoded[0].DataSource == nil || decoded[0].DataSource.DatasetID != "dataset-1" {
 		t.Fatalf("dataset metadata was not preserved: %#v", decoded[0].DataSource)
 	}
-	if decoded[0].DetailedRailInformation == nil || !decoded[0].DetailedRailInformation.ReplacementBus || len(decoded[0].Path) != 1 || !reflect.DeepEqual(decoded[0].Path[0].DestinationActivity, journeys[0].Path[0].DestinationActivity) {
+	if decoded[0].DetailedRailInformation == nil || !decoded[0].DetailedRailInformation.ReplacementBus || len(decoded[0].Calls) != 2 || !reflect.DeepEqual(decoded[0].Calls[1].DestinationActivity, journeys[0].Calls[1].DestinationActivity) {
 		t.Fatalf("board eligibility metadata was not preserved: %#v", decoded[0])
 	}
 }
@@ -137,7 +141,7 @@ func TestPreviousServiceDayGraphWindowKeepsOvernightCalls(t *testing.T) {
 	serviceDate := time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)
 	clock := time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC)
 	makeJourney := func(id string, at time.Time) *ctdf.Journey {
-		return &ctdf.Journey{PrimaryIdentifier: id, DepartureTime: at, Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Path: []*ctdf.JourneyPathItem{{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)}}}
+		return &ctdf.Journey{PrimaryIdentifier: id, DepartureTime: at, Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Calls: boardTestCalls(&ctdf.JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)})}
 	}
 	journeys := make([]*ctdf.Journey, 0, 141)
 	for i := 0; i < 140; i++ {
@@ -172,7 +176,7 @@ func TestBoardUsesCompleteGraphWithoutRealtime(t *testing.T) {
 			if !empty {
 				journeys = []*ctdf.Journey{{PrimaryIdentifier: "scheduled", DepartureTime: at,
 					Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}},
-					Path:         []*ctdf.JourneyPathItem{{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)}},
+					Calls:        boardTestCalls(&ctdf.JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)}),
 				}}
 			}
 			cache := &cachedresults.Cache{}
@@ -231,8 +235,20 @@ func TestSaturatedGraphFallsBackToCompleteJourneyCache(t *testing.T) {
 			if i == 140 {
 				at = clock.Add(25*time.Hour + 30*time.Minute)
 			}
-			journey := &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("journey-%03d", i), DepartureTime: at, Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Path: []*ctdf.JourneyPathItem{{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)}}}
-			encoded, err := bson.Marshal(journey)
+			journey := &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("journey-%03d", i), DepartureTime: at, Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityMatchAll}}}, Calls: boardTestCalls(&ctdf.JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "next", OriginDepartureTime: at, DestinationArrivalTime: at.Add(time.Minute)})}
+			encoded, err := bson.Marshal(bson.M{
+				"primaryidentifier": journey.PrimaryIdentifier,
+				"departuretime":     at,
+				"availability": bson.M{"match": bson.A{
+					bson.M{"type": ctdf.AvailabilityMatchAll},
+				}},
+				"originstoprefs":      bson.A{"stop"},
+				"destinationstoprefs": bson.A{"next"},
+				"calls": bson.A{
+					bson.M{"stopref": "stop", "start": true, "arrival": at, "departure": at},
+					bson.M{"stopref": "next", "end": true, "arrival": at.Add(time.Minute)},
+				},
+			})
 			if err != nil {
 				mt.Fatal(err)
 			}
@@ -255,6 +271,11 @@ func TestSaturatedGraphFallsBackToCompleteJourneyCache(t *testing.T) {
 		if got[len(got)-1].PrimaryIdentifier != "journey-140" {
 			mt.Fatal("fallback omitted the overnight journey")
 		}
+		if len(got[len(got)-1].Calls) != 2 || got[len(got)-1].Calls[0].StopRef != "stop" ||
+			got[len(got)-1].Calls[1].StopRef != "next" ||
+			!got[len(got)-1].Calls[1].Arrival.Equal(time.Date(0, 1, 2, 1, 31, 0, 0, time.UTC)) {
+			mt.Fatalf("fallback did not reconstruct ordered calls: %#v", got[len(got)-1].Calls)
+		}
 	})
 }
 
@@ -275,12 +296,12 @@ func TestDepartureBoardCandidateLookupUsesLazyGraph(t *testing.T) {
 		Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
 			Type: ctdf.AvailabilityMatchAll,
 		}}},
-		Path: []*ctdf.JourneyPathItem{{
+		Calls: boardTestCalls(&ctdf.JourneyPathItem{
 			OriginStopRef:          "stop-a",
 			DestinationStopRef:     "stop-b",
 			OriginDepartureTime:    serviceTime,
 			DestinationArrivalTime: serviceTime.Add(10 * time.Minute),
-		}},
+		}),
 	}
 	loader := &localGraphLoader{journey: journey}
 	graph := departuregraph.New(loader, departuregraph.Config{Enabled: true})

@@ -37,8 +37,8 @@ func (l *fakeLoader) LoadStopJourneys(_ context.Context, stopRefs []string, serv
 		if journey.Availability == nil || !journey.Availability.MatchDate(serviceDate) {
 			continue
 		}
-		for _, path := range journey.Path {
-			if path != nil && requested[path.OriginStopRef] {
+		for origin, _ := range journey.LegCalls() {
+			if requested[origin.StopRef] {
 				result = append(result, journey)
 				break
 			}
@@ -157,12 +157,12 @@ func TestGraphWindowFiltersAndSortsByDepartureAtRequestedStop(t *testing.T) {
 			Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
 				Type: ctdf.AvailabilityMatchAll,
 			}}},
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef:          "stop-a",
 				DestinationStopRef:     "stop-b",
 				OriginDepartureTime:    serviceStart.Add(time.Duration(departureHour) * time.Hour),
 				DestinationArrivalTime: serviceStart.Add(time.Duration(departureHour)*time.Hour + 30*time.Minute),
-			}},
+			}),
 		}
 	}
 	graph := New(&fakeLoader{}, Config{Enabled: true})
@@ -346,15 +346,15 @@ func TestCompactGraphReconstructsOriginArrivalsWithoutDestinationPlatforms(t *te
 	data.addJourney(makeDayKey(serviceDate), testJourney())
 
 	journey := data.materializeJourney(0)
-	if journey == nil || len(journey.Path) != 2 {
+	if journey == nil || journey.LegCount() != 2 {
 		t.Fatalf("unexpected materialized journey: %#v", journey)
 	}
-	if journey.Path[0].OriginArrivalTime != time.Date(0, time.January, 2, 1, 0, 0, 0, time.UTC) ||
-		journey.Path[1].OriginArrivalTime != journey.Path[0].DestinationArrivalTime {
-		t.Fatalf("origin arrivals not reconstructed: %#v", journey.Path)
+	if journey.Calls[0].Arrival != time.Date(0, time.January, 2, 1, 0, 0, 0, time.UTC) ||
+		journey.Calls[1].Arrival != time.Date(0, time.January, 2, 1, 20, 0, 0, time.UTC) {
+		t.Fatalf("origin arrivals not reconstructed: %#v", journey.Calls)
 	}
-	if journey.Path[0].DestinationPlatform != "" {
-		t.Fatalf("unused destination platform was materialized: %q", journey.Path[0].DestinationPlatform)
+	if journey.Calls[1].Platform != "" {
+		t.Fatalf("unused destination platform was materialized: %q", journey.Calls[1].Platform)
 	}
 }
 
@@ -494,10 +494,10 @@ func TestUnchangedCompleteRestoredGraphSkipsCheckpoint(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey", Path: []*ctdf.JourneyPathItem{{
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "origin", DestinationStopRef: "destination",
 		OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
-	}}})
+	})})
 	data.completeScan([]time.Time{serviceDate})
 	if err := graph.Save(); err != nil {
 		t.Fatalf("save graph: %v", err)
@@ -580,27 +580,24 @@ func testJourney() *ctdf.Journey {
 		Availability: &ctdf.Availability{Match: []ctdf.AvailabilityRule{{
 			Type: ctdf.AvailabilityMatchAll,
 		}}},
-		Path: []*ctdf.JourneyPathItem{
-			{
-				OriginStopRef:          "stop-a",
-				DestinationStopRef:     "stop-b",
-				OriginPlatform:         "1",
-				DestinationPlatform:    "2",
-				OriginArrivalTime:      serviceStart.Add(25 * time.Hour),
-				OriginDepartureTime:    serviceStart.Add(25*time.Hour + 5*time.Minute),
-				DestinationArrivalTime: serviceStart.Add(25*time.Hour + 20*time.Minute),
-				DestinationDisplay:     "Central",
-				OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
-				DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
-			},
-			{
-				OriginStopRef:          "stop-b",
-				DestinationStopRef:     "stop-c",
-				OriginArrivalTime:      serviceStart.Add(25*time.Hour + 20*time.Minute),
-				OriginDepartureTime:    serviceStart.Add(25*time.Hour + 25*time.Minute),
-				DestinationArrivalTime: serviceStart.Add(25*time.Hour + 45*time.Minute),
-			},
-		},
+		Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
+			OriginStopRef:          "stop-a",
+			DestinationStopRef:     "stop-b",
+			OriginPlatform:         "1",
+			DestinationPlatform:    "2",
+			OriginArrivalTime:      serviceStart.Add(25 * time.Hour),
+			OriginDepartureTime:    serviceStart.Add(25*time.Hour + 5*time.Minute),
+			DestinationArrivalTime: serviceStart.Add(25*time.Hour + 20*time.Minute),
+			DestinationDisplay:     "Central",
+			OriginActivity:         []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPickup},
+			DestinationActivity:    []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivitySetdown},
+		}, &ctdf.JourneyPathItem{
+			OriginStopRef:          "stop-b",
+			DestinationStopRef:     "stop-c",
+			OriginArrivalTime:      serviceStart.Add(25*time.Hour + 20*time.Minute),
+			OriginDepartureTime:    serviceStart.Add(25*time.Hour + 25*time.Minute),
+			DestinationArrivalTime: serviceStart.Add(25*time.Hour + 45*time.Minute),
+		}),
 	}
 }
 
@@ -629,11 +626,11 @@ func assertMaterializedJourney(t *testing.T, journey *ctdf.Journey) {
 	if journey.OtherIdentifiers["BlockNumber"] != "block-7" || journey.DataSource == nil || journey.DataSource.DatasetID != "dataset-1" {
 		t.Fatalf("materialized block metadata missing: %#v", journey)
 	}
-	if len(journey.Path) != 2 || journey.Path[0].OriginDepartureTime.Hour() != 1 || journey.Path[0].OriginDepartureTime.Day() != 2 {
-		t.Fatalf("service-day overflow not preserved: %#v", journey.Path)
+	if journey.LegCount() != 2 || journey.Calls[0].Departure.Hour() != 1 || journey.Calls[0].Departure.Day() != 2 {
+		t.Fatalf("service-day overflow not preserved: %#v", journey.Calls)
 	}
-	if len(journey.Path[0].OriginActivity) != 1 || journey.Path[0].OriginActivity[0] != ctdf.JourneyPathItemActivityPickup {
-		t.Fatalf("pickup activity not preserved: %#v", journey.Path[0].OriginActivity)
+	if len(journey.Calls[0].OriginActivity) != 1 || journey.Calls[0].OriginActivity[0] != ctdf.JourneyPathItemActivityPickup {
+		t.Fatalf("pickup activity not preserved: %#v", journey.Calls[0].OriginActivity)
 	}
 	if !journey.Availability.MatchDate(time.Now()) {
 		t.Fatal("materialized journey should be active for its already-selected service day")

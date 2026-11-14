@@ -40,6 +40,12 @@ func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 	liveCollectionName, rawCollectionName, stagingCollectionName := l.collectionNames()
 
 	ctx := context.Background()
+	journeys := l.objectName == "journey"
+	if journeys {
+		if err := database.EnsureJourneyCollection(ctx, liveCollectionName); err != nil {
+			return err
+		}
+	}
 	linkerDataset := datasetversion.LinkerDataset(l.objectName)
 	if config.SkipStaging {
 		if err := publishUpdatedDatasets(ctx, rawCollectionName, liveCollectionName, linkerDataset); err != nil {
@@ -48,12 +54,23 @@ func (l PlainCopyLinker) Run(config PlainCopyConfig) error {
 	} else {
 		dropCollection(stagingCollectionName)
 		defer dropCollection(stagingCollectionName)
+		if journeys {
+			if err := database.EnsureJourneyCollection(ctx, stagingCollectionName); err != nil {
+				return err
+			}
+		}
 
 		if err := copyCollection(rawCollectionName, stagingCollectionName); err != nil {
 			return err
 		}
 		if err := runJourneySourceWrite(ctx, func() error {
-			return copyCollection(stagingCollectionName, liveCollectionName)
+			if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
+				return err
+			}
+			if journeys {
+				return database.EnsureJourneyCollection(ctx, liveCollectionName)
+			}
+			return nil
 		}); err != nil {
 			return err
 		}

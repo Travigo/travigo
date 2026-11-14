@@ -400,10 +400,10 @@ func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBo
 				refs[d.StopRef] = struct{}{}
 			}
 		}
-		if item.DestinationDisplay == "" && (item.DisplayReference == nil || !item.DisplayReference.Arrival) && len(item.Journey.Path) > 0 {
-			p := item.Journey.Path[len(item.Journey.Path)-1]
-			if p != nil && p.DestinationStop == nil && p.DestinationStopRef != "" {
-				refs[p.DestinationStopRef] = struct{}{}
+		if item.DestinationDisplay == "" && (item.DisplayReference == nil || !item.DisplayReference.Arrival) && len(item.Journey.Calls) > 0 {
+			call := &item.Journey.Calls[len(item.Journey.Calls)-1]
+			if call.Stop == nil && call.StopRef != "" {
+				refs[call.StopRef] = struct{}{}
 			}
 		}
 	}
@@ -444,13 +444,11 @@ func resolveDepartureBoardDestinationDisplays(departureBoard []*ctdf.DepartureBo
 		}
 		fallbacks++
 		var stop *ctdf.Stop
-		if len(item.Journey.Path) > 0 {
-			p := item.Journey.Path[len(item.Journey.Path)-1]
-			if p != nil {
-				stop = p.DestinationStop
-				if stop == nil {
-					stop = stops[p.DestinationStopRef]
-				}
+		if len(item.Journey.Calls) > 0 {
+			call := &item.Journey.Calls[len(item.Journey.Calls)-1]
+			stop = call.Stop
+			if stop == nil {
+				stop = stops[call.StopRef]
 			}
 		}
 		display, applied := resolveStopDisplayName(stop, names)

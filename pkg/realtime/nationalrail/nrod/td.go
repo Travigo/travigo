@@ -142,12 +142,13 @@ func (t *tdTracker) trust(journey *ctdf.RealtimeJourney, m *TrustMovement, at ti
 		return
 	}
 	if exists && operationalStop != nil && old.trainID == m.TrainID && old.runDate.Equal(journey.JourneyRunDate) &&
-		journey.ActivelyTracked && !journey.Cancelled && m.CorrectionInd != "true" &&
-		journey.Journey != nil && old.leg >= 0 && old.leg < len(journey.Journey.Path) &&
-		matchesPassingStop(journey.Journey.Path[old.leg], operationalStop) {
-		old.trustAt = at
-		t.anchors[id] = old
-		return
+		journey.ActivelyTracked && !journey.Cancelled && m.CorrectionInd != "true" {
+		origin, _ := journey.Journey.LegEndpoints(old.leg)
+		if origin != nil && matchesPassingStop(origin.Outgoing, operationalStop) {
+			old.trustAt = at
+			t.anchors[id] = old
+			return
+		}
 	}
 	trainID := m.CurrentTrainID
 	if trainID == "" {
@@ -363,29 +364,26 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 		progress := a.progress
 		var mapping tdMapping
 		if mapped {
-			if candidate.Journey == nil || a.leg >= len(candidate.Journey.Path) {
+			origin, destination := candidate.Journey.LegEndpoints(a.leg)
+			if origin == nil {
 				noteRejection("journey_leg_missing", id)
 				continue
 			}
-			leg := candidate.Journey.Path[a.leg]
-			if leg == nil {
-				noteRejection("journey_leg_missing", id)
-				continue
-			}
-			legKey := tdLeg{leg.OriginStopRef, leg.DestinationStopRef}
+			leg := origin.Outgoing
+			legKey := tdLeg{origin.StopRef, destination.StopRef}
 			var ok bool
 			mapping, ok = transitions[legKey]
 			if !ok {
 				mapping, ok = berths[legKey]
 			}
 			if !ok && hasSMART {
-				stopRef := leg.OriginStopRef
+				stopRef := origin.StopRef
 				if reportingPoint.arrival {
-					stopRef = leg.DestinationStopRef
+					stopRef = destination.StopRef
 				}
-				if slices.Contains(reportingPoint.Refs, stopRef) || slices.ContainsFunc(leg.PassingPath, func(ref string) bool {
+				if slices.Contains(reportingPoint.Refs, stopRef) || (leg != nil && slices.ContainsFunc(leg.PassingPath, func(ref string) bool {
 					return slices.Contains(reportingPoint.Refs, ref)
-				}) {
+				})) {
 					mapping = tdMapping{From: event.From, Point: reportingPoint.Point, Confidence: "approximate"}
 					ok = true
 				}
@@ -394,15 +392,18 @@ func (t *tdTracker) process(ctx context.Context, kind string, event tdEvent, at 
 				noteRejection("mapping_not_on_journey_leg", id)
 				continue
 			}
-			track := leg.Track
-			if leg.TrackRef != "" {
-				var record ctdf.JourneyTrack
-				err := database.GetCollection("journey_tracks").FindOne(ctx, bson.M{"primaryidentifier": leg.TrackRef}).Decode(&record)
-				if err != nil {
-					reject("track_lookup_failed", id)
-					return
+			var track []ctdf.Location
+			if leg != nil {
+				track = leg.Track
+				if leg.TrackRef != "" {
+					var record ctdf.JourneyTrack
+					err := database.GetCollection("journey_tracks").FindOne(ctx, bson.M{"primaryidentifier": leg.TrackRef}).Decode(&record)
+					if err != nil {
+						reject("track_lookup_failed", id)
+						return
+					}
+					track = record.Track
 				}
-				track = record.Track
 			}
 			progress = railtd.TrackProgress(mapping.Point, track)
 			if progress < 0 {

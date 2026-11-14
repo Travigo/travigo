@@ -90,6 +90,7 @@ func (v *VSTPMessage) processOverlay() {
 		log.Error().Err(err).Msg("Failed to read journeys for VSTP overlay")
 		return
 	}
+
 	var replaced, affectedStops []string
 	datesByJourney := make(map[string][]string)
 	for _, journey := range originals {
@@ -177,6 +178,7 @@ func (v *VSTPMessage) processCancellation() {
 			log.Error().Err(err).Msg("Failed to decode permanent journey for VSTP cancellation")
 			continue
 		}
+
 		cancelledDates := vstpMatchingServiceDates(&journey, startDate, endDate, v.VSTP.Schedule.DayRuns)
 		if len(cancelledDates) == 0 {
 			continue
@@ -371,11 +373,15 @@ func (v *VSTPMessage) processCreate(replaced, affectedStops []string) bool {
 		}
 		journey.Expiry = endDate.Add(48 * time.Hour)
 
-		if len(journey.Path) == 0 {
+		if len(journey.Calls) == 0 {
 			continue
 		}
 		journey.ReplacesJourneyRefs = replaced
 		journey.AmendmentStopRefs = affectedStops
+		if err := journey.ValidatePath(); err != nil {
+			log.Error().Err(err).Str("journey", journey.PrimaryIdentifier).Msg("Invalid VSTP journey calls")
+			continue
+		}
 
 		operations = append(operations, mongo.NewReplaceOneModel().
 			SetFilter(bson.M{"primaryidentifier": journeyID}).
@@ -421,7 +427,7 @@ func (v *VSTPMessage) processDelete() {
 		cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{
 			"datasource.datasetid":      "gb-nationalrail-timetable",
 			"otheridentifiers.TrainUID": v.VSTP.Schedule.TrainUID,
-		})
+		}, options.Find().SetProjection(bson.M{"primaryidentifier": 1}))
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to find cancelled VSTP journeys")
 			return
@@ -448,7 +454,7 @@ func (v *VSTPMessage) processDelete() {
 	id := v.vstpJourneyID()
 	if v.VSTP.Schedule.STP == "O" {
 		var overlay ctdf.Journey
-		err := database.GetCollection("journeys").FindOne(ctx, bson.M{"primaryidentifier": id}).Decode(&overlay)
+		err := database.GetCollection("journeys").FindOne(ctx, bson.M{"primaryidentifier": id}, options.FindOne().SetProjection(bson.M{"primaryidentifier": 1, "replacesjourneyrefs": 1})).Decode(&overlay)
 		if err != nil && err != mongo.ErrNoDocuments {
 			log.Error().Err(err).Str("journey", id).Msg("Failed to load withdrawn VSTP overlay")
 			return

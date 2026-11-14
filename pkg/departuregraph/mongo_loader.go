@@ -89,7 +89,7 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	// or a published stop/day lookup while retaining MatchDate as the final authority.
 	// Compare rows examined/decoded at busy stops and bound projection/query batches.
 	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, bson.M{
-		"path.originstopref":   bson.M{"$in": stopRefs},
+		"originstoprefs":       bson.M{"$in": stopRefs},
 		"datasource.datasetid": bson.M{"$ne": railutils.DarwinAmendmentDataset},
 	}, departureGraphFindOptions())
 	if err != nil {
@@ -102,6 +102,9 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 		var journey ctdf.Journey
 		if err := cursor.Decode(&journey); err != nil {
 			return nil, err
+		}
+		if err := journey.ValidatePath(); err != nil {
+			return nil, fmt.Errorf("decode departure graph stop journey %q: %w", journey.PrimaryIdentifier, err)
 		}
 		if journey.Availability != nil && journey.Availability.MatchDate(serviceDate) {
 			if err := repairMissingJourneyTimes(&journey); err != nil {
@@ -141,6 +144,9 @@ func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, a
 		if err := cursor.Decode(&record); err != nil {
 			return fmt.Errorf("decode journey for departure graph: %w", err)
 		}
+		if err := record.Journey.ValidatePath(); err != nil {
+			return fmt.Errorf("decode journey path for departure graph %q: %w", record.Journey.PrimaryIdentifier, err)
+		}
 		// Old GTFS imports stored absent intermediate times as time.Time{}.
 		// Repair those on read too, so recovery does not depend on a reimport.
 		// Unresolvable records still visit the graph for rejection accounting
@@ -154,8 +160,11 @@ func (MongoLoader) ScanJourneys(ctx context.Context, serviceDates []time.Time, a
 }
 
 func repairMissingJourneyTimes(journey *ctdf.Journey) error {
-	for _, path := range journey.Path {
-		if path == nil || path.OriginDepartureTime.IsZero() || path.DestinationArrivalTime.IsZero() {
+	if journey == nil || journey.LegCount() == 0 {
+		return ctdf.InterpolateMissingJourneyTimes(journey)
+	}
+	for origin, destination := range journey.LegCalls() {
+		if origin.Departure.IsZero() || destination.ArrivalTime().IsZero() {
 			return ctdf.InterpolateMissingJourneyTimes(journey)
 		}
 	}
@@ -209,15 +218,16 @@ func departureGraphFindOptions() *options.FindOptions {
 		{Key: "replacesjourneyrefs", Value: 1},
 		{Key: "availability", Value: 1},
 		{Key: "detailedrailinformation.replacementbus", Value: 1},
-		{Key: "path.originstopref", Value: 1},
-		{Key: "path.destinationstopref", Value: 1},
-		{Key: "path.originplatform", Value: 1},
-		{Key: "path.destinationplatform", Value: 1},
-		{Key: "path.originarrivaltime", Value: 1},
-		{Key: "path.origindeparturetime", Value: 1},
-		{Key: "path.destinationarrivaltime", Value: 1},
-		{Key: "path.destinationdisplay", Value: 1},
-		{Key: "path.originactivity", Value: 1},
-		{Key: "path.destinationactivity", Value: 1},
+		{Key: "calls.stopref", Value: 1},
+		{Key: "calls.start", Value: 1},
+		{Key: "calls.end", Value: 1},
+		{Key: "calls.arrival", Value: 1},
+		{Key: "calls.departure", Value: 1},
+		{Key: "calls.platform", Value: 1},
+		{Key: "calls.incomingarrival", Value: 1},
+		{Key: "calls.incomingplatform", Value: 1},
+		{Key: "calls.originactivity", Value: 1},
+		{Key: "calls.destinationactivity", Value: 1},
+		{Key: "calls.outgoing.destinationdisplay", Value: 1},
 	})
 }

@@ -7,11 +7,28 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
+func journeyWithLegs(legs ...*ctdf.JourneyPathItem) *ctdf.Journey {
+	return &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(legs...)}
+}
+
+func outgoingTrackRef(journey *ctdf.Journey, index int) string {
+	for call, _ := range journey.LegCalls() {
+		if index == 0 {
+			if call.Outgoing == nil {
+				return ""
+			}
+			return call.Outgoing.TrackRef
+		}
+		index--
+	}
+	return ""
+}
+
 func TestApplyBestRouteAssignsTrackReferencesToScheduledJourneyLegs(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b"},
-		{OriginStopRef: "b", DestinationStopRef: "c", TrackRef: "timetable-track"},
-	}}
+	journey := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b"},
+		&ctdf.JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "c", TrackRef: "timetable-track"},
+	)
 	route := Route{
 		Metadata: RouteLeg{RouteKey: "route", RouteStopIdentifiers: [][]string{{"a"}, {"b"}, {"c"}}},
 		Legs: map[int]ctdf.JourneyTrack{
@@ -23,11 +40,11 @@ func TestApplyBestRouteAssignsTrackReferencesToScheduledJourneyLegs(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !changed || journey.Path[0].TrackRef != "imported-a-b" {
-		t.Fatalf("first leg track ref = %q", journey.Path[0].TrackRef)
+	if !changed || outgoingTrackRef(journey, 0) != "imported-a-b" {
+		t.Fatalf("first leg track ref = %q", outgoingTrackRef(journey, 0))
 	}
-	if journey.Path[1].TrackRef != "timetable-track" {
-		t.Fatalf("timetable track was overwritten: %q", journey.Path[1].TrackRef)
+	if outgoingTrackRef(journey, 1) != "timetable-track" {
+		t.Fatalf("timetable track was overwritten: %q", outgoingTrackRef(journey, 1))
 	}
 }
 
@@ -57,9 +74,9 @@ func TestIndexRoutesByEndpointsIncludesSubsequencesAndAliases(t *testing.T) {
 }
 
 func TestApplyBestRouteMatchesPassingPath(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
-	}}
+	journey := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
+	)
 	candidate := func(key string, passingPaths [][]string) Route {
 		return Route{
 			Metadata: RouteLeg{
@@ -70,22 +87,22 @@ func TestApplyBestRouteMatchesPassingPath(t *testing.T) {
 	}
 	candidates := []Route{candidate("a-legacy", nil), candidate("b-other", [][]string{{"other"}}), candidate("c-matching", [][]string{{"via"}})}
 	changed, err := ApplyBestRoute(context.Background(), journey, candidates)
-	if err != nil || !changed || journey.Path[0].TrackRef != "c-matching" {
-		t.Fatalf("changed = %t, track = %q, err = %v", changed, journey.Path[0].TrackRef, err)
+	if err != nil || !changed || outgoingTrackRef(journey, 0) != "c-matching" {
+		t.Fatalf("changed = %t, track = %q, err = %v", changed, outgoingTrackRef(journey, 0), err)
 	}
-	journey.Path[0].TrackRef = ""
-	journey.Path[0].PassingPath = nil
+	journey.Calls[0].Outgoing.TrackRef = ""
+	journey.Calls[0].Outgoing.PassingPath = nil
 	changed, err = ApplyBestRoute(context.Background(), journey, candidates)
-	if err != nil || !changed || journey.Path[0].TrackRef != "a-legacy" {
-		t.Fatalf("legacy journey: changed = %t, track = %q, err = %v", changed, journey.Path[0].TrackRef, err)
+	if err != nil || !changed || outgoingTrackRef(journey, 0) != "a-legacy" {
+		t.Fatalf("legacy journey: changed = %t, track = %q, err = %v", changed, outgoingTrackRef(journey, 0), err)
 	}
 }
 
 func TestApplyOSMRailRoutesKeepsFallbackAcrossPathGap(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}, TrackRef: "old-a-b"},
-		{OriginStopRef: "c", DestinationStopRef: "d", PassingPath: []string{"unroutable"}, TrackRef: "old-c-d"},
-	}}
+	journey := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}, TrackRef: "old-a-b"},
+		&ctdf.JourneyPathItem{OriginStopRef: "c", DestinationStopRef: "d", PassingPath: []string{"unroutable"}, TrackRef: "old-c-d"},
+	)
 	routes := []Route{{
 		Metadata: RouteLeg{
 			RouteKey: "a-b-via", RouteStopIdentifiers: [][]string{{"a"}, {"b"}}, PassingPaths: [][]string{{"via"}},
@@ -97,7 +114,7 @@ func TestApplyOSMRailRoutesKeepsFallbackAcrossPathGap(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("changed = %t, err = %v", changed, err)
 	}
-	if journey.Path[0].TrackRef != "new-a-b" || journey.Path[1].TrackRef != "old-c-d" {
-		t.Fatalf("track refs = %q, %q", journey.Path[0].TrackRef, journey.Path[1].TrackRef)
+	if outgoingTrackRef(journey, 0) != "new-a-b" || outgoingTrackRef(journey, 1) != "old-c-d" {
+		t.Fatalf("track refs = %q, %q", outgoingTrackRef(journey, 0), outgoingTrackRef(journey, 1))
 	}
 }

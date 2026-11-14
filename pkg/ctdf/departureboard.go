@@ -151,35 +151,53 @@ func BoardOccurrenceIdentifier(journeyID, serviceDate string, stopIndex int, boa
 	return hex.EncodeToString(sum[:])
 }
 
-func boardPathStopRef(path *JourneyPathItem, boardType BoardType) string {
+func boardCallStopRef(origin, destination *JourneyCall, boardType BoardType) string {
 	if boardType.IsArrival() {
-		return path.DestinationStopRef
+		return destination.StopRef
 	}
-	return path.OriginStopRef
+	return origin.StopRef
 }
 
-func boardPathTime(path *JourneyPathItem, boardType BoardType) time.Time {
+func boardCallTime(origin, destination *JourneyCall, boardType BoardType) time.Time {
 	if boardType.IsArrival() {
-		return path.DestinationArrivalTime
+		return destination.ArrivalTime()
 	}
-	return path.OriginDepartureTime
+	return origin.Departure
 }
 
-func boardPathPlatform(path *JourneyPathItem, boardType BoardType) string {
+func boardCallPlatform(origin, destination *JourneyCall, boardType BoardType) string {
 	if boardType.IsArrival() {
-		return path.DestinationPlatform
+		return destination.ArrivalPlatform()
 	}
-	return path.OriginPlatform
+	return origin.Platform
 }
 
-func boardPathIsUnavailable(path *JourneyPathItem, boardType BoardType) bool {
-	activity := path.OriginActivity
+func boardCallIsUnavailable(origin, destination *JourneyCall, boardType BoardType) bool {
+	activity := origin.OriginActivity
 	var unavailableActivity JourneyPathItemActivity = JourneyPathItemActivitySetdown
 	if boardType.IsArrival() {
-		activity = path.DestinationActivity
+		activity = destination.DestinationActivity
 		unavailableActivity = JourneyPathItemActivityPickup
 	}
 	return len(activity) == 1 && activity[0] == unavailableActivity
+}
+
+// boardArrivalCalls keeps the destination side at each occurrence index. At a
+// discontinuity, that is the prior segment end; departure lookups use the next
+// segment start at the same legacy index.
+func boardArrivalCalls(journey *Journey) []*JourneyCall {
+	if journey == nil || len(journey.Calls) == 0 {
+		return nil
+	}
+	calls := make([]*JourneyCall, 0, len(journey.Calls))
+	calls = append(calls, &journey.Calls[0])
+	for _, destination := range journey.LegCalls() {
+		calls = append(calls, destination)
+	}
+	if len(calls) == 1 {
+		return nil
+	}
+	return calls
 }
 
 func boardRealtimeStopTime(stop *RealtimeJourneyStops, boardType BoardType) time.Time {
@@ -287,23 +305,21 @@ func boardClockTimeOnServiceDate(journey *Journey, serviceDate, clock time.Time)
 // following day as an hour value above 24. Keep the path's clock sequence
 // monotonic so an after-midnight call belongs to the date the train started.
 func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDate time.Time, boardType BoardType) time.Time {
-	if journey == nil || pathIndex < 0 || pathIndex >= len(journey.Path) {
+	if journey == nil || pathIndex < 0 || pathIndex >= journey.LegCount() {
 		return time.Time{}
 	}
 
 	target := time.Time{}
 	previous := time.Time{}
-	for index, path := range journey.Path[:pathIndex+1] {
-		if path == nil {
-			continue
-		}
+	index := 0
+	for origin, destination := range journey.LegCalls() {
 		for _, event := range []struct {
 			clock  time.Time
 			target bool
 		}{
-			{clock: path.OriginArrivalTime},
-			{clock: path.OriginDepartureTime, target: index == pathIndex && !boardType.IsArrival()},
-			{clock: path.DestinationArrivalTime, target: index == pathIndex && boardType.IsArrival()},
+			{clock: origin.Arrival},
+			{clock: origin.Departure, target: index == pathIndex && !boardType.IsArrival()},
+			{clock: destination.ArrivalTime(), target: index == pathIndex && boardType.IsArrival()},
 		} {
 			if event.clock.IsZero() {
 				continue
@@ -324,80 +340,80 @@ func boardScheduledTimeOnServiceDate(journey *Journey, pathIndex int, serviceDat
 				target = at
 			}
 		}
+		if index == pathIndex {
+			break
+		}
+		index++
 	}
 	if !target.IsZero() {
 		return target
 	}
-	return boardClockTimeOnServiceDate(journey, serviceDate, boardPathTime(journey.Path[pathIndex], boardType))
+	origin, destination := journey.LegEndpoints(pathIndex)
+	if origin == nil || destination == nil {
+		return time.Time{}
+	}
+	return boardClockTimeOnServiceDate(journey, serviceDate, boardCallTime(origin, destination, boardType))
 }
 
 // BoardDestinationDisplay returns the service destination for departures and
 // the journey origin for arrivals. It never loads missing stop references;
 // selected API entries resolve those references in one batch.
 func BoardDestinationDisplay(journey *Journey, fallback string, boardType BoardType) string {
-	if !boardType.IsArrival() || journey == nil || len(journey.Path) == 0 {
+	if !boardType.IsArrival() || journey == nil || len(journey.Calls) == 0 {
 		return fallback
 	}
+	return boardDestinationDisplayWithArrivalCalls(journey, fallback, boardType, boardArrivalCalls(journey))
+}
 
-	firstPathItem := journey.Path[0]
-	if firstPathItem == nil {
+func boardDestinationDisplayWithArrivalCalls(journey *Journey, fallback string, boardType BoardType, arrivalCalls []*JourneyCall) string {
+	if !boardType.IsArrival() || journey == nil || len(arrivalCalls) == 0 {
 		return fallback
 	}
-
-	if firstPathItem.OriginStop != nil && firstPathItem.OriginStop.PrimaryName != "" {
-		return firstPathItem.OriginStop.PrimaryName
+	firstCall := arrivalCalls[0]
+	if firstCall.Stop != nil && firstCall.Stop.PrimaryName != "" {
+		return firstCall.Stop.PrimaryName
 	}
 
-	return firstPathItem.OriginStopRef
+	return firstCall.StopRef
 }
 
 // BoardDestinationDisplayWithRealtime shortens a departure's destination when
 // realtime marks the scheduled terminal call as cancelled. Whole-journey
 // cancellations retain the scheduled destination.
 func BoardDestinationDisplayWithRealtime(journey *Journey, realtimeJourney *RealtimeJourney, fallback string, boardType BoardType, wholeJourneyCancelled bool) string {
-	display := BoardDestinationDisplay(journey, fallback, boardType)
-	if boardType.IsArrival() || wholeJourneyCancelled || journey == nil || realtimeJourney == nil || len(journey.Path) == 0 {
+	var arrivalCalls []*JourneyCall
+	if boardType.IsArrival() || (!wholeJourneyCancelled && realtimeJourney != nil) {
+		arrivalCalls = boardArrivalCalls(journey)
+	}
+	return boardDestinationDisplayWithRealtimeAndCalls(journey, realtimeJourney, fallback, boardType, wholeJourneyCancelled, arrivalCalls)
+}
+
+func boardDestinationDisplayWithRealtimeAndCalls(journey *Journey, realtimeJourney *RealtimeJourney, fallback string, boardType BoardType, wholeJourneyCancelled bool, arrivalCalls []*JourneyCall) string {
+	display := boardDestinationDisplayWithArrivalCalls(journey, fallback, boardType, arrivalCalls)
+	if boardType.IsArrival() || wholeJourneyCancelled || journey == nil || realtimeJourney == nil {
 		return display
 	}
 
-	terminalIndex := len(journey.Path)
-	terminalPathItem := journey.Path[terminalIndex-1]
-	if terminalPathItem == nil {
+	if len(arrivalCalls) == 0 {
 		return display
 	}
-	terminalStop := realtimeJourney.RealtimeStop(terminalPathItem.DestinationStopRef, terminalIndex)
+	terminalIndex := len(arrivalCalls) - 1
+	terminalCall := arrivalCalls[terminalIndex]
+	terminalStop := realtimeJourney.RealtimeStop(terminalCall.StopRef, terminalIndex)
 	if terminalStop == nil || !terminalStop.Cancelled {
 		return display
 	}
 
 	for journeyStopIndex := terminalIndex - 1; journeyStopIndex >= 0; journeyStopIndex-- {
-		var stopRef string
-		var pathItem *JourneyPathItem
-		if journeyStopIndex == 0 {
-			pathItem = journey.Path[0]
-			if pathItem == nil {
-				continue
-			}
-			stopRef = pathItem.OriginStopRef
-		} else {
-			pathItem = journey.Path[journeyStopIndex-1]
-			if pathItem == nil {
-				continue
-			}
-			stopRef = pathItem.DestinationStopRef
-		}
+		call := arrivalCalls[journeyStopIndex]
+		stopRef := call.StopRef
 
 		realtimeStop := realtimeJourney.RealtimeStop(stopRef, journeyStopIndex)
 		if realtimeStop != nil && realtimeStop.Cancelled {
 			continue
 		}
 
-		var stop *Stop
-		if journeyStopIndex == 0 {
-			stop = pathItem.OriginStop
-		} else {
-			stop = pathItem.DestinationStop
-		}
+		stop := call.Stop
 		if stop == nil {
 			return display
 		}
@@ -479,13 +495,14 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 	p.WithMaxGoroutines(maxGoroutines)
 
 	for _, journey := range journeys {
+		arrivalCalls := boardArrivalCalls(journey)
 		p.Go(func() []*DepartureBoard {
 			var occurrences []*DepartureBoard
-			for occurrenceIndex, occurrencePath := range journey.Path {
-				if occurrencePath == nil {
-					continue
-				}
-				if _, ok := stopRefsSet[boardPathStopRef(occurrencePath, boardType)]; !ok {
+			occurrenceIndex := 0
+			for originCall, destinationCall := range journey.LegCalls() {
+				currentOccurrence := occurrenceIndex
+				occurrenceIndex++
+				if _, ok := stopRefsSet[boardCallStopRef(originCall, destinationCall, boardType)]; !ok {
 					continue
 				}
 				entry := func() *DepartureBoard {
@@ -501,7 +518,7 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 
 					if journey.Availability.MatchDate(dateTime) {
 						availabilityMatchedCount.Add(1)
-						scheduledStopTime = boardScheduledTimeOnServiceDate(journey, occurrenceIndex, dateTime, boardType)
+						scheduledStopTime = boardScheduledTimeOnServiceDate(journey, currentOccurrence, dateTime, boardType)
 						if startTime.Sub(scheduledStopTime) > 4*time.Hour {
 							tooOldSkippedCount.Add(1)
 							return nil
@@ -527,11 +544,11 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 						}
 
 						stopMatchedCount.Add(1)
-						stopPlatform = boardPathPlatform(occurrencePath, boardType)
+						stopPlatform = boardCallPlatform(originCall, destinationCall, boardType)
 						stopPlatformType = "ESTIMATED"
 
 						// A departure needs pickup permission; an arrival needs setdown permission.
-						if boardPathIsUnavailable(occurrencePath, boardType) {
+						if boardCallIsUnavailable(originCall, destinationCall, boardType) {
 							activitySkippedCount.Add(1)
 							return nil
 						}
@@ -540,8 +557,8 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 						if journey.RealtimeJourney != nil {
 							var realtimeJourneyStop *RealtimeJourneyStops
 
-							journeyStopIndex := occurrenceIndex + boardStopIndexOffset(boardType)
-							realtimeJourneyStop = boardRealtimeStop(journey.RealtimeJourney, boardPathStopRef(occurrencePath, boardType), journeyStopIndex, realtimeLookup.StopAliases)
+							journeyStopIndex := currentOccurrence + boardStopIndexOffset(boardType)
+							realtimeJourneyStop = boardRealtimeStop(journey.RealtimeJourney, boardCallStopRef(originCall, destinationCall, boardType), journeyStopIndex, realtimeLookup.StopAliases)
 
 							if realtimeJourneyStop != nil {
 								realtimeStopMatchedCount.Add(1)
@@ -580,8 +597,12 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 						}
 						delayed = boardEntryIsDelayed(scheduledStopTime, stopTime, departureBoardRecordType == DepartureBoardRecordTypeCancelled)
 
-						destinationDisplay = BoardDestinationDisplayWithRealtime(journey, journey.RealtimeJourney, occurrencePath.DestinationDisplay, boardType, wholeJourneyCancelled)
-						displayReference = BoardDisplayReferenceFor(journey, journey.RealtimeJourney, boardType, wholeJourneyCancelled)
+						legDisplay := ""
+						if originCall.Outgoing != nil {
+							legDisplay = originCall.Outgoing.DestinationDisplay
+						}
+						destinationDisplay = boardDestinationDisplayWithRealtimeAndCalls(journey, journey.RealtimeJourney, legDisplay, boardType, wholeJourneyCancelled, arrivalCalls)
+						displayReference = boardDisplayReferenceForCalls(journey, journey.RealtimeJourney, boardType, wholeJourneyCancelled, arrivalCalls)
 
 						if stopTime.Before(startTime) {
 							beforeStartSkippedCount.Add(1)
@@ -595,7 +616,7 @@ func GenerateBoardFromJourneysForServiceDate(journeys []*Journey, stopRefs []str
 						}
 
 						return &DepartureBoard{
-							OccurrenceIdentifier: BoardOccurrenceIdentifier(journey.PrimaryIdentifier, dateTime.Format(YearMonthDayFormat), occurrenceIndex+boardStopIndexOffset(boardType), boardType),
+							OccurrenceIdentifier: BoardOccurrenceIdentifier(journey.PrimaryIdentifier, dateTime.Format(YearMonthDayFormat), currentOccurrence+boardStopIndexOffset(boardType), boardType),
 							ServiceDate:          dateTime.Format(YearMonthDayFormat),
 							Journey:              journey,
 							Time:                 stopTime,
@@ -825,43 +846,39 @@ type BoardDisplayReference struct {
 }
 
 func BoardDisplayReferenceFor(journey *Journey, realtime *RealtimeJourney, kind BoardType, wholeCancelled bool) *BoardDisplayReference {
-	if journey == nil || len(journey.Path) == 0 {
+	var arrivalCalls []*JourneyCall
+	if kind.IsArrival() || (!wholeCancelled && realtime != nil) {
+		arrivalCalls = boardArrivalCalls(journey)
+	}
+	return boardDisplayReferenceForCalls(journey, realtime, kind, wholeCancelled, arrivalCalls)
+}
+
+func boardDisplayReferenceForCalls(journey *Journey, realtime *RealtimeJourney, kind BoardType, wholeCancelled bool, arrivalCalls []*JourneyCall) *BoardDisplayReference {
+	if journey == nil || len(journey.Calls) == 0 {
 		return nil
 	}
 	if kind.IsArrival() {
-		p := journey.Path[0]
-		if p == nil {
+		if len(arrivalCalls) == 0 {
 			return nil
 		}
-		return &BoardDisplayReference{p.OriginStopRef, p.OriginStop, true}
+		call := arrivalCalls[0]
+		return &BoardDisplayReference{call.StopRef, call.Stop, true}
 	}
 	if wholeCancelled || realtime == nil {
 		return nil
 	}
-	last := journey.Path[len(journey.Path)-1]
-	if last == nil {
+	if len(arrivalCalls) == 0 {
 		return nil
 	}
-	terminal := realtime.RealtimeStop(last.DestinationStopRef, len(journey.Path))
+	terminalIndex := len(arrivalCalls) - 1
+	last := arrivalCalls[terminalIndex]
+	terminal := realtime.RealtimeStop(last.StopRef, terminalIndex)
 	if terminal == nil || !terminal.Cancelled {
 		return nil
 	}
-	for i := len(journey.Path) - 1; i >= 0; i-- {
-		var ref string
-		var stop *Stop
-		if i == 0 {
-			p := journey.Path[0]
-			if p == nil {
-				continue
-			}
-			ref, stop = p.OriginStopRef, p.OriginStop
-		} else {
-			p := journey.Path[i-1]
-			if p == nil {
-				continue
-			}
-			ref, stop = p.DestinationStopRef, p.DestinationStop
-		}
+	for i := terminalIndex - 1; i >= 0; i-- {
+		call := arrivalCalls[i]
+		ref, stop := call.StopRef, call.Stop
 		if update := realtime.RealtimeStop(ref, i); update != nil && update.Cancelled {
 			continue
 		}

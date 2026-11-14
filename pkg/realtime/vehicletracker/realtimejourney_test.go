@@ -40,7 +40,7 @@ func TestTrackerUpdatePersistsLocationAndUsesTrackForHistory(t *testing.T) {
 			journey := &ctdf.Journey{
 				PrimaryIdentifier: "schedule",
 				DepartureTimezone: "UTC",
-				Path:              []*ctdf.JourneyPathItem{leg},
+				Calls:             ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{leg}...),
 			}
 			consumer := &BatchConsumer{
 				trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{
@@ -161,28 +161,27 @@ func TestTrackerSavesPredictionsWithoutRequiringPastStops(t *testing.T) {
 			journey := &ctdf.Journey{
 				PrimaryIdentifier: "schedule",
 				DepartureTimezone: "UTC",
-				Path: []*ctdf.JourneyPathItem{
+				Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{
 					{OriginStopRef: "a", DestinationStopRef: "b", OriginArrivalTime: clock, OriginDepartureTime: clock, DestinationArrivalTime: clock.Add(10 * time.Minute)},
 					{OriginStopRef: "b", DestinationStopRef: "a", OriginArrivalTime: clock.Add(10 * time.Minute), OriginDepartureTime: clock.Add(12 * time.Minute), DestinationArrivalTime: clock.Add(20 * time.Minute)},
 					{OriginStopRef: "a", DestinationStopRef: "c", OriginArrivalTime: clock.Add(20 * time.Minute), OriginDepartureTime: clock.Add(22 * time.Minute), DestinationArrivalTime: clock.Add(30 * time.Minute)},
-				},
+				}...),
 			}
 			if tc.missingTimes {
-				for _, path := range journey.Path {
-					path.OriginArrivalTime = time.Time{}
-					path.OriginDepartureTime = time.Time{}
-					path.DestinationArrivalTime = time.Time{}
+				for i := range journey.Calls {
+					journey.Calls[i].Arrival = time.Time{}
+					journey.Calls[i].Departure = time.Time{}
 				}
 			}
 			if tc.gps {
 				point := ctdf.Location{Type: "Point", Coordinates: []float64{0.01, 51}}
-				for _, path := range journey.Path {
-					path.DestinationStop = &ctdf.Stop{Location: &point}
+				for _, destination := range journey.LegCalls() {
+					destination.Stop = &ctdf.Stop{Location: &point}
 				}
-				journey.Path[0].Track = []ctdf.Location{
+				journey.Calls[0].Outgoing = &ctdf.JourneyLeg{Track: []ctdf.Location{
 					{Type: "Point", Coordinates: []float64{0, 51}},
 					point,
-				}
+				}}
 			}
 			consumer := &BatchConsumer{trackedJourneyCache: &trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{
 				journey.PrimaryIdentifier: {

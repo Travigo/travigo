@@ -470,7 +470,11 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 			})
 		}
 	}
-	realtimeJourney.Journey.Path = vehicleJourneyPath
+	if err := realtimeJourney.Journey.SetLegs(vehicleJourneyPath); err != nil {
+		log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to convert TfL realtime path to calls")
+		realtimeJourney.Journey.Calls = []ctdf.JourneyCall{}
+		realtimeJourney.Journey.RefreshStopRefs()
+	}
 
 	// Work out what the departed & next stops are
 	// We find the first stop with an estimate instead of historical value and then base the departed/origin stops

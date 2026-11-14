@@ -230,10 +230,10 @@ func (i *SiriVM) findJourney(framedVehicleJourneyDate, exactDeparture time.Time)
 	// If we fail with the ID codes then use both endpoints whenever supplied.
 	query := bson.M{}
 	if originRef := i.IdentifyingInformation["OriginRef"]; originRef != "" {
-		query["path.originstopref"] = originRef
+		query["originstoprefs"] = originRef
 	}
 	if destinationRef := i.IdentifyingInformation["DestinationRef"]; destinationRef != "" {
-		query["path.destinationstopref"] = destinationRef
+		query["destinationstoprefs"] = destinationRef
 	}
 	if len(query) == 0 {
 		return "", errSiriMissing
@@ -366,11 +366,11 @@ func (i *SiriVM) narrowJourneys(journeys []*ctdf.Journey, includeAvailabilityCon
 		if len(timeFilteredJourneys) == 0 {
 			for _, journey := range journeys {
 				// Skip check if none of the start/end stops match
-				if len(journey.Path) == 0 {
+				if journey.LegCount() == 0 || len(journey.Calls) == 0 {
 					continue
 				}
 
-				if !(journey.Path[0].OriginStopRef == i.IdentifyingInformation["OriginRef"] || journey.Path[len(journey.Path)-1].DestinationStopRef == i.IdentifyingInformation["DestinationRef"]) {
+				if !(journey.Calls[0].StopRef == i.IdentifyingInformation["OriginRef"] || journey.Calls[len(journey.Calls)-1].StopRef == i.IdentifyingInformation["DestinationRef"]) {
 					continue
 				}
 

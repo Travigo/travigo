@@ -183,7 +183,7 @@ func (c *CommonInterfaceFormat) ConvertToCTDF() []*ctdf.Journey {
 
 	for _, journey := range journeys {
 		// Skip zero path journeys
-		if len(journey.Path) == 0 {
+		if journey.LegCount() == 0 {
 			continue
 		}
 		journeysArray = append(journeysArray, journey)
@@ -246,7 +246,13 @@ func (c *CommonInterfaceFormat) Import(dataset datasets.DataSet, datasource *ctd
 			// overlays/track references and publishing only a fully validated run.
 			insertModel := mongo.NewInsertOneModel()
 
-			bsonRep, _ := bson.Marshal(journey)
+			if err := journey.ValidatePath(); err != nil {
+				return datasets.DataImportReport{}, fmt.Errorf("validate CIF journey %s: %w", journey.PrimaryIdentifier, err)
+			}
+			bsonRep, err := bson.Marshal(journey)
+			if err != nil {
+				return datasets.DataImportReport{}, fmt.Errorf("marshal CIF journey %s: %w", journey.PrimaryIdentifier, err)
+			}
 			insertModel.SetDocument(bsonRep)
 
 			operations = append(operations, insertModel)
@@ -285,14 +291,11 @@ func preserveExistingJourneyTrackRefs(ctx context.Context, collection *mongo.Col
 	}
 
 	cursor, err := collection.Find(ctx, bson.M{
-		"primaryidentifier": bson.M{"$in": identifiers},
-		"path.trackref":     bson.M{"$exists": true, "$ne": ""},
+		"primaryidentifier":       bson.M{"$in": identifiers},
+		"calls.outgoing.trackref": bson.M{"$exists": true, "$ne": ""},
 	}, options.Find().SetProjection(bson.M{
-		"primaryidentifier":       1,
-		"path.originstopref":      1,
-		"path.destinationstopref": 1,
-		"path.trackref":           1,
-		"path.passingpath":        1,
+		"primaryidentifier": 1,
+		"calls":             1,
 	}))
 	if err != nil {
 		return 0, err
@@ -325,20 +328,24 @@ func preserveMatchingJourneyTrackRefs(existing *ctdf.Journey, replacement *ctdf.
 		passingPath string
 	}
 	existingRefs := make(map[legKey][]string)
-	for _, path := range existing.Path {
-		if path == nil || path.TrackRef == "" {
+	for origin, destination := range existing.LegCalls() {
+		if origin.Outgoing == nil || origin.Outgoing.TrackRef == "" {
 			continue
 		}
-		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef, passingPath: strings.Join(path.PassingPath, "\x00")}
-		existingRefs[key] = append(existingRefs[key], path.TrackRef)
+		key := legKey{origin: origin.StopRef, destination: destination.StopRef, passingPath: strings.Join(origin.Outgoing.PassingPath, "\x00")}
+		existingRefs[key] = append(existingRefs[key], origin.Outgoing.TrackRef)
 	}
 
 	preserved := 0
-	for _, path := range replacement.Path {
-		if path == nil || path.TrackRef != "" {
+	for origin, destination := range replacement.LegCalls() {
+		if origin.Outgoing != nil && origin.Outgoing.TrackRef != "" {
 			continue
 		}
-		key := legKey{origin: path.OriginStopRef, destination: path.DestinationStopRef, passingPath: strings.Join(path.PassingPath, "\x00")}
+		var passingPath []string
+		if origin.Outgoing != nil {
+			passingPath = origin.Outgoing.PassingPath
+		}
+		key := legKey{origin: origin.StopRef, destination: destination.StopRef, passingPath: strings.Join(passingPath, "\x00")}
 		refs := existingRefs[key]
 		if len(refs) == 0 && key.passingPath != "" {
 			// On the first import with passing points, keep the old geometry as a fallback.
@@ -348,7 +355,10 @@ func preserveMatchingJourneyTrackRefs(existing *ctdf.Journey, replacement *ctdf.
 		if len(refs) == 0 {
 			continue
 		}
-		path.TrackRef = refs[0]
+		if origin.Outgoing == nil {
+			origin.Outgoing = &ctdf.JourneyLeg{}
+		}
+		origin.Outgoing.TrackRef = refs[0]
 		existingRefs[key] = refs[1:]
 		preserved++
 	}
@@ -658,9 +668,11 @@ func (c *CommonInterfaceFormat) CreateJourneyFromTraindef(journeyID string, trai
 		DepartureTimezone:    "Europe/London",
 		DestinationDisplay:   destinationDisplay,
 		Availability:         availability,
-		Path:                 path,
 
 		DetailedRailInformation: &detailedRailInformation,
+	}
+	if err := journey.SetLegs(path); err != nil {
+		log.Error().Err(err).Str("journey", journeyID).Msg("Could not build National Rail journey calls")
 	}
 
 	return journey

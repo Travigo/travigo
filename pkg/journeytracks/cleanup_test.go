@@ -26,11 +26,14 @@ func TestCleanupOSMRailTracksProtectsJourneyReferences(t *testing.T) {
 			bson.D{{Key: "primaryidentifier", Value: "live"}},
 			bson.D{{Key: "primaryidentifier", Value: "unused"}},
 		)
-		reply(database.JourneysRawCollectionName, bson.D{{Key: "path", Value: bson.A{
-			bson.D{{Key: "trackref", Value: "raw-fallback"}},
+		reply(database.JourneysRawCollectionName, bson.D{{Key: "calls", Value: bson.A{
+			bson.D{{Key: "outgoing", Value: bson.D{{Key: "trackref", Value: "raw-fallback"}}}},
 		}}})
 		reply(database.JourneysStagingCollectionName, bson.D{{Key: "trackref", Value: "staged"}})
-		reply(database.JourneysCollectionName, bson.D{{Key: "trackref", Value: "live"}})
+		reply(database.JourneysCollectionName, bson.D{{Key: "calls", Value: bson.A{
+			bson.D{{Key: "outgoing", Value: bson.D{{Key: "trackref", Value: "live"}}}},
+		}}})
+		reply(RouteCollectionName)
 		mt.AddMockResponses(mtest.CreateSuccessResponse(bson.E{Key: "n", Value: 1}))
 
 		source := &ctdf.DataSourceReference{DatasetID: "osm", OriginalFormat: "gb-osm-rail-tracks", Timestamp: "123"}
@@ -38,10 +41,10 @@ func TestCleanupOSMRailTracksProtectsJourneyReferences(t *testing.T) {
 			mt.Fatal(err)
 		}
 		events := mt.GetAllStartedEvents()
-		if len(events) != 5 || events[4].CommandName != "delete" {
-			mt.Fatalf("expected four reads and one delete, got %v", events)
+		if len(events) != 6 || events[5].CommandName != "delete" {
+			mt.Fatalf("expected five reads and one delete, got %v", events)
 		}
-		deletions, err := events[4].Command.Lookup("deletes").Array().Values()
+		deletions, err := events[5].Command.Lookup("deletes").Array().Values()
 		if err != nil || len(deletions) != 1 {
 			mt.Fatalf("delete requests = %v, %v", deletions, err)
 		}

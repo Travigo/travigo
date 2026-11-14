@@ -12,13 +12,13 @@ import (
 )
 
 func TestMatchJourneyPositionUsesDistanceAlongLeg(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{
 		Track: []ctdf.Location{
 			{Type: "Point", Coordinates: []float64{0, 51}},
 			{Type: "Point", Coordinates: []float64{0.01, 51}},
 			{Type: "Point", Coordinates: []float64{0.02, 51}},
 		},
-	}}}
+	}}...)}
 
 	match, ok := matchJourneyPositionWithStopFallback(journey, ctdf.Location{Type: "Point", Coordinates: []float64{0.015, 51}})
 	if !ok {
@@ -74,10 +74,10 @@ func BenchmarkClosestTrackPosition(b *testing.B) {
 func TestMatchJourneyPositionFallsBackToStopPairWithoutTrack(t *testing.T) {
 	firstStop := &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0, 51}}}
 	secondStop := &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0.01, 51}}}
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{
 		{DestinationStop: firstStop},
 		{DestinationStop: secondStop},
-	}}
+	}...)}
 
 	match, ok := matchJourneyPositionWithStopFallback(journey, ctdf.Location{Type: "Point", Coordinates: []float64{0.0075, 51}})
 	if !ok {
@@ -97,11 +97,11 @@ func TestMatchJourneyProgressSkipsGlobalStopMapping(t *testing.T) {
 			{Type: "Point", Coordinates: []float64{0.01, 51}},
 			{Type: "Point", Coordinates: []float64{0.02, 51}},
 		},
-		Path: []*ctdf.JourneyPathItem{{
+		Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{
 			DestinationStop: &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0.005, 51}}},
 		}, {
 			DestinationStop: &ctdf.Stop{Location: &ctdf.Location{Type: "Point", Coordinates: []float64{0.015, 51}}},
-		}},
+		}}...),
 	}
 	vehicle := ctdf.Location{Type: "Point", Coordinates: []float64{0.01, 51}}
 
@@ -139,7 +139,7 @@ func TestPathForGlobalProgressReusesSharedShapeAndKeysStopCoordinates(t *testing
 				Type: "Point", Coordinates: []float64{longitude, 51},
 			}}}
 		}
-		return &ctdf.Journey{TrackRef: "shared-shape", Track: track, Path: paths}
+		return &ctdf.Journey{TrackRef: "shared-shape", Track: track, Calls: ctdf.JourneyCallsFromLegs(paths...)}
 	}
 
 	firstJourney := makeJourney(0.005, 0.015)
@@ -202,13 +202,13 @@ func TestPathForGlobalProgressPreservesProjectionSemantics(t *testing.T) {
 		globalProgress float64
 	}{
 		{name: "loop tie keeps earliest segment", track: loopTrack, path: []*ctdf.JourneyPathItem{validStop(0.005), validStop(0.009)}, globalProgress: 0.2},
-		{name: "malformed vertices and stops are skipped", track: malformedTrack, path: []*ctdf.JourneyPathItem{nil, invalidStop, {DestinationStop: &ctdf.Stop{}}, validStop(0.005), validStop(0.018)}, globalProgress: 0.6},
+		{name: "malformed vertices and stops are skipped", track: malformedTrack, path: []*ctdf.JourneyPathItem{{}, invalidStop, {DestinationStop: &ctdf.Stop{}}, validStop(0.005), validStop(0.018)}, globalProgress: 0.6},
 		{name: "decreasing loop progress preserves order", track: loopTrack, path: []*ctdf.JourneyPathItem{validStop(0.009), validStop(0.002)}, globalProgress: 0.8},
 		{name: "zero usable segments falls back to last path", track: []ctdf.Location{{Type: "Point", Coordinates: []float64{0, 51}}}, path: []*ctdf.JourneyPathItem{validStop(0), validStop(0.005)}, globalProgress: 0.5},
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			journey := &ctdf.Journey{TrackRef: "shape-" + test.name, Track: test.track, Path: test.path}
+			journey := &ctdf.Journey{TrackRef: "shape-" + test.name, Track: test.track, Calls: ctdf.JourneyCallsFromLegs(test.path...)}
 			wantIndex, wantProgress := pathForGlobalProgressUncached(journey, test.globalProgress)
 			gotIndex, gotProgress := pathForGlobalProgress(journey, test.globalProgress)
 			if gotIndex != wantIndex || math.Abs(gotProgress-wantProgress) > 1e-12 || (math.IsNaN(gotProgress) != math.IsNaN(wantProgress)) {
@@ -256,7 +256,8 @@ func TestStopProjectionCacheIsBoundedAndConcurrent(t *testing.T) {
 
 func pathForGlobalProgressUncached(journey *ctdf.Journey, globalProgress float64) (int, float64) {
 	previous := 0.0
-	for index, path := range journey.Path {
+	paths := journey.Legs()
+	for index, path := range paths {
 		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil || len(path.DestinationStop.Location.Coordinates) < 2 {
 			continue
 		}
@@ -264,7 +265,7 @@ func pathForGlobalProgressUncached(journey *ctdf.Journey, globalProgress float64
 		if !ok {
 			continue
 		}
-		if globalProgress <= destinationProgress || index == len(journey.Path)-1 {
+		if globalProgress <= destinationProgress || index == len(paths)-1 {
 			span := destinationProgress - previous
 			if span <= 0 {
 				return index, 0
@@ -273,7 +274,7 @@ func pathForGlobalProgressUncached(journey *ctdf.Journey, globalProgress float64
 		}
 		previous = destinationProgress
 	}
-	return len(journey.Path) - 1, 1
+	return len(paths) - 1, 1
 }
 
 func resetStopProjectionCacheForTest() {
@@ -350,7 +351,7 @@ func TestEstimateFutureStopsAbsorbsDelayDuringScheduledDwell(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stops := estimateFutureStops(paths, 0, test.offset)
+			stops := estimateFutureStops(&ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(paths...)}, 0, test.offset)
 			if !stops[0].ArrivalTime.Equal(test.wantTimedArrival) || !stops[0].DepartureTime.Equal(test.wantTimedDeparture) {
 				t.Fatalf("timed stop = arrival %s, departure %s; want arrival %s, departure %s", stops[0].ArrivalTime, stops[0].DepartureTime, test.wantTimedArrival, test.wantTimedDeparture)
 			}
@@ -362,11 +363,11 @@ func TestEstimateFutureStopsAbsorbsDelayDuringScheduledDwell(t *testing.T) {
 }
 
 func TestJourneyStopOccurrenceIndexHandlesRepeatedStop(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{
 		{OriginStopRef: "waterloo", DestinationStopRef: "vauxhall"},
 		{OriginStopRef: "vauxhall", DestinationStopRef: "waterloo"},
 		{OriginStopRef: "waterloo", DestinationStopRef: "clapham"},
-	}}
+	}...)}
 	if got := journeyStopOccurrenceIndex(journey, "waterloo", 0); got != 0 {
 		t.Fatalf("expected first Waterloo call at 0, got %d", got)
 	}
@@ -395,7 +396,7 @@ func TestScoreLocationCandidatePrefersForwardProgressOnSameJourney(t *testing.T)
 }
 
 func TestGeometryMetricsCoverBothMatchingPathsWithoutDoubleCounting(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{Track: []ctdf.Location{{Type: "Point", Coordinates: []float64{0, 51}}, {Type: "Point", Coordinates: []float64{0.01, 51}}}}}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{Track: []ctdf.Location{{Type: "Point", Coordinates: []float64{0, 51}}, {Type: "Point", Coordinates: []float64{0.01, 51}}}}}...)}
 	vehicle := ctdf.Location{Type: "Point", Coordinates: []float64{0.005, 51}}
 	for _, match := range []func(*ctdf.Journey, ctdf.Location) (journeyPositionMatch, bool){matchJourneyPositionWithStopFallback, matchJourneyProgress} {
 		before := telemetry.Snapshot().Stages["geometry"].Count

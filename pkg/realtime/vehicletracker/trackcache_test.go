@@ -64,16 +64,16 @@ func TestJourneyTrackCacheBoundsEntriesAndExpiresNegativeMisses(t *testing.T) {
 func TestCloneJourneyPathCopiesPathsWithoutChangingBase(t *testing.T) {
 	base := &ctdf.Journey{
 		PrimaryIdentifier: "journey",
-		Path: []*ctdf.JourneyPathItem{{
+		Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{
 			OriginStopRef:      "origin",
-			DestinationStopRef: "destination",
-		}},
+			DestinationStopRef: "destination", TrackRef: "leg",
+		}}...),
 	}
 	clone := cloneJourneyPath(base)
-	clone.Path[0].DestinationStopRef = "changed"
-	clone.Path[0].Track = []ctdf.Location{{Type: "Point"}}
+	clone.Calls[1].StopRef = "changed"
+	clone.Calls[0].Outgoing.Track = []ctdf.Location{{Type: "Point"}}
 
-	if base.Path[0].DestinationStopRef != "destination" || len(base.Path[0].Track) != 0 {
-		t.Fatalf("event view mutation changed cached schedule: %#v", base.Path[0])
+	if base.Calls[1].StopRef != "destination" || len(base.Calls[0].Outgoing.Track) != 0 {
+		t.Fatalf("event view mutation changed cached schedule: %#v", base.Calls)
 	}
 }

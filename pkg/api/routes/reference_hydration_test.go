@@ -136,9 +136,12 @@ func TestRealtimeOnlySkipsOuterHydrationButKeepsNestedTracks(t *testing.T) {
 		app := fiber.New()
 		app.Get("/:identifier", getJourney)
 		for _, view := range []string{"", "&view=web"} {
-			reply(mt, "journeys", bson.D{{Key: "primaryidentifier", Value: "journey"}, {Key: "serviceref", Value: "unused-service"}, {Key: "operatorref", Value: "unused-operator"}, {Key: "path", Value: bson.A{bson.D{{Key: "originstopref", Value: "unused-origin"}, {Key: "destinationstopref", Value: "unused-destination"}}}}})
+			reply(mt, "journeys", bson.D{{Key: "primaryidentifier", Value: "journey"}, {Key: "serviceref", Value: "unused-service"}, {Key: "operatorref", Value: "unused-operator"}, {Key: "calls", Value: bson.A{
+				bson.D{{Key: "stopref", Value: "unused-origin"}, {Key: "start", Value: true}},
+				bson.D{{Key: "stopref", Value: "unused-destination"}, {Key: "end", Value: true}},
+			}}})
 			reply(mt, "journey_tracks", bson.D{{Key: "primaryidentifier", Value: "track"}, {Key: "track", Value: bson.A{bson.D{{Key: "type", Value: "Point"}, {Key: "coordinates", Value: bson.A{1.0, 52.0}}}}}})
-			payload, _ := json.Marshal(&ctdf.RealtimeJourney{PrimaryIdentifier: "rt", Journey: &ctdf.Journey{PrimaryIdentifier: "nested", TrackRef: "track"}})
+			payload, _ := json.Marshal(&ctdf.RealtimeJourney{PrimaryIdentifier: "rt", Journey: &ctdf.Journey{PrimaryIdentifier: "journey", TrackRef: "track"}})
 			server.Set("realtime-journey:mapping:travigo-journeyid:journey", "rt")
 			server.Set("realtime-journey:details/rt", string(payload))
 			mt.ClearEvents()
@@ -182,7 +185,7 @@ func TestMissingShortenedDisplayRetainsTerminalFallback(t *testing.T) {
 	mt.Run("missing shortened destination", func(mt *mtest.T) {
 		useMockReferences(mt)
 		reply(mt, "stops", bson.D{{Key: "primaryidentifier", Value: "terminal"}, {Key: "primaryname", Value: "Scheduled Terminal"}})
-		item := &ctdf.DepartureBoard{Journey: &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{DestinationStopRef: "terminal"}}}, DisplayReference: &ctdf.BoardDisplayReference{StopRef: "missing"}}
+		item := &ctdf.DepartureBoard{Journey: &ctdf.Journey{Calls: []ctdf.JourneyCall{{StopRef: "terminal", Start: true, End: true}}}, DisplayReference: &ctdf.BoardDisplayReference{StopRef: "missing"}}
 		resolveDepartureBoardDestinationDisplays([]*ctdf.DepartureBoard{item})
 		if item.DestinationDisplay != "Scheduled Terminal" {
 			mt.Fatalf("terminal fallback lost: %q", item.DestinationDisplay)

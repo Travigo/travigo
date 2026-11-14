@@ -212,7 +212,14 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 	cursor, err := database.GetCollection(database.JourneysRawCollectionName).Find(
 		ctx,
 		bson.M{"datasource.datasetid": datasetID},
-		options.Find().SetProjection(bson.M{"path.originstopref": 1, "path.destinationstopref": 1, "path.passingpath": 1, "serviceref": 1}),
+		options.Find().SetProjection(bson.M{
+			"primaryidentifier":          1,
+			"serviceref":                 1,
+			"calls.stopref":              1,
+			"calls.start":                1,
+			"calls.end":                  1,
+			"calls.outgoing.passingpath": 1,
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -233,15 +240,15 @@ func loadRoutePatterns(ctx context.Context, datasetID string) ([]routePattern, e
 		if journey.ServiceRef == "" {
 			continue
 		}
-		for path := range journeytracks.ContiguousPaths(journey.Path) {
-			stopRefs := journeytracks.JourneyStops(path)
+		for calls := range journeytracks.ContiguousCallPaths(&journey) {
+			stopRefs := journeytracks.JourneyCallStops(calls)
 			var passingPaths [][]string
-			for i, leg := range path {
-				if len(leg.PassingPath) > 0 {
+			for i, call := range calls[:len(calls)-1] {
+				if call.Outgoing != nil && len(call.Outgoing.PassingPath) > 0 {
 					if passingPaths == nil {
-						passingPaths = make([][]string, len(path))
+						passingPaths = make([][]string, len(calls)-1)
 					}
-					passingPaths[i] = leg.PassingPath
+					passingPaths[i] = call.Outgoing.PassingPath
 				}
 			}
 			key := routeIdentifier(stopRefs, passingPaths...)

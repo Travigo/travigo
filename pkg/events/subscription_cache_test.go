@@ -124,7 +124,10 @@ func TestSubscriptionsForCommutePlansWatchRouteStopsJourneysAndPlatforms(t *test
 	commute := ctdf.UserCommute{PrimaryIdentifier: "commute-1", UserID: "user-1"}
 	plans := []ctdf.JourneyPlan{{RouteItems: []ctdf.JourneyPlanRouteItem{{
 		Type: ctdf.JourneyPlanRouteItemTypeJourney, OriginStopRef: "origin", DestinationStopRef: "destination",
-		Journey: &ctdf.Journey{PrimaryIdentifier: "journey-1", ServiceRef: "service-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "via"}, {OriginStopRef: "via", DestinationStopRef: "destination"}}},
+		Journey: &ctdf.Journey{PrimaryIdentifier: "journey-1", ServiceRef: "service-1", Calls: ctdf.JourneyCallsFromLegs(
+			&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "via"},
+			&ctdf.JourneyPathItem{OriginStopRef: "via", DestinationStopRef: "destination"},
+		)},
 	}}}}
 
 	subscriptions := subscriptionsForCommutePlans(commute, plans)

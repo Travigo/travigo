@@ -9,6 +9,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type storedRealtimeJourney struct {
@@ -41,33 +42,35 @@ type storedRealtimeJourney struct {
 }
 
 type storedJourney struct {
-	PrimaryIdentifier   string                  `json:"id"`
-	ServiceRef          string                  `json:"sr,omitempty"`
-	Service             *storedService          `json:"s,omitempty"`
-	OperatorRef         string                  `json:"or,omitempty"`
-	Operator            *storedOperator         `json:"op,omitempty"`
-	DepartureTimezone   string                  `json:"tz,omitempty"`
-	DestinationDisplay  string                  `json:"dest,omitempty"`
-	ReplacesJourneyRefs []string                `json:"rep,omitempty"`
-	Path                []storedJourneyPathItem `json:"p,omitempty"`
+	PrimaryIdentifier   string              `json:"id"`
+	ServiceRef          string              `json:"sr,omitempty"`
+	Service             *storedService      `json:"s,omitempty"`
+	OperatorRef         string              `json:"or,omitempty"`
+	Operator            *storedOperator     `json:"op,omitempty"`
+	DepartureTimezone   string              `json:"tz,omitempty"`
+	TrackRef            string              `json:"tr,omitempty"`
+	DestinationDisplay  string              `json:"dest,omitempty"`
+	ReplacesJourneyRefs []string            `json:"rep,omitempty"`
+	Calls               []storedJourneyCall `json:"calls,omitempty"`
 }
 
-// storedJourneyPathItem retains route information without embedding full stop
-// documents in every realtime journey Redis key.
-type storedJourneyPathItem struct {
-	OriginStopRef          string                         `json:"o,omitempty"`
-	DestinationStopRef     string                         `json:"d,omitempty"`
-	OriginPlatform         string                         `json:"op,omitempty"`
-	DestinationPlatform    string                         `json:"dp,omitempty"`
-	Distance               int                            `json:"di,omitempty"`
-	OriginArrivalTime      time.Time                      `json:"oa,omitempty"`
-	DestinationArrivalTime time.Time                      `json:"da,omitempty"`
-	OriginDepartureTime    time.Time                      `json:"od,omitempty"`
-	DestinationDisplay     string                         `json:"dd,omitempty"`
-	OriginActivity         []ctdf.JourneyPathItemActivity `json:"ox,omitempty"`
-	DestinationActivity    []ctdf.JourneyPathItemActivity `json:"dx,omitempty"`
-	TrackRef               string                         `json:"tr,omitempty"`
-	PassingPath            []string                       `json:"pp,omitempty"`
+// Realtime snapshots keep timetable calls and track refs without hydrated
+// stops, track coordinates or request-only data.
+type storedJourneyCall struct {
+	StopRef             string                         `json:"s"`
+	Arrival             *time.Time                     `json:"a,omitempty"`
+	Departure           *time.Time                     `json:"d,omitempty"`
+	Platform            string                         `json:"p,omitempty"`
+	IncomingArrival     *primitive.DateTime            `json:"ia,omitempty"`
+	IncomingPlatform    *string                        `json:"ip,omitempty"`
+	OriginActivity      []ctdf.JourneyPathItemActivity `json:"ox,omitempty"`
+	DestinationActivity []ctdf.JourneyPathItemActivity `json:"dx,omitempty"`
+	Start               bool                           `json:"start,omitempty"`
+	End                 bool                           `json:"end,omitempty"`
+	Distance            int                            `json:"di,omitempty"`
+	DestinationDisplay  string                         `json:"dd,omitempty"`
+	TrackRef            string                         `json:"tr,omitempty"`
+	PassingPath         []string                       `json:"pp,omitempty"`
 }
 
 type storedService struct {
@@ -157,9 +160,10 @@ func storedJourneyFromCTDF(journey *ctdf.Journey, realtimeJourneyID string) *sto
 		ServiceRef:          journey.ServiceRef,
 		OperatorRef:         journey.OperatorRef,
 		DepartureTimezone:   journey.DepartureTimezone,
+		TrackRef:            journey.TrackRef,
 		DestinationDisplay:  journey.DestinationDisplay,
 		ReplacesJourneyRefs: journey.ReplacesJourneyRefs,
-		Path:                storedJourneyPathFromCTDF(journey.Path),
+		Calls:               storedJourneyCallsFromCTDF(journey.Calls),
 	}
 
 	if journey.PrimaryIdentifier == realtimeJourneyID {
@@ -170,35 +174,35 @@ func storedJourneyFromCTDF(journey *ctdf.Journey, realtimeJourneyID string) *sto
 	return stored
 }
 
-func storedJourneyPathFromCTDF(path []*ctdf.JourneyPathItem) []storedJourneyPathItem {
-	if len(path) == 0 {
+func storedJourneyCallsFromCTDF(calls []ctdf.JourneyCall) []storedJourneyCall {
+	if len(calls) == 0 {
 		return nil
 	}
-
-	storedPath := make([]storedJourneyPathItem, 0, len(path))
-	for _, item := range path {
-		if item == nil {
-			continue
+	stored := make([]storedJourneyCall, len(calls))
+	for index := range calls {
+		call := &calls[index]
+		item := &stored[index]
+		item.StopRef = call.StopRef
+		if !call.Arrival.IsZero() {
+			item.Arrival = &call.Arrival
 		}
-
-		storedPath = append(storedPath, storedJourneyPathItem{
-			OriginStopRef:          item.OriginStopRef,
-			DestinationStopRef:     item.DestinationStopRef,
-			OriginPlatform:         item.OriginPlatform,
-			DestinationPlatform:    item.DestinationPlatform,
-			Distance:               item.Distance,
-			OriginArrivalTime:      item.OriginArrivalTime,
-			DestinationArrivalTime: item.DestinationArrivalTime,
-			OriginDepartureTime:    item.OriginDepartureTime,
-			DestinationDisplay:     item.DestinationDisplay,
-			OriginActivity:         item.OriginActivity,
-			DestinationActivity:    item.DestinationActivity,
-			TrackRef:               item.TrackRef,
-			PassingPath:            item.PassingPath,
-		})
+		if !call.Departure.IsZero() {
+			item.Departure = &call.Departure
+		}
+		item.Platform = call.Platform
+		item.IncomingArrival = call.IncomingArrival
+		item.IncomingPlatform = call.IncomingPlatform
+		item.OriginActivity = call.OriginActivity
+		item.DestinationActivity = call.DestinationActivity
+		item.Start, item.End = call.Start, call.End
+		if leg := call.Outgoing; leg != nil {
+			item.Distance = leg.Distance
+			item.DestinationDisplay = leg.DestinationDisplay
+			item.TrackRef = leg.TrackRef
+			item.PassingPath = leg.PassingPath
+		}
 	}
-
-	return storedPath
+	return stored
 }
 
 func storedServiceFromCTDF(service *ctdf.Service) *storedService {
@@ -310,7 +314,7 @@ func (stored *storedJourney) toCTDF() *ctdf.Journey {
 		return nil
 	}
 
-	path := stored.path()
+	calls := stored.calls()
 	journey := &ctdf.Journey{
 		PrimaryIdentifier:   stored.PrimaryIdentifier,
 		ServiceRef:          stored.ServiceRef,
@@ -318,41 +322,45 @@ func (stored *storedJourney) toCTDF() *ctdf.Journey {
 		OperatorRef:         stored.OperatorRef,
 		Operator:            stored.Operator.toCTDF(),
 		DepartureTimezone:   stored.DepartureTimezone,
+		TrackRef:            stored.TrackRef,
 		DestinationDisplay:  stored.DestinationDisplay,
 		ReplacesJourneyRefs: stored.ReplacesJourneyRefs,
-		Path:                path,
+		Calls:               calls,
 	}
-	if len(path) > 0 {
-		journey.DepartureTime = path[0].OriginDepartureTime
+	if len(calls) > 0 {
+		journey.DepartureTime = calls[0].Departure
 	}
 	return journey
 }
 
-func (stored *storedJourney) path() []*ctdf.JourneyPathItem {
-	if stored == nil || len(stored.Path) == 0 {
+func (stored *storedJourney) calls() []ctdf.JourneyCall {
+	if len(stored.Calls) == 0 {
 		return nil
 	}
-
-	path := make([]*ctdf.JourneyPathItem, 0, len(stored.Path))
-	for _, item := range stored.Path {
-		path = append(path, &ctdf.JourneyPathItem{
-			OriginStopRef:          item.OriginStopRef,
-			DestinationStopRef:     item.DestinationStopRef,
-			OriginPlatform:         item.OriginPlatform,
-			DestinationPlatform:    item.DestinationPlatform,
-			Distance:               item.Distance,
-			OriginArrivalTime:      item.OriginArrivalTime,
-			DestinationArrivalTime: item.DestinationArrivalTime,
-			OriginDepartureTime:    item.OriginDepartureTime,
-			DestinationDisplay:     item.DestinationDisplay,
-			OriginActivity:         item.OriginActivity,
-			DestinationActivity:    item.DestinationActivity,
-			TrackRef:               item.TrackRef,
-			PassingPath:            item.PassingPath,
-		})
+	calls := make([]ctdf.JourneyCall, len(stored.Calls))
+	for index, item := range stored.Calls {
+		call := &calls[index]
+		call.StopRef = item.StopRef
+		if item.Arrival != nil {
+			call.Arrival = *item.Arrival
+		}
+		if item.Departure != nil {
+			call.Departure = *item.Departure
+		}
+		call.Platform = item.Platform
+		call.IncomingArrival = item.IncomingArrival
+		call.IncomingPlatform = item.IncomingPlatform
+		call.OriginActivity = item.OriginActivity
+		call.DestinationActivity = item.DestinationActivity
+		call.Start, call.End = item.Start, item.End
+		if item.Distance != 0 || item.DestinationDisplay != "" || item.TrackRef != "" || len(item.PassingPath) != 0 {
+			call.Outgoing = &ctdf.JourneyLeg{
+				Distance: item.Distance, DestinationDisplay: item.DestinationDisplay,
+				TrackRef: item.TrackRef, PassingPath: item.PassingPath,
+			}
+		}
 	}
-
-	return path
+	return calls
 }
 
 func (stored *storedService) toCTDF() *ctdf.Service {

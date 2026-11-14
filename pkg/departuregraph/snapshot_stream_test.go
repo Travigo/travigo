@@ -198,7 +198,7 @@ func TestLegacySnapshotRepairsMissingTimesAndRewritesFormat(t *testing.T) {
 		t.Fatal(err)
 	}
 	journeys := restored.current.Load().materializeStop(day, []string{"stop-b"})
-	if len(journeys) != 1 || journeys[0].Path[1].OriginDepartureTime.IsZero() {
+	if len(journeys) != 1 || journeys[0].Calls[1].Departure.IsZero() {
 		t.Fatal("legacy untimed stop was not repaired and reindexed")
 	}
 	if err := restored.Save(); err != nil {

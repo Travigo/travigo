@@ -71,7 +71,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		return err
 	}
 	journey := cachedJourney.Journey
-	if journey == nil || len(journey.Path) == 0 {
+	if journey == nil || len(journey.Calls) == 0 {
 		return errors.New("tracked journey has no path")
 	}
 	journeyTimezone := consumer.loadLocation(journey.DepartureTimezone)
@@ -114,15 +114,15 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	// GPS can generate estimates when the feed supplies no stop predictions.
 	if len(update.StopUpdates) == 0 && positionMatched {
 		pathIndex := historyPosition.PathIndex
-		path := journey.Path[pathIndex]
+		origin, destination := journey.LegEndpoints(pathIndex)
 		nextStopIndex = pathIndex + 1
 		if historyPosition.UsedGlobalTrack {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithoutTrack
 		} else {
 			realtimeJourneyReliability = ctdf.RealtimeJourneyReliabilityLocationWithTrack
 		}
-		destinationArrivalTimeWithDate := stopPredictionTime(path.DestinationArrivalTime, time.Time{}, 0, serviceDate, journeyTimezone)
-		originDepartureTimeWithDate := stopPredictionTime(path.OriginDepartureTime, time.Time{}, 0, serviceDate, journeyTimezone)
+		destinationArrivalTimeWithDate := stopPredictionTime(destination.ArrivalTime(), time.Time{}, 0, serviceDate, journeyTimezone)
+		originDepartureTimeWithDate := stopPredictionTime(origin.Departure, time.Time{}, 0, serviceDate, journeyTimezone)
 
 		// How long it take to travel between origin & destination
 		currentPathTraversalTime := destinationArrivalTimeWithDate.Sub(originDepartureTimeWithDate)
@@ -147,7 +147,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		// cannot leave a timed stop before its scheduled departure, so its delay
 		// can be absorbed by scheduled dwell time before calculating later calls.
 		if newRealtimeJourney || realtimeJourney.NextStopIndex != nextStopIndex || realtimeJourney.Offset != offset || futureStopsNeedRebuild(realtimeJourney, cachedJourney.StopKeys, pathIndex, offset, journeyTimezone) {
-			for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey.Path, pathIndex, offset) {
+			for _, stopUpdate := range estimateFutureStops(realtimeJourney.Journey, pathIndex, offset) {
 				stopUpdate.ArrivalTime = stopPredictionTime(stopUpdate.ArrivalTime, time.Time{}, 0, serviceDate, journeyTimezone)
 				stopUpdate.DepartureTime = stopPredictionTime(stopUpdate.DepartureTime, time.Time{}, 0, serviceDate, journeyTimezone)
 				journeyStopUpdates[ctdf.RealtimeJourneyStopKey(stopUpdate.StopRef, stopUpdate.JourneyStopIndex)] = stopUpdate
@@ -165,14 +165,14 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 			nextOccurrence[stopUpdate.StopID] = occurrence + 1
 			arrivalTime := stopUpdate.ArrivalTime
 			departureTime := stopUpdate.DepartureTime
-			var scheduledArrivalTime, scheduledDepartureTime time.Time
-			if journeyStopIndex < len(realtimeJourney.Journey.Path) {
-				scheduledArrivalTime = realtimeJourney.Journey.Path[journeyStopIndex].OriginArrivalTime
-				scheduledDepartureTime = realtimeJourney.Journey.Path[journeyStopIndex].OriginDepartureTime
-			} else {
-				lastPath := realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1]
-				scheduledArrivalTime = lastPath.DestinationArrivalTime
-				scheduledDepartureTime = lastPath.DestinationArrivalTime
+			call := journey.StopCall(journeyStopIndex)
+			if call == nil {
+				continue
+			}
+			scheduledArrivalTime, scheduledDepartureTime := call.Arrival, call.Departure
+			if call.End {
+				scheduledArrivalTime = call.ArrivalTime()
+				scheduledDepartureTime = scheduledArrivalTime
 			}
 
 			arrivalTime = stopPredictionTime(arrivalTime, scheduledArrivalTime, stopUpdate.ArrivalOffset, serviceDate, journeyTimezone)
@@ -214,11 +214,11 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		realtimeJourney.NextStopIndex = nextStopIndex
 		realtimeJourney.DepartedStopRef = ""
 		if nextStopIndex == 0 {
-			realtimeJourney.NextStopRef = journey.Path[0].OriginStopRef
+			realtimeJourney.NextStopRef = journey.Calls[0].StopRef
 		} else {
-			path := journey.Path[nextStopIndex-1]
-			realtimeJourney.DepartedStopRef = path.OriginStopRef
-			realtimeJourney.NextStopRef = path.DestinationStopRef
+			origin, destination := journey.LegEndpoints(nextStopIndex - 1)
+			realtimeJourney.DepartedStopRef = origin.StopRef
+			realtimeJourney.NextStopRef = destination.StopRef
 		}
 	}
 
@@ -271,17 +271,9 @@ func stopPredictionTime(value, scheduled time.Time, delaySeconds int, serviceDat
 // Predictions describe a call as next until its departure, including dwell.
 // If every usable time has passed, progress is uncertain and stays as stored.
 func nextStopAt(realtimeJourney *ctdf.RealtimeJourney, occurrences map[string][]int, serviceDate time.Time, location *time.Location, observedAt time.Time) int {
-	paths := realtimeJourney.Journey.Path
-	for index := 0; index <= len(paths); index++ {
-		var ref string
-		var arrival, departure time.Time
-		if index < len(paths) {
-			path := paths[index]
-			ref, arrival, departure = path.OriginStopRef, path.OriginArrivalTime, path.OriginDepartureTime
-		} else {
-			path := paths[len(paths)-1]
-			ref, arrival = path.DestinationStopRef, path.DestinationArrivalTime
-		}
+	journey := realtimeJourney.Journey
+	for index, call := range journey.StopCalls() {
+		ref, arrival, departure := call.StopRef, call.Arrival, call.Departure
 		arrival = stopPredictionTime(arrival, time.Time{}, 0, serviceDate, location)
 		departure = stopPredictionTime(departure, time.Time{}, 0, serviceDate, location)
 		stop := realtimeJourney.Stops[ctdf.RealtimeJourneyStopKey(ref, index)]
@@ -293,7 +285,7 @@ func nextStopAt(realtimeJourney *ctdf.RealtimeJourney, occurrences map[string][]
 			arrival = stopPredictionTime(stop.ArrivalTime, arrival, 0, serviceDate, location)
 			departure = stopPredictionTime(stop.DepartureTime, departure, 0, serviceDate, location)
 		}
-		if index == len(paths) || arrival.After(departure) {
+		if call.End || arrival.After(departure) {
 			departure = arrival
 		}
 		if departure.After(observedAt) {
@@ -304,17 +296,13 @@ func nextStopAt(realtimeJourney *ctdf.RealtimeJourney, occurrences map[string][]
 }
 
 func journeyStopOccurrenceIndex(journey *ctdf.Journey, stopRef string, occurrence int) int {
-	seen := 0
-	for index, path := range journey.Path {
-		if path.OriginStopRef == stopRef {
-			if seen == occurrence {
+	for index, call := range journey.StopCalls() {
+		if call.StopRef == stopRef {
+			if occurrence == 0 {
 				return index
 			}
-			seen++
+			occurrence--
 		}
-	}
-	if len(journey.Path) > 0 && journey.Path[len(journey.Path)-1].DestinationStopRef == stopRef && seen == occurrence {
-		return len(journey.Path)
 	}
 	return -1
 }
@@ -328,34 +316,43 @@ func serviceTimeOnDate(serviceDate time.Time, serviceTime time.Time, location *t
 	return serviceDayStart.Add(serviceTime.Sub(encodedStart))
 }
 
-func estimateFutureStops(paths []*ctdf.JourneyPathItem, startIndex int, offset time.Duration) []*ctdf.RealtimeJourneyStops {
-	stops := make([]*ctdf.RealtimeJourneyStops, 0, len(paths)-startIndex)
-	projectedOffset := offset
-
-	for i := startIndex; i < len(paths); i++ {
-		path := paths[i]
-		arrivalTime := path.DestinationArrivalTime.Add(projectedOffset).Round(time.Minute)
-		departureTime := time.Time{}
-
-		if i < len(paths)-1 {
-			scheduledDepartureTime := paths[i+1].OriginDepartureTime
-			departureTime = scheduledDepartureTime
-			if arrivalTime.After(departureTime) {
-				departureTime = arrivalTime
-			}
-			projectedOffset = departureTime.Sub(scheduledDepartureTime)
+func estimateFutureStops(journey *ctdf.Journey, startIndex int, offset time.Duration) []*ctdf.RealtimeJourneyStops {
+	stops := make([]*ctdf.RealtimeJourneyStops, 0, len(journey.Calls))
+	index := -1
+	for callIndex := 1; callIndex < len(journey.Calls); callIndex++ {
+		call := &journey.Calls[callIndex]
+		if call.Start {
+			continue
 		}
-
+		index++
+		if index < startIndex {
+			continue
+		}
+		arrival, departure := estimatedCallTimes(journey, callIndex, &offset)
 		stops = append(stops, &ctdf.RealtimeJourneyStops{
-			StopRef:          path.DestinationStopRef,
-			JourneyStopIndex: i + 1,
-			TimeType:         ctdf.RealtimeJourneyStopTimeEstimatedFuture,
-			ArrivalTime:      arrivalTime,
-			DepartureTime:    departureTime,
+			StopRef: call.StopRef, JourneyStopIndex: index + 1,
+			TimeType:    ctdf.RealtimeJourneyStopTimeEstimatedFuture,
+			ArrivalTime: arrival, DepartureTime: departure,
 		})
 	}
-
 	return stops
+}
+
+func estimatedCallTimes(journey *ctdf.Journey, callIndex int, offset *time.Duration) (arrival, departure time.Time) {
+	call := &journey.Calls[callIndex]
+	arrival = call.ArrivalTime().Add(*offset).Round(time.Minute)
+	if callIndex+1 < len(journey.Calls) {
+		if call.End {
+			call = &journey.Calls[callIndex+1]
+		}
+		scheduled := call.Departure
+		departure = scheduled
+		if arrival.After(departure) {
+			departure = arrival
+		}
+		*offset = departure.Sub(scheduled)
+	}
+	return arrival, departure
 }
 
 func absDuration(value time.Duration) time.Duration {
@@ -368,18 +365,16 @@ func absDuration(value time.Duration) time.Duration {
 // Compare predictions without allocating a replacement slice. Recomputing the
 // expected times also detects timetable edits and delay absorbed by dwell time.
 func futureStopsNeedRebuild(journey *ctdf.RealtimeJourney, keys []string, start int, offset time.Duration, location *time.Location) bool {
-	for i := start; i < len(journey.Journey.Path); i++ {
-		path := journey.Journey.Path[i]
-		arrival := path.DestinationArrivalTime.Add(offset).Round(time.Minute)
-		departure := time.Time{}
-		if i < len(journey.Journey.Path)-1 {
-			scheduled := journey.Journey.Path[i+1].OriginDepartureTime
-			departure = scheduled
-			if arrival.After(departure) {
-				departure = arrival
-			}
-			offset = departure.Sub(scheduled)
+	i := -1
+	for callIndex := 1; callIndex < len(journey.Journey.Calls); callIndex++ {
+		if journey.Journey.Calls[callIndex].Start {
+			continue
 		}
+		i++
+		if i < start {
+			continue
+		}
+		arrival, departure := estimatedCallTimes(journey.Journey, callIndex, &offset)
 		if !journey.JourneyRunDate.IsZero() {
 			arrival = stopPredictionTime(arrival, time.Time{}, 0, journey.JourneyRunDate, location)
 			departure = stopPredictionTime(departure, time.Time{}, 0, journey.JourneyRunDate, location)

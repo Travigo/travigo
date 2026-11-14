@@ -3,6 +3,7 @@ package vehicletracker
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -79,13 +80,11 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 		if err != nil {
 			return nil, err
 		}
-		if journey == nil || len(journey.Path) == 0 {
+		if journey == nil || len(journey.Calls) == 0 {
 			return nil, fmt.Errorf("tracked journey %q has no path", journeyID)
 		}
-		for _, path := range journey.Path {
-			if path == nil {
-				return nil, fmt.Errorf("tracked journey %q contains a nil path item", journeyID)
-			}
+		if err := journey.ValidatePath(); err != nil {
+			return nil, err
 		}
 		journey.GetService()
 		entry := &cachedTrackedJourney{
@@ -112,13 +111,9 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 }
 
 func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
-	occurrences := make(map[string][]int, len(journey.Path)+1)
-	for index, path := range journey.Path {
-		occurrences[path.OriginStopRef] = append(occurrences[path.OriginStopRef], index)
-	}
-	if len(journey.Path) > 0 {
-		lastPath := journey.Path[len(journey.Path)-1]
-		occurrences[lastPath.DestinationStopRef] = append(occurrences[lastPath.DestinationStopRef], len(journey.Path))
+	occurrences := make(map[string][]int, len(journey.Calls))
+	for index, call := range journey.StopCalls() {
+		occurrences[call.StopRef] = append(occurrences[call.StopRef], index)
 	}
 	return occurrences
 }
@@ -126,14 +121,13 @@ func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
 func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
 	var journey *ctdf.Journey
 	journeysCollection := database.GetCollection("journeys")
-	// Preserve geometry, embedded stops, timetable times and passenger-facing
-	// fields used by realtime storage and notifications. Matching availability
-	// and importer identifiers are used by the identifiers' own queries.
+	// Read ordered calls directly from MongoDB.
+	// Geometry and stops are hydrated lazily from their shared collections.
 	projection := options.FindOne().SetProjection(bson.M{
 		"_id": 0, "primaryidentifier": 1, "modificationdatetime": 1,
 		"serviceref": 1, "operatorref": 1, "departuretime": 1, "departuretimezone": 1,
-		"destinationdisplay": 1, "replacesjourneyrefs": 1, "path": 1,
-		"track": 1, "trackref": 1,
+		"destinationdisplay": 1, "replacesjourneyrefs": 1, "calls": 1,
+		"trackref": 1,
 	})
 	started := time.Now()
 	result := journeysCollection.FindOne(context.Background(), bson.M{"primaryidentifier": journeyID}, projection)
@@ -148,19 +142,19 @@ func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
 }
 
 func hydrateDestinationStops(journey *ctdf.Journey, projection bson.M) error {
-	if journey == nil || len(journey.Path) == 0 {
+	if journey == nil || len(journey.Calls) == 0 {
 		return nil
 	}
 
-	stopRefs := make([]string, 0, len(journey.Path))
+	stopRefs := make([]string, 0, len(journey.Calls))
 	seenStopRefs := map[string]bool{}
-	for _, pathItem := range journey.Path {
-		if pathItem.DestinationStop != nil || pathItem.DestinationStopRef == "" || seenStopRefs[pathItem.DestinationStopRef] {
+	for _, pathItem := range journey.LegCalls() {
+		if pathItem.Stop != nil || pathItem.StopRef == "" || seenStopRefs[pathItem.StopRef] {
 			continue
 		}
 
-		seenStopRefs[pathItem.DestinationStopRef] = true
-		stopRefs = append(stopRefs, pathItem.DestinationStopRef)
+		seenStopRefs[pathItem.StopRef] = true
+		stopRefs = append(stopRefs, pathItem.StopRef)
 	}
 
 	if len(stopRefs) == 0 {
@@ -200,9 +194,9 @@ func hydrateDestinationStops(journey *ctdf.Journey, projection bson.M) error {
 		return err
 	}
 
-	for _, pathItem := range journey.Path {
-		if pathItem.DestinationStop == nil {
-			pathItem.DestinationStop = stopsByIdentifier[pathItem.DestinationStopRef]
+	for _, pathItem := range journey.LegCalls() {
+		if pathItem.Stop == nil {
+			pathItem.Stop = stopsByIdentifier[pathItem.StopRef]
 		}
 	}
 
@@ -260,13 +254,12 @@ func cloneJourneyPath(journey *ctdf.Journey) *ctdf.Journey {
 		return nil
 	}
 	clone := *journey
-	clone.Path = make([]*ctdf.JourneyPathItem, len(journey.Path))
-	for index, path := range journey.Path {
-		if path == nil {
-			continue
+	clone.Calls = slices.Clone(journey.Calls)
+	for index, call := range clone.Calls {
+		if call.Outgoing != nil {
+			leg := *call.Outgoing
+			clone.Calls[index].Outgoing = &leg
 		}
-		pathClone := *path
-		clone.Path[index] = &pathClone
 	}
 	return &clone
 }
@@ -339,9 +332,9 @@ func (consumer *trackedJourneyCache) pruneJourneyCacheLocked() {
 }
 
 func journeyDestinationKeys(journey *ctdf.Journey) []string {
-	keys := make([]string, len(journey.Path))
-	for i, path := range journey.Path {
-		keys[i] = ctdf.RealtimeJourneyStopKey(path.DestinationStopRef, i+1)
+	keys := make([]string, 0, len(journey.Calls))
+	for _, destination := range journey.LegCalls() {
+		keys = append(keys, ctdf.RealtimeJourneyStopKey(destination.StopRef, len(keys)+1))
 	}
 	return keys
 }

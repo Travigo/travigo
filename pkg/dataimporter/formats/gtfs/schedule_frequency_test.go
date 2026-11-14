@@ -29,10 +29,10 @@ func TestExpandJourneyForFrequenciesShiftsEveryPathTime(t *testing.T) {
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: "dataset-journey-trip-1",
 		DepartureTime:     baseDeparture,
-		Path: []*ctdf.JourneyPathItem{{
+		Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginDepartureTime:    baseDeparture,
 			DestinationArrivalTime: baseArrival,
-		}},
+		}),
 	}
 
 	expanded := expandJourneyForFrequencies(journey, []frequencyWindow{{
@@ -50,8 +50,8 @@ func TestExpandJourneyForFrequenciesShiftsEveryPathTime(t *testing.T) {
 			t.Fatalf("journey %d departure = %v, want %v", index, expanded[index].DepartureTime, wantDeparture)
 		}
 		wantArrival := wantDeparture.Add(10 * time.Minute)
-		if !expanded[index].Path[0].DestinationArrivalTime.Equal(wantArrival) {
-			t.Fatalf("journey %d arrival = %v, want %v", index, expanded[index].Path[0].DestinationArrivalTime, wantArrival)
+		if got := expanded[index].Leg(0).DestinationArrivalTime; !got.Equal(wantArrival) {
+			t.Fatalf("journey %d arrival = %v, want %v", index, got, wantArrival)
 		}
 		if expanded[index].PrimaryIdentifier == journey.PrimaryIdentifier {
 			t.Fatalf("journey %d kept the template identifier", index)
@@ -62,7 +62,7 @@ func TestExpandJourneyForFrequenciesShiftsEveryPathTime(t *testing.T) {
 		}
 	}
 
-	if !journey.DepartureTime.Equal(baseDeparture) || !journey.Path[0].DestinationArrivalTime.Equal(baseArrival) {
+	if !journey.DepartureTime.Equal(baseDeparture) || !journey.Leg(0).DestinationArrivalTime.Equal(baseArrival) {
 		t.Fatal("expansion mutated the template journey")
 	}
 }
@@ -75,7 +75,7 @@ func TestExpandJourneyForFrequenciesSupportsServiceTimesAbove24HoursAndWindowBou
 	journey := &ctdf.Journey{
 		PrimaryIdentifier: "dataset-journey-trip-2",
 		DepartureTime:     baseDeparture,
-		Path:              []*ctdf.JourneyPathItem{{OriginDepartureTime: baseDeparture}},
+		Calls:             ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginDepartureTime: baseDeparture}),
 	}
 
 	parse := func(value string) time.Time {

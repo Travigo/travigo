@@ -132,6 +132,9 @@ func populateRealtimeJourneyListReferences(realtimeJourneys []*ctdf.RealtimeJour
 }
 
 func getRealtimeJourney(c *fiber.Ctx) error {
+	if err := validateJourneyPathFormat(c); err != nil {
+		return sheriffViewError(c, err)
+	}
 	identifier := c.Params("identifier")
 
 	realtimeJourney, err := realtimestore.FindByIdentifier(context.Background(), identifier)
@@ -144,6 +147,9 @@ func getRealtimeJourney(c *fiber.Ctx) error {
 		if realtimeJourney.Journey != nil {
 			realtimeJourney.Journey.GetTracks()
 		}
-		return c.JSON(realtimeJourney)
+		if c.Query("path_format") == "calls" {
+			return c.JSON(realtimeJourney)
+		}
+		return c.JSON(legacyRealtimeJSON(realtimeJourney))
 	}
 }

@@ -138,6 +138,32 @@ func TestGetNotificationDataRealtimeJourneyLifecycle(t *testing.T) {
 	}
 }
 
+func TestGetNotificationDataCancelledJourneyUsesPathOrigin(t *testing.T) {
+	data := GetNotificationData(&ctdf.Event{
+		Type: ctdf.EventTypeRealtimeJourneyCancelled,
+		Body: map[string]interface{}{
+			"Journey": map[string]interface{}{
+				"DepartureTime":      "2026-11-13T08:45:00Z",
+				"DestinationDisplay": "London",
+				"Path": []interface{}{
+					map[string]interface{}{"OriginStopRef": "Cambridge", "DestinationStopRef": "London"},
+				},
+			},
+			"JourneyRunDate": "2026-11-13T00:00:00Z",
+		},
+	}, ctdf.UserNotificationSubscription{})
+
+	if want := "The 13/11 08:45 to London from Cambridge has been cancelled."; data.Message != want {
+		t.Fatalf("notification message = %q, want %q", data.Message, want)
+	}
+}
+
+func TestJourneyOriginReferenceHandlesMissingPath(t *testing.T) {
+	if got := journeyOriginReference(map[string]interface{}{}); got != "" {
+		t.Fatalf("origin = %q, want empty for pathless journey", got)
+	}
+}
+
 func TestGetNotificationDataNextStopChanged(t *testing.T) {
 	bodyBytes, err := json.Marshal(ctdf.RealtimeJourney{
 		Journey:     &ctdf.Journey{DestinationDisplay: "London"},

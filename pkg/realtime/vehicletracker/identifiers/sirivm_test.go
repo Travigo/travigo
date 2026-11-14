@@ -12,6 +12,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
+func siriTestCalls(origin, destination string, originArrival, departure, destinationArrival time.Time) bson.A {
+	return bson.A{
+		bson.M{"stopref": origin, "start": true, "arrival": originArrival, "departure": departure},
+		bson.M{"stopref": destination, "end": true, "arrival": destinationArrival},
+	}
+}
+
 func TestSameServiceNameNormalizesCommonPresentationDifferences(t *testing.T) {
 	for _, test := range []struct{ left, right string }{
 		{" X 1 ", "x-1"},
@@ -35,13 +42,18 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 			{Key: "primaryidentifier", Value: "available"},
 			{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
 			{Key: "direction", Value: "outbound"},
+			{Key: "calls", Value: siriTestCalls("origin", "dest", time.Time{}, time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC), time.Time{})},
 		}
-		unavailable := bson.D{{Key: "primaryidentifier", Value: "unavailable"}}
+		unavailable := bson.D{
+			{Key: "primaryidentifier", Value: "unavailable"},
+			{Key: "calls", Value: siriTestCalls("origin", "dest", time.Time{}, time.Time{}, time.Time{})},
+		}
 		wrongDirection := bson.D{
 			{Key: "primaryidentifier", Value: "wrong-direction"},
 			{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
 			{Key: "direction", Value: "inbound"},
 			{Key: "departuretime", Value: time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)},
+			{Key: "calls", Value: siriTestCalls("origin", "dest", time.Time{}, time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC), time.Time{})},
 		}
 		mt.AddMockResponses(
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".operators", mtest.FirstBatch,
@@ -88,7 +100,7 @@ func TestSiriReportsCandidatesForEachAttemptedFallback(t *testing.T) {
 			}
 		}
 		filter := commands[5].Command.Lookup("filter").Document()
-		if filter.Lookup("path.originstopref").StringValue() != "origin" {
+		if filter.Lookup("originstoprefs").StringValue() != "origin" {
 			mt.Fatalf("unexpected stop filter %v", filter)
 		}
 		if _, err := filter.LookupErr("$expr"); err == nil {
@@ -118,10 +130,11 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
 				{Key: "primaryidentifier", Value: "journey"},
 				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				{Key: "calls", Value: siriTestCalls("a", "c", time.Time{}, time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(0, 1, 1, 9, 10, 0, 0, time.UTC))},
 			}),
 		)
 
-		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "path.originstopref": "a", "path.destinationstopref": "c"}
+		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "originstoprefs": "a", "destinationstoprefs": "c"}
 		got, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, "")
 		if err != nil || len(got.available) != 1 || got.available[0].PrimaryIdentifier != "journey" {
 			mt.Fatalf("unexpected candidates: %+v, %v", got, err)
@@ -131,8 +144,8 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mt.Fatalf("sent %d commands, want two ID scans and one fetch", len(commands))
 		}
 		for n, branch := range []struct{ field, stop, index string }{
-			{"path.originstopref", "a", database.JourneyOriginStopServiceIDsIndex},
-			{"path.destinationstopref", "c", database.JourneyDestinationStopServiceIDsIndex},
+			{"originstoprefs", "a", database.JourneyOriginStopServiceIDsIndex},
+			{"destinationstoprefs", "c", database.JourneyDestinationStopServiceIDsIndex},
 		} {
 			command := commands[n].Command
 			filter := command.Lookup("filter").Document()
@@ -146,7 +159,7 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 		filter := fetch.Lookup("filter").Document()
 		values, err := filter.Lookup("_id", "$in").Array().Values()
 		if err != nil || len(values) != 1 || values[0].ObjectID() != id || fetch.Lookup("hint").StringValue() != "_id_" ||
-			filter.Lookup("path.originstopref").StringValue() != "a" || filter.Lookup("path.destinationstopref").StringValue() != "c" {
+			filter.Lookup("originstoprefs").StringValue() != "a" || filter.Lookup("destinationstoprefs").StringValue() != "c" {
 			mt.Fatalf("unexpected candidate fetch: %v", fetch)
 		}
 	})
@@ -155,7 +168,7 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 2, Message: "hint provided does not correspond to an existing index"}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch),
 		)
-		query := bson.M{"serviceref": "service", "path.originstopref": "a", "path.destinationstopref": "c"}
+		query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "c"}
 		if _, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, ""); err != nil {
 			mt.Fatal(err)
 		}
@@ -199,10 +212,12 @@ func TestSiriReferenceMatchesAreNarrowedTogether(t *testing.T) {
 			"OriginAimedDepartureTime": "2026-11-10T10:00:00+00:00",
 		}}
 		candidate := func(id string, hour int) bson.D {
+			departure := time.Date(0, 1, 1, hour, 0, 0, 0, time.UTC)
 			return bson.D{
 				{Key: "primaryidentifier", Value: id},
 				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
-				{Key: "departuretime", Value: time.Date(0, 1, 1, hour, 0, 0, 0, time.UTC)},
+				{Key: "departuretime", Value: departure},
+				{Key: "calls", Value: siriTestCalls("origin", "dest", departure, departure, departure.Add(10*time.Minute))},
 			}
 		}
 		namespace := mt.DB.Name() + "." + mt.Coll.Name()
@@ -226,11 +241,13 @@ func TestSiriExactDepartureAcceptsOvernightClockAndRejectsAmbiguity(t *testing.T
 			"OriginAimedDepartureTime": "2026-11-11T01:30:00+00:00", "DirectionRef": "OUTBOUND",
 		}}
 		candidate := func(id string) bson.D {
+			departure := time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)
 			return bson.D{
 				{Key: "primaryidentifier", Value: id},
 				{Key: "direction", Value: "outbound"},
-				{Key: "departuretime", Value: time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)},
+				{Key: "departuretime", Value: departure},
 				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				{Key: "calls", Value: siriTestCalls("stop", "dest", departure, departure, departure.Add(10*time.Minute))},
 			}
 		}
 		namespace := mt.DB.Name() + "." + mt.Coll.Name()
@@ -238,7 +255,7 @@ func TestSiriExactDepartureAcceptsOvernightClockAndRejectsAmbiguity(t *testing.T
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, candidate("trip")),
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, candidate("trip"), candidate("other")),
 		)
-		query := bson.M{"serviceref": "route", "path.originstopref": "stop"}
+		query := bson.M{"serviceref": "route", "originstoprefs": "stop"}
 		candidates, err := getAvailableJourneys(mt.Coll, day, query, aimed)
 		if err != nil {
 			mt.Fatal(err)
@@ -268,11 +285,7 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 				{Key: "direction", Value: "outbound"},
 				{Key: "departuretime", Value: departure},
 				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
-				{Key: "path", Value: bson.A{bson.M{
-					"originstopref": "origin", "destinationstopref": "dest",
-					"originarrivaltime": departure, "origindeparturetime": departure,
-					"destinationarrivaltime": departure.Add(10 * time.Minute),
-				}}},
+				{Key: "calls", Value: siriTestCalls("origin", "dest", departure, departure, departure.Add(10*time.Minute))},
 			}
 		}
 		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch, candidate("wanted", 10), candidate("other", 11)))
@@ -284,8 +297,7 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 		projection := mt.GetStartedEvent().Command.Lookup("projection").Document()
 		for _, field := range []string{
 			"primaryidentifier", "serviceref", "direction", "departuretime", "availability",
-			"path.originstopref", "path.destinationstopref", "path.originarrivaltime",
-			"path.origindeparturetime", "path.destinationarrivaltime",
+			"calls.stopref", "calls.start", "calls.end", "calls.arrival", "calls.departure", "calls.incomingarrival",
 		} {
 			if projection.Lookup(field).Int32() != 1 {
 				mt.Fatalf("candidate projection omits required field %s", field)
@@ -305,7 +317,7 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 		if err != nil || selected.PrimaryIdentifier != "wanted" {
 			mt.Fatalf("lightweight candidates changed matching: %+v (%v)", selected, err)
 		}
-		if len(candidates) != 2 || candidates[0].Availability == nil || candidates[0].Path[0].OriginStopRef != "origin" {
+		if len(candidates) != 2 || candidates[0].Availability == nil || candidates[0].Calls[0].StopRef != "origin" {
 			mt.Fatal("candidate availability or ordered path was lost")
 		}
 		if candidates[0].GenerateFunctionalHash(true) == candidates[1].GenerateFunctionalHash(true) {
@@ -330,11 +342,13 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 			day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
 			aimed := day.Add(90 * time.Minute)
 			row := func(id string) bson.D {
+				departure := time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)
 				return bson.D{
 					{Key: "primaryidentifier", Value: id},
 					{Key: "direction", Value: "outbound"},
-					{Key: "departuretime", Value: time.Date(0, 1, 2, 1, 30, 0, 0, time.UTC)},
+					{Key: "departuretime", Value: departure},
 					{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+					{Key: "calls", Value: siriTestCalls("a", "b", departure, departure, departure.Add(10*time.Minute))},
 				}
 			}
 			rows := []bson.D{row("trip")}
@@ -343,7 +357,7 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 			}
 			candidates := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
 			mt.AddMockResponses(ids, ids, candidates, candidates, candidates)
-			query := bson.M{"serviceref": "route", "path.originstopref": "a", "path.destinationstopref": "b"}
+			query := bson.M{"serviceref": "route", "originstoprefs": "a", "destinationstoprefs": "b"}
 			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "OUTBOUND")
 			if err != nil {
 				mt.Fatal(err)
@@ -357,7 +371,7 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 				mt.Fatalf("got %d commands, want %d", len(commands), wantCommands)
 			}
 			probe := commands[2].Command
-			if _, err := probe.LookupErr("projection", "path.originstopref"); err == nil {
+			if _, err := probe.LookupErr("projection", "calls"); err == nil {
 				mt.Fatal("exact probe fetched path fields")
 			}
 			if _, err := probe.LookupErr("filter", "$expr"); err != nil {
@@ -402,6 +416,7 @@ func TestSiriStopProbeUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourn
 				if available {
 					fields = append(fields, bson.E{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}})
 				}
+				fields = append(fields, bson.E{Key: "calls", Value: siriTestCalls("a", "b", departure, departure, departure.Add(10*time.Minute))})
 				return fields
 			}
 			rows := []bson.D{row("exact", "false", aimed, true)}
@@ -410,7 +425,7 @@ func TestSiriStopProbeUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourn
 			}
 			response := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
 			mt.AddMockResponses(ids, ids, response, response, response)
-			query := bson.M{"serviceref": "service", "path.originstopref": "a", "path.destinationstopref": "b"}
+			query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "b"}
 			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "1")
 			if err != nil {
 				mt.Fatal(err)

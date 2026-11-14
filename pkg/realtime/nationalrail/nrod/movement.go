@@ -69,7 +69,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	}
 	// The stored path includes Darwin amendments and uses the same occurrence
 	// indexes as the realtime stop records. Only hydrate older runs without a path.
-	if len(realtimeJourney.Journey.Path) == 0 {
+	if len(realtimeJourney.Journey.Calls) == 0 {
 		realtimestore.LoadStaticJourney(context.Background(), realtimeJourney)
 	}
 
@@ -89,23 +89,31 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	matchedJourneyStop := false
 	if m.EventType == "DEPARTURE" {
 
-		for pathIndex, path := range realtimeJourney.Journey.Path {
-			if path.OriginStopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, path.OriginStopRef) {
+		pathIndex := -1
+		for origin, destination := range realtimeJourney.Journey.LegCalls() {
+			pathIndex++
+			if origin.StopRef == locationStop.PrimaryIdentifier || util.ContainsString(locationStop.OtherIdentifiers, origin.StopRef) {
 				matchedJourneyStop = true
-				journeyStop := realtimeJourney.RealtimeStop(path.OriginStopRef, pathIndex)
+				journeyStop := realtimeJourney.RealtimeStop(origin.StopRef, pathIndex)
 
 				if journeyStop != nil && !journeyStop.DepartureTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 					continue
 				}
 				legIndex = pathIndex
-				realtimeJourney.DepartedStopRef = path.OriginStopRef
-				realtimeJourney.NextStopRef = path.DestinationStopRef
+				realtimeJourney.DepartedStopRef = origin.StopRef
+				realtimeJourney.NextStopRef = destination.StopRef
 				realtimeJourney.NextStopIndex = pathIndex + 1
-				realtimeJourney.DepartedStop = path.OriginStop
-				realtimeJourney.NextStop = path.DestinationStop
+				if origin.Stop == nil {
+					origin.Stop = locationStop
+				}
+				if destination.Stop == nil {
+					destination.GetStop()
+				}
+				realtimeJourney.DepartedStop = origin.Stop
+				realtimeJourney.NextStop = destination.Stop
 
 				if journeyStop == nil {
-					journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.OriginStopRef, JourneyStopIndex: pathIndex}
+					journeyStop = &ctdf.RealtimeJourneyStops{StopRef: origin.StopRef, JourneyStopIndex: pathIndex}
 				}
 				journeyStop.DepartureTime = stopTime
 				journeyStop.TimeType = ctdf.RealtimeJourneyStopTimeHistorical
@@ -121,18 +129,20 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		}
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
 	} else if m.EventType == "ARRIVAL" {
-		for pathIndex, path := range realtimeJourney.Journey.Path {
+		pathIndex := -1
+		for _, destination := range realtimeJourney.Journey.LegCalls() {
+			pathIndex++
 			journeyStopIndex := pathIndex + 1
-			if path.DestinationStopRef != locationStop.PrimaryIdentifier && !util.ContainsString(locationStop.OtherIdentifiers, path.DestinationStopRef) {
+			if destination.StopRef != locationStop.PrimaryIdentifier && !util.ContainsString(locationStop.OtherIdentifiers, destination.StopRef) {
 				continue
 			}
 			matchedJourneyStop = true
-			journeyStop := realtimeJourney.RealtimeStop(path.DestinationStopRef, journeyStopIndex)
+			journeyStop := realtimeJourney.RealtimeStop(destination.StopRef, journeyStopIndex)
 			if journeyStop != nil && !journeyStop.ArrivalTime.IsZero() && journeyStop.TimeType == ctdf.RealtimeJourneyStopTimeHistorical {
 				continue
 			}
 			if journeyStop == nil {
-				journeyStop = &ctdf.RealtimeJourneyStops{StopRef: path.DestinationStopRef, JourneyStopIndex: journeyStopIndex}
+				journeyStop = &ctdf.RealtimeJourneyStops{StopRef: destination.StopRef, JourneyStopIndex: journeyStopIndex}
 			}
 			journeyStop.ArrivalTime = stopTime
 
@@ -147,7 +157,7 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, description)
 
 		// If we've arrived at the end, then it's not actively tracked anymore
-		if len(realtimeJourney.Journey.Path) > 0 && locationStop.PrimaryIdentifier == realtimeJourney.Journey.Path[len(realtimeJourney.Journey.Path)-1].DestinationStopRef {
+		if len(realtimeJourney.Journey.Calls) > 0 && locationStop.PrimaryIdentifier == realtimeJourney.Journey.Calls[len(realtimeJourney.Journey.Calls)-1].StopRef {
 			realtimeJourney.ActivelyTracked = false
 			realtimeJourney.TimeoutDurationMinutes = 15
 		}
@@ -169,8 +179,8 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		var operationalStop *ctdf.Stop
 		isPositionReport := m.EventType == "ARRIVAL" || m.EventType == "DEPARTURE" || m.EventType == "PASS"
 		if !matchedJourneyStop && m.Offroute != "true" && isPositionReport {
-			for _, path := range realtimeJourney.Journey.Path {
-				if matchesPassingStop(path, locationStop) {
+			for origin := range realtimeJourney.Journey.LegCalls() {
+				if matchesPassingStop(origin.Outgoing, locationStop) {
 					operationalStop = locationStop
 					break
 				}
@@ -202,7 +212,7 @@ func railEventTime(value string, now time.Time) (time.Time, bool) {
 	return at, !at.After(now.Add(time.Minute)) && !at.Before(now.Add(-24*time.Hour))
 }
 
-func matchesPassingStop(leg *ctdf.JourneyPathItem, stop *ctdf.Stop) bool {
+func matchesPassingStop(leg *ctdf.JourneyLeg, stop *ctdf.Stop) bool {
 	if leg == nil || stop == nil {
 		return false
 	}
@@ -216,13 +226,14 @@ func matchesPassingStop(leg *ctdf.JourneyPathItem, stop *ctdf.Stop) bool {
 
 func (m *TrustMovement) recordObservation(client *StompClient, journey *ctdf.RealtimeJourney, at time.Time, point *ctdf.Location, leg int, operationalStop *ctdf.Stop) {
 	if client.td != nil {
-		if leg >= 0 {
-			origin := journey.Journey.Path[leg].OriginStopRef
-			for i, path := range journey.Journey.Path {
-				if i != leg && path != nil && path.OriginStopRef == origin {
+		if origin, _ := journey.Journey.LegEndpoints(leg); origin != nil {
+			index := 0
+			for candidate := range journey.Journey.LegCalls() {
+				if index != leg && candidate.StopRef == origin.StopRef {
 					leg = -1
 					break
 				}
+				index++
 			}
 		}
 		if point == nil || m.CorrectionInd == "true" {

@@ -46,13 +46,17 @@ func TestLoadShapeTracksAllowsFeedsWithoutShapes(t *testing.T) {
 	}
 }
 
-func TestAssignJourneyPathTracksSplitsAtStops(t *testing.T) {
+func TestAssignJourneyCallTracksSplitsAtStops(t *testing.T) {
 	track := []ctdf.Location{
 		{Type: "Point", Coordinates: []float64{0, 51}},
 		{Type: "Point", Coordinates: []float64{0.01, 51}},
 		{Type: "Point", Coordinates: []float64{0.02, 51}},
 	}
-	path := []*ctdf.JourneyPathItem{{}, {}}
+	calls := []ctdf.JourneyCall{
+		{StopRef: "a", Start: true, Outgoing: &ctdf.JourneyLeg{}},
+		{StopRef: "b", Outgoing: &ctdf.JourneyLeg{}},
+		{StopRef: "c", End: true},
+	}
 	stopTimes := []StopTime{{StopID: "a"}, {StopID: "b"}, {StopID: "c"}}
 	stops := map[string]ctdf.Location{
 		"a": {Type: "Point", Coordinates: []float64{0, 51}},
@@ -60,44 +64,51 @@ func TestAssignJourneyPathTracksSplitsAtStops(t *testing.T) {
 		"c": {Type: "Point", Coordinates: []float64{0.02, 51}},
 	}
 
-	if !assignJourneyPathTracks(path, stopTimes, stops, track) {
-		t.Fatal("expected path tracks to be assigned")
+	if !assignJourneyCallTracksCached(calls, stopTimes, stops, track, nil) {
+		t.Fatal("expected outgoing call tracks to be assigned")
 	}
-	if got := path[0].Track; len(got) < 2 || got[0].Coordinates[0] != 0 || got[len(got)-1].Coordinates[0] <= 0.01 {
+	if got := calls[0].Outgoing.Track; len(got) < 2 || got[0].Coordinates[0] != 0 || got[len(got)-1].Coordinates[0] <= 0.01 {
 		t.Fatalf("first leg = %#v", got)
 	}
-	if got := path[1].Track; len(got) < 2 || got[0].Coordinates[0] >= 0.01 || got[len(got)-1].Coordinates[0] != 0.02 {
+	if got := calls[1].Outgoing.Track; len(got) < 2 || got[0].Coordinates[0] >= 0.01 || got[len(got)-1].Coordinates[0] != 0.02 {
 		t.Fatalf("second leg = %#v", got)
 	}
 }
 
-func TestAssignJourneyPathTracksFallsBackForDistantStop(t *testing.T) {
+func TestAssignJourneyCallTracksFallsBackForDistantStop(t *testing.T) {
 	track := []ctdf.Location{
 		{Type: "Point", Coordinates: []float64{0, 51}},
 		{Type: "Point", Coordinates: []float64{0.01, 51}},
 	}
-	path := []*ctdf.JourneyPathItem{{}}
+	calls := []ctdf.JourneyCall{
+		{StopRef: "near", Start: true, Outgoing: &ctdf.JourneyLeg{}},
+		{StopRef: "far", End: true},
+	}
 	stopTimes := []StopTime{{StopID: "near"}, {StopID: "far"}}
 	stops := map[string]ctdf.Location{
 		"near": {Type: "Point", Coordinates: []float64{0, 51}},
 		"far":  {Type: "Point", Coordinates: []float64{1, 52}},
 	}
 
-	if assignJourneyPathTracks(path, stopTimes, stops, track) {
+	if assignJourneyCallTracksCached(calls, stopTimes, stops, track, nil) {
 		t.Fatal("expected distant stop to leave the global journey track as fallback")
 	}
-	if len(path[0].Track) != 0 {
-		t.Fatalf("got fallback path track %#v", path[0].Track)
+	if len(calls[0].Outgoing.Track) != 0 {
+		t.Fatalf("got fallback outgoing track %#v", calls[0].Outgoing.Track)
 	}
 }
 
-func TestAssignJourneyPathTracksAddsLeewayEitherSideOfCut(t *testing.T) {
+func TestAssignJourneyCallTracksAddsLeewayEitherSideOfCut(t *testing.T) {
 	track := []ctdf.Location{
 		{Type: "Point", Coordinates: []float64{0, 51}},
 		{Type: "Point", Coordinates: []float64{0.0001, 51}},
 		{Type: "Point", Coordinates: []float64{0.0002, 51}},
 	}
-	path := []*ctdf.JourneyPathItem{{}, {}}
+	calls := []ctdf.JourneyCall{
+		{StopRef: "a", Start: true, Outgoing: &ctdf.JourneyLeg{}},
+		{StopRef: "b", Outgoing: &ctdf.JourneyLeg{}},
+		{StopRef: "c", End: true},
+	}
 	stopTimes := []StopTime{{StopID: "a"}, {StopID: "b"}, {StopID: "c"}}
 	stops := map[string]ctdf.Location{
 		"a": {Type: "Point", Coordinates: []float64{0, 51}},
@@ -105,13 +116,13 @@ func TestAssignJourneyPathTracksAddsLeewayEitherSideOfCut(t *testing.T) {
 		"c": {Type: "Point", Coordinates: []float64{0.0002, 51}},
 	}
 
-	if !assignJourneyPathTracks(path, stopTimes, stops, track) {
-		t.Fatal("expected path tracks to be assigned")
+	if !assignJourneyCallTracksCached(calls, stopTimes, stops, track, nil) {
+		t.Fatal("expected outgoing call tracks to be assigned")
 	}
-	if path[0].Track[len(path[0].Track)-1].Coordinates[0] <= 0.0001 {
-		t.Fatalf("first leg did not extend after cut: %#v", path[0].Track)
+	if calls[0].Outgoing.Track[len(calls[0].Outgoing.Track)-1].Coordinates[0] <= 0.0001 {
+		t.Fatalf("first leg did not extend past the middle stop: %#v", calls[0].Outgoing.Track)
 	}
-	if path[1].Track[0].Coordinates[0] >= 0.0001 {
-		t.Fatalf("second leg did not extend before cut: %#v", path[1].Track)
+	if calls[1].Outgoing.Track[0].Coordinates[0] >= 0.0001 {
+		t.Fatalf("second leg did not begin before the middle stop: %#v", calls[1].Outgoing.Track)
 	}
 }

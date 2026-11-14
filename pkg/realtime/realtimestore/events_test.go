@@ -18,10 +18,10 @@ func BenchmarkRealtimeJourneyEventEncoding(b *testing.B) {
 		for point := range track {
 			track[point] = ctdf.Location{Type: "Point", Coordinates: []float64{float64(point) / 100, 51.5}}
 		}
-		journey.Journey.Path = append(journey.Journey.Path, &ctdf.JourneyPathItem{
-			OriginStopRef: fmt.Sprintf("origin-%d", index), DestinationStopRef: fmt.Sprintf("destination-%d", index),
-			Track: track, DestinationStop: &ctdf.Stop{PrimaryName: "Destination", OtherIdentifiers: []string{"alias"}},
-		})
+		journey.Journey.Calls = append(journey.Journey.Calls,
+			ctdf.JourneyCall{StopRef: fmt.Sprintf("origin-%d", index), Start: true, Outgoing: &ctdf.JourneyLeg{Track: track}},
+			ctdf.JourneyCall{StopRef: fmt.Sprintf("destination-%d", index), End: true, Stop: &ctdf.Stop{PrimaryName: "Destination", OtherIdentifiers: []string{"alias"}}},
+		)
 	}
 	for _, compact := range []bool{false, true} {
 		b.Run(fmt.Sprintf("compact=%t", compact), func(b *testing.B) {
@@ -322,7 +322,7 @@ func TestRealtimeJourneyEventsDistinguishRepeatedStopCalls(t *testing.T) {
 }
 
 func TestRealtimeJourneyEventsCompareLegacyPreviousStop(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "waterloo"}}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "waterloo"}}...)}
 	previous := &ctdf.RealtimeJourney{
 		PrimaryIdentifier: "realtime-test",
 		Journey:           journey,
@@ -342,7 +342,7 @@ func TestRealtimeJourneyEventsCompareLegacyPreviousStop(t *testing.T) {
 
 func TestRealtimeJourneyEventsDetectsIncreasingDelay(t *testing.T) {
 	runDate := time.Date(2026, time.August, 17, 0, 0, 0, 0, time.Local)
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "destination", OriginDepartureTime: time.Date(1, 1, 1, 8, 0, 0, 0, time.Local), DestinationArrivalTime: time.Date(1, 1, 1, 9, 0, 0, 0, time.Local)}}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "destination", OriginDepartureTime: time.Date(1, 1, 1, 8, 0, 0, 0, time.Local), DestinationArrivalTime: time.Date(1, 1, 1, 9, 0, 0, 0, time.Local)}}...)}
 	previous := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Journey: journey, JourneyRunDate: runDate}
 	previous.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "origin", JourneyStopIndex: 0, DepartureTime: runDate.Add(5*time.Minute + 8*time.Hour), TimeType: ctdf.RealtimeJourneyStopTimeEstimatedFuture})
 	current := &ctdf.RealtimeJourney{PrimaryIdentifier: "realtime-test", Journey: journey, JourneyRunDate: runDate}

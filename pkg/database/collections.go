@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rs/zerolog/log"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,12 +19,14 @@ const (
 	JourneyDestinationStopServiceIDsIndex = "JourneyDestinationStopServiceIDs"
 )
 
-func createIndexes() {
+func createIndexes() error {
 	createStopsIndexes()
 	createStopTransferIndexes()
 	createOSMStopIndexes()
 	createOperatorsIndexes()
-	createJourneysIndexes()
+	if err := createJourneysIndexes(); err != nil {
+		return err
+	}
 	createSavedObjectsIndexes()
 	createDatasetImportReportIndexes()
 	EnsureDatasetRetirementIndexes(context.Background())
@@ -32,6 +35,7 @@ func createIndexes() {
 	if err := EnsureTDMappingsIndex(context.Background()); err != nil {
 		log.Error().Err(err).Msg("Creating rail TD mappings index")
 	}
+	return nil
 }
 
 // EnsureDatasetRetirementIndexes covers ownership deletes, track reference
@@ -40,7 +44,7 @@ func EnsureDatasetRetirementIndexes(ctx context.Context) {
 	datasetID := mongo.IndexModel{Keys: bson.D{{Key: "datasource.datasetid", Value: 1}}}
 	trackReferences := []mongo.IndexModel{
 		{Keys: bson.D{{Key: "trackref", Value: 1}}, Options: options.Index().SetSparse(true)},
-		{Keys: bson.D{{Key: "path.trackref", Value: 1}}, Options: options.Index().SetSparse(true)},
+		{Keys: bson.D{{Key: "calls.outgoing.trackref", Value: 1}}, Options: options.Index().SetSparse(true)},
 	}
 	for _, collection := range []struct {
 		name    string
@@ -311,7 +315,7 @@ func createOperatorsIndexes() {
 	}
 }
 
-func createJourneysIndexes() {
+func createJourneysIndexes() error {
 	journeysRawCollection := GetCollection(JourneysRawCollectionName)
 	_, err := journeysRawCollection.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
 		{Keys: bson.D{{Key: "expiry", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(1)},
@@ -328,7 +332,7 @@ func createJourneysIndexes() {
 		}},
 	})
 	if err != nil {
-		log.Error().Err(err).Str("collection", JourneysRawCollectionName).Msg("Creating journey import indexes")
+		return fmt.Errorf("create indexes for %s: %w", JourneysRawCollectionName, err)
 	}
 
 	journeyTracksCollection := GetCollection("journey_tracks")
@@ -344,7 +348,7 @@ func createJourneysIndexes() {
 		},
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Creating journey track indexes")
+		return fmt.Errorf("create indexes for journey_tracks: %w", err)
 	}
 	journeyTrackRoutesCollection := GetCollection("journey_track_routes")
 
@@ -355,7 +359,7 @@ func createJourneysIndexes() {
 		{Keys: bson.D{{Key: "datasource.datasetid", Value: 1}, {Key: "attributes.mode", Value: 1}}},
 	})
 	if err != nil {
-		log.Error().Err(err).Msg("Creating journey track route indexes")
+		return fmt.Errorf("create indexes for journey_track_routes: %w", err)
 	}
 
 	// Services
@@ -414,7 +418,7 @@ func createJourneysIndexes() {
 		{
 			Options: options.Index().SetName(JourneyOriginStopServiceIDsIndex),
 			Keys: bson.D{
-				{Key: "path.originstopref", Value: 1},
+				{Key: "originstoprefs", Value: 1},
 				{Key: "serviceref", Value: 1},
 				{Key: "_id", Value: 1},
 			},
@@ -422,7 +426,7 @@ func createJourneysIndexes() {
 		{
 			Options: options.Index().SetName(JourneyDestinationStopServiceIDsIndex),
 			Keys: bson.D{
-				{Key: "path.destinationstopref", Value: 1},
+				{Key: "destinationstoprefs", Value: 1},
 				{Key: "serviceref", Value: 1},
 				{Key: "_id", Value: 1},
 			},
@@ -468,7 +472,7 @@ func createJourneysIndexes() {
 		},
 	}, options.CreateIndexes())
 	if err != nil {
-		log.Error().Err(err).Msg("Creating Index")
+		return fmt.Errorf("create indexes for %s: %w", JourneysCollectionName, err)
 	}
 
 	// Retry Records
@@ -541,4 +545,5 @@ func createJourneysIndexes() {
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
 	}
+	return nil
 }

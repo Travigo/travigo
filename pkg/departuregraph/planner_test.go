@@ -118,25 +118,25 @@ func TestGraphSimpleRouteIsNotStarvedByIncomingJourneyStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	day := makeDayKey(serviceDate)
-	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "access-bus", Path: []*ctdf.JourneyPathItem{{
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "access-bus", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "origin", DestinationStopRef: "station",
 		OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 20*60),
-	}}})
-	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "destination-train", Path: []*ctdf.JourneyPathItem{{
+	})})
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "destination-train", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "station", DestinationStopRef: "destination",
 		OriginDepartureTime: serviceTime(9*3600 + 30*60), DestinationArrivalTime: serviceTime(10*3600 + 30*60),
-	}}})
+	})})
 	for index := 0; index < 20; index++ {
-		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("distractor-arrival-%d", index), Path: []*ctdf.JourneyPathItem{{
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("distractor-arrival-%d", index), Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: "origin", DestinationStopRef: "distractor",
 			OriginDepartureTime: serviceTime(8*3600 + 55*60), DestinationArrivalTime: serviceTime(9*3600 + 60),
-		}}})
+		})})
 	}
 	for index, leg := range [][2]string{{"distractor", "distractor-2"}, {"distractor-2", "distractor-3"}, {"distractor-3", "destination"}} {
-		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("late-connection-%d", index), Path: []*ctdf.JourneyPathItem{{
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("late-connection-%d", index), Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: leg[0], DestinationStopRef: leg[1],
 			OriginDepartureTime: serviceTime(int32((11 + index) * 3600)), DestinationArrivalTime: serviceTime(int32((11+index)*3600 + 30*60)),
-		}}})
+		})})
 	}
 	data.completeScan([]time.Time{serviceDate})
 
@@ -175,10 +175,10 @@ func TestGraphReturnsRequestedDirectAlternatives(t *testing.T) {
 		departure := int32(10*3600 + index*10*60)
 		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 			PrimaryIdentifier: "journey-" + string(rune('a'+index)),
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef: "origin", DestinationStopRef: "destination",
 				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
-			}},
+			}),
 		})
 	}
 	data.completeScan([]time.Time{serviceDate})
@@ -206,10 +206,10 @@ func TestGraphReturnsPartialAlternativesWhenBudgetEnds(t *testing.T) {
 	}
 	for index := 0; index < 5; index++ {
 		departure := int32(10*3600 + index*10*60)
-		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("journey-%d", index), Path: []*ctdf.JourneyPathItem{{
+		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("journey-%d", index), Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: "origin", DestinationStopRef: "destination",
 			OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
-		}}})
+		})})
 	}
 	data.completeScan([]time.Time{serviceDate})
 
@@ -241,18 +241,18 @@ func TestGraphSearchesLowestVehicleLegRoundBeforeWiderCorridors(t *testing.T) {
 		t.Fatal(err)
 	}
 	day := makeDayKey(serviceDate)
-	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "direct", Path: []*ctdf.JourneyPathItem{{
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "direct", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "origin", DestinationStopRef: "destination",
 		OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(12 * 3600),
-	}}})
+	})})
 	for index := 0; index < 20; index++ {
 		refs := []string{"origin", fmt.Sprintf("a-%d", index), fmt.Sprintf("b-%d", index), fmt.Sprintf("c-%d", index), "destination"}
 		for leg := 0; leg < 4; leg++ {
 			departure := int32(9*3600 + index*60 + leg*120)
-			data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("distractor-%d-%d", index, leg), Path: []*ctdf.JourneyPathItem{{
+			data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("distractor-%d-%d", index, leg), Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef: refs[leg], DestinationStopRef: refs[leg+1],
 				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 60),
-			}}})
+			})})
 		}
 	}
 	data.completeScan([]time.Time{serviceDate})
@@ -281,17 +281,17 @@ func TestGraphResultCountOnlyWidensDestinationPatterns(t *testing.T) {
 	day := makeDayKey(serviceDate)
 	for index := 0; index < 20; index++ {
 		departure := int32(9*3600 + index*60)
-		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("feeder-%02d", index), ServiceRef: "feeder", Path: []*ctdf.JourneyPathItem{{
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("feeder-%02d", index), ServiceRef: "feeder", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: "origin", DestinationStopRef: "interchange",
 			OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 10*60),
-		}}})
+		})})
 	}
 	for index := 0; index < 5; index++ {
 		departure := int32(10*3600 + index*10*60)
-		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("final-%02d", index), ServiceRef: "final", Path: []*ctdf.JourneyPathItem{{
+		data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: fmt.Sprintf("final-%02d", index), ServiceRef: "final", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: "interchange", DestinationStopRef: "destination",
 			OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
-		}}})
+		})})
 	}
 	data.completeScan([]time.Time{serviceDate})
 	request := PlanRequest{
@@ -329,10 +329,10 @@ func TestGraphUsesPatternDepartureIndexAndHonoursExclusions(t *testing.T) {
 		departure := int32(10*3600 + index*60)
 		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 			PrimaryIdentifier: fmt.Sprintf("journey-%02d", index),
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef: "origin", DestinationStopRef: "destination",
 				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
-			}},
+			}),
 		})
 	}
 	data.completeScan([]time.Time{serviceDate})
@@ -374,10 +374,10 @@ func BenchmarkGraphPatternIndexedPlanner(b *testing.B) {
 		departure := int32(10*3600 + index*60)
 		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 			PrimaryIdentifier: fmt.Sprintf("journey-%04d", index), ServiceRef: "service",
-			Path: []*ctdf.JourneyPathItem{{
+			Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 				OriginStopRef: "origin", DestinationStopRef: "destination",
 				OriginDepartureTime: serviceTime(departure), DestinationArrivalTime: serviceTime(departure + 30*60),
-			}},
+			}),
 		})
 	}
 	data.completeScan([]time.Time{serviceDate})
@@ -413,14 +413,14 @@ func TestGraphCoordinatesAllowAccessInterchangeAndEgressWalks(t *testing.T) {
 		t.Fatal(err)
 	}
 	day := makeDayKey(serviceDate)
-	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "first", Path: []*ctdf.JourneyPathItem{{
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "first", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "access", DestinationStopRef: "arrival",
 		OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 20*60),
-	}}})
-	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "second", Path: []*ctdf.JourneyPathItem{{
+	})})
+	data.addJourney(day, &ctdf.Journey{PrimaryIdentifier: "second", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "departure", DestinationStopRef: "approach",
 		OriginDepartureTime: serviceTime(9*3600 + 30*60), DestinationArrivalTime: serviceTime(10 * 3600),
-	}}})
+	})})
 	data.completeScan([]time.Time{serviceDate})
 
 	result, err := graph.Plan(context.Background(), PlanRequest{
@@ -460,10 +460,10 @@ func TestGraphCoordinateAccessCanTraversePlatformAlias(t *testing.T) {
 	}
 	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 		PrimaryIdentifier: "journey",
-		Path: []*ctdf.JourneyPathItem{{
+		Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 			OriginStopRef: "station", DestinationStopRef: "destination",
 			OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
-		}},
+		}),
 	})
 	data.completeScan([]time.Time{serviceDate})
 
@@ -493,12 +493,12 @@ func TestGraphAppliesRouteRestrictedTransfer(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "in", ServiceRef: "service-in", Path: []*ctdf.JourneyPathItem{{
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "in", ServiceRef: "service-in", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "origin", DestinationStopRef: "arrival", OriginDepartureTime: serviceTime(9 * 3600), DestinationArrivalTime: serviceTime(9*3600 + 30*60),
-	}}})
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "out", ServiceRef: "service-out", Path: []*ctdf.JourneyPathItem{{
+	})})
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "out", ServiceRef: "service-out", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
 		OriginStopRef: "departure", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(10 * 3600), DestinationArrivalTime: serviceTime(11 * 3600),
-	}}})
+	})})
 	data.completeScan([]time.Time{serviceDate})
 
 	result, err := graph.Plan(context.Background(), PlanRequest{
@@ -581,16 +581,13 @@ func TestGraphPlansJourneyAndFinalTransferEntirelyInMemory(t *testing.T) {
 	}
 	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 		PrimaryIdentifier: "journey-1",
-		Path: []*ctdf.JourneyPathItem{
-			{
-				OriginStopRef: "origin-alias", DestinationStopRef: "middle-alias",
-				OriginDepartureTime: serviceTime(10*3600 + 5*60), DestinationArrivalTime: serviceTime(10*3600 + 15*60),
-			},
-			{
-				OriginStopRef: "middle-alias", DestinationStopRef: "approach-alias",
-				OriginDepartureTime: serviceTime(10*3600 + 15*60), DestinationArrivalTime: serviceTime(10*3600 + 25*60),
-			},
-		},
+		Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
+			OriginStopRef: "origin-alias", DestinationStopRef: "middle-alias",
+			OriginDepartureTime: serviceTime(10*3600 + 5*60), DestinationArrivalTime: serviceTime(10*3600 + 15*60),
+		}, &ctdf.JourneyPathItem{
+			OriginStopRef: "middle-alias", DestinationStopRef: "approach-alias",
+			OriginDepartureTime: serviceTime(10*3600 + 15*60), DestinationArrivalTime: serviceTime(10*3600 + 25*60),
+		}),
 	})
 	data.completeScan([]time.Time{serviceDate})
 
@@ -622,7 +619,7 @@ func TestStaticCorridorFindsUpstreamRideAndTransferLinks(t *testing.T) {
 	if err := data.loadTopology(context.Background(), loader); err != nil {
 		t.Fatal(err)
 	}
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "approach", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)}}})
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "approach", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)})})
 	data.completeScan([]time.Time{serviceDate})
 	destination, _ := data.stopIndex("destination")
 	origin, _ := data.stopIndex("origin")
@@ -655,10 +652,7 @@ func TestStaticCorridorDeduplicatesIdenticalStopPatterns(t *testing.T) {
 	for index := 0; index < 2; index++ {
 		data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{
 			PrimaryIdentifier: fmt.Sprintf("journey-%d", index),
-			Path: []*ctdf.JourneyPathItem{
-				{OriginStopRef: "origin", DestinationStopRef: "middle", OriginDepartureTime: serviceTime(3600 + int32(index*600)), DestinationArrivalTime: serviceTime(3900 + int32(index*600))},
-				{OriginStopRef: "middle", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3960 + int32(index*600)), DestinationArrivalTime: serviceTime(4260 + int32(index*600))},
-			},
+			Calls:             ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "middle", OriginDepartureTime: serviceTime(3600 + int32(index*600)), DestinationArrivalTime: serviceTime(3900 + int32(index*600))}, &ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3960 + int32(index*600)), DestinationArrivalTime: serviceTime(4260 + int32(index*600))}),
 		})
 	}
 	data.completeScan([]time.Time{serviceDate})
@@ -678,7 +672,7 @@ func TestGraphCoordinateOriginUsesSpatialStopIndex(t *testing.T) {
 	if err := data.loadTopology(context.Background(), loader); err != nil {
 		t.Fatal(err)
 	}
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "nearby", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)}}})
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "nearby", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)})})
 	data.completeScan([]time.Time{serviceDate})
 	result, err := graph.Plan(context.Background(), PlanRequest{OriginLocation: &PlanLocation{Longitude: 0.0001, Latitude: 52}, DestinationRefs: []string{"destination"}, StartDateTime: serviceDate.Add(30 * time.Minute), Count: 1, MaxTransferDistanceMetres: 200})
 	if err != nil {
@@ -726,7 +720,7 @@ func TestPlanClientUsesJourneyGraphEndpoint(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)}}})
+	data.addJourney(makeDayKey(serviceDate), &ctdf.Journey{PrimaryIdentifier: "journey-1", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "destination", OriginDepartureTime: serviceTime(3600), DestinationArrivalTime: serviceTime(4200)})})
 	data.completeScan([]time.Time{serviceDate})
 	client := NewClient("http://journey-graph", &http.Client{Transport: handlerTransport{handler: NewServer(graph).Handler()}})
 	result, err := client.Plan(context.Background(), PlanRequest{OriginRefs: []string{"origin"}, DestinationRefs: []string{"destination"}, StartDateTime: serviceDate.Add(30 * time.Minute), Count: 1})

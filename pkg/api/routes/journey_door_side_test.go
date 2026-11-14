@@ -424,10 +424,10 @@ func TestFindRealtimePlatformSelectsRepeatedStopVisit(t *testing.T) {
 
 func TestFindJourneyStopVisitPrefersIncomingPlatform(t *testing.T) {
 	stop := &ctdf.Stop{PrimaryIdentifier: "middle"}
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "start", DestinationStopRef: "middle", DestinationPlatform: "2"},
-		{OriginStopRef: "middle", DestinationStopRef: "end", OriginPlatform: "3"},
-	}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "start", DestinationStopRef: "middle", DestinationPlatform: "2"},
+		&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "end", OriginPlatform: "3"},
+	)}
 
 	visit, err := findJourneyStopVisit(journey, stop, 1)
 	if err != nil {

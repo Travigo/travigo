@@ -144,36 +144,45 @@ func MatchStops(journeyStops []string, routeStops [][]string) ([]int, bool) {
 	return positions, true
 }
 
-// ContiguousPaths splits a journey at gaps left by unresolved stops.
-func ContiguousPaths(path []*ctdf.JourneyPathItem) iter.Seq[[]*ctdf.JourneyPathItem] {
-	return func(yield func([]*ctdf.JourneyPathItem) bool) {
-		for start := 0; start < len(path); {
-			if path[start] == nil {
-				start++
+// ContiguousCallPaths yields canonical journey segments without materializing
+// temporary public leg views.
+func ContiguousCallPaths(journey *ctdf.Journey) iter.Seq[[]*ctdf.JourneyCall] {
+	return func(yield func([]*ctdf.JourneyCall) bool) {
+		if journey == nil || len(journey.Calls) == 0 {
+			return
+		}
+		start := 0
+		for index := range journey.Calls {
+			if !journey.Calls[index].End {
 				continue
 			}
-			end := start + 1
-			for end < len(path) && path[end] != nil && path[end-1].DestinationStopRef == path[end].OriginStopRef {
-				end++
+			if index-start+1 < 2 {
+				start = index + 1
+				continue
 			}
-			if !yield(path[start:end]) {
+			segment := make([]*ctdf.JourneyCall, index-start+1)
+			for callIndex := start; callIndex <= index; callIndex++ {
+				segment[callIndex-start] = &journey.Calls[callIndex]
+			}
+			if !yield(segment) {
 				return
 			}
-			start = end
+			start = index + 1
+		}
+		if len(journey.Calls)-start >= 2 {
+			segment := make([]*ctdf.JourneyCall, len(journey.Calls)-start)
+			for index := start; index < len(journey.Calls); index++ {
+				segment[index-start] = &journey.Calls[index]
+			}
+			yield(segment)
 		}
 	}
 }
 
-func JourneyStops(path []*ctdf.JourneyPathItem) []string {
-	stops := make([]string, 0, len(path)+1)
-	for _, item := range path {
-		if item == nil {
-			continue
-		}
-		if len(stops) == 0 {
-			stops = append(stops, item.OriginStopRef)
-		}
-		stops = append(stops, item.DestinationStopRef)
+func JourneyCallStops(calls []*ctdf.JourneyCall) []string {
+	stops := make([]string, len(calls))
+	for index, call := range calls {
+		stops[index] = call.StopRef
 	}
 	return stops
 }

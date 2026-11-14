@@ -154,7 +154,7 @@ func writeJourneyStopDoorSide(c *fiber.Ctx, response journeyStopDoorSideResponse
 }
 
 func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber int) (journeyStopVisit, error) {
-	if journey == nil || len(journey.Path) == 0 {
+	if journey == nil || len(journey.Calls) == 0 {
 		return journeyStopVisit{}, fmt.Errorf("journey has no path")
 	}
 
@@ -163,14 +163,10 @@ func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber in
 		stopIDs[stopID] = struct{}{}
 	}
 
-	refs := make([]string, 0, len(journey.Path)+1)
-	refs = append(refs, journey.Path[0].OriginStopRef)
-	for _, pathItem := range journey.Path {
-		refs = append(refs, pathItem.DestinationStopRef)
-	}
-
 	matchingVisit := 0
-	for index, stopRef := range refs {
+	for index := range journey.Calls {
+		call := &journey.Calls[index]
+		stopRef := call.StopRef
 		if _, matches := stopIDs[stopRef]; !matches {
 			continue
 		}
@@ -180,21 +176,31 @@ func findJourneyStopVisit(journey *ctdf.Journey, stop *ctdf.Stop, visitNumber in
 			continue
 		}
 
-		visit := journeyStopVisit{stopRef: stopRef, journeyStopIndex: index}
-		if index > 0 {
-			visit.previousStopRef = refs[index-1]
-			visit.scheduledPlatform = journey.Path[index-1].DestinationPlatform
+		visit := journeyStopVisit{stopRef: stopRef, journeyStopIndex: journeyCallRealtimeIndex(journey, index)}
+		if index > 0 && !call.Start {
+			visit.previousStopRef = journey.Calls[index-1].StopRef
+			visit.scheduledPlatform = call.ArrivalPlatform()
 		}
-		if index < len(journey.Path) {
-			visit.nextStopRef = refs[index+1]
+		if index+1 < len(journey.Calls) && !call.End {
+			visit.nextStopRef = journey.Calls[index+1].StopRef
 			if visit.scheduledPlatform == "" {
-				visit.scheduledPlatform = journey.Path[index].OriginPlatform
+				visit.scheduledPlatform = call.Platform
 			}
 		}
 		return visit, nil
 	}
 
 	return journeyStopVisit{}, fmt.Errorf("stop is not visit %d in this journey", visitNumber)
+}
+
+func journeyCallRealtimeIndex(journey *ctdf.Journey, callIndex int) int {
+	index := 0
+	for i := 0; i < callIndex && i < len(journey.Calls); i++ {
+		if !journey.Calls[i].End {
+			index++
+		}
+	}
+	return index
 }
 
 func findRealtimePlatform(realtimeJourney *ctdf.RealtimeJourney, stop *ctdf.Stop, journeyStopRef string, journeyStopIndex int) string {

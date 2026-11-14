@@ -20,14 +20,15 @@ func TestRealtimeStopsPreserveRepeatedStopOccurrences(t *testing.T) {
 
 func TestRealtimeStopReadsLegacyStopRefKey(t *testing.T) {
 	legacy := &RealtimeJourney{
-		Journey: &Journey{Path: []*JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "waterloo"}}},
+		Journey: &Journey{Calls: JourneyCallsFromLegs(&JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "waterloo"})},
 		Stops:   map[string]*RealtimeJourneyStops{"waterloo": {StopRef: "waterloo", Platform: "1"}},
 	}
 	if got := legacy.RealtimeStop("waterloo", 1); got == nil || got.Platform != "1" {
 		t.Fatal("expected legacy stop-ref-keyed realtime stop to remain readable")
 	}
 
-	legacy.Journey.Path = append(legacy.Journey.Path,
+	legacy.Journey.Calls = JourneyCallsFromLegs(
+		&JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "waterloo"},
 		&JourneyPathItem{OriginStopRef: "waterloo", DestinationStopRef: "other"},
 		&JourneyPathItem{OriginStopRef: "other", DestinationStopRef: "waterloo"},
 	)

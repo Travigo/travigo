@@ -33,9 +33,13 @@ func ConnectAndCreateIndexes() error {
 		return err
 	}
 
-	createIndexes()
+	for _, name := range []string{JourneysRawCollectionName, JourneysCollectionName} {
+		if err := EnsureJourneyCollection(context.Background(), name); err != nil {
+			return err
+		}
+	}
 
-	return nil
+	return createIndexes()
 }
 
 func ConnectStandard() error {

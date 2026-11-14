@@ -7,6 +7,10 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
+func journeyWithLegs(legs ...*ctdf.JourneyPathItem) *ctdf.Journey {
+	return &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(legs...)}
+}
+
 func TestReferencedTIPLOCsMatchesJourneyStopSelection(t *testing.T) {
 	cif := &CommonInterfaceFormat{
 		TrainDefinitionSets: []*TrainDefinitionSet{
@@ -33,48 +37,48 @@ func TestReferencedTIPLOCsMatchesJourneyStopSelection(t *testing.T) {
 }
 
 func TestPreserveMatchingJourneyTrackRefs(t *testing.T) {
-	existing := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "track-a-b"},
-		{OriginStopRef: "b", DestinationStopRef: "c", TrackRef: "track-b-c"},
-		{OriginStopRef: "c", DestinationStopRef: "d", TrackRef: "track-c-d"},
-	}}
-	replacement := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b"},
-		{OriginStopRef: "b", DestinationStopRef: "x"},
-		{OriginStopRef: "c", DestinationStopRef: "d", TrackRef: "replacement-track"},
-	}}
+	existing := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "track-a-b"},
+		&ctdf.JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "c", TrackRef: "track-b-c"},
+		&ctdf.JourneyPathItem{OriginStopRef: "c", DestinationStopRef: "d", TrackRef: "track-c-d"},
+	)
+	replacement := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b"},
+		&ctdf.JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "x"},
+		&ctdf.JourneyPathItem{OriginStopRef: "c", DestinationStopRef: "d", TrackRef: "replacement-track"},
+	)
 
 	preserved := preserveMatchingJourneyTrackRefs(existing, replacement)
 	if preserved != 1 {
 		t.Fatalf("preserved %d track references, want 1", preserved)
 	}
-	if replacement.Path[0].TrackRef != "track-a-b" {
-		t.Fatalf("matching leg track ref = %q, want track-a-b", replacement.Path[0].TrackRef)
+	if replacement.Leg(0).TrackRef != "track-a-b" {
+		t.Fatalf("matching leg track ref = %q, want track-a-b", replacement.Leg(0).TrackRef)
 	}
-	if replacement.Path[1].TrackRef != "" {
-		t.Fatalf("changed leg inherited track ref %q", replacement.Path[1].TrackRef)
+	if replacement.Leg(1).TrackRef != "" {
+		t.Fatalf("changed leg inherited track ref %q", replacement.Leg(1).TrackRef)
 	}
-	if replacement.Path[2].TrackRef != "replacement-track" {
-		t.Fatalf("replacement track ref was overwritten with %q", replacement.Path[2].TrackRef)
+	if replacement.Leg(2).TrackRef != "replacement-track" {
+		t.Fatalf("replacement track ref was overwritten with %q", replacement.Leg(2).TrackRef)
 	}
 }
 
 func TestPreserveMatchingJourneyTrackRefsMatchesRepeatedLegsByOccurrence(t *testing.T) {
-	existing := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "first"},
-		{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "second"},
-	}}
-	replacement := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b"},
-		{OriginStopRef: "a", DestinationStopRef: "b"},
-	}}
+	existing := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "first"},
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "second"},
+	)
+	replacement := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b"},
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b"},
+	)
 
 	preserved := preserveMatchingJourneyTrackRefs(existing, replacement)
 	if preserved != 2 {
 		t.Fatalf("preserved %d track references, want 2", preserved)
 	}
-	if replacement.Path[0].TrackRef != "first" || replacement.Path[1].TrackRef != "second" {
-		t.Fatalf("repeated leg refs = %q, %q", replacement.Path[0].TrackRef, replacement.Path[1].TrackRef)
+	if replacement.Leg(0).TrackRef != "first" || replacement.Leg(1).TrackRef != "second" {
+		t.Fatalf("repeated leg refs = %q, %q", replacement.Leg(0).TrackRef, replacement.Leg(1).TrackRef)
 	}
 }
 
@@ -105,25 +109,25 @@ func TestCreateJourneyStoresPassingPathBetweenCalls(t *testing.T) {
 		t.Fatalf("passenger stops = %v", got)
 	}
 	for i, want := range [][]string{{"gb-tiploc-PASSING", "gb-tiploc-OTHER"}, {"gb-tiploc-PASSING"}} {
-		if got := journey.Path[i].PassingPath; !reflect.DeepEqual(got, want) {
+		if got := journey.Leg(i).PassingPath; !reflect.DeepEqual(got, want) {
 			t.Fatalf("leg %d passing path = %v, want %v", i, got, want)
 		}
 	}
 }
 
 func TestPassingPathBackfillKeepsLegacyTrack(t *testing.T) {
-	existing := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "legacy"},
-		{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"old"}, TrackRef: "old-variant"},
-	}}
-	replacement := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
-		{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"new"}},
-	}}
+	existing := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", TrackRef: "legacy"},
+		&ctdf.JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"old"}, TrackRef: "old-variant"},
+	)
+	replacement := journeyWithLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"via"}},
+		&ctdf.JourneyPathItem{OriginStopRef: "b", DestinationStopRef: "c", PassingPath: []string{"new"}},
+	)
 	if got := preserveMatchingJourneyTrackRefs(existing, replacement); got != 1 {
 		t.Fatalf("preserved %d track references, want 1", got)
 	}
-	if replacement.Path[0].TrackRef != "legacy" || replacement.Path[1].TrackRef != "" {
-		t.Fatalf("track refs = %q, %q", replacement.Path[0].TrackRef, replacement.Path[1].TrackRef)
+	if replacement.Leg(0).TrackRef != "legacy" || replacement.Leg(1).TrackRef != "" {
+		t.Fatalf("track refs = %q, %q", replacement.Leg(0).TrackRef, replacement.Leg(1).TrackRef)
 	}
 }

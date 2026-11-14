@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/travigo/travigo/pkg/database"
@@ -40,7 +39,7 @@ type Journey struct {
 	DepartureTime        time.Time `groups:"basic,departures-llm,departureboard-cache,web-journey,web-planner,web-saved" bson:",omitempty"`
 	DepartureTimezone    string    `groups:"basic,departureboard-cache,web-journey,web-planner,web-saved" bson:",omitempty"`
 
-	Track               []Location           `groups:"detailed,web-journey" bson:",omitempty"`
+	Track               []Location           `groups:"detailed,web-journey" bson:"-"`
 	TrackRef            string               `groups:"internal" bson:",omitempty"`
 	TrackDataSource     *DataSourceReference `groups:"detailed,web-journey" bson:"-"`
 	DestinationDisplay  string               `groups:"basic,departures-llm,departureboard-cache,web-journey,web-saved,web-notification" bson:",omitempty"`
@@ -52,7 +51,9 @@ type Journey struct {
 
 	Availability *Availability `groups:"internal,departureboard-cache" bson:",omitempty"`
 
-	Path []*JourneyPathItem `groups:"detailed,departureboard-cache,web-journey" bson:",omitempty"`
+	Calls               []JourneyCall `groups:"detailed,departureboard-cache,web-journey" bson:"calls"`
+	OriginStopRefs      []string      `bson:"originstoprefs,omitempty" json:"-"`
+	DestinationStopRefs []string      `bson:"destinationstoprefs,omitempty" json:"-"`
 
 	RealtimeJourney *RealtimeJourney `groups:"basic,web-board,web-journey,web-planner" bson:"-"`
 
@@ -84,21 +85,6 @@ func (j *Journey) GetService() {
 		bson.M{"otheridentifiers": j.ServiceRef},
 	}}).Decode(&j.Service)
 }
-func (j *Journey) GetDeepReferences() {
-	wg := sync.WaitGroup{}
-	for _, path := range j.Path {
-		wg.Add(1)
-		go func(path *JourneyPathItem) {
-			path.GetReferences()
-
-			wg.Done()
-		}(path)
-	}
-	j.GetTracks()
-
-	wg.Wait()
-}
-
 func (j Journey) MarshalBinary() ([]byte, error) {
 	return json.Marshal(j)
 }
@@ -113,57 +99,28 @@ func (j *Journey) GenerateFunctionalHash(includeAvailabilityCondition bool) stri
 	// TODO: REVERT THE CHAGES TO THIS LINE
 	// BUT THINK ABOUT IT - WE SHOULD ALWAYS IGNORE AVAILABILITY CONDITIONS WHEN FINDING IDENTICAL JOURNEYS
 	// IF WE FILTER OUT BASED ON BEING AVAILABLE TODAY THEN WE SHOULDNT CARE ABOUT THE SPECIFICS OF THE CONDITIONS???
-	if includeAvailabilityCondition {
-		rules := append(j.Availability.Match, j.Availability.MatchSecondary...)
-		rules = append(rules, j.Availability.Exclude...)
-
-		rules = append(rules, j.Availability.Condition...)
-
-		for _, availabilityMatchRule := range rules {
-			hash.Write([]byte(availabilityMatchRule.Type))
-			hash.Write([]byte(availabilityMatchRule.Value))
-			hash.Write([]byte(availabilityMatchRule.Description))
+	if includeAvailabilityCondition && j.Availability != nil {
+		for _, rules := range [][]AvailabilityRule{
+			j.Availability.Match, j.Availability.MatchSecondary, j.Availability.Exclude, j.Availability.Condition,
+		} {
+			for _, rule := range rules {
+				hash.Write([]byte(rule.Type))
+				hash.Write([]byte(rule.Value))
+				hash.Write([]byte(rule.Description))
+			}
 		}
 	}
 
-	for _, pathItem := range j.Path {
-		hash.Write([]byte(pathItem.OriginStopRef))
-		hash.Write([]byte(pathItem.OriginArrivalTime.GoString()))
-		hash.Write([]byte(pathItem.OriginDepartureTime.GoString()))
-		hash.Write([]byte(pathItem.DestinationStopRef))
-		hash.Write([]byte(pathItem.DestinationArrivalTime.GoString()))
+	for origin, destination := range j.LegCalls() {
+		hash.Write([]byte(origin.StopRef))
+		hash.Write([]byte(origin.Arrival.GoString()))
+		hash.Write([]byte(origin.Departure.GoString()))
+		hash.Write([]byte(destination.StopRef))
+		hash.Write([]byte(destination.ArrivalTime().GoString()))
 	}
 
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
-func (j Journey) FlattenStops() ([]string, map[string]time.Time, map[string]time.Time) {
-	var stops []string
-	arrivalTimes := map[string]time.Time{}
-	departureTimes := map[string]time.Time{}
-	alreadySeen := map[string]bool{}
-
-	for _, pathItem := range j.Path {
-		if !alreadySeen[pathItem.OriginStopRef] {
-			stops = append(stops, pathItem.OriginStopRef)
-
-			arrivalTimes[pathItem.OriginStopRef] = pathItem.OriginArrivalTime
-			departureTimes[pathItem.OriginStopRef] = pathItem.OriginDepartureTime
-
-			alreadySeen[pathItem.OriginStopRef] = true
-		}
-	}
-
-	lastPathItem := j.Path[len(j.Path)-1]
-	if !alreadySeen[lastPathItem.OriginStopRef] {
-		stops = append(stops, lastPathItem.OriginStopRef)
-
-		arrivalTimes[lastPathItem.OriginStopRef] = lastPathItem.OriginArrivalTime
-		departureTimes[lastPathItem.OriginStopRef] = lastPathItem.OriginDepartureTime
-	}
-
-	return stops, arrivalTimes, departureTimes
-}
-
 func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition bool) []*Journey {
 	var filtered []*Journey
 
@@ -180,6 +137,8 @@ func FilterIdenticalJourneys(journeys []*Journey, includeAvailabilityCondition b
 	return filtered
 }
 
+// JourneyPathItem represents a timing link used when building calls from feed
+// data. Journeys persist the calls directly.
 type JourneyPathItem struct {
 	// PassingPath holds ordered CIF TIPLOC references between passenger calls.
 	PassingPath []string `bson:"passingpath,omitempty" json:"-"`
@@ -212,37 +171,6 @@ type JourneyPathItem struct {
 	// Associations []*Association `groups:"detailed" bson:",omitempty"`
 }
 
-func (jpi *JourneyPathItem) GetReferences() {
-	jpi.GetOriginStop()
-	jpi.GetDestinationStop()
-}
-func (jpi *JourneyPathItem) GetOriginStop() {
-	if jpi.OriginStop != nil {
-		return
-	}
-
-	stopsCollection := database.GetCollection("stops")
-	stopsCollection.FindOne(context.Background(), bson.M{
-		"$or": bson.A{
-			bson.M{"primaryidentifier": jpi.OriginStopRef},
-			bson.M{"otheridentifiers": jpi.OriginStopRef},
-		},
-	}).Decode(&jpi.OriginStop)
-}
-func (jpi *JourneyPathItem) GetDestinationStop() {
-	if jpi.DestinationStop != nil {
-		return
-	}
-
-	stopsCollection := database.GetCollection("stops")
-	stopsCollection.FindOne(context.Background(), bson.M{
-		"$or": bson.A{
-			bson.M{"primaryidentifier": jpi.DestinationStopRef},
-			bson.M{"otheridentifiers": jpi.DestinationStopRef},
-		},
-	}).Decode(&jpi.DestinationStop)
-}
-
 type JourneyPathItemActivity string
 
 const (
@@ -251,26 +179,35 @@ const (
 	JourneyPathItemActivityPass    = "Pass"
 )
 
-// GetStopRefs returns the stop references along the journey.
+func (c *JourneyCall) GetStop() {
+	if c.Stop != nil || c.StopRef == "" {
+		return
+	}
+	database.GetCollection("stops").FindOne(context.Background(), bson.M{
+		"$or": bson.A{
+			bson.M{"primaryidentifier": c.StopRef},
+			bson.M{"otheridentifiers": c.StopRef},
+		},
+	}).Decode(&c.Stop)
+}
+
+// GetStopRefs returns the distinct stop references in visit order.
 func (j *Journey) GetStopRefs() []string {
-	refs := make([]string, 0, len(j.Path)+1)
-	seen := map[string]bool{}
-	for _, leg := range j.Path {
-		if leg == nil {
-			continue
-		}
-		for _, ref := range []string{leg.OriginStopRef, leg.DestinationStopRef} {
-			if ref != "" && !seen[ref] {
-				refs = append(refs, ref)
-				seen[ref] = true
-			}
+	refs := make([]string, 0, len(j.Calls))
+	seen := make(map[string]struct{}, len(j.Calls))
+	for _, call := range j.Calls {
+		if _, found := seen[call.StopRef]; !found && call.StopRef != "" {
+			refs = append(refs, call.StopRef)
+			seen[call.StopRef] = struct{}{}
 		}
 	}
 	return refs
 }
 
 func (j *Journey) ApplyRouteAmendment(amendment *Journey) {
-	j.Path = amendment.Path
+	j.Calls = amendment.Calls
+	j.OriginStopRefs = amendment.OriginStopRefs
+	j.DestinationStopRefs = amendment.DestinationStopRefs
 	j.DepartureTime = amendment.DepartureTime
 	j.DestinationDisplay = amendment.DestinationDisplay
 	j.Track, j.TrackRef, j.TrackDataSource = nil, "", nil

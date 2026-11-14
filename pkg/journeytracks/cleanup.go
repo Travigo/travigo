@@ -25,27 +25,31 @@ func RemoveDatasets(ctx context.Context, datasetIDs []string) error {
 			refs = append(refs, ref)
 		}
 	}
-	for _, name := range []string{database.JourneysRawCollectionName, database.JourneysCollectionName} {
+	for _, name := range []string{database.JourneysRawCollectionName, database.JourneysStagingCollectionName, database.JourneysCollectionName} {
 		collection := database.GetCollection(name)
 		for batch := range slices.Chunk(refs, 5000) {
 			trackRefs := bson.M{"$in": batch}
 			if _, err := collection.UpdateMany(ctx, bson.M{"trackref": trackRefs},
-				bson.M{"$unset": bson.M{"trackref": "", "track": ""}}); err != nil {
+				bson.M{"$unset": bson.M{"trackref": ""}}); err != nil {
 				return fmt.Errorf("clear journey track references in %s: %w", name, err)
 			}
-			if _, err := collection.UpdateMany(ctx, bson.M{"path.trackref": trackRefs},
-				bson.M{"$unset": bson.M{"path.$[leg].trackref": "", "path.$[leg].track": ""}},
+			if _, err := collection.UpdateMany(ctx, bson.M{"calls.outgoing.trackref": trackRefs},
+				bson.M{"$unset": bson.M{"calls.$[call].outgoing.trackref": ""}},
 				options.Update().SetArrayFilters(options.ArrayFilters{Filters: []interface{}{
-					bson.M{"leg.trackref": trackRefs},
+					bson.M{"call.outgoing.trackref": trackRefs},
 				}})); err != nil {
 				return fmt.Errorf("clear path track references in %s: %w", name, err)
 			}
 		}
 	}
-	for _, name := range []string{"journey_track_routes", "journey_tracks"} {
-		if _, err := database.GetCollection(name).DeleteMany(ctx, filter); err != nil {
-			return fmt.Errorf("delete data from %s: %w", name, err)
-		}
+	if _, err := database.GetCollection(RouteCollectionName).DeleteMany(ctx, filter); err != nil {
+		return fmt.Errorf("delete data from %s: %w", RouteCollectionName, err)
+	}
+	if err := excludeReferencedTracksAcrossCollections(ctx, owned); err != nil {
+		return err
+	}
+	if err := deleteTrackRefs(ctx, owned, filter); err != nil {
+		return err
 	}
 	return nil
 }
@@ -62,62 +66,120 @@ func CleanupOSMRailTracks(ctx context.Context, source *ctdf.DataSourceReference)
 		return err
 	}
 
-	// Check the collections in publication order so a journey copied by the
-	// linker during cleanup is visible in its source or destination.
+	return cleanupStaleTracks(ctx, stale, filter)
+}
+
+// CleanupStaleUnreferencedTracks removes prior generations only after their
+// geometry is no longer referenced by raw, staging, or published journeys and
+// route metadata. A track still used by the currently published generation is
+// retained; a later refresh/maintenance pass can remove it once publication has
+// moved past that reference.
+func CleanupStaleUnreferencedTracks(ctx context.Context, source *ctdf.DataSourceReference) error {
+	if source == nil || source.DatasetID == "" {
+		return nil
+	}
+	filter := bson.M{
+		"datasource.datasetid":      source.DatasetID,
+		"datasource.originalformat": source.OriginalFormat,
+		"datasource.timestamp":      bson.M{"$ne": source.Timestamp},
+	}
+	stale, err := loadTrackRefs(ctx, filter)
+	if err != nil {
+		return err
+	}
+	return cleanupStaleTracks(ctx, stale, filter)
+}
+
+func cleanupStaleTracks(ctx context.Context, stale map[string]struct{}, ownerFilter bson.M) error {
+	if err := excludeReferencedTracksAcrossCollections(ctx, stale); err != nil {
+		return err
+	}
+	return deleteTrackRefs(ctx, stale, ownerFilter)
+}
+
+func excludeReferencedTracksAcrossCollections(ctx context.Context, stale map[string]struct{}) error {
 	for _, name := range []string{
 		database.JourneysRawCollectionName,
 		database.JourneysStagingCollectionName,
 		database.JourneysCollectionName,
+		RouteCollectionName,
 	} {
 		if len(stale) == 0 {
 			return nil
 		}
-		if err := excludeReferencedTracks(ctx, name, stale); err != nil {
+		if err := excludeReferencedTracksInCollection(ctx, name, stale); err != nil {
 			return fmt.Errorf("check track references in %s: %w", name, err)
 		}
 	}
-
-	tracks := database.GetCollection("journey_tracks")
-	batch := make([]string, 0, 500)
-	for ref := range stale {
-		batch = append(batch, ref)
-		if len(batch) == cap(batch) {
-			filter["primaryidentifier"] = bson.M{"$in": batch}
-			if _, err := tracks.DeleteMany(ctx, filter); err != nil {
-				return err
-			}
-			batch = batch[:0]
-		}
-	}
-	if len(batch) > 0 {
-		filter["primaryidentifier"] = bson.M{"$in": batch}
-		_, err = tracks.DeleteMany(ctx, filter)
-	}
-	return err
+	return nil
 }
 
-func excludeReferencedTracks(ctx context.Context, collectionName string, stale map[string]struct{}) error {
-	cursor, err := database.GetCollection(collectionName).Find(ctx, bson.M{
-		"$or": bson.A{
-			bson.M{"trackref": bson.M{"$exists": true}},
-			bson.M{"path.trackref": bson.M{"$exists": true}},
-		},
-	}, options.Find().SetProjection(bson.M{"_id": 0, "trackref": 1, "path.trackref": 1}))
-	if err != nil {
-		return err
+func excludeReferencedTracksInCollection(ctx context.Context, collectionName string, stale map[string]struct{}) error {
+	refs := make([]string, 0, len(stale))
+	for ref := range stale {
+		refs = append(refs, ref)
 	}
-	defer cursor.Close(ctx)
-	for len(stale) > 0 && cursor.Next(ctx) {
-		var journey ctdf.Journey
-		if err := cursor.Decode(&journey); err != nil {
+	collection := database.GetCollection(collectionName)
+	for batch := range slices.Chunk(refs, 5000) {
+		trackRefs := bson.M{"$in": batch}
+		cursor, err := collection.Find(ctx, bson.M{"$or": bson.A{
+			bson.M{"trackref": trackRefs},
+			bson.M{"calls.outgoing.trackref": trackRefs},
+		}}, options.Find().SetProjection(bson.M{"_id": 0, "trackref": 1, "calls.outgoing.trackref": 1}))
+		if err != nil {
 			return err
 		}
-		delete(stale, journey.TrackRef)
-		for _, leg := range journey.Path {
-			if leg != nil {
-				delete(stale, leg.TrackRef)
+		for cursor.Next(ctx) {
+			var journey struct {
+				TrackRef string `bson:"trackref"`
+				Calls    []struct {
+					Outgoing struct {
+						TrackRef string `bson:"trackref"`
+					} `bson:"outgoing"`
+				} `bson:"calls"`
+			}
+			if err := cursor.Decode(&journey); err != nil {
+				cursor.Close(ctx)
+				return err
+			}
+			delete(stale, journey.TrackRef)
+			for _, call := range journey.Calls {
+				delete(stale, call.Outgoing.TrackRef)
+			}
+		}
+		if err := cursor.Err(); err != nil {
+			cursor.Close(ctx)
+			return err
+		}
+		cursor.Close(ctx)
+	}
+	return nil
+}
+
+func deleteTrackRefs(ctx context.Context, refs map[string]struct{}, ownerFilter bson.M) error {
+	tracks := database.GetCollection("journey_tracks")
+	batch := make([]string, 0, 500)
+	deleteBatch := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		filter := bson.M{"primaryidentifier": bson.M{"$in": batch}}
+		for key, value := range ownerFilter {
+			filter[key] = value
+		}
+		if _, err := tracks.DeleteMany(ctx, filter); err != nil {
+			return err
+		}
+		batch = batch[:0]
+		return nil
+	}
+	for ref := range refs {
+		batch = append(batch, ref)
+		if len(batch) == cap(batch) {
+			if err := deleteBatch(); err != nil {
+				return err
 			}
 		}
 	}
-	return cursor.Err()
+	return deleteBatch()
 }

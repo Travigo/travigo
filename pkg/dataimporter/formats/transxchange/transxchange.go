@@ -361,6 +361,8 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 
 	var journeyOperationInsert uint64
 	var journeyOperationUpdate uint64
+	var journeyEncodingErr error
+	var journeyEncodingErrMu sync.Mutex
 
 	// Performance Review [Set O] [PR056] [P2] (batch): CPU-count partitioning bounds goroutines,
 	// but aggregate worker BSON buffers can grow with the whole document. NumCPU ignores
@@ -576,8 +578,6 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 					DestinationDisplay: destinationDisplay,
 
 					Availability: availability,
-
-					Path: []*ctdf.JourneyPathItem{},
 				}
 
 				// Get the vehicle journey reference code
@@ -592,6 +592,7 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 				timeCursor, _ := time.Parse("15:04:05", txcJourney.DepartureTime)
 
 				// Create CTDF Journey path based on TXC VehicleJourney referenced JourneyPatternSection
+				path := make([]*ctdf.JourneyPathItem, 0, len(journeyPatternSection.JourneyPatternTimingLinks))
 				for _, journeyPatternTimingLink := range journeyPatternSection.JourneyPatternTimingLinks {
 					vehicleJourneyTimingLink := txcJourney.GetVehicleJourneyTimingLinkByJourneyPatternTimingLinkRef(journeyPatternTimingLink.ID)
 
@@ -707,14 +708,38 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						TrackRef: journeyTrackRefs[routeLink.ID],
 					}
 
-					ctdfJourney.Path = append(ctdfJourney.Path, &pathItem)
+					path = append(path, &pathItem)
 				}
 
-				if len(ctdfJourney.Path) == 0 {
+				if len(path) == 0 {
 					log.Error().Msgf("Journey %s has a nil path", ctdfJourney.PrimaryIdentifier)
 				}
+				if err := ctdfJourney.SetLegs(path); err != nil {
+					journeyEncodingErrMu.Lock()
+					if journeyEncodingErr == nil {
+						journeyEncodingErr = fmt.Errorf("build TransXChange calls for journey %s: %w", ctdfJourney.PrimaryIdentifier, err)
+					}
+					journeyEncodingErrMu.Unlock()
+					continue
+				}
+				if err := ctdfJourney.ValidatePath(); err != nil {
+					journeyEncodingErrMu.Lock()
+					if journeyEncodingErr == nil {
+						journeyEncodingErr = fmt.Errorf("validate TransXChange journey %s: %w", ctdfJourney.PrimaryIdentifier, err)
+					}
+					journeyEncodingErrMu.Unlock()
+					continue
+				}
 
-				bsonRep, _ := bson.Marshal(ctdfJourney)
+				bsonRep, err := bson.Marshal(&ctdfJourney)
+				if err != nil {
+					journeyEncodingErrMu.Lock()
+					if journeyEncodingErr == nil {
+						journeyEncodingErr = fmt.Errorf("encode TransXChange journey %s: %w", ctdfJourney.PrimaryIdentifier, err)
+					}
+					journeyEncodingErrMu.Unlock()
+					continue
+				}
 
 				existingCtdfJourney := existingJourneysByID[ctdfJourney.PrimaryIdentifier]
 
@@ -755,6 +780,9 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 	}
 
 	processingGroup.Wait()
+	if journeyEncodingErr != nil {
+		return datasets.DataImportReport{}, journeyEncodingErr
+	}
 
 	log.Info().Msg(" - Written to MongoDB")
 	log.Info().Msgf(" - %d inserts", journeyOperationInsert)
@@ -872,7 +900,14 @@ func loadExistingTransXChangeRecords[T ctdf.Service | ctdf.Journey](ctx context.
 	for identifier := range uniqueIdentifiers {
 		queryIdentifiers = append(queryIdentifiers, identifier)
 	}
-	cursor, err := collection.Find(ctx, bson.M{"primaryidentifier": bson.M{"$in": queryIdentifiers}})
+	cursor, err := collection.Find(ctx,
+		bson.M{"primaryidentifier": bson.M{"$in": queryIdentifiers}},
+		options.Find().SetProjection(bson.M{
+			"primaryidentifier":    1,
+			"modificationdatetime": 1,
+			"datasource.timestamp": 1,
+		}),
+	)
 	if err != nil {
 		return nil, err
 	}

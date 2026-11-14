@@ -58,6 +58,31 @@ func loadStopsByReferences(refs map[string]struct{}, projection bson.M) map[stri
 	}
 	return result
 }
+
+// hydrateJourneyReferences loads the references required by a detailed journey
+// response in batches. Stored Mongo journeys retain stop IDs, while CTDF still
+// exposes resolved stop objects and hydrated track geometry to the API.
+func hydrateJourneyReferences(journey *ctdf.Journey) {
+	if journey == nil {
+		return
+	}
+	journey.GetReferences()
+
+	stopRefs := map[string]struct{}{}
+	for _, call := range journey.Calls {
+		if call.Stop == nil && call.StopRef != "" {
+			stopRefs[call.StopRef] = struct{}{}
+		}
+	}
+	stops := loadStopsByReferences(stopRefs, nil)
+	for index := range journey.Calls {
+		if journey.Calls[index].Stop == nil {
+			journey.Calls[index].Stop = stops[journey.Calls[index].StopRef]
+		}
+	}
+	journey.GetTracks()
+}
+
 func hydratePlannerReferences(plans *ctdf.JourneyPlanResults) {
 	stops := map[string]*ctdf.Stop{}
 	// Only exact endpoint identifiers are authoritative without a lookup.

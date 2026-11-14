@@ -54,10 +54,10 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	if boardType == "" {
 		boardType = ctdf.BoardTypeDeparture
 	}
-	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v3/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
-	stopField := "path.originstopref"
+	baseCacheItemPath := fmt.Sprintf("cachedresults/%sboardjourneys-v4/%s/%s", boardType, q.Stop.PrimaryIdentifier, filterHashString)
+	stopField := "originstoprefs"
 	if boardType.IsArrival() {
-		stopField = "path.destinationstopref"
+		stopField = "destinationstoprefs"
 	}
 	journeyQuery := bson.M{stopField: bson.M{"$in": allStopIDs}}
 	if q.Filter != nil {
@@ -403,11 +403,10 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "direction", Value: 0},
-		bson.E{Key: "path.track", Value: 0},
-		bson.E{Key: "path.associations", Value: 0},
-		bson.E{Key: "path.distance", Value: 0},
-		bson.E{Key: "path.originstop", Value: 0},
-		bson.E{Key: "path.destinationstop", Value: 0},
+		bson.E{Key: "track", Value: 0},
+		bson.E{Key: "trackref", Value: 0},
+		bson.E{Key: "calls.outgoing.trackref", Value: 0},
+		bson.E{Key: "calls.outgoing.passingpath", Value: 0},
 	})
 
 	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
@@ -428,8 +427,7 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	dateMatchedJourneys := 0
 	for cursor.Next(context.Background()) {
 		var journey ctdf.Journey
-		err := cursor.Decode(&journey)
-		if err != nil {
+		if err := cursor.Decode(&journey); err != nil {
 			return nil, fmt.Errorf("decode board journey: %w", err)
 		}
 		if journey.Availability == nil {
@@ -477,13 +475,25 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 func loadDynamicJourneys(filter bson.M) ([]*ctdf.Journey, error) {
 	ctx := context.Background()
 	collection := database.GetCollection("journeys")
-	cursor, err := collection.Find(ctx, filter)
+	cursor, err := collection.Find(ctx, filter, options.Find().SetProjection(bson.M{
+		"track":                      0,
+		"trackref":                   0,
+		"calls.outgoing.trackref":    0,
+		"calls.outgoing.passingpath": 0,
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("query dynamic journeys: %w", err)
 	}
 	defer cursor.Close(ctx)
 	var journeys []*ctdf.Journey
-	if err := cursor.All(ctx, &journeys); err != nil {
+	for cursor.Next(ctx) {
+		var journey ctdf.Journey
+		if err := cursor.Decode(&journey); err != nil {
+			return nil, fmt.Errorf("decode dynamic journey: %w", err)
+		}
+		journeys = append(journeys, &journey)
+	}
+	if err := cursor.Err(); err != nil {
 		return nil, fmt.Errorf("read dynamic journeys: %w", err)
 	}
 	// An in-flight Darwin write can land after a VSTP withdrawal. Require

@@ -34,7 +34,10 @@ func matchJourneyTrack(journey *ctdf.Journey, vehicle ctdf.Location, mapGlobalPr
 
 	var best journeyPositionMatch
 	found := false
-	for pathIndex, path := range journey.Path {
+	pathIndex := -1
+	for origin := range journey.LegCalls() {
+		pathIndex++
+		path := origin.Outgoing
 		if path == nil || len(path.Track) < 2 {
 			continue
 		}
@@ -45,12 +48,13 @@ func matchJourneyTrack(journey *ctdf.Journey, vehicle ctdf.Location, mapGlobalPr
 		best = journeyPositionMatch{PathIndex: pathIndex, LegProgress: progress, DistanceMetres: distance, HasTrackMatch: true}
 		found = true
 	}
+	legCount := pathIndex + 1
 	if found {
-		best.JourneyProgress = (float64(best.PathIndex) + best.LegProgress) / float64(len(journey.Path))
+		best.JourneyProgress = (float64(best.PathIndex) + best.LegProgress) / float64(legCount)
 		return best, true
 	}
 
-	if len(journey.Track) < 2 || len(journey.Path) == 0 {
+	if len(journey.Track) < 2 || legCount == 0 {
 		return journeyPositionMatch{}, false
 	}
 	distance, globalProgress, ok := closestTrackPosition(vehicle, journey.Track)
@@ -80,11 +84,14 @@ func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Lo
 
 	closestPathIndex := -1
 	closestDistance := math.Inf(1)
-	for index, path := range journey.Path {
-		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil {
+	legCount := 0
+	for _, destination := range journey.LegCalls() {
+		index := legCount
+		legCount++
+		if destination.Stop == nil || destination.Stop.Location == nil {
 			continue
 		}
-		distance := vehicle.Distance(path.DestinationStop.Location)
+		distance := vehicle.Distance(destination.Stop.Location)
 		if distance < closestDistance {
 			closestPathIndex = index
 			closestDistance = distance
@@ -96,32 +103,35 @@ func matchJourneyPositionWithStopFallback(journey *ctdf.Journey, vehicle ctdf.Lo
 
 	progress := 0.5
 	if closestPathIndex > 0 {
-		previous := journey.Path[closestPathIndex-1]
-		current := journey.Path[closestPathIndex]
-		if previous != nil && previous.DestinationStop != nil && previous.DestinationStop.Location != nil && current != nil && current.DestinationStop != nil && current.DestinationStop.Location != nil {
-			previousDistance := vehicle.Distance(previous.DestinationStop.Location)
-			currentDistance := vehicle.Distance(current.DestinationStop.Location)
+		_, previous := journey.LegEndpoints(closestPathIndex - 1)
+		_, current := journey.LegEndpoints(closestPathIndex)
+		if previous != nil && previous.Stop != nil && previous.Stop.Location != nil && current != nil && current.Stop != nil && current.Stop.Location != nil {
+			previousDistance := vehicle.Distance(previous.Stop.Location)
+			currentDistance := vehicle.Distance(current.Stop.Location)
 			if total := previousDistance + currentDistance; total > 0 {
 				progress = previousDistance / total
 			}
 		}
 	}
-	return journeyPositionMatch{PathIndex: closestPathIndex, LegProgress: progress, JourneyProgress: (float64(closestPathIndex) + progress) / float64(len(journey.Path)), DistanceMetres: closestDistance, UsedGlobalTrack: true}, true
+	return journeyPositionMatch{PathIndex: closestPathIndex, LegProgress: progress, JourneyProgress: (float64(closestPathIndex) + progress) / float64(legCount), DistanceMetres: closestDistance, UsedGlobalTrack: true}, true
 }
 
 func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, float64) {
 	track := journey.Track
 	shape := newStopProjectionShape(journey.TrackRef, track)
 	previous := 0.0
-	for index, path := range journey.Path {
-		if path == nil || path.DestinationStop == nil || path.DestinationStop.Location == nil || len(path.DestinationStop.Location.Coordinates) < 2 {
+	lastIndex := journey.LegCount() - 1
+	index := -1
+	for _, destination := range journey.LegCalls() {
+		index++
+		if destination.Stop == nil || destination.Stop.Location == nil || len(destination.Stop.Location.Coordinates) < 2 {
 			continue
 		}
-		destinationProgress, ok := cachedStopProgress(shape, *path.DestinationStop.Location, track)
+		destinationProgress, ok := cachedStopProgress(shape, *destination.Stop.Location, track)
 		if !ok {
 			continue
 		}
-		if globalProgress <= destinationProgress || index == len(journey.Path)-1 {
+		if globalProgress <= destinationProgress || index == lastIndex {
 			span := destinationProgress - previous
 			if span <= 0 {
 				return index, 0
@@ -130,7 +140,7 @@ func pathForGlobalProgress(journey *ctdf.Journey, globalProgress float64) (int, 
 		}
 		previous = destinationProgress
 	}
-	return len(journey.Path) - 1, 1
+	return lastIndex, 1
 }
 
 func closestTrackPosition(location ctdf.Location, track []ctdf.Location) (float64, float64, bool) {

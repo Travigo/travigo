@@ -1014,23 +1014,31 @@ func (d *graphData) addJourney(day dayKey, journey *ctdf.Journey) bool {
 }
 
 func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
-	if journey == nil || journey.PrimaryIdentifier == "" || len(journey.Path) == 0 {
+	if journey == nil || journey.PrimaryIdentifier == "" || journey.Calls == nil || journey.LegCount() == 0 {
 		return false
 	}
 	// Validate before interning or retaining any part of a corrupt journey.
-	for index, path := range journey.Path {
-		if path == nil || path.OriginDepartureTime.IsZero() || path.DestinationArrivalTime.IsZero() {
+	legCount := journey.LegCount()
+	firstOrigin := &journey.Calls[0]
+	index := 0
+	for origin, destination := range journey.LegCalls() {
+		if origin == nil || destination == nil || origin.Departure.IsZero() || destination.ArrivalTime().IsZero() {
 			d.rejectedJourneyDays++
 			return false
 		}
-		if _, ok := packDepartureEntry(0, uint32(index), serviceSeconds(path.OriginDepartureTime)); !ok {
+		if _, ok := packDepartureEntry(0, uint32(index), serviceSeconds(origin.Departure)); !ok {
 			d.rejectedJourneyDays++
 			return false
 		}
-		if _, ok := packDepartureEntry(0, 0, serviceSeconds(path.DestinationArrivalTime)); !ok {
+		if _, ok := packDepartureEntry(0, 0, serviceSeconds(destination.ArrivalTime())); !ok {
 			d.rejectedJourneyDays++
 			return false
 		}
+		index++
+	}
+	if index != legCount {
+		d.rejectedJourneyDays++
+		return false
 	}
 	d.ensureBuildIndexesLocked()
 	primaryID := d.intern(journey.PrimaryIdentifier)
@@ -1050,17 +1058,17 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 			DestinationDisplay: d.intern(journey.DestinationDisplay),
 			DepartureSeconds:   serviceSeconds(journey.DepartureTime),
 			PathStart:          uint32(len(d.Paths)),
-			PathCount:          uint32(len(journey.Path)),
+			PathCount:          uint32(legCount),
 			ReplacementStart:   uint32(len(d.Replacements)),
 			ReplacementCount:   uint32(len(journey.ReplacesJourneyRefs)),
 		}
 		if journey.DepartureTime.IsZero() {
-			record.DepartureSeconds = serviceSeconds(journey.Path[0].OriginDepartureTime)
+			record.DepartureSeconds = serviceSeconds(firstOrigin.Departure)
 		}
-		if journey.Path[0] != nil {
-			record.InitialArrival = serviceSeconds(journey.Path[0].OriginArrivalTime)
-			if journey.Path[0].OriginArrivalTime.IsZero() {
-				record.InitialArrival = serviceSeconds(journey.Path[0].OriginDepartureTime)
+		if firstOrigin != nil {
+			record.InitialArrival = serviceSeconds(firstOrigin.Arrival)
+			if firstOrigin.Arrival.IsZero() {
+				record.InitialArrival = serviceSeconds(firstOrigin.Departure)
 			}
 		}
 		if journey.DataSource != nil {
@@ -1076,16 +1084,16 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 			d.Replacements = append(d.Replacements, d.intern(replacement))
 		}
 
-		for _, path := range journey.Path {
+		for origin, destination := range journey.LegCalls() {
 			d.Paths = append(d.Paths, pathRecord{
-				OriginStopRef:       d.internStop(path.OriginStopRef),
-				DestinationStopRef:  d.internStop(path.DestinationStopRef),
-				OriginPlatform:      d.intern(path.OriginPlatform),
-				DestinationDisplay:  d.intern(path.DestinationDisplay),
-				OriginDeparture:     serviceSeconds(path.OriginDepartureTime),
-				DestinationArrival:  serviceSeconds(path.DestinationArrivalTime),
-				OriginActivity:      packActivities(path.OriginActivity),
-				DestinationActivity: packActivities(path.DestinationActivity),
+				OriginStopRef:       d.internStop(origin.StopRef),
+				DestinationStopRef:  d.internStop(destination.StopRef),
+				OriginPlatform:      d.intern(origin.Platform),
+				DestinationDisplay:  d.intern(outgoingDisplay(origin)),
+				OriginDeparture:     serviceSeconds(origin.Departure),
+				DestinationArrival:  serviceSeconds(destination.ArrivalTime()),
+				OriginActivity:      packActivities(origin.OriginActivity),
+				DestinationActivity: packActivities(destination.DestinationActivity),
 			})
 		}
 
@@ -1111,6 +1119,13 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 		}
 	}
 	return true
+}
+
+func outgoingDisplay(call *ctdf.JourneyCall) string {
+	if call == nil || call.Outgoing == nil {
+		return ""
+	}
+	return call.Outgoing.DestinationDisplay
 }
 
 func (d *graphData) stopComplete(day dayKey, canonical string) bool {
@@ -1225,11 +1240,8 @@ func filterJourneyWindow(journeys []*ctdf.Journey, stopRefs []string, serviceDat
 		}
 		var earliest int32
 		matched := false
-		for _, path := range journey.Path {
-			if path == nil {
-				continue
-			}
-			if _, exists := requested[path.OriginStopRef]; !exists {
+		for origin, _ := range journey.LegCalls() {
+			if _, exists := requested[origin.StopRef]; !exists {
 				continue
 			}
 			// Performance Review [Set G] [PR080] [P2] (boards): Cold-fill filtering counts setdown-only
@@ -1237,7 +1249,7 @@ func filterJourneyWindow(journeys []*ctdf.Journey, stopRefs []string, serviceDat
 			// earlier setdown call displaces the next boardable journey, so cold and
 			// warm requests differ. Apply the same activity/occurrence eligibility
 			// before truncation in both paths and test their result parity.
-			departureSeconds := serviceSeconds(path.OriginDepartureTime)
+			departureSeconds := serviceSeconds(origin.Departure)
 			if hasThreshold && departureSeconds < threshold {
 				continue
 			}
@@ -1301,7 +1313,7 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 			Type:  ctdf.AvailabilityMatchAll,
 			Value: "graph-materialized",
 		}}},
-		Path: make([]*ctdf.JourneyPathItem, 0, record.PathCount),
+		Calls: make([]ctdf.JourneyCall, 0, record.PathCount+1),
 	}
 	if blockNumber := d.stringValue(record.BlockNumber); blockNumber != "" {
 		journey.OtherIdentifiers = map[string]string{"BlockNumber": blockNumber}
@@ -1317,22 +1329,40 @@ func (d *graphData) materializeJourney(id journeyID) *ctdf.Journey {
 	}
 	for index := uint32(0); index < record.PathCount; index++ {
 		path := d.Paths[record.PathStart+index]
-		originArrival := record.InitialArrival
-		if index > 0 {
-			originArrival = d.Paths[record.PathStart+index-1].DestinationArrival
+		originRef := d.stringValue(path.OriginStopRef)
+		destinationRef := d.stringValue(path.DestinationStopRef)
+		var origin *ctdf.JourneyCall
+		if index > 0 && d.stringValue(d.Paths[record.PathStart+index-1].DestinationStopRef) == originRef {
+			origin = &journey.Calls[len(journey.Calls)-1]
+		} else {
+			if len(journey.Calls) > 0 {
+				journey.Calls[len(journey.Calls)-1].End = true
+			}
+			originArrival := path.OriginDeparture
+			if index == 0 {
+				originArrival = record.InitialArrival
+			}
+			journey.Calls = append(journey.Calls, ctdf.JourneyCall{
+				StopRef: originRef, Start: true, Arrival: serviceTime(originArrival),
+			})
+			origin = &journey.Calls[len(journey.Calls)-1]
 		}
-		journey.Path = append(journey.Path, &ctdf.JourneyPathItem{
-			OriginStopRef:          d.stringValue(path.OriginStopRef),
-			DestinationStopRef:     d.stringValue(path.DestinationStopRef),
-			OriginPlatform:         d.stringValue(path.OriginPlatform),
-			DestinationDisplay:     d.stringValue(path.DestinationDisplay),
-			OriginArrivalTime:      serviceTime(originArrival),
-			OriginDepartureTime:    serviceTime(path.OriginDeparture),
-			DestinationArrivalTime: serviceTime(path.DestinationArrival),
-			OriginActivity:         unpackActivities(path.OriginActivity),
-			DestinationActivity:    unpackActivities(path.DestinationActivity),
+		origin.Departure = serviceTime(path.OriginDeparture)
+		origin.Platform = d.stringValue(path.OriginPlatform)
+		origin.OriginActivity = unpackActivities(path.OriginActivity)
+		display := d.stringValue(path.DestinationDisplay)
+		if display != "" {
+			origin.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: display}
+		}
+		journey.Calls = append(journey.Calls, ctdf.JourneyCall{
+			StopRef: destinationRef, Arrival: serviceTime(path.DestinationArrival),
+			DestinationActivity: unpackActivities(path.DestinationActivity),
 		})
+		if index+1 == record.PathCount || d.stringValue(d.Paths[record.PathStart+index+1].OriginStopRef) != destinationRef {
+			journey.Calls[len(journey.Calls)-1].End = true
+		}
 	}
+	journey.RefreshStopRefs()
 	return journey
 }
 

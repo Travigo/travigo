@@ -475,16 +475,15 @@ func stopServiceAggregation(dataset string) mongo.Pipeline {
 	}
 	return mongo.Pipeline{
 		{{Key: "$match", Value: filter}},
-		{{Key: "$unwind", Value: "$path"}},
+		{{Key: "$unwind", Value: "$calls"}},
 		{{Key: "$project", Value: bson.M{
 			"dataset":    "$datasource.datasetid",
 			"serviceRef": "$serviceref",
-			"stopRefs":   bson.A{"$path.originstopref", "$path.destinationstopref"},
+			"stopRef":    "$calls.stopref",
 		}}},
-		{{Key: "$unwind", Value: "$stopRefs"}},
-		{{Key: "$match", Value: bson.M{"stopRefs": bson.M{"$type": "string", "$ne": ""}}}},
+		{{Key: "$match", Value: bson.M{"stopRef": bson.M{"$type": "string", "$ne": ""}}}},
 		{{Key: "$group", Value: bson.M{"_id": bson.M{
-			"dataset": "$dataset", "stopref": "$stopRefs", "serviceref": "$serviceRef",
+			"dataset": "$dataset", "stopref": "$stopRef", "serviceref": "$serviceRef",
 		}}}},
 	}
 }

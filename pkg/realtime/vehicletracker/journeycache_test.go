@@ -15,11 +15,11 @@ import (
 )
 
 func TestJourneyStopOccurrencesPreserveRepeatedAndTerminalStops(t *testing.T) {
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{
 		{OriginStopRef: "waterloo", DestinationStopRef: "vauxhall"},
 		{OriginStopRef: "vauxhall", DestinationStopRef: "waterloo"},
 		{OriginStopRef: "waterloo", DestinationStopRef: "clapham"},
-	}}
+	}...)}
 
 	got := journeyStopOccurrences(journey)
 	want := map[string][]int{
@@ -80,7 +80,10 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 		mt.AddMockResponses(
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch, bson.D{
 				{Key: "primaryidentifier", Value: identifier},
-				{Key: "path", Value: bson.A{bson.D{{Key: "originstopref", Value: "origin"}, {Key: "destinationstopref", Value: "dest"}}}},
+				{Key: "calls", Value: bson.A{
+					bson.D{{Key: "stopref", Value: "origin"}, {Key: "start", Value: true}},
+					bson.D{{Key: "stopref", Value: "dest"}, {Key: "end", Value: true}},
+				}},
 			}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".services", mtest.FirstBatch, bson.D{{Key: "primaryidentifier", Value: "service"}}),
 		)

@@ -95,9 +95,9 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 		}
 
 		if len(calls) == len(passengerCalls) {
-			path := buildDarwinPath(calls)
-			if len(path) > 0 && darwinPathChanged(realtimeJourney.Journey.Path, path) {
-				if err := publishDarwinPath(context.Background(), realtimeJourney, path, schedule.SSD); err != nil {
+			journeyCalls := buildDarwinCalls(calls)
+			if len(journeyCalls) > 0 && darwinPathChanged(realtimeJourney.Journey, journeyCalls) {
+				if err := publishDarwinPath(context.Background(), realtimeJourney, journeyCalls, schedule.SSD); err != nil {
 					log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to publish Darwin route amendment")
 					continue
 				}

@@ -133,8 +133,8 @@ func notificationJourney(current *ctdf.RealtimeJourney) realtimeJourneyEventBody
 			DestinationDisplay: current.Journey.DestinationDisplay,
 		}
 		// Cancellation messages use the origin of the first leg.
-		if len(current.Journey.Path) > 0 && current.Journey.Path[0] != nil {
-			body.Journey.Path = []notificationPath{{OriginStopRef: current.Journey.Path[0].OriginStopRef}}
+		if len(current.Journey.Calls) > 0 {
+			body.Journey.Path = []notificationPath{{OriginStopRef: current.Journey.Calls[0].StopRef}}
 		}
 	}
 	if current.NextStop != nil {
@@ -326,14 +326,13 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 				}
 				counts[ref]++
 			}
-			paths := realtimeJourney.Journey.Path
-			if len(paths) > 0 && paths[0] != nil {
-				add(paths[0].OriginStopRef, 0)
+			if len(realtimeJourney.Journey.Calls) > 0 {
+				add(realtimeJourney.Journey.Calls[0].StopRef, 0)
 			}
-			for i, path := range paths {
-				if path != nil {
-					add(path.DestinationStopRef, i+1)
-				}
+			index := 1
+			for _, call := range realtimeJourney.Journey.LegCalls() {
+				add(call.StopRef, index)
+				index++
 			}
 		}
 		if counts[ref] <= 1 || first[ref] == index {
@@ -355,18 +354,16 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 		return time.Time{}
 	}
 
-	for pathIndex, path := range realtimeJourney.Journey.Path {
-		if path == nil {
-			continue
-		}
+	pathIndex := 0
+	for origin, destination := range realtimeJourney.Journey.LegCalls() {
 		for _, candidate := range []struct {
 			stopRef   string
 			stopIndex int
 			scheduled time.Time
 			actual    time.Time
 		}{
-			{stopRef: path.OriginStopRef, stopIndex: pathIndex, scheduled: path.OriginDepartureTime, actual: departure(path.OriginStopRef, pathIndex)},
-			{stopRef: path.DestinationStopRef, stopIndex: pathIndex + 1, scheduled: path.DestinationArrivalTime, actual: arrival(path.DestinationStopRef, pathIndex+1)},
+			{stopRef: origin.StopRef, stopIndex: pathIndex, scheduled: origin.Departure, actual: departure(origin.StopRef, pathIndex)},
+			{stopRef: destination.StopRef, stopIndex: pathIndex + 1, scheduled: destination.ArrivalTime(), actual: arrival(destination.StopRef, pathIndex+1)},
 		} {
 			if candidate.actual.IsZero() || candidate.scheduled.IsZero() {
 				continue
@@ -377,6 +374,7 @@ func realtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.Duration,
 				maximumDelay, delayedStop = delay, candidate.stopRef
 			}
 		}
+		pathIndex++
 	}
 	return maximumDelay, delayedStop
 }

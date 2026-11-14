@@ -1,21 +1,26 @@
 package ctdf
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func testJourneyCalls(legs ...*JourneyPathItem) []JourneyCall {
+	return JourneyCallsFromLegs(legs...)
+}
 
 func TestBoardUsesServiceDateForStoredDarwinAmendmentClocks(t *testing.T) {
 	serviceDate := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
 	journey := &Journey{
 		PrimaryIdentifier: "amended-train",
 		Availability:      &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}},
-		Path: []*JourneyPathItem{{
+		Calls: testJourneyCalls(&JourneyPathItem{
 			OriginStopRef:          "cambridge-south",
 			OriginDepartureTime:    time.Date(1, 1, 1, 19, 29, 0, 0, time.UTC),
 			DestinationStopRef:     "cambridge",
 			DestinationArrivalTime: time.Date(1, 1, 2, 0, 5, 0, 0, time.UTC),
-		}},
+		}),
 	}
 	for _, test := range []struct {
 		boardType BoardType
@@ -57,11 +62,11 @@ func TestBoardPreservesRepeatedStopOccurrencesAndServiceDate(t *testing.T) {
 	journey := &Journey{
 		PrimaryIdentifier: "loop",
 		Availability:      &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}},
-		Path: []*JourneyPathItem{
-			{OriginStopRef: "stop", OriginDepartureTime: clock(23, 0)},
-			{OriginStopRef: "stop", OriginDepartureTime: clock(25, 30)},
-			{OriginStopRef: "stop", OriginDepartureTime: clock(26, 0)},
-		},
+		Calls: testJourneyCalls(
+			&JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "stop", OriginDepartureTime: clock(23, 0), DestinationArrivalTime: clock(23, 1)},
+			&JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "stop", OriginDepartureTime: clock(25, 30), DestinationArrivalTime: clock(25, 31)},
+			&JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "terminal", OriginDepartureTime: clock(26, 0), DestinationArrivalTime: clock(27, 0)},
+		),
 	}
 	start := serviceDate.Add(24*time.Hour + time.Hour)
 	entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, serviceDate, start, false, nil, BoardTypeDeparture)
@@ -80,7 +85,7 @@ func TestBoardPreservesRepeatedStopOccurrencesAndServiceDate(t *testing.T) {
 
 func TestBoardAppliesServiceDateCancellationAlerts(t *testing.T) {
 	start := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
-	journey := &Journey{PrimaryIdentifier: "train", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Path: []*JourneyPathItem{{OriginStopRef: "stop", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)}}}
+	journey := &Journey{PrimaryIdentifier: "train", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Calls: testJourneyCalls(&JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "terminal", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)})}
 	for offset, want := range []DepartureBoardRecordType{
 		DepartureBoardRecordTypeScheduled,
 		DepartureBoardRecordTypeCancelled,
@@ -102,7 +107,7 @@ func TestBoardAppliesServiceDateCancellationAlerts(t *testing.T) {
 
 func TestBoardDoesNotApplyAnotherRunDatesCancellation(t *testing.T) {
 	date := time.Date(2026, 11, 4, 0, 0, 0, 0, time.UTC)
-	journey := &Journey{PrimaryIdentifier: "journey", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Path: []*JourneyPathItem{{OriginStopRef: "stop", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)}}}
+	journey := &Journey{PrimaryIdentifier: "journey", Availability: &Availability{Match: []AvailabilityRule{{Type: AvailabilityMatchAll}}}, Calls: testJourneyCalls(&JourneyPathItem{OriginStopRef: "stop", DestinationStopRef: "terminal", OriginDepartureTime: time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC)})}
 	update := &RealtimeJourney{JourneyRunDate: date.AddDate(0, 0, -1), Cancelled: true}
 	lookup := &DepartureBoardRealtimeLookup{ByJourneyID: map[string]*RealtimeJourney{"journey": update}}
 	entries := GenerateBoardFromJourneysForServiceDate([]*Journey{journey}, []string{"stop"}, date, date, false, lookup, BoardTypeDeparture)
@@ -119,44 +124,46 @@ func TestBoardDoesNotApplyAnotherRunDatesCancellation(t *testing.T) {
 func TestBoardPathSelectorsUseDestinationForArrivals(t *testing.T) {
 	originTime := time.Date(2026, 7, 9, 10, 0, 0, 0, time.UTC)
 	arrivalTime := originTime.Add(12 * time.Minute)
-	path := &JourneyPathItem{
-		OriginStopRef:          "origin",
-		DestinationStopRef:     "destination",
-		OriginDepartureTime:    originTime,
-		DestinationArrivalTime: arrivalTime,
-		OriginPlatform:         "1",
-		DestinationPlatform:    "2",
-		OriginActivity:         []JourneyPathItemActivity{JourneyPathItemActivityPickup},
-		DestinationActivity:    []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
+	origin := &JourneyCall{
+		Departure:      originTime,
+		StopRef:        "origin",
+		Arrival:        originTime,
+		Platform:       "1",
+		OriginActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup},
+	}
+	destination := &JourneyCall{
+		StopRef:             "destination",
+		End:                 true,
+		Arrival:             arrivalTime,
+		Platform:            "2",
+		DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
 	}
 
-	if got := boardPathStopRef(path, BoardTypeArrival); got != "destination" {
+	if got := boardCallStopRef(origin, destination, BoardTypeArrival); got != "destination" {
 		t.Fatalf("arrival board matched %q, want destination", got)
 	}
-	if got := boardPathTime(path, BoardTypeArrival); !got.Equal(arrivalTime) {
+	if got := boardCallTime(origin, destination, BoardTypeArrival); !got.Equal(arrivalTime) {
 		t.Fatalf("arrival board time = %v, want %v", got, arrivalTime)
 	}
-	if got := boardPathPlatform(path, BoardTypeArrival); got != "2" {
+	if got := boardCallPlatform(origin, destination, BoardTypeArrival); got != "2" {
 		t.Fatalf("arrival board platform = %q, want 2", got)
 	}
-	if boardPathIsUnavailable(path, BoardTypeArrival) {
+	if boardCallIsUnavailable(origin, destination, BoardTypeArrival) {
 		t.Fatal("setdown stop should be present on arrivals board")
 	}
-	if boardPathIsUnavailable(path, BoardTypeDeparture) {
+	if boardCallIsUnavailable(origin, destination, BoardTypeDeparture) {
 		t.Fatal("pickup stop should be present on departures board")
 	}
 }
 
 func TestBoardPathSelectorsExcludeWrongSingleActivity(t *testing.T) {
-	path := &JourneyPathItem{
-		OriginActivity:      []JourneyPathItemActivity{JourneyPathItemActivitySetdown},
-		DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup},
-	}
+	origin := &JourneyCall{OriginActivity: []JourneyPathItemActivity{JourneyPathItemActivitySetdown}}
+	destination := &JourneyCall{DestinationActivity: []JourneyPathItemActivity{JourneyPathItemActivityPickup}}
 
-	if !boardPathIsUnavailable(path, BoardTypeDeparture) {
+	if !boardCallIsUnavailable(origin, destination, BoardTypeDeparture) {
 		t.Fatal("setdown-only origin should be excluded from departures")
 	}
-	if !boardPathIsUnavailable(path, BoardTypeArrival) {
+	if !boardCallIsUnavailable(origin, destination, BoardTypeArrival) {
 		t.Fatal("pickup-only destination should be excluded from arrivals")
 	}
 }
@@ -278,15 +285,15 @@ func TestServiceTimeOnDateAcrossClockChanges(t *testing.T) {
 }
 
 func TestBoardDestinationDisplayUsesJourneyOriginForArrivals(t *testing.T) {
-	journey := &Journey{Path: []*JourneyPathItem{
+	journey := &Journey{Calls: JourneyCallsFromLegs([]*JourneyPathItem{
 		{OriginStop: &Stop{PrimaryName: "First Stop"}},
 		{DestinationDisplay: "Final Destination"},
-	}}
+	}...)}
 
-	if got := BoardDestinationDisplay(journey, journey.Path[1].DestinationDisplay, BoardTypeArrival); got != "First Stop" {
+	if got := BoardDestinationDisplay(journey, journey.Calls[1].Outgoing.DestinationDisplay, BoardTypeArrival); got != "First Stop" {
 		t.Fatalf("arrival display = %q, want first origin stop", got)
 	}
-	if got := BoardDestinationDisplay(journey, journey.Path[1].DestinationDisplay, BoardTypeDeparture); got != "Final Destination" {
+	if got := BoardDestinationDisplay(journey, journey.Calls[1].Outgoing.DestinationDisplay, BoardTypeDeparture); got != "Final Destination" {
 		t.Fatalf("departure display = %q, want path destination display", got)
 	}
 }
@@ -294,7 +301,7 @@ func TestBoardDestinationDisplayUsesJourneyOriginForArrivals(t *testing.T) {
 func TestBoardDestinationDisplayWithRealtimeUsesLastNonCancelledStop(t *testing.T) {
 	journey := &Journey{
 		DestinationDisplay: "Terminal",
-		Path: []*JourneyPathItem{
+		Calls: JourneyCallsFromLegs([]*JourneyPathItem{
 			{
 				OriginStopRef:      "origin",
 				OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
@@ -311,7 +318,7 @@ func TestBoardDestinationDisplayWithRealtimeUsesLastNonCancelledStop(t *testing.
 				DestinationStopRef: "terminal",
 				DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
 			},
-		},
+		}...),
 	}
 	realtimeJourney := &RealtimeJourney{Journey: journey}
 	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 3, Cancelled: true})
@@ -324,7 +331,7 @@ func TestBoardDestinationDisplayWithRealtimeUsesLastNonCancelledStop(t *testing.
 func TestBoardDestinationDisplayWithRealtimeSkipsConsecutiveCancelledStops(t *testing.T) {
 	journey := &Journey{
 		DestinationDisplay: "Terminal",
-		Path: []*JourneyPathItem{
+		Calls: JourneyCallsFromLegs([]*JourneyPathItem{
 			{
 				OriginStopRef:      "origin",
 				OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
@@ -341,7 +348,7 @@ func TestBoardDestinationDisplayWithRealtimeSkipsConsecutiveCancelledStops(t *te
 				DestinationStopRef: "terminal",
 				DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
 			},
-		},
+		}...),
 	}
 	realtimeJourney := &RealtimeJourney{Journey: journey}
 	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "penultimate", JourneyStopIndex: 2, Cancelled: true})
@@ -355,12 +362,12 @@ func TestBoardDestinationDisplayWithRealtimeSkipsConsecutiveCancelledStops(t *te
 func TestBoardDestinationDisplayWithRealtimeKeepsWholeJourneyCancellationDestination(t *testing.T) {
 	journey := &Journey{
 		DestinationDisplay: "Terminal",
-		Path: []*JourneyPathItem{{
+		Calls: JourneyCallsFromLegs([]*JourneyPathItem{{
 			OriginStopRef:      "origin",
 			OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
 			DestinationStopRef: "terminal",
 			DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
-		}},
+		}}...),
 	}
 	realtimeJourney := &RealtimeJourney{Journey: journey}
 	realtimeJourney.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 1, Cancelled: true})
@@ -373,12 +380,12 @@ func TestBoardDestinationDisplayWithRealtimeKeepsWholeJourneyCancellationDestina
 func TestBoardDestinationDisplayWithRealtimeKeepsUncancelledTerminalDestination(t *testing.T) {
 	journey := &Journey{
 		DestinationDisplay: "Terminal",
-		Path: []*JourneyPathItem{{
+		Calls: JourneyCallsFromLegs([]*JourneyPathItem{{
 			OriginStopRef:      "origin",
 			OriginStop:         &Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
 			DestinationStopRef: "terminal",
 			DestinationStop:    &Stop{PrimaryIdentifier: "terminal", PrimaryName: "Terminal"},
-		}},
+		}}...),
 	}
 	realtimeJourney := &RealtimeJourney{Journey: journey}
 
@@ -508,7 +515,7 @@ func TestRealtimeJourneySuppressesBoardOnlyOnReplacementDates(t *testing.T) {
 func TestBoardDisplayReferenceDefersMissingStopsWithoutDatabase(t *testing.T) {
 	// No database is configured: selecting references and fallback display text
 	// must not attempt to hydrate any candidate.
-	j := &Journey{Path: []*JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "middle"}, {OriginStopRef: "middle", DestinationStopRef: "terminal"}}}
+	j := &Journey{Calls: JourneyCallsFromLegs([]*JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "middle"}, {OriginStopRef: "middle", DestinationStopRef: "terminal"}}...)}
 	rt := &RealtimeJourney{Journey: j}
 	rt.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: 2, Cancelled: true})
 	arrival := BoardDisplayReferenceFor(j, rt, BoardTypeArrival, false)
@@ -527,5 +534,31 @@ func TestBoardDisplayReferenceDefersMissingStopsWithoutDatabase(t *testing.T) {
 	}
 	if got := BoardDestinationDisplay(j, "Terminal", BoardTypeArrival); got != "origin" {
 		t.Fatalf("arrival fallback = %s", got)
+	}
+}
+
+func TestBoardArrivalCallsKeepPriorSegmentEndAtGap(t *testing.T) {
+	journey := &Journey{Calls: JourneyCallsFromLegs(
+		&JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "before-gap", DestinationStop: &Stop{PrimaryName: "Before gap"}},
+		&JourneyPathItem{OriginStopRef: "after-gap", DestinationStopRef: "middle", DestinationStop: &Stop{PrimaryName: "Middle"}},
+		&JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "terminal", DestinationStop: &Stop{PrimaryName: "Terminal"}},
+	)}
+	arrivalCalls := boardArrivalCalls(journey)
+	var got []string
+	for _, call := range arrivalCalls {
+		got = append(got, call.StopRef)
+	}
+	want := []string{"origin", "before-gap", "middle", "terminal"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("arrival calls = %v, want %v", got, want)
+	}
+
+	realtime := &RealtimeJourney{Journey: journey}
+	realtime.SetRealtimeStop(&RealtimeJourneyStops{StopRef: "terminal", JourneyStopIndex: len(arrivalCalls) - 1, Cancelled: true})
+	if got := boardDestinationDisplayWithRealtimeAndCalls(journey, realtime, "Terminal", BoardTypeDeparture, false, arrivalCalls); got != "Middle" {
+		t.Fatalf("shortened destination = %q, want Middle", got)
+	}
+	if got := boardDisplayReferenceForCalls(journey, realtime, BoardTypeDeparture, false, arrivalCalls); got == nil || got.StopRef != "middle" {
+		t.Fatalf("shortened display reference = %#v, want middle", got)
 	}
 }

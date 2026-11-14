@@ -91,18 +91,17 @@ func TestDepartureBoardDirectionUsesMatchingRepeatedStopOccurrence(t *testing.T)
 		Time: secondTime,
 		Journey: &ctdf.Journey{
 			ServiceRef: "service",
-			Path: []*ctdf.JourneyPathItem{
-				{
+			Calls: ctdf.JourneyCallsFromLegs(
+				&ctdf.JourneyPathItem{
 					OriginStopRef:       "station",
 					DestinationStopRef:  "first-next-stop",
 					OriginDepartureTime: firstTime,
 				},
-				{
+				&ctdf.JourneyPathItem{
 					OriginStopRef:       "station",
 					DestinationStopRef:  "second-next-stop",
 					OriginDepartureTime: secondTime,
-				},
-			},
+				}),
 		},
 	}
 
@@ -122,26 +121,25 @@ func TestDepartureBoardDirectionUsesNextPathTimeForRepeatedArrival(t *testing.T)
 		Time: secondTime,
 		Journey: &ctdf.Journey{
 			ServiceRef: "service",
-			Path: []*ctdf.JourneyPathItem{
-				{
+			Calls: ctdf.JourneyCallsFromLegs(
+				&ctdf.JourneyPathItem{
 					OriginStopRef:      "first-previous-stop",
 					DestinationStopRef: "station",
 				},
-				{
+				&ctdf.JourneyPathItem{
 					OriginStopRef:      "station",
 					OriginArrivalTime:  firstTime,
 					DestinationStopRef: "middle-stop",
 				},
-				{
+				&ctdf.JourneyPathItem{
 					OriginStopRef:      "second-previous-stop",
 					DestinationStopRef: "station",
 				},
-				{
+				&ctdf.JourneyPathItem{
 					OriginStopRef:      "station",
 					OriginArrivalTime:  secondTime,
 					DestinationStopRef: "final-stop",
-				},
-			},
+				}),
 		},
 	}
 
@@ -167,7 +165,7 @@ func boardEntry(serviceRef, originStopRef, destinationStopRef string, boardTime 
 		Journey: &ctdf.Journey{
 			PrimaryIdentifier: serviceRef + originStopRef + destinationStopRef + boardTime.String(),
 			ServiceRef:        serviceRef,
-			Path:              []*ctdf.JourneyPathItem{pathItem},
+			Calls:             ctdf.JourneyCallsFromLegs(pathItem),
 		},
 	}
 }

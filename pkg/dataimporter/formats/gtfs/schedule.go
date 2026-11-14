@@ -3,6 +3,7 @@ package gtfs
 import (
 	"archive/zip"
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
 	"github.com/travigo/travigo/pkg/util"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -79,7 +81,7 @@ type frequencyWindow struct {
 type journeyTrackStore struct {
 	dataset    datasets.DataSet
 	datasource *ctdf.DataSourceReference
-	queue      DatabaseBatchProcessingQueue
+	pending    []mongo.WriteModel
 	unique     int
 	reused     int
 }
@@ -144,9 +146,7 @@ func journeyPathPatternHash(shapeID string, stopTimes []StopTime) [sha256.Size]b
 }
 
 func newJourneyTrackStore(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) *journeyTrackStore {
-	store := &journeyTrackStore{dataset: dataset, datasource: datasource, queue: NewDatabaseBatchProcessingQueue("journey_tracks", time.Second, time.Minute, journeyTrackBatchSize)}
-	store.queue.Process()
-	return store
+	return &journeyTrackStore{dataset: dataset, datasource: datasource, pending: make([]mongo.WriteModel, 0, journeyTrackBatchSize)}
 }
 
 func (store *journeyTrackStore) Identifier(key string) string {
@@ -154,20 +154,48 @@ func (store *journeyTrackStore) Identifier(key string) string {
 	return fmt.Sprintf("%s-journey-track-%x", store.dataset.Identifier, hash)
 }
 
-func (store *journeyTrackStore) Reference(key string, track []ctdf.Location) string {
+func (store *journeyTrackStore) Reference(key string, track []ctdf.Location) (string, error) {
 	if len(track) < 2 {
-		return ""
+		return "", nil
 	}
 	hash := sha256.Sum256([]byte(key))
 	ref := fmt.Sprintf("%s-journey-track-%x", store.dataset.Identifier, hash)
 	store.unique++
 	object := &ctdf.JourneyTrack{PrimaryIdentifier: ref, Track: track, DataSource: store.datasource, CreationDateTime: time.Now(), ModificationDateTime: time.Now()}
 	update := mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": ref}).SetUpdate(bson.M{"$set": object}).SetUpsert(true)
-	store.queue.Add(update)
-	return ref
+	store.pending = append(store.pending, update)
+	if len(store.pending) >= journeyTrackBatchSize {
+		if err := store.Flush(); err != nil {
+			return "", err
+		}
+	}
+	return ref, nil
 }
 
-func (store *journeyTrackStore) Wait() { store.queue.Wait() }
+func (store *journeyTrackStore) Flush() error {
+	if len(store.pending) == 0 {
+		return nil
+	}
+	models := store.pending
+	store.pending = make([]mongo.WriteModel, 0, journeyTrackBatchSize)
+	if _, err := database.GetCollection("journey_tracks").BulkWrite(context.Background(), models); err != nil {
+		return fmt.Errorf("store GTFS journey tracks: %w", err)
+	}
+	return nil
+}
+
+func flushGTFSJourneyBatch(trackStore *journeyTrackStore, journeyModels []mongo.WriteModel) error {
+	if len(journeyModels) == 0 {
+		return nil
+	}
+	if err := trackStore.Flush(); err != nil {
+		return err
+	}
+	if _, err := database.GetCollection(database.JourneysRawCollectionName).BulkWrite(context.Background(), journeyModels); err != nil {
+		return fmt.Errorf("store GTFS raw journeys: %w", err)
+	}
+	return nil
+}
 
 func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 	gtfs.fileMap = map[string]string{}
@@ -509,7 +537,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 	trackStore := newJourneyTrackStore(dataset, datasource)
 	for shapeID, track := range shapeTracks {
-		trackStore.Reference("shape:"+shapeID, materializeShapeTrack(track))
+		if _, err := trackStore.Reference("shape:"+shapeID, materializeShapeTrack(track)); err != nil {
+			return datasets.DataImportReport{}, err
+		}
 	}
 	shapeSnapCaches := make(map[string]map[string]cachedTrackSnap)
 	shapeSnapCacheEntries := 0
@@ -702,7 +732,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			DestinationDisplay:   g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
 			DepartureTimezone:    agency.Timezone,
 			Availability:         availability,
-			Path:                 []*ctdf.JourneyPathItem{},
 		}
 
 		if dataset.Identifier == nyct.SubwayDataset {
@@ -717,7 +746,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			journey.OtherIdentifiers["BlockNumber"] = t.BlockID
 		}
 
-		if _, exists := shapeTracks[t.ShapeID]; t.ShapeID != "" && exists {
+		if len(shapeTracks[t.ShapeID]) > 1 {
 			journey.TrackRef = trackStore.Identifier("shape:" + t.ShapeID)
 		}
 
@@ -758,7 +787,16 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	defer stopTimeGroups.Close()
 
 	log.Info().Msg("Importing Finished Journeys")
-	journeysQueue := NewDatabaseBatchProcessingQueue(database.JourneysRawCollectionName, 1*time.Second, 1*time.Minute, journeyBatchSize)
+	journeyModels := make([]mongo.WriteModel, 0, journeyBatchSize)
+	flushJourneys := func() error {
+		if len(journeyModels) == 0 {
+			return nil
+		}
+		models := journeyModels
+		journeyModels = make([]mongo.WriteModel, 0, journeyBatchSize)
+		// Track geometry must be durable before a journey batch can publish its refs.
+		return flushGTFSJourneyBatch(trackStore, models)
+	}
 	importedJourneys := 0
 	rejectedJourneys := 0
 	rejectJourney := func(tripID string, err error) error {
@@ -767,9 +805,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			log.Warn().Err(err).Str("trip", tripID).Msg("Skipping GTFS journey with unresolved times")
 		}
 		return nil
-	}
-	if dataset.SupportedObjects.Journeys {
-		journeysQueue.Process()
 	}
 	serviceRouteKeys := make(map[string]map[routeEndpointPair]struct{}, len(g.ctdfServices))
 	for routeID, service := range g.ctdfServices {
@@ -794,71 +829,46 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 
 		journey := buildJourney(trip)
-
-		if len(stopTimes) > 1 {
-			journey.Path = make([]*ctdf.JourneyPathItem, 0, len(stopTimes)-1)
-		}
-
-		for index := 1; index < len(stopTimes); index += 1 {
-			stopTime := stopTimes[index]
-			previousStopTime := stopTimes[index-1]
-
-			originArrivalTime, err := parseOptionalGTFSTime(previousStopTime.ArrivalTime)
+		journey.Calls = make([]ctdf.JourneyCall, len(stopTimes))
+		for index, stopTime := range stopTimes {
+			arrivalTime, err := parseOptionalGTFSTime(stopTime.ArrivalTime)
 			if err != nil {
 				return rejectJourney(tripID, err)
 			}
-			originDeparturelTime, err := parseOptionalGTFSTime(previousStopTime.DepartureTime)
-			if err != nil {
-				return rejectJourney(tripID, err)
-			}
-			destinationArrivalTime, err := parseOptionalGTFSTime(stopTime.ArrivalTime)
+			departureTime, err := parseOptionalGTFSTime(stopTime.DepartureTime)
 			if err != nil {
 				return rejectJourney(tripID, err)
 			}
 
-			var originStopRef string
-			var destinationStopRef string
-
-			// TODO no hardocded nonsense!!
+			stopRef := datasetStopPrefix + stopTime.StopID
 			if useGBAtcoStopRef {
-				originStopRef = fmt.Sprintf("gb-atco-%s", previousStopTime.StopID)
-				destinationStopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
-			} else {
-				originStopRef = datasetStopPrefix + previousStopTime.StopID
-				destinationStopRef = datasetStopPrefix + stopTime.StopID
+				stopRef = fmt.Sprintf("gb-atco-%s", stopTime.StopID)
 			}
-
-			journeyPathItem := &ctdf.JourneyPathItem{
-				OriginStopRef:          originStopRef,
-				DestinationStopRef:     destinationStopRef,
-				OriginArrivalTime:      originArrivalTime,
-				DestinationArrivalTime: destinationArrivalTime,
-				OriginDepartureTime:    originDeparturelTime,
-				DestinationDisplay:     stopTime.StopHeadsign,
-				OriginActivity:         make([]ctdf.JourneyPathItemActivity, 0, 2),
-				DestinationActivity:    make([]ctdf.JourneyPathItemActivity, 0, 2),
+			call := ctdf.JourneyCall{
+				StopRef:             stopRef,
+				Arrival:             arrivalTime,
+				Departure:           departureTime,
+				OriginActivity:      make([]ctdf.JourneyPathItemActivity, 0, 2),
+				DestinationActivity: make([]ctdf.JourneyPathItemActivity, 0, 2),
+				Start:               index == 0,
+				End:                 index == len(stopTimes)-1,
 			}
-
-			if previousStopTime.DropOffType == 0 {
-				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
-			}
-			if previousStopTime.PickupType == 0 {
-				journeyPathItem.OriginActivity = append(journeyPathItem.OriginActivity, ctdf.JourneyPathItemActivityPickup)
+			if index+1 < len(stopTimes) && stopTimes[index+1].StopHeadsign != "" {
+				call.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: stopTimes[index+1].StopHeadsign}
 			}
 			if stopTime.DropOffType == 0 {
-				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
+				call.OriginActivity = append(call.OriginActivity, ctdf.JourneyPathItemActivitySetdown)
+				call.DestinationActivity = append(call.DestinationActivity, ctdf.JourneyPathItemActivitySetdown)
 			}
 			if stopTime.PickupType == 0 {
-				journeyPathItem.DestinationActivity = append(journeyPathItem.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
+				call.OriginActivity = append(call.OriginActivity, ctdf.JourneyPathItemActivityPickup)
+				call.DestinationActivity = append(call.DestinationActivity, ctdf.JourneyPathItemActivityPickup)
 			}
-
-			journey.Path = append(journey.Path, journeyPathItem)
-
-			if index == 1 {
-				journey.DepartureTime = originDeparturelTime
+			journey.Calls[index] = call
+			if index == 0 {
+				journey.DepartureTime = departureTime
 			}
 		}
-
 		if err := ctdf.InterpolateMissingJourneyTimes(journey); err != nil {
 			return rejectJourney(tripID, err)
 		}
@@ -868,11 +878,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		if patternCached {
 			pathPatternCacheHits++
 			if patternSplit {
-				trackStore.reused += len(journey.Path)
+				trackStore.reused += journey.LegCount()
 				journey.Track = nil
 				journey.TrackRef = ""
-				for index, path := range journey.Path {
-					path.TrackRef = trackStore.Identifier(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index))
+				for index := 0; index+1 < len(journey.Calls); index++ {
+					if journey.Calls[index].Outgoing == nil {
+						journey.Calls[index].Outgoing = &ctdf.JourneyLeg{}
+					}
+					journey.Calls[index].Outgoing.TrackRef = trackStore.Identifier(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index))
 				}
 			}
 		} else if compactTrack := shapeTracks[trip.ShapeID]; len(compactTrack) > 1 {
@@ -892,16 +905,24 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				}
 			}
 			snapCacheEntriesBefore := len(snapCache)
-			if assignJourneyPathTracksCached(journey.Path, stopTimes, g.stopLocations, journeyTrack, snapCache) {
+			if assignJourneyCallTracksCached(journey.Calls, stopTimes, g.stopLocations, journeyTrack, snapCache) {
 				shapeSnapCacheEntries += len(snapCache) - snapCacheEntriesBefore
 				// Every leg now owns an accurate slice of the shape, so avoid storing
 				// the same geometry again at journey level. If splitting fails, the
 				// complete journey track is intentionally retained as the fallback.
 				journey.Track = nil
 				journey.TrackRef = ""
-				for index, path := range journey.Path {
-					path.TrackRef = trackStore.Reference(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index), path.Track)
-					path.Track = nil
+				for index := 0; index+1 < len(journey.Calls); index++ {
+					call := &journey.Calls[index]
+					if call.Outgoing == nil {
+						call.Outgoing = &ctdf.JourneyLeg{}
+					}
+					trackRef, err := trackStore.Reference(fmt.Sprintf("shape-leg:%s:%x:%d", trip.ShapeID, patternHash, index), call.Outgoing.Track)
+					if err != nil {
+						return fmt.Errorf("store GTFS shape leg track for trip %s: %w", tripID, err)
+					}
+					call.Outgoing.TrackRef = trackRef
+					call.Outgoing.Track = nil
 				}
 				pathTrackCache.Put(patternHash, true)
 			} else {
@@ -909,30 +930,32 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				pathTrackCache.Put(patternHash, false)
 			}
 		}
+		journey.RefreshStopRefs()
 
 		if dataset.SupportedObjects.Journeys {
 			// Insert one concrete journey for each frequency iteration. Frequency
 			// trips are represented by their expanded journeys in CTDF; the base
 			// template is never persisted.
 			for _, expandedJourney := range expandJourneyForFrequencies(journey, g.frequencies[tripID]) {
+				if err := expandedJourney.ValidatePath(); err != nil {
+					return fmt.Errorf("validate GTFS journey %s: %w", expandedJourney.PrimaryIdentifier, err)
+				}
+				bsonRep, err := bson.Marshal(expandedJourney)
+				if err != nil {
+					return fmt.Errorf("marshal GTFS journey %s: %w", expandedJourney.PrimaryIdentifier, err)
+				}
+				replacementModel := mongo.NewReplaceOneModel()
+				replacementModel.SetFilter(bson.M{"primaryidentifier": expandedJourney.PrimaryIdentifier})
+				replacementModel.SetReplacement(bsonRep)
+				replacementModel.SetUpsert(true)
 
-				// Geometry is persisted exclusively in journey_tracks. Keep the
-				// in-memory fallback available for this import, but never write the
-				// legacy embedded fields back to MongoDB.
-				expandedJourney.Track = nil
-				for _, path := range expandedJourney.Path {
-					if path != nil {
-						path.Track = nil
+				journeyModels = append(journeyModels, replacementModel)
+				importedJourneys++
+				if len(journeyModels) >= journeyBatchSize {
+					if err := flushJourneys(); err != nil {
+						return fmt.Errorf("flush GTFS journey batch: %w", err)
 					}
 				}
-				bsonRep, _ := bson.Marshal(bson.M{"$set": expandedJourney})
-				updateModel := mongo.NewUpdateOneModel()
-				updateModel.SetFilter(bson.M{"primaryidentifier": expandedJourney.PrimaryIdentifier})
-				updateModel.SetUpdate(bsonRep)
-				updateModel.SetUpsert(true)
-
-				journeysQueue.Add(updateModel)
-				importedJourneys++
 			}
 		}
 
@@ -950,6 +973,14 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		}
 		return nil
 	}); err != nil {
+		return datasets.DataImportReport{}, err
+	}
+	if dataset.SupportedObjects.Journeys {
+		if err := flushJourneys(); err != nil {
+			return datasets.DataImportReport{}, err
+		}
+	}
+	if err := trackStore.Flush(); err != nil {
 		return datasets.DataImportReport{}, err
 	}
 	if dataset.SupportedObjects.Services {
@@ -976,10 +1007,6 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 	gtfsTrips = nil
 
-	if dataset.SupportedObjects.Journeys {
-		journeysQueue.Wait()
-	}
-	trackStore.Wait()
 	log.Info().Str("dataset", dataset.Identifier).
 		Int("unique_tracks", trackStore.unique).
 		Int("reused_tracks", trackStore.reused).
@@ -1111,8 +1138,8 @@ func expandJourneyForFrequencies(journey *ctdf.Journey, windows []frequencyWindo
 	})
 
 	templateDepartureTime := journey.DepartureTime
-	if templateDepartureTime.IsZero() && len(journey.Path) > 0 && journey.Path[0] != nil {
-		templateDepartureTime = journey.Path[0].OriginDepartureTime
+	if templateDepartureTime.IsZero() && len(journey.Calls) > 0 {
+		templateDepartureTime = journey.Calls[0].Departure
 	}
 
 	expanded := make([]*ctdf.Journey, 0)
@@ -1160,23 +1187,38 @@ func cloneJourneyWithTimeShift(journey *ctdf.Journey, offset time.Duration) *ctd
 		availability.Exclude = append([]ctdf.AvailabilityRule(nil), journey.Availability.Exclude...)
 		clone.Availability = &availability
 	}
-	if journey.Path != nil {
-		clone.Path = make([]*ctdf.JourneyPathItem, len(journey.Path))
-		for index, path := range journey.Path {
-			if path == nil {
-				continue
+	if journey.Calls != nil {
+		clone.Calls = make([]ctdf.JourneyCall, len(journey.Calls))
+		for index, call := range journey.Calls {
+			callClone := call
+			if !callClone.Arrival.IsZero() {
+				callClone.Arrival = callClone.Arrival.Add(offset)
 			}
-			pathClone := *path
-			pathClone.OriginArrivalTime = path.OriginArrivalTime.Add(offset)
-			pathClone.OriginDepartureTime = path.OriginDepartureTime.Add(offset)
-			pathClone.DestinationArrivalTime = path.DestinationArrivalTime.Add(offset)
-			clone.Path[index] = &pathClone
+			if !callClone.Departure.IsZero() {
+				callClone.Departure = callClone.Departure.Add(offset)
+			}
+			if call.IncomingArrival != nil {
+				incomingArrival := *call.IncomingArrival
+				if !incomingArrival.Time().IsZero() {
+					incomingArrival = primitive.NewDateTimeFromTime(incomingArrival.Time().Add(offset))
+				}
+				callClone.IncomingArrival = &incomingArrival
+			}
+			if call.IncomingPlatform != nil {
+				incomingPlatform := *call.IncomingPlatform
+				callClone.IncomingPlatform = &incomingPlatform
+			}
+			if call.Outgoing != nil {
+				outgoing := *call.Outgoing
+				callClone.Outgoing = &outgoing
+			}
+			clone.Calls[index] = callClone
 		}
 	}
 	if !journey.DepartureTime.IsZero() {
 		clone.DepartureTime = journey.DepartureTime.Add(offset)
-	} else if len(journey.Path) > 0 && journey.Path[0] != nil {
-		clone.DepartureTime = journey.Path[0].OriginDepartureTime.Add(offset)
+	} else if len(journey.Calls) > 0 && !journey.Calls[0].Departure.IsZero() {
+		clone.DepartureTime = journey.Calls[0].Departure.Add(offset)
 	}
 	return &clone
 }

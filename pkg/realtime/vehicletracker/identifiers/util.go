@@ -2,6 +2,7 @@ package identifiers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -57,17 +58,19 @@ func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJou
 		{Key: "serviceref", Value: 1},
 		{Key: "direction", Value: 1},
 		{Key: "departuretime", Value: 1},
+		{Key: "destinationdisplay", Value: 1},
 		{Key: "availability", Value: 1},
-		{Key: "path.originstopref", Value: 1},
-		{Key: "path.destinationstopref", Value: 1},
-		{Key: "path.originarrivaltime", Value: 1},
-		{Key: "path.origindeparturetime", Value: 1},
-		{Key: "path.destinationarrivaltime", Value: 1},
+		{Key: "calls.stopref", Value: 1},
+		{Key: "calls.start", Value: 1},
+		{Key: "calls.end", Value: 1},
+		{Key: "calls.arrival", Value: 1},
+		{Key: "calls.departure", Value: 1},
+		{Key: "calls.incomingarrival", Value: 1},
 	})
-	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, append(findOpts, opts)...)
+	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, true, append(findOpts, opts)...)
 }
 
-func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, documents telemetry.Counter, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
+func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, documents telemetry.Counter, includePath bool, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
 	started := time.Now()
 	defer func() { telemetry.Observe(telemetry.SiriCandidateQuery, time.Since(started)) }()
 	var candidates siriJourneyCandidates
@@ -80,18 +83,24 @@ func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson
 
 	for cursor.Next(context.Background()) {
 		candidates.count++
-		var journey ctdf.Journey
-		if err := cursor.Decode(&journey); err != nil {
+		var decoded ctdf.Journey
+		if err := cursor.Decode(&decoded); err != nil {
 			log.Error().Err(err).Msg("Failed to decode journey")
 			continue
 		}
+		if includePath {
+			if err := decoded.ValidatePath(); err != nil {
+				return candidates, fmt.Errorf("decode SIRI journey path %q: %w", decoded.PrimaryIdentifier, err)
+			}
+		}
+		journey := &decoded
 		if !exactDeparture.IsZero() && sameDepartureMinute(journey.DepartureTime.UTC(), exactDeparture) {
 			candidates.exactCount++
 		}
 
 		// if it has no availability then we'll just ignore it
 		if journey.Availability != nil && journey.Availability.MatchDate(date) {
-			candidates.available = append(candidates.available, &journey)
+			candidates.available = append(candidates.available, journey)
 		}
 	}
 

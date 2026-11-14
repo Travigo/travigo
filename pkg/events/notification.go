@@ -265,7 +265,7 @@ func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificatio
 		journeyRunDate, _ := time.Parse(time.RFC3339, eventBody["JourneyRunDate"].(string))
 		journeyRunDateText := journeyRunDate.Format("02/01")
 
-		origin := journey["Path"].([]interface{})[0].(map[string]interface{})["OriginStopRef"].(string)
+		origin := journeyOriginReference(journey)
 
 		destination := journey["DestinationDisplay"]
 		eventNotificationData.Message = fmt.Sprintf("The %s %s to %s from %s has been cancelled.", journeyRunDateText, departureTimeText, destination, origin)
@@ -354,4 +354,14 @@ func GetNotificationData(e *ctdf.Event, notificationMatcher ctdf.UserNotificatio
 	}
 
 	return eventNotificationData
+}
+
+func journeyOriginReference(journey map[string]interface{}) string {
+	if path, ok := journey["Path"].([]interface{}); ok && len(path) > 0 {
+		if first, ok := path[0].(map[string]interface{}); ok {
+			origin, _ := first["OriginStopRef"].(string)
+			return origin
+		}
+	}
+	return ""
 }

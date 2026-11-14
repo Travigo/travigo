@@ -94,7 +94,7 @@ func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomain
 	observedAt := time.Now().UTC()
 	realtime := &ctdf.RealtimeJourney{
 		PrimaryIdentifier:         "realtime-1",
-		Journey:                   &ctdf.Journey{PrimaryIdentifier: "nested-journey", Path: []*ctdf.JourneyPathItem{{}}},
+		Journey:                   &ctdf.Journey{PrimaryIdentifier: "nested-journey", Calls: []ctdf.JourneyCall{{StopRef: "nested-stop", Start: true, End: true}}},
 		DepartedStop:              &ctdf.Stop{PrimaryIdentifier: "departed"},
 		NextStop:                  &ctdf.Stop{PrimaryIdentifier: "next"},
 		ActivelyTracked:           true,
@@ -129,7 +129,7 @@ func TestWebBoardSheriffViewKeepsDisplayFieldsWithoutJourneyGraphs(t *testing.T)
 				TransportType:     ctdf.TransportTypeRail,
 				Routes:            []ctdf.Route{{Origin: "unused-heavy-route"}},
 			},
-			Path: []*ctdf.JourneyPathItem{{OriginStopRef: "unused-heavy-path"}},
+			Calls: []ctdf.JourneyCall{{StopRef: "unused-heavy-path", Start: true, End: true}},
 			RealtimeJourney: &ctdf.RealtimeJourney{
 				Reliability: ctdf.RealtimeJourneyReliabilityLocationWithoutTrack,
 				Stops:       map[string]*ctdf.RealtimeJourneyStops{"unused": {StopRef: "unused"}},
@@ -163,7 +163,7 @@ func TestWebPlannerSheriffViewUsesSummaries(t *testing.T) {
 				Journey: &ctdf.Journey{
 					PrimaryIdentifier: "journey-1",
 					Service:           &ctdf.Service{PrimaryIdentifier: "service-1", ServiceName: "A", TransportType: ctdf.TransportTypeRail},
-					Path:              []*ctdf.JourneyPathItem{{OriginStopRef: "unused-heavy-path"}},
+					Calls:             []ctdf.JourneyCall{{StopRef: "unused-heavy-path", Start: true, End: true}},
 				},
 				OriginStopRef: "origin",
 				OriginStop:    &ctdf.Stop{PrimaryIdentifier: "origin", PrimaryName: "Origin"},
@@ -237,7 +237,7 @@ func TestWebNotificationSubscriptionSheriffViewEmbedsResolvedReferences(t *testi
 		Subject: &ctdf.Journey{
 			PrimaryIdentifier:  "journey-1",
 			DestinationDisplay: "Destination",
-			Path:               []*ctdf.JourneyPathItem{{OriginStopRef: "unused-heavy-path"}},
+			Calls:              []ctdf.JourneyCall{{StopRef: "unused-heavy-path", Start: true, End: true}},
 		},
 		PlatformStops: []*ctdf.Stop{{
 			PrimaryIdentifier: "stop-1",
@@ -279,7 +279,7 @@ func TestWebViewsAreSmallerThanLegacyJourneyAndOSMPayloads(t *testing.T) {
 		PrimaryIdentifier: "journey-1",
 		Service:           &ctdf.Service{PrimaryIdentifier: "service-1", ServiceName: "A"},
 		RealtimeJourney: &ctdf.RealtimeJourney{
-			Journey: &ctdf.Journey{PrimaryIdentifier: "duplicated-journey", Path: []*ctdf.JourneyPathItem{{OriginStop: &ctdf.Stop{PrimaryName: string(largeText)}}}},
+			Journey: &ctdf.Journey{PrimaryIdentifier: "duplicated-journey", Calls: []ctdf.JourneyCall{{StopRef: "origin", Stop: &ctdf.Stop{PrimaryName: string(largeText)}, Start: true, End: true}}},
 		},
 	}
 	osmStop := &ctdf.OSMStop{
@@ -325,9 +325,9 @@ func TestMarshalWithSheriffViewRejectsArbitraryGroups(t *testing.T) {
 }
 
 func TestPassingPathIsStoredButExcludedFromJourneyViews(t *testing.T) {
-	journey := ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"gb-tiploc-hidden"}},
-	}}
+	journey := ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
+		OriginStopRef: "a", DestinationStopRef: "b", PassingPath: []string{"gb-tiploc-hidden"},
+	})}
 	data, err := bson.Marshal(journey)
 	if err != nil {
 		t.Fatal(err)
@@ -336,12 +336,15 @@ func TestPassingPathIsStoredButExcludedFromJourneyViews(t *testing.T) {
 	if err := bson.Unmarshal(data, &stored); err != nil {
 		t.Fatal(err)
 	}
-	if got := stored.Path[0].PassingPath; len(got) != 1 || got[0] != "gb-tiploc-hidden" {
+	if got := stored.Calls[0].Outgoing.PassingPath; len(got) != 1 || got[0] != "gb-tiploc-hidden" {
 		t.Fatalf("stored passing path = %v", got)
 	}
 	for _, view := range []string{"detailed", "web-journey", "departureboard-cache"} {
-		result := marshalSheriffMap(t, []string{view}, journey)
-		if _, ok := result["Path"]; !ok {
+		result, err := marshalLegacyJourney(&sheriff.Options{Groups: []string{view}}, &journey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := result.(map[string]any)["Path"]; !ok {
 			t.Fatalf("%s: passenger path missing", view)
 		}
 		jsonData, err := json.Marshal(result)
@@ -352,5 +355,71 @@ func TestPassingPathIsStoredButExcludedFromJourneyViews(t *testing.T) {
 	jsonData, err := json.Marshal(journey)
 	if err != nil || strings.Contains(string(jsonData), "gb-tiploc-hidden") {
 		t.Fatalf("plain journey JSON = %s, %v", jsonData, err)
+	}
+}
+
+func TestJourneyPathTrackDefaultsMatchSheriffCompatibility(t *testing.T) {
+	arrival := time.Date(2026, time.November, 13, 9, 0, 0, 0, time.UTC)
+	journey := &ctdf.Journey{
+		PrimaryIdentifier: "journey-1",
+		Calls: ctdf.JourneyCallsFromLegs(
+			&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "middle", DestinationArrivalTime: arrival},
+			&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "destination", OriginArrivalTime: arrival.Add(10 * time.Minute)},
+		),
+	}
+
+	groups := []string{"basic", "detailed"}
+	legacy, err := marshalLegacyJourney(&sheriff.Options{Groups: groups}, journey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyJourney := legacy.(map[string]interface{})
+	path := legacyJourney["Path"].([]interface{})
+	leg := path[0].(map[string]interface{})
+	track, ok := leg["Track"].([]interface{})
+	if !ok || len(track) != 0 {
+		t.Fatalf("legacy sheriff track = %#v, want empty array", leg["Track"])
+	}
+	if _, ok := leg["OriginActivity"].([]interface{}); !ok {
+		t.Fatalf("legacy sheriff origin activity = %#v, want array", leg["OriginActivity"])
+	}
+	if _, ok := leg["DestinationActivity"].([]interface{}); !ok {
+		t.Fatalf("legacy sheriff destination activity = %#v, want array", leg["DestinationActivity"])
+	}
+	if got, ok := leg["DestinationArrivalTime"].(time.Time); !ok || !got.Equal(arrival) {
+		t.Fatalf("legacy sheriff destination arrival = %#v, want %s", leg["DestinationArrivalTime"], arrival)
+	}
+
+	internal, err := marshalLegacyJourney(&sheriff.Options{Groups: []string{"basic", "detailed", "internal"}}, journey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	internalPath := internal.(map[string]interface{})["Path"].([]interface{})
+	if got := internalPath[0].(map[string]interface{})["TrackRef"]; got != "" {
+		t.Fatalf("legacy internal track ref = %#v, want empty string", got)
+	}
+
+	plainJSON, err := json.Marshal(legacyRealtimeJSON(&ctdf.RealtimeJourney{Journey: journey}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Journey map[string]any
+	}
+	if err := json.Unmarshal(plainJSON, &response); err != nil {
+		t.Fatal(err)
+	}
+	legacyJSONJourney := response.Journey
+	forbidKeys(t, legacyJSONJourney, "Calls")
+	legacyJSONPath := legacyJSONJourney["Path"].([]interface{})
+	legacyJSONLeg := legacyJSONPath[0].(map[string]interface{})
+	if track, exists := legacyJSONLeg["Track"]; !exists || track != nil {
+		t.Fatalf("plain JSON legacy track = %#v, want null", track)
+	}
+	if got, ok := legacyJSONLeg["DestinationArrivalTime"].(string); !ok || got != arrival.Format(time.RFC3339) {
+		t.Fatalf("plain JSON destination arrival = %#v, want %s", legacyJSONLeg["DestinationArrivalTime"], arrival.Format(time.RFC3339))
+	}
+	if trackRef, exists := legacyJSONLeg["TrackRef"]; !exists || trackRef != "" {
+		t.Fatalf("plain JSON legacy track ref = %#v, want empty string", trackRef)
 	}
 }

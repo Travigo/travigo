@@ -10,10 +10,11 @@ import (
 func predictionFixture(n int) *ctdf.RealtimeJourney {
 	base := time.Date(0, 1, 1, 10, 0, 0, 0, time.UTC)
 	j := &ctdf.RealtimeJourney{Journey: &ctdf.Journey{}, Stops: map[string]*ctdf.RealtimeJourneyStops{}}
-	for i := 0; i < n; i++ {
-		j.Journey.Path = append(j.Journey.Path, &ctdf.JourneyPathItem{OriginStopRef: fmt.Sprint(i % 5), DestinationStopRef: fmt.Sprint((i + 1) % 5), OriginDepartureTime: base.Add(time.Duration(i) * time.Minute), DestinationArrivalTime: base.Add(time.Duration(i+1) * time.Minute)})
+	for i := 0; i <= n; i++ {
+		clock := base.Add(time.Duration(i) * time.Minute)
+		j.Journey.Calls = append(j.Journey.Calls, ctdf.JourneyCall{StopRef: fmt.Sprint(i % 5), Arrival: clock, Departure: clock, Start: i == 0, End: i == n})
 	}
-	for _, s := range estimateFutureStops(j.Journey.Path, 0, 0) {
+	for _, s := range estimateFutureStops(j.Journey, 0, 0) {
 		j.Stops[ctdf.RealtimeJourneyStopKey(s.StopRef, s.JourneyStopIndex)] = s
 	}
 	return j
@@ -24,12 +25,12 @@ func TestFutureStopsNeedRebuild(t *testing.T) {
 	if futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("unchanged predictions rebuilt")
 	}
-	delete(j.Stops, ctdf.RealtimeJourneyStopKey(j.Journey.Path[5].DestinationStopRef, 6))
+	delete(j.Stops, ctdf.RealtimeJourneyStopKey(j.Journey.Calls[6].StopRef, 6))
 	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("missing prediction ignored")
 	}
 	j = predictionFixture(20)
-	j.Journey.Path[5].DestinationArrivalTime = j.Journey.Path[5].DestinationArrivalTime.Add(2 * time.Minute)
+	j.Journey.Calls[6].Arrival = j.Journey.Calls[6].Arrival.Add(2 * time.Minute)
 	if !futureStopsNeedRebuild(j, journeyDestinationKeys(j.Journey), 0, 0, time.UTC) {
 		t.Fatal("timetable edit ignored")
 	}
@@ -70,7 +71,7 @@ func BenchmarkUnchangedPredictions(b *testing.B) {
 		b.Run(fmt.Sprintf("%d/before", n), func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				benchmarkPredictionSink = estimateFutureStops(j.Journey.Path, 0, 0)
+				benchmarkPredictionSink = estimateFutureStops(j.Journey, 0, 0)
 			}
 		})
 		b.Run(fmt.Sprintf("%d/after", n), func(b *testing.B) {

@@ -64,7 +64,7 @@ func applyDataset(ctx context.Context, datasetID string, timestamp string, opera
 	// Stage/fence publication so failure after clearing cannot leave live journeys
 	// without usable tracks; measure paths rewritten versus paths actually changed.
 	if !keepFallback {
-		if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, readCollectionName, writeCollectionNames); err != nil {
+		if err := clearOwnedJourneyTrackRefs(ctx, ownedTrackRefs, writeCollectionNames); err != nil {
 			return err
 		}
 		ownedTrackRefs = nil
@@ -207,7 +207,7 @@ func loadTrackRefs(ctx context.Context, filter bson.M) (map[string]struct{}, err
 	return refs, cursor.Err()
 }
 
-func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, readCollectionName string, writeCollectionNames []string) error {
+func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, writeCollectionNames []string) error {
 	if len(owned) == 0 {
 		return nil
 	}
@@ -215,66 +215,33 @@ func clearOwnedJourneyTrackRefs(ctx context.Context, owned map[string]struct{}, 
 	for ref := range owned {
 		refs = append(refs, ref)
 	}
-	seenJourneys := map[string]struct{}{}
-	models := []mongo.WriteModel{}
-	flush := func() error {
-		if len(models) == 0 {
-			return nil
-		}
-		err := bulkWriteJourneyPaths(ctx, models, writeCollectionNames)
-		models = models[:0]
-		return err
-	}
 	for start := 0; start < len(refs); start += 5000 {
 		end := min(start+5000, len(refs))
-		cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"path.trackref": bson.M{"$in": refs[start:end]}})
-		if err != nil {
-			return err
-		}
-		for cursor.Next(ctx) {
-			var journey ctdf.Journey
-			if err := cursor.Decode(&journey); err != nil {
-				cursor.Close(ctx)
-				return err
-			}
-			if _, seen := seenJourneys[journey.PrimaryIdentifier]; seen {
-				continue
-			}
-			seenJourneys[journey.PrimaryIdentifier] = struct{}{}
-			changed := false
-			for _, path := range journey.Path {
-				if path == nil {
-					continue
-				}
-				if _, isOwned := owned[path.TrackRef]; isOwned {
-					path.TrackRef = ""
-					path.Track = nil
-					changed = true
-				}
-			}
-			if changed {
-				models = append(models, journeyPathUpdate(&journey))
-				if len(models) == 1000 {
-					if err := flush(); err != nil {
-						cursor.Close(ctx)
-						return err
-					}
-				}
+		trackRefs := bson.M{"$in": refs[start:end]}
+		for _, collectionName := range writeCollectionNames {
+			_, err := database.GetCollection(collectionName).UpdateMany(
+				ctx,
+				bson.M{"calls.outgoing.trackref": trackRefs},
+				bson.M{"$unset": bson.M{"calls.$[call].outgoing.trackref": ""}},
+				options.Update().SetArrayFilters(options.ArrayFilters{Filters: []interface{}{
+					bson.M{"call.outgoing.trackref": trackRefs},
+				}}),
+			)
+			if err != nil {
+				return fmt.Errorf("clear owned journey track references in %s: %w", collectionName, err)
 			}
 		}
-		if err := cursor.Err(); err != nil {
-			cursor.Close(ctx)
-			return err
-		}
-		cursor.Close(ctx)
 	}
-	return flush()
+	return nil
 }
 
 func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates []Route, readCollectionName string, keepFallback bool, ownedTrackRefs map[string]struct{}, writeCollectionNames []string, changedRawDatasets map[string]struct{}) (serviceJourneyStats, error) {
 	stats := serviceJourneyStats{}
 	candidatesByEndpoints := indexRoutesByEndpoints(candidates)
-	cursor, err := database.GetCollection(readCollectionName).Find(ctx, bson.M{"serviceref": bson.M{"$in": serviceRefs}})
+	cursor, err := database.GetCollection(readCollectionName).Find(ctx,
+		bson.M{"serviceref": bson.M{"$in": serviceRefs}},
+		options.Find().SetProjection(enrichmentJourneyProjection),
+	)
 	if err != nil {
 		return stats, err
 	}
@@ -312,7 +279,11 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 			if keepFallback && journey.DataSource != nil && journey.DataSource.DatasetID != "" {
 				changedRawDatasets[journey.DataSource.DatasetID] = struct{}{}
 			}
-			models = append(models, journeyPathUpdate(&journey))
+			model, err := journeyPathUpdate(&journey)
+			if err != nil {
+				return stats, err
+			}
+			models = append(models, model)
 			stats.Updated++
 			if len(models) == journeyPathUpdateBatchSize {
 				if err := flush(); err != nil {
@@ -334,35 +305,53 @@ func applyServiceJourneys(ctx context.Context, serviceRefs []string, candidates 
 }
 
 func applyIndexedRoutes(ctx context.Context, journey *ctdf.Journey, candidates map[string][]Route) (bool, error) {
-	stops := JourneyStops(journey.Path)
-	if len(stops) < 2 {
-		return false, nil
+	changed := false
+	for calls := range ContiguousCallPaths(journey) {
+		stops := JourneyCallStops(calls)
+		if len(stops) < 2 {
+			continue
+		}
+		updated, err := applyBestRouteToCalls(ctx, calls, candidates[routeEndpointKey(stops[0], stops[len(stops)-1])])
+		if err != nil {
+			return false, err
+		}
+		changed = changed || updated
 	}
-	return ApplyBestRoute(ctx, journey, candidates[routeEndpointKey(stops[0], stops[len(stops)-1])])
+	return changed, nil
 }
 
 func applyOSMRailRoutes(ctx context.Context, journey *ctdf.Journey, candidates map[string][]Route, owned map[string]struct{}) (bool, error) {
 	changed := false
-	for path := range ContiguousPaths(journey.Path) {
-		fallback := map[*ctdf.JourneyPathItem]ctdf.JourneyTrack{}
-		for _, leg := range path {
-			if _, ok := owned[leg.TrackRef]; ok {
-				fallback[leg] = ctdf.JourneyTrack{PrimaryIdentifier: leg.TrackRef, Track: leg.Track}
-				leg.TrackRef = ""
-				leg.Track = nil
+	for calls := range ContiguousCallPaths(journey) {
+		fallback := map[*ctdf.JourneyCall]string{}
+		for _, call := range calls[:len(calls)-1] {
+			if call.Outgoing != nil {
+				if _, ok := owned[call.Outgoing.TrackRef]; ok {
+					fallback[call] = call.Outgoing.TrackRef
+					call.Outgoing.TrackRef = ""
+					call.Outgoing.Track = nil
+				}
 			}
 		}
-		part := *journey
-		part.Path = path
-		updated, err := applyIndexedRoutes(ctx, &part, candidates)
-		for leg, track := range fallback {
-			if leg.TrackRef == "" {
-				leg.TrackRef = track.PrimaryIdentifier
-				leg.Track = track.Track
+		stops := JourneyCallStops(calls)
+		updated := false
+		if len(stops) >= 2 {
+			var err error
+			updated, err = applyBestRouteToCalls(ctx, calls, candidates[routeEndpointKey(stops[0], stops[len(stops)-1])])
+			if err != nil {
+				for call, ref := range fallback {
+					call.Outgoing.TrackRef = ref
+				}
+				return false, err
 			}
 		}
-		if err != nil {
-			return false, err
+		for call, ref := range fallback {
+			if call.Outgoing == nil {
+				call.Outgoing = &ctdf.JourneyLeg{}
+			}
+			if call.Outgoing.TrackRef == "" {
+				call.Outgoing.TrackRef = ref
+			}
 		}
 		changed = changed || updated
 	}
@@ -376,6 +365,15 @@ func bulkWriteJourneyPaths(ctx context.Context, models []mongo.WriteModel, colle
 		}
 	}
 	return nil
+}
+
+var enrichmentJourneyProjection = bson.M{
+	"primaryidentifier":    1,
+	"modificationdatetime": 1,
+	"datasource":           1,
+	"trackref":             1,
+	"calls":                1,
+	"serviceref":           1,
 }
 
 func indexRoutesByEndpoints(routes []Route) map[string][]Route {
@@ -414,27 +412,61 @@ func routeEndpointKey(originStopRef, destinationStopRef string) string {
 	return originStopRef + "\x00" + destinationStopRef
 }
 
-func journeyPathUpdate(journey *ctdf.Journey) mongo.WriteModel {
-	return mongo.NewUpdateOneModel().SetFilter(bson.M{"primaryidentifier": journey.PrimaryIdentifier}).SetUpdate(bson.M{"$set": bson.M{"path": journey.Path}})
+func journeyPathUpdate(journey *ctdf.Journey) (mongo.WriteModel, error) {
+	if err := journey.ValidatePath(); err != nil {
+		return nil, fmt.Errorf("validate updated journey %s: %w", journey.PrimaryIdentifier, err)
+	}
+	filter := bson.M{"primaryidentifier": journey.PrimaryIdentifier}
+	if journey.DataSource != nil {
+		if journey.DataSource.DatasetID != "" {
+			filter["datasource.datasetid"] = journey.DataSource.DatasetID
+		}
+		if journey.DataSource.Timestamp != "" {
+			filter["datasource.timestamp"] = journey.DataSource.Timestamp
+		}
+	}
+	if !journey.ModificationDateTime.IsZero() {
+		filter["modificationdatetime"] = journey.ModificationDateTime
+	}
+	return mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(bson.M{"$set": bson.M{"calls": journey.Calls}}), nil
 }
 
 func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Route) (bool, error) {
 	if journey.TrackRef != "" || len(journey.Track) > 0 {
 		return false, nil
 	}
-	journeyStops := JourneyStops(journey.Path)
+	changed := false
+	for calls := range ContiguousCallPaths(journey) {
+		updated, err := applyBestRouteToCalls(ctx, calls, candidates)
+		if err != nil {
+			return false, err
+		}
+		changed = changed || updated
+	}
+	return changed, nil
+}
+
+func applyBestRouteToCalls(ctx context.Context, calls []*ctdf.JourneyCall, candidates []Route) (bool, error) {
+	journeyStops := JourneyCallStops(calls)
+	if len(journeyStops) < 2 {
+		return false, nil
+	}
 	type routeMatch struct {
 		route     Route
 		positions []int
 	}
 	matches := []routeMatch{}
-	hasPassingPath := slices.ContainsFunc(journey.Path, func(leg *ctdf.JourneyPathItem) bool {
-		return leg != nil && len(leg.PassingPath) > 0
-	})
+	hasPassingPath := false
+	for _, call := range calls[:len(calls)-1] {
+		if call.Outgoing != nil && len(call.Outgoing.PassingPath) > 0 {
+			hasPassingPath = true
+			break
+		}
+	}
 	for _, candidate := range candidates {
 		if positions, ok := MatchStops(journeyStops, candidate.Metadata.RouteStopIdentifiers); ok {
 			if (hasPassingPath || len(candidate.Metadata.PassingPaths) > 0) &&
-				!matchesPassingPaths(journey.Path, positions, candidate.Metadata.PassingPaths) {
+				!matchesPassingCallPaths(calls, positions, candidate.Metadata.PassingPaths) {
 				continue
 			}
 			matches = append(matches, routeMatch{route: candidate, positions: positions})
@@ -453,8 +485,8 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 	})
 	selected := matches[0]
 	changed := false
-	for pathIndex, path := range journey.Path {
-		if path == nil || path.TrackRef != "" || len(path.Track) > 0 || pathIndex+1 >= len(selected.positions) {
+	for pathIndex, call := range calls[:len(calls)-1] {
+		if call.Outgoing != nil && (call.Outgoing.TrackRef != "" || len(call.Outgoing.Track) > 0) || pathIndex+1 >= len(selected.positions) {
 			continue
 		}
 		start, end := selected.positions[pathIndex], selected.positions[pathIndex+1]
@@ -463,7 +495,10 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 		}
 		if end == start+1 {
 			if leg, ok := selected.route.Legs[start]; ok {
-				path.TrackRef = leg.PrimaryIdentifier
+				if call.Outgoing == nil {
+					call.Outgoing = &ctdf.JourneyLeg{}
+				}
+				call.Outgoing.TrackRef = leg.PrimaryIdentifier
 				changed = true
 			}
 			continue
@@ -473,23 +508,30 @@ func ApplyBestRoute(ctx context.Context, journey *ctdf.Journey, candidates []Rou
 			return false, err
 		}
 		if trackRef != "" {
-			path.TrackRef = trackRef
+			if call.Outgoing == nil {
+				call.Outgoing = &ctdf.JourneyLeg{}
+			}
+			call.Outgoing.TrackRef = trackRef
 			changed = true
 		}
 	}
 	return changed, nil
 }
 
-func matchesPassingPaths(path []*ctdf.JourneyPathItem, positions []int, passingPaths [][]string) bool {
-	if len(path)+1 != len(positions) || len(path) != len(passingPaths) {
+func matchesPassingCallPaths(calls []*ctdf.JourneyCall, positions []int, passingPaths [][]string) bool {
+	if len(calls)-1 != len(passingPaths) || len(calls) != len(positions) {
 		return false
 	}
-	for i, leg := range path {
-		if leg == nil || positions[i] != i || !slices.Equal(leg.PassingPath, passingPaths[i]) {
+	for i, call := range calls[:len(calls)-1] {
+		var passingPath []string
+		if call.Outgoing != nil {
+			passingPath = call.Outgoing.PassingPath
+		}
+		if positions[i] != i || !slices.Equal(passingPath, passingPaths[i]) {
 			return false
 		}
 	}
-	return positions[len(path)] == len(path)
+	return positions[len(calls)-1] == len(calls)-1
 }
 
 func storeCombinedTrack(ctx context.Context, route Route, start, end int) (string, error) {

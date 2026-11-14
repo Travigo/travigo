@@ -358,6 +358,9 @@ func hydrateGraphJourneys(ctx context.Context, result departuregraph.PlanRespons
 		if err := cursor.Decode(&journey); err != nil {
 			return nil, err
 		}
+		if err := journey.ValidatePath(); err != nil {
+			return nil, fmt.Errorf("decode planner journey path %q: %w", journey.PrimaryIdentifier, err)
+		}
 		journeys[journey.PrimaryIdentifier] = &journey
 	}
 	if err := cursor.Err(); err != nil {
@@ -381,7 +384,10 @@ func applyRealtimeLegTimes(item *ctdf.JourneyPlanRouteItem, boardingIndex, desti
 		return true
 	}
 	journey := item.Journey
-	if boardingIndex < 0 || boardingIndex >= len(journey.Path) || destinationIndex <= boardingIndex || destinationIndex > len(journey.Path) || journey.Path[boardingIndex] == nil || journey.Path[boardingIndex].OriginStopRef != item.OriginStopRef || journey.Path[destinationIndex-1] == nil || journey.Path[destinationIndex-1].DestinationStopRef != item.DestinationStopRef {
+	boardingOrigin, _ := journey.LegEndpoints(boardingIndex)
+	_, destinationCall := journey.LegEndpoints(destinationIndex - 1)
+	if destinationIndex <= boardingIndex ||
+		boardingOrigin == nil || destinationCall == nil || boardingOrigin.StopRef != item.OriginStopRef || destinationCall.StopRef != item.DestinationStopRef {
 		boardingIndex, destinationIndex = graphLegStopIndexes(journey, item)
 	}
 	if boardingIndex < 0 || destinationIndex < 0 {
@@ -389,9 +395,9 @@ func applyRealtimeLegTimes(item *ctdf.JourneyPlanRouteItem, boardingIndex, desti
 	}
 	// The graph indexes the imported path. Darwin indexes predictions
 	// against its amended path, where an inserted call shifts later stops.
-	if live := journey.RealtimeJourney.Journey; live != nil && len(live.Path) > 0 {
-		boardingIndex = remapGraphStopOccurrence(journey.Path, live.Path, boardingIndex, item.OriginStopRef)
-		destinationIndex = remapGraphStopOccurrence(journey.Path, live.Path, destinationIndex, item.DestinationStopRef)
+	if live := journey.RealtimeJourney.Journey; live != nil && live.LegCount() > 0 {
+		boardingIndex = remapGraphStopOccurrence(journey, live, boardingIndex, item.OriginStopRef, false)
+		destinationIndex = remapGraphStopOccurrence(journey, live, destinationIndex, item.DestinationStopRef, true)
 		if boardingIndex < 0 || destinationIndex <= boardingIndex {
 			return false
 		}
@@ -415,18 +421,25 @@ func applyRealtimeLegTimes(item *ctdf.JourneyPlanRouteItem, boardingIndex, desti
 	return !item.ArrivalTime.Before(item.StartTime)
 }
 
-// Match the same visit on both paths when a train calls at a station twice.
-func remapGraphStopOccurrence(scheduled, live []*ctdf.JourneyPathItem, index int, ref string) int {
+// Match the same visit on both call sequences when a train calls at a station
+// twice. At a gap, arrival and departure sides share an occurrence index but
+// refer to different calls.
+func remapGraphStopOccurrence(scheduled, live *ctdf.Journey, index int, ref string, arrivalSide bool) int {
+	scheduledRefs := graphStopRefs(scheduled, arrivalSide)
+	liveRefs := graphStopRefs(live, arrivalSide)
+	if index < 0 || index >= len(scheduledRefs) {
+		return -1
+	}
 	occurrence := 0
-	for i := 0; i < index; i++ {
-		if graphPathStopRef(scheduled, i) == ref {
+	for _, stopRef := range scheduledRefs[:index] {
+		if stopRef == ref {
 			occurrence++
 		}
 	}
-	for i := 0; i <= len(live); i++ {
-		if graphPathStopRef(live, i) == ref {
+	for index, stopRef := range liveRefs {
+		if stopRef == ref {
 			if occurrence == 0 {
-				return i
+				return index
 			}
 			occurrence--
 		}
@@ -434,30 +447,40 @@ func remapGraphStopOccurrence(scheduled, live []*ctdf.JourneyPathItem, index int
 	return -1
 }
 
-func graphPathStopRef(path []*ctdf.JourneyPathItem, index int) string {
-	if index < len(path) && path[index] != nil {
-		return path[index].OriginStopRef
+func graphStopRefs(journey *ctdf.Journey, arrivalSide bool) []string {
+	if journey == nil {
+		return nil
 	}
-	if index == len(path) && index > 0 && path[index-1] != nil {
-		return path[index-1].DestinationStopRef
+	refs := make([]string, 0, len(journey.Calls))
+	if arrivalSide {
+		if len(journey.Calls) == 0 {
+			return refs
+		}
+		refs = append(refs, journey.Calls[0].StopRef)
+		for _, destination := range journey.LegCalls() {
+			refs = append(refs, destination.StopRef)
+		}
+		return refs
 	}
-	return ""
+	for _, call := range journey.StopCalls() {
+		refs = append(refs, call.StopRef)
+	}
+	return refs
 }
 
 func graphLegStopIndexes(journey *ctdf.Journey, item *ctdf.JourneyPlanRouteItem) (int, int) {
 	boardingIndex := -1
 	destinationIndex := -1
-	for index, path := range journey.Path {
-		if path == nil {
-			continue
-		}
-		if boardingIndex < 0 && path.OriginStopRef == item.OriginStopRef {
+	index := 0
+	for origin, destination := range journey.LegCalls() {
+		if boardingIndex < 0 && origin.StopRef == item.OriginStopRef {
 			boardingIndex = index
 		}
-		if boardingIndex >= 0 && path.DestinationStopRef == item.DestinationStopRef {
+		if boardingIndex >= 0 && destination.StopRef == item.DestinationStopRef {
 			destinationIndex = index + 1
 			break
 		}
+		index++
 	}
 	return boardingIndex, destinationIndex
 }

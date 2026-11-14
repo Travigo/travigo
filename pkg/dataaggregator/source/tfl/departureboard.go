@@ -324,30 +324,19 @@ func departureBoardDirection(entry *ctdf.DepartureBoard, stopIDs []string, board
 
 	var adjacentStopRef string
 	closestTimeDifference := time.Duration(math.MaxInt64)
-	for pathIndex, pathItem := range entry.Journey.Path {
-		if pathItem == nil {
-			continue
+	for origin, destination := range entry.Journey.LegCalls() {
+		stopRef := origin.StopRef
+		candidateAdjacentStopRef := destination.StopRef
+		candidateTime := origin.Departure
+		if candidateTime.IsZero() {
+			candidateTime = origin.Arrival
 		}
-
-		var stopRef string
-		var candidateAdjacentStopRef string
-		var candidateTime time.Time
 		if boardType.IsArrival() {
-			stopRef = pathItem.DestinationStopRef
-			candidateAdjacentStopRef = pathItem.OriginStopRef
-			candidateTime = pathItem.DestinationArrivalTime
-			if candidateTime.IsZero() && pathIndex+1 < len(entry.Journey.Path) {
-				nextPathItem := entry.Journey.Path[pathIndex+1]
-				if nextPathItem != nil && nextPathItem.OriginStopRef == stopRef {
-					candidateTime = nextPathItem.OriginArrivalTime
-				}
-			}
-		} else {
-			stopRef = pathItem.OriginStopRef
-			candidateAdjacentStopRef = pathItem.DestinationStopRef
-			candidateTime = pathItem.OriginDepartureTime
-			if candidateTime.IsZero() {
-				candidateTime = pathItem.OriginArrivalTime
+			stopRef = destination.StopRef
+			candidateAdjacentStopRef = origin.StopRef
+			candidateTime = destination.ArrivalTime()
+			if candidateTime.IsZero() && !destination.End {
+				candidateTime = destination.Arrival
 			}
 		}
 		if !util.ContainsString(stopIDs, stopRef) || candidateAdjacentStopRef == "" {

@@ -437,18 +437,20 @@ func (d *graphData) repairLegacySnapshotTimes() error {
 		if err := ctdf.InterpolateMissingJourneyTimes(journey); err != nil {
 			return fmt.Errorf("repair snapshot journey %s: %w", journey.PrimaryIdentifier, err)
 		}
-		for offset, path := range journey.Path {
+		offset := 0
+		for origin, destination := range journey.LegCalls() {
 			stored := &d.Paths[int(record.PathStart)+offset]
-			stored.OriginDeparture = serviceSeconds(path.OriginDepartureTime)
-			stored.DestinationArrival = serviceSeconds(path.DestinationArrivalTime)
+			stored.OriginDeparture = serviceSeconds(origin.Departure)
+			stored.DestinationArrival = serviceSeconds(destination.ArrivalTime())
 			if _, ok := packDepartureEntry(0, 0, stored.OriginDeparture); !ok {
 				return fmt.Errorf("snapshot journey time remains out of bounds")
 			}
 			if _, ok := packDepartureEntry(0, 0, stored.DestinationArrival); !ok {
 				return fmt.Errorf("snapshot journey time remains out of bounds")
 			}
+			offset++
 		}
-		d.Journeys[index].InitialArrival = serviceSeconds(journey.Path[0].OriginArrivalTime)
+		d.Journeys[index].InitialArrival = serviceSeconds(journey.Calls[0].Arrival)
 		d.Journeys[index].DepartureSeconds = serviceSeconds(journey.DepartureTime)
 		repaired[journeyID(index)] = true
 	}

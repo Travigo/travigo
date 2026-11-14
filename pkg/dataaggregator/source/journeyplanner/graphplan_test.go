@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -108,7 +109,7 @@ func TestPlanArrivingByChoosesLatestDepartureThatMeetsDeadline(t *testing.T) {
 
 func TestApplyRealtimeLegTimesUsesOccurrenceAndRejectsCancelledCall(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{OriginStopRef: "origin", DestinationStopRef: "destination"}}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "destination"})}
 	journey.RealtimeJourney = &ctdf.RealtimeJourney{Journey: journey, Stops: map[string]*ctdf.RealtimeJourneyStops{}}
 	journey.RealtimeJourney.SetRealtimeStop(&ctdf.RealtimeJourneyStops{
 		StopRef:          "origin",
@@ -142,11 +143,11 @@ func TestApplyRealtimeLegTimesUsesOccurrenceAndRejectsCancelledCall(t *testing.T
 
 func TestApplyRealtimeLegTimesUsesGraphOccurrenceForRepeatedStop(t *testing.T) {
 	serviceDate := time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)
-	journey := &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
-		{OriginStopRef: "loop", DestinationStopRef: "middle"},
-		{OriginStopRef: "middle", DestinationStopRef: "loop"},
-		{OriginStopRef: "loop", DestinationStopRef: "destination"},
-	}}
+	journey := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "middle"},
+		&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "loop"},
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "destination"},
+	)}
 	journey.RealtimeJourney = &ctdf.RealtimeJourney{Journey: journey, Stops: map[string]*ctdf.RealtimeJourneyStops{}}
 	journey.RealtimeJourney.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "loop", JourneyStopIndex: 0, Cancelled: true})
 	journey.RealtimeJourney.SetRealtimeStop(&ctdf.RealtimeJourneyStops{StopRef: "loop", JourneyStopIndex: 2, DepartureTime: serviceDate.Add(11 * time.Hour)})
@@ -160,5 +161,37 @@ func TestApplyRealtimeLegTimesUsesGraphOccurrenceForRepeatedStop(t *testing.T) {
 	}
 	if !item.StartTime.Equal(serviceDate.Add(11 * time.Hour)) {
 		t.Fatalf("start time = %v", item.StartTime)
+	}
+}
+
+func TestRemapGraphStopOccurrenceAcrossInsertedCallsAndGaps(t *testing.T) {
+	scheduled := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "loop"},
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "middle"},
+		&ctdf.JourneyPathItem{OriginStopRef: "middle", DestinationStopRef: "loop"},
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "destination"},
+	)}
+	live := &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs(
+		&ctdf.JourneyPathItem{OriginStopRef: "origin", DestinationStopRef: "loop"},
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "inserted"},
+		&ctdf.JourneyPathItem{OriginStopRef: "inserted", DestinationStopRef: "middle"},
+		&ctdf.JourneyPathItem{OriginStopRef: "after-gap", DestinationStopRef: "loop"},
+		&ctdf.JourneyPathItem{OriginStopRef: "loop", DestinationStopRef: "destination"},
+	)}
+
+	for _, arrivalSide := range []bool{false, true} {
+		if got := remapGraphStopOccurrence(scheduled, live, 3, "loop", arrivalSide); got != 4 {
+			t.Fatalf("second loop occurrence (arrivalSide=%v) mapped to %d, want 4", arrivalSide, got)
+		}
+		if got := remapGraphStopOccurrence(scheduled, live, 4, "destination", arrivalSide); got != 5 {
+			t.Fatalf("destination occurrence (arrivalSide=%v) mapped to %d, want 5", arrivalSide, got)
+		}
+	}
+
+	if got, want := graphStopRefs(live, false), []string{"origin", "loop", "inserted", "after-gap", "loop", "destination"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("departure stop refs = %v, want %v", got, want)
+	}
+	if got, want := graphStopRefs(live, true), []string{"origin", "loop", "inserted", "middle", "loop", "destination"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("arrival stop refs = %v, want %v", got, want)
 	}
 }

@@ -88,9 +88,9 @@ func TestHealthAndStatsReturnWhileGraphIsWriteLocked(t *testing.T) {
 
 func TestInvalidJourneyTimesAreRejectedBeforeAllocation(t *testing.T) {
 	for name, change := range map[string]func(*ctdf.Journey){
-		"missing departure": func(j *ctdf.Journey) { j.Path[0].OriginDepartureTime = time.Time{} },
-		"missing arrival":   func(j *ctdf.Journey) { j.Path[0].DestinationArrivalTime = time.Time{} },
-		"out of bounds":     func(j *ctdf.Journey) { j.Path[0].OriginDepartureTime = serviceTime(700000) },
+		"missing departure": func(j *ctdf.Journey) { j.Calls[0].Departure = time.Time{} },
+		"missing arrival":   func(j *ctdf.Journey) { j.Calls[1].Arrival = time.Time{} },
+		"out of bounds":     func(j *ctdf.Journey) { j.Calls[0].Departure = serviceTime(700000) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			data := newGraphData()

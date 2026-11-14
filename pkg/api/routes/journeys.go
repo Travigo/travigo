@@ -22,6 +22,9 @@ func JourneysRouter(router fiber.Router) {
 }
 
 func getJourney(c *fiber.Ctx) error {
+	if err := validateJourneyPathFormat(c); err != nil {
+		return sheriffViewError(c, err)
+	}
 	identifier := c.Params("identifier")
 	realtimeOnly := c.QueryBool("realtime_only", false)
 	views := sheriffViews{
@@ -56,8 +59,7 @@ func getJourney(c *fiber.Ctx) error {
 		}
 		if !realtimeOnly {
 			applyRailAmendment(c, journey, realtimeJourney)
-			journey.GetReferences()
-			journey.GetDeepReferences()
+			hydrateJourneyReferences(journey)
 		}
 		journey.RealtimeJourney = realtimeJourney
 		if realtimeJourney != nil && realtimeJourney.Journey != nil {
@@ -70,14 +72,14 @@ func getJourney(c *fiber.Ctx) error {
 			if journey.RealtimeJourney == nil {
 				journeyReduced = nil
 			} else {
-				journeyReduced, err = marshalWithSheriffView(c, journey.RealtimeJourney, []string{"basic", "detailed"}, sheriffViews{
+				journeyReduced, err = marshalJourneyView(c, journey.RealtimeJourney, []string{"basic", "detailed"}, sheriffViews{
 					"web": {"web-journey-realtime"},
 				})
 			}
 		} else {
 			applyJourneyServiceStopNameOverrides(journey)
 
-			journeyReduced, err = marshalWithSheriffView(c, journey, []string{"basic", "detailed"}, sheriffViews{
+			journeyReduced, err = marshalJourneyView(c, journey, []string{"basic", "detailed"}, sheriffViews{
 				"web":          {"web-journey"},
 				"saved":        {"web-saved"},
 				"notification": {"web-notification"},
@@ -93,17 +95,27 @@ func getJourney(c *fiber.Ctx) error {
 }
 
 func applyJourneyServiceStopNameOverrides(journey *ctdf.Journey) {
-	if journey == nil {
+	if journey == nil || journey.Service == nil || len(journey.Service.StopNameOverrides) == 0 {
 		return
 	}
 
-	for _, pathItem := range journey.Path {
-		if pathItem == nil {
+	for index := range journey.Calls {
+		stop := journey.Calls[index].Stop
+		if stop == nil {
 			continue
 		}
-
-		pathItem.OriginStop.UpdateNameFromServiceOverrides(journey.Service)
-		pathItem.DestinationStop.UpdateNameFromServiceOverrides(journey.Service)
+		for _, stopID := range stop.GetAllStopIDs() {
+			name := journey.Service.StopNameOverrides[stopID]
+			if name == "" {
+				continue
+			}
+			if name != stop.PrimaryName {
+				adapted := *stop
+				adapted.PrimaryName = name
+				journey.Calls[index].Stop = &adapted
+			}
+			break
+		}
 	}
 }
 

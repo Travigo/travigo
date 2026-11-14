@@ -3,6 +3,8 @@ package ctdf
 import (
 	"fmt"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // InterpolateMissingJourneyTimes resolves untimed intermediate calls evenly
@@ -10,22 +12,41 @@ import (
 // times are preserved, including service-day times beyond 24:00. Missing endpoint
 // times and backwards timetables are rejected rather than invented.
 func InterpolateMissingJourneyTimes(journey *Journey) error {
-	if journey == nil || len(journey.Path) == 0 {
+	if journey == nil || journey.Calls == nil {
 		return fmt.Errorf("journey has no path")
 	}
-	type call struct{ arrival, departure time.Time }
-	calls := make([]call, len(journey.Path)+1)
-	for index, path := range journey.Path {
-		if path == nil {
-			return fmt.Errorf("nil journey path at %d", index)
-		}
-		arrival := path.OriginArrivalTime
-		if index > 0 && !journey.Path[index-1].DestinationArrivalTime.IsZero() {
-			arrival = journey.Path[index-1].DestinationArrivalTime
-		}
-		calls[index] = call{arrival, path.OriginDepartureTime}
+	if len(journey.Calls) == 0 {
+		return nil
 	}
-	calls[len(calls)-1].arrival = journey.Path[len(journey.Path)-1].DestinationArrivalTime
+	if journey.LegCount() == 0 {
+		return fmt.Errorf("journey has no path")
+	}
+	for start := 0; start < len(journey.Calls); {
+		end := start + 1
+		for end < len(journey.Calls) && !journey.Calls[end-1].End {
+			end++
+		}
+		if err := interpolateJourneySegment(journey.Calls[start:end]); err != nil {
+			return err
+		}
+		start = end
+	}
+	if journey.DepartureTime.IsZero() {
+		journey.DepartureTime = journey.Calls[0].Departure
+	}
+	return nil
+}
+
+func interpolateJourneySegment(segment []JourneyCall) error {
+	type times struct{ arrival, departure time.Time }
+	calls := make([]times, len(segment))
+	for index, call := range segment {
+		arrival := call.ArrivalTime()
+		if arrival.IsZero() && !call.End {
+			arrival = call.Arrival
+		}
+		calls[index] = times{arrival, call.Departure}
+	}
 	for index := range calls {
 		if calls[index].arrival.IsZero() {
 			calls[index].arrival = calls[index].departure
@@ -51,17 +72,23 @@ func InterpolateMissingJourneyTimes(journey *Journey) error {
 		}
 		for index := previous + 1; index < next; index++ {
 			estimated := start.Add((end.Sub(start) / time.Duration(next-previous)) * time.Duration(index-previous)).Truncate(time.Second)
-			calls[index] = call{estimated, estimated}
+			calls[index] = times{estimated, estimated}
 		}
 		previous = next
 	}
-	for index, path := range journey.Path {
-		path.OriginArrivalTime = calls[index].arrival
-		path.OriginDepartureTime = calls[index].departure
-		path.DestinationArrivalTime = calls[index+1].arrival
-	}
-	if journey.DepartureTime.IsZero() {
-		journey.DepartureTime = calls[0].departure
+	for index := range segment {
+		call := &segment[index]
+		if call.Arrival.IsZero() {
+			call.Arrival = calls[index].arrival
+		}
+		if call.IncomingArrival != nil && call.ArrivalTime().IsZero() {
+			// Repair a missing incoming time without replacing the outgoing time.
+			arrival := primitive.NewDateTimeFromTime(calls[index].arrival)
+			call.IncomingArrival = &arrival
+		}
+		if !call.End {
+			call.Departure = calls[index].departure
+		}
 	}
 	return nil
 }

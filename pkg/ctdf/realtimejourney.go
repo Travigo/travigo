@@ -37,7 +37,7 @@ type RealtimeJourney struct {
 	DepartedStop    *Stop  `groups:"basic" bson:"-"`
 
 	NextStopRef string `groups:"basic,web-journey,web-journey-realtime"`
-	// NextStopIndex identifies the next call in Journey.Path's ordered stop list.
+	// NextStopIndex identifies the next call in the journey's ordered stop list.
 	// NextStopRef alone is ambiguous when a journey revisits a stop.
 	NextStopIndex int   `groups:"basic,web-journey,web-journey-realtime"`
 	NextStop      *Stop `groups:"basic" bson:"-"`
@@ -119,29 +119,29 @@ func (r *RealtimeJourney) IsActive() bool {
 	}
 
 	// If the path is nil then we cant do the following checks so just assume true
-	if len(r.Journey.Path) == 0 {
+	if len(r.Journey.Calls) == 0 {
 		return true
 	}
 
-	lastPathItem := r.Journey.Path[len(r.Journey.Path)-1]
+	terminal := &r.Journey.Calls[len(r.Journey.Calls)-1]
 
-	if lastPathItem.DestinationStop == nil {
-		lastPathItem.GetDestinationStop()
+	if terminal.Stop == nil {
+		terminal.GetStop()
 
 		// If we still cant find it then mark as in-active
-		if lastPathItem.DestinationStop == nil {
+		if terminal.Stop == nil {
 			return false
 		}
 	}
 
 	// No proper location then give up and say valid
 	if r.VehicleLocation.Type != "Point" || len(r.VehicleLocation.Coordinates) < 2 ||
-		lastPathItem.DestinationStop.Location == nil || len(lastPathItem.DestinationStop.Location.Coordinates) < 2 {
+		terminal.Stop.Location == nil || len(terminal.Stop.Location.Coordinates) < 2 {
 		return true
 	}
 
 	now := time.Now()
-	lastPathItemArrival := lastPathItem.DestinationArrivalTime
+	lastPathItemArrival := terminal.ArrivalTime()
 	if lastPathItemArrival.IsZero() {
 		lastPathItemArrival = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	} else if r.Journey != nil {
@@ -152,11 +152,11 @@ func (r *RealtimeJourney) IsActive() bool {
 			runDate := r.JourneyRunDate
 			serviceDate = time.Date(runDate.Year(), runDate.Month(), runDate.Day(), 0, 0, 0, 0, now.Location())
 		}
-		lastPathItemArrival = boardScheduledTimeOnServiceDate(r.Journey, len(r.Journey.Path)-1, serviceDate, BoardTypeArrival)
+		lastPathItemArrival = boardScheduledTimeOnServiceDate(r.Journey, r.Journey.LegCount()-1, serviceDate, BoardTypeArrival)
 	}
 	timeFromlastPathItemArrival := lastPathItemArrival.Sub(now).Minutes()
 
-	distanceEndStopLocation := r.VehicleLocation.Distance(lastPathItem.DestinationStop.Location)
+	distanceEndStopLocation := r.VehicleLocation.Distance(terminal.Stop.Location)
 
 	// If we're past the last path item arrival time & vehicle location is less than 150m from it then class journey as in-active
 	return !((timeFromlastPathItemArrival < 0) && (distanceEndStopLocation < 150))
@@ -206,22 +206,24 @@ func (r *RealtimeJourney) RealtimeStop(stopRef string, journeyStopIndex int) *Re
 }
 
 func (r *RealtimeJourney) legacyStopCanMatch(stopRef string, journeyStopIndex int) bool {
-	if r.Journey == nil || len(r.Journey.Path) == 0 {
+	if r.Journey == nil || len(r.Journey.Calls) == 0 {
 		return true
 	}
 	matchCount := 0
 	firstMatchIndex := -1
-	if r.Journey.Path[0].OriginStopRef == stopRef {
+	if r.Journey.Calls[0].StopRef == stopRef {
 		firstMatchIndex = 0
 		matchCount++
 	}
-	for index, path := range r.Journey.Path {
-		if path.DestinationStopRef == stopRef {
+	index := 0
+	for _, destination := range r.Journey.LegCalls() {
+		if destination.StopRef == stopRef {
 			if firstMatchIndex < 0 {
 				firstMatchIndex = index + 1
 			}
 			matchCount++
 		}
+		index++
 	}
 	return matchCount <= 1 || journeyStopIndex == firstMatchIndex
 }

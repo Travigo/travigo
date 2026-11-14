@@ -29,13 +29,14 @@ func (j *Journey) GetTracks() JourneyTrackHydrationStats {
 	if j == nil {
 		return stats
 	}
-	refs := make([]string, 0, len(j.Path)+1)
-	seenRefs := make(map[string]struct{}, len(j.Path)+1)
+	refs := make([]string, 0, len(j.Calls)+1)
+	seenRefs := make(map[string]struct{}, len(j.Calls)+1)
 	if j.TrackRef != "" {
 		seenRefs[j.TrackRef] = struct{}{}
 		refs = append(refs, j.TrackRef)
 	}
-	for _, path := range j.Path {
+	for _, call := range j.Calls {
+		path := call.Outgoing
 		if path != nil && path.TrackRef != "" {
 			if _, seen := seenRefs[path.TrackRef]; !seen {
 				seenRefs[path.TrackRef] = struct{}{}
@@ -85,7 +86,8 @@ func applyJourneyTracks(j *Journey, tracks map[string]JourneyTrack) {
 			j.TrackDataSource = track.DataSource
 		}
 	}
-	for _, path := range j.Path {
+	for _, call := range j.Calls {
+		path := call.Outgoing
 		if path != nil && path.TrackRef != "" {
 			if track, ok := tracks[path.TrackRef]; ok {
 				path.Track = track.Track

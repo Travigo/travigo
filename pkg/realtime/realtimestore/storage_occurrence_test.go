@@ -11,12 +11,16 @@ func TestStoredJourneyRestoresDepartureTimeFromPath(t *testing.T) {
 	departure := time.Date(2026, time.July, 9, 7, 45, 0, 0, time.UTC)
 	stored := storedJourneyFromCTDF(&ctdf.Journey{
 		PrimaryIdentifier: "journey",
-		Path:              []*ctdf.JourneyPathItem{{OriginDepartureTime: departure}},
+		TrackRef:          "journey-track",
+		Calls:             ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{OriginDepartureTime: departure}}...),
 	}, "realtime-journey")
 
 	journey := stored.toCTDF()
 	if !journey.DepartureTime.Equal(departure) {
 		t.Fatalf("departure time = %s, want %s", journey.DepartureTime, departure)
+	}
+	if journey.TrackRef != "journey-track" {
+		t.Fatalf("whole track ref = %q, want journey-track", journey.TrackRef)
 	}
 }
 

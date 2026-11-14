@@ -10,10 +10,10 @@ import (
 func TestDelayPartialLegacyLoopStops(t *testing.T) {
 	scheduled := time.Date(0, 1, 1, 10, 0, 0, 0, time.UTC)
 	run := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
-	j := &ctdf.RealtimeJourney{JourneyRunDate: run, Journey: &ctdf.Journey{Path: []*ctdf.JourneyPathItem{
+	j := &ctdf.RealtimeJourney{JourneyRunDate: run, Journey: &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{
 		{OriginStopRef: "a", DestinationStopRef: "b", OriginDepartureTime: scheduled, DestinationArrivalTime: scheduled.Add(time.Minute)},
 		{OriginStopRef: "b", DestinationStopRef: "a", OriginDepartureTime: scheduled.Add(time.Minute), DestinationArrivalTime: scheduled.Add(2 * time.Minute)},
-	}}, Stops: map[string]*ctdf.RealtimeJourneyStops{"a": {DepartureTime: run.Add(10*time.Hour + 3*time.Minute)}}}
+	}...)}, Stops: map[string]*ctdf.RealtimeJourneyStops{"a": {DepartureTime: run.Add(10*time.Hour + 3*time.Minute)}}}
 	delay, ref := realtimeJourneyDelay(j)
 	if delay != 3*time.Minute || ref != "a" {
 		t.Fatalf("legacy delay=%v stop=%s", delay, ref)
@@ -38,8 +38,9 @@ func BenchmarkDelaySummaries(b *testing.B) {
 			scheduled := time.Date(0, 1, 1, 10, 0, 0, 0, time.UTC)
 			run := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
 			j := &ctdf.RealtimeJourney{JourneyRunDate: run, Journey: &ctdf.Journey{}, Stops: map[string]*ctdf.RealtimeJourneyStops{}}
-			for i := 0; i < n; i++ {
-				j.Journey.Path = append(j.Journey.Path, &ctdf.JourneyPathItem{OriginStopRef: fmt.Sprint(i), DestinationStopRef: fmt.Sprint(i + 1), OriginDepartureTime: scheduled.Add(time.Duration(i) * time.Minute), DestinationArrivalTime: scheduled.Add(time.Duration(i+1) * time.Minute)})
+			for i := 0; i <= n; i++ {
+				clock := scheduled.Add(time.Duration(i) * time.Minute)
+				j.Journey.Calls = append(j.Journey.Calls, ctdf.JourneyCall{StopRef: fmt.Sprint(i), Arrival: clock, Departure: clock, Start: i == 0, End: i == n})
 			}
 			for i := 0; i <= n; i++ {
 				if sparse && i%10 != 0 {
@@ -70,7 +71,7 @@ func baselineRealtimeJourneyDelay(realtimeJourney *ctdf.RealtimeJourney) (time.D
 	maximumDelay := time.Duration(0)
 	delayedStop := ""
 
-	for pathIndex, path := range realtimeJourney.Journey.Path {
+	for pathIndex, path := range realtimeJourney.Journey.Legs() {
 		if path == nil {
 			continue
 		}

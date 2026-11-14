@@ -46,13 +46,14 @@ func hydrateJourneyTracksWithCache(journey *ctdf.Journey) (bool, bool) {
 	if journey == nil {
 		return false, false
 	}
-	refs := make([]string, 0, len(journey.Path)+1)
-	seen := make(map[string]struct{}, len(journey.Path)+1)
+	refs := make([]string, 0, len(journey.Calls)+1)
+	seen := make(map[string]struct{}, len(journey.Calls)+1)
 	if journey.TrackRef != "" {
 		refs = append(refs, journey.TrackRef)
 		seen[journey.TrackRef] = struct{}{}
 	}
-	for _, path := range journey.Path {
+	for _, call := range journey.Calls {
+		path := call.Outgoing
 		if path == nil || path.TrackRef == "" {
 			continue
 		}
@@ -112,7 +113,8 @@ func applyCachedJourneyTracks(journey *ctdf.Journey, tracks map[string]ctdf.Jour
 			journey.TrackDataSource = track.DataSource
 		}
 	}
-	for _, path := range journey.Path {
+	for _, call := range journey.Calls {
+		path := call.Outgoing
 		if path == nil || path.TrackRef == "" {
 			continue
 		}

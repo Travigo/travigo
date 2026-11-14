@@ -342,7 +342,9 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		if dataset.SupportedObjects.Journeys {
 			cleanupOldRecords(database.JourneysRawCollectionName, datasource)
 			if dataset.Format != datasets.DataSetFormatOSMRailTracks {
-				cleanupOldRecords("journey_tracks", datasource)
+				if err := journeytracks.CleanupStaleUnreferencedTracks(context.Background(), datasource); err != nil {
+					return fmt.Errorf("clean stale journey tracks: %w", err)
+				}
 			}
 		}
 	}
@@ -418,7 +420,7 @@ func applyJourneyTracks(dataset *datasets.DataSet, datasource *ctdf.DataSourceRe
 		if dataset.Format == datasets.DataSetFormatOSMRailTracks {
 			return journeytracks.CleanupOSMRailTracks(context.Background(), datasource)
 		}
-		cleanupOldRecords("journey_tracks", datasource)
+		return journeytracks.CleanupStaleUnreferencedTracks(context.Background(), datasource)
 	}
 	return nil
 }

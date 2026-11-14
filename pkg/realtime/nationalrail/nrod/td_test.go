@@ -101,7 +101,7 @@ func TestTDStepsOnlyPositionUniqueRunOnDirectedLeg(t *testing.T) {
 		journey := &ctdf.RealtimeJourney{
 			PrimaryIdentifier: "rail-run", JourneyRunDate: now.Truncate(24 * time.Hour), ActivelyTracked: true,
 			OtherIdentifiers: map[string]string{"TrainID": "011A010106"},
-			Journey:          &ctdf.Journey{PrimaryIdentifier: "rail-schedule", Path: []*ctdf.JourneyPathItem{leg}},
+			Journey:          &ctdf.Journey{PrimaryIdentifier: "rail-schedule", Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{leg}...)},
 		}
 		save := func(run *ctdf.RealtimeJourney) {
 			if err := realtimestore.SaveRealtimeJourney(ctx, run); err != nil {
@@ -199,7 +199,7 @@ func TestTrustPassingPointKeepsDepartureAnchor(t *testing.T) {
 	now := time.Now()
 	journey := &ctdf.RealtimeJourney{
 		PrimaryIdentifier: "rail-run", ActivelyTracked: true, JourneyRunDate: now,
-		Journey: &ctdf.Journey{Path: []*ctdf.JourneyPathItem{{PassingPath: []string{"gb-tiploc-PASS"}}}},
+		Journey: &ctdf.Journey{Calls: ctdf.JourneyCallsFromLegs([]*ctdf.JourneyPathItem{{PassingPath: []string{"gb-tiploc-PASS"}}}...)},
 	}
 	movement := &TrustMovement{TrainID: "021A010106"}
 	departure := now.Add(-time.Minute)

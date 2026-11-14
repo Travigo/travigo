@@ -97,6 +97,10 @@ func TestSiriReusesMatchWhileCheckingGTFSOwnership(t *testing.T) {
 				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
 					{Key: "primaryidentifier", Value: journeyID},
 					{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+					{Key: "calls", Value: bson.A{
+						bson.M{"stopref": "from", "start": true},
+						bson.M{"stopref": "to", "end": true},
+					}},
 				}),
 				mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch),
 			)

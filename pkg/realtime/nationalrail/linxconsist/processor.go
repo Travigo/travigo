@@ -126,15 +126,15 @@ func createRealtimeJourney(ctx context.Context, realtimeJourneyID string, identi
 	var journey *ctdf.Journey
 	journeyPotentials := 0
 	for cursor.Next(ctx) {
-		var potentialJourney *ctdf.Journey
+		var potentialJourney ctdf.Journey
 		if err := cursor.Decode(&potentialJourney); err != nil {
 			log.Error().Err(err).Msg("Failed to decode Journey")
 			continue
 		}
 		journeyPotentials += 1
 
-		if potentialJourney.Availability.MatchDate(journeyDate) {
-			journey = potentialJourney
+		if potentialJourney.Availability != nil && potentialJourney.Availability.MatchDate(journeyDate) {
+			journey = &potentialJourney
 			break
 		}
 	}

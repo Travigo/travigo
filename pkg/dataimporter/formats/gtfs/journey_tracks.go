@@ -31,15 +31,10 @@ type cachedTrackSnap struct {
 	ok       bool
 }
 
-// assignJourneyPathTracks splits a journey shape at each stop. A split is only
-// applied when every stop can be snapped near the shape in its travel order;
-// otherwise Path tracks are left empty and Journey.Track remains the fallback.
-func assignJourneyPathTracks(path []*ctdf.JourneyPathItem, stopTimes []StopTime, stopLocations map[string]ctdf.Location, journeyTrack []ctdf.Location) bool {
-	return assignJourneyPathTracksCached(path, stopTimes, stopLocations, journeyTrack, nil)
-}
-
-func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []StopTime, stopLocations map[string]ctdf.Location, journeyTrack []ctdf.Location, snapCache map[string]cachedTrackSnap) bool {
-	if len(path) == 0 || len(path) != len(stopTimes)-1 || len(journeyTrack) < 2 {
+// assignJourneyCallTracksCached writes split shape geometry directly to each
+// canonical call's outgoing leg. The terminal call has no outgoing geometry.
+func assignJourneyCallTracksCached(calls []ctdf.JourneyCall, stopTimes []StopTime, stopLocations map[string]ctdf.Location, journeyTrack []ctdf.Location, snapCache map[string]cachedTrackSnap) bool {
+	if len(calls) < 2 || len(calls) != len(stopTimes) || len(journeyTrack) < 2 {
 		return false
 	}
 
@@ -58,8 +53,7 @@ func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []Sto
 				snapCache[stopTime.StopID] = cached
 			}
 		}
-		distance, ok := cached.distance, cached.ok
-		if !ok || distance > maxStopShapeDistanceMetres {
+		if !cached.ok || cached.distance > maxStopShapeDistanceMetres {
 			return false
 		}
 		snap := newTrackSnap(cached.segment, cached.fraction, journeyTrack)
@@ -69,8 +63,8 @@ func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []Sto
 		snaps[index] = snap
 	}
 
-	legTracks := make([][]ctdf.Location, len(path))
-	for index := range path {
+	legTracks := make([][]ctdf.Location, len(calls)-1)
+	for index := range legTracks {
 		start := offsetTrackSnap(snaps[index], journeyTrack, -pathCutLeewayMetres)
 		end := offsetTrackSnap(snaps[index+1], journeyTrack, pathCutLeewayMetres)
 		legTracks[index] = trackSlice(start, end, journeyTrack)
@@ -80,9 +74,11 @@ func assignJourneyPathTracksCached(path []*ctdf.JourneyPathItem, stopTimes []Sto
 	}
 
 	for index, track := range legTracks {
-		path[index].Track = track
+		if calls[index].Outgoing == nil {
+			calls[index].Outgoing = &ctdf.JourneyLeg{}
+		}
+		calls[index].Outgoing.Track = track
 	}
-
 	return true
 }
 

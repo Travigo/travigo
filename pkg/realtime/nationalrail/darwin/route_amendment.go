@@ -32,7 +32,7 @@ func scheduleClock(public, working string) time.Time {
 	return time.Time{}
 }
 
-func buildDarwinPath(calls []darwinCall) []*ctdf.JourneyPathItem {
+func buildDarwinCalls(calls []darwinCall) []ctdf.JourneyCall {
 	if len(calls) < 2 {
 		return nil
 	}
@@ -55,18 +55,26 @@ func buildDarwinPath(calls []darwinCall) []*ctdf.JourneyPathItem {
 			last = *clock
 		}
 	}
-	path := make([]*ctdf.JourneyPathItem, 0, len(calls)-1)
+	journeyCalls := make([]ctdf.JourneyCall, 0, len(calls))
 	destination := calls[len(calls)-1].stop.PrimaryName
-	for i, origin := range calls[:len(calls)-1] {
-		next := calls[i+1]
-		path = append(path, &ctdf.JourneyPathItem{
-			OriginStopRef: origin.stop.PrimaryIdentifier, DestinationStopRef: next.stop.PrimaryIdentifier,
-			OriginArrivalTime: origin.arrival, OriginDepartureTime: origin.departure, DestinationArrivalTime: next.arrival,
-			OriginPlatform: origin.platform, DestinationPlatform: next.platform,
-			OriginActivity: origin.activity, DestinationActivity: next.activity, DestinationDisplay: destination,
-		})
+	for index, source := range calls {
+		call := ctdf.JourneyCall{
+			StopRef: source.stop.PrimaryIdentifier, Stop: source.stop,
+			Arrival: source.arrival, Departure: source.departure, Platform: source.platform,
+			Start: index == 0, End: index == len(calls)-1,
+		}
+		if !call.End {
+			call.OriginActivity = source.activity
+		}
+		if !call.Start {
+			call.DestinationActivity = source.activity
+		}
+		if !call.End && destination != "" {
+			call.Outgoing = &ctdf.JourneyLeg{DestinationDisplay: destination}
+		}
+		journeyCalls = append(journeyCalls, call)
 	}
-	return path
+	return journeyCalls
 }
 
 func darwinCallActivity(activity string) []ctdf.JourneyPathItemActivity {
@@ -80,7 +88,7 @@ func darwinCallActivity(activity string) []ctdf.JourneyPathItemActivity {
 	}
 }
 
-func publishDarwinPath(ctx context.Context, run *ctdf.RealtimeJourney, path []*ctdf.JourneyPathItem, date string) error {
+func publishDarwinPath(ctx context.Context, run *ctdf.RealtimeJourney, calls []ctdf.JourneyCall, date string) error {
 	collection := database.GetCollection("journeys")
 	id := railutils.DarwinAmendmentID(run.Journey.PrimaryIdentifier, date)
 	var base ctdf.Journey
@@ -90,15 +98,23 @@ func publishDarwinPath(ctx context.Context, run *ctdf.RealtimeJourney, path []*c
 	amended := base
 	amended.PrimaryIdentifier = id
 	amended.OtherIdentifiers = nil // Keep synthetic schedules out of TrainUID lookups.
-	amended.Path = path
-	amended.DepartureTime = path[0].OriginDepartureTime
-	amended.DestinationDisplay = path[0].DestinationDisplay
+	amended.Calls = append([]ctdf.JourneyCall(nil), calls...)
+	amended.RefreshStopRefs()
+	amended.DepartureTime = calls[0].Departure
+	if calls[0].Outgoing != nil {
+		amended.DestinationDisplay = calls[0].Outgoing.DestinationDisplay
+	} else {
+		amended.DestinationDisplay = ""
+	}
 	amended.Track, amended.TrackRef = nil, ""
 	amended.ReplacesJourneyRefs = []string{base.PrimaryIdentifier}
 	amended.AmendmentStopRefs = base.GetStopRefs()
 	amended.Availability = &ctdf.Availability{Match: []ctdf.AvailabilityRule{{Type: ctdf.AvailabilityDate, Value: date}}}
 	amended.Expiry = run.JourneyRunDate.AddDate(0, 0, 2)
 	amended.DataSource = &ctdf.DataSourceReference{DatasetID: railutils.DarwinAmendmentDataset, ProviderName: "National Rail"}
+	if err := amended.ValidatePath(); err != nil {
+		return err
+	}
 	for _, name := range []string{database.JourneysRawCollectionName, database.JourneysCollectionName} {
 		if _, err := database.GetCollection(name).ReplaceOne(ctx, bson.M{"primaryidentifier": id}, &amended, options.Replace().SetUpsert(true)); err != nil {
 			return err
@@ -115,13 +131,8 @@ func remapDarwinStopState(run *ctdf.RealtimeJourney, updated *ctdf.Journey) {
 	old := *run
 	run.Stops = nil
 	occurrences := map[string]int{}
-	for i := 0; i <= len(old.Journey.Path) && len(old.Journey.Path) > 0; i++ {
-		var ref string
-		if i < len(old.Journey.Path) {
-			ref = old.Journey.Path[i].OriginStopRef
-		} else {
-			ref = old.Journey.Path[i-1].DestinationStopRef
-		}
+	for i, call := range old.Journey.StopCalls() {
+		ref := call.StopRef
 		index := darwinJourneyStopOccurrenceIndex(updated, &ctdf.Stop{PrimaryIdentifier: ref}, occurrences[ref])
 		occurrences[ref]++
 		if previous := old.RealtimeStop(ref, i); previous != nil && index >= 0 {
@@ -136,16 +147,56 @@ func remapDarwinStopState(run *ctdf.RealtimeJourney, updated *ctdf.Journey) {
 
 // Keep the imported path and its geometry when the passenger calling pattern
 // is unchanged. Timing predictions and cancellations still use realtime state.
-func darwinPathChanged(before, after []*ctdf.JourneyPathItem) bool {
-	if len(before) != len(after) {
+func darwinPathChanged(before *ctdf.Journey, after []ctdf.JourneyCall) bool {
+	if before == nil {
 		return true
 	}
-	for i, leg := range before {
-		if leg.OriginStopRef != after[i].OriginStopRef || leg.DestinationStopRef != after[i].DestinationStopRef {
+	beforeIndex := 0
+	var origin, destination *ctdf.JourneyCall
+	var found bool
+	for index := 0; index+1 < len(after); index++ {
+		beforeIndex, origin, destination, found = nextDarwinJourneyLeg(before, beforeIndex)
+		if !found || origin.StopRef != after[index].StopRef || destination.StopRef != after[index+1].StopRef {
 			return true
 		}
+		beforeIndex++
 	}
-	return false
+	_, _, _, found = nextDarwinJourneyLeg(before, beforeIndex)
+	return found
+}
+
+func darwinJourneysPathChanged(before, after *ctdf.Journey) bool {
+	if before == nil || after == nil {
+		return true
+	}
+	beforeIndex, afterIndex := 0, 0
+	var beforeOrigin, beforeDestination, afterOrigin, afterDestination *ctdf.JourneyCall
+	var beforeFound, afterFound bool
+	for {
+		beforeIndex, beforeOrigin, beforeDestination, beforeFound = nextDarwinJourneyLeg(before, beforeIndex)
+		afterIndex, afterOrigin, afterDestination, afterFound = nextDarwinJourneyLeg(after, afterIndex)
+		if !beforeFound || !afterFound {
+			return beforeFound != afterFound
+		}
+		if beforeOrigin.StopRef != afterOrigin.StopRef || beforeDestination.StopRef != afterDestination.StopRef {
+			return true
+		}
+		beforeIndex++
+		afterIndex++
+	}
+}
+
+func nextDarwinJourneyLeg(journey *ctdf.Journey, start int) (int, *ctdf.JourneyCall, *ctdf.JourneyCall, bool) {
+	if journey == nil {
+		return 0, nil, nil, false
+	}
+	for index := start; index+1 < len(journey.Calls); index++ {
+		origin, destination := &journey.Calls[index], &journey.Calls[index+1]
+		if !origin.End && !destination.Start {
+			return index, origin, destination, true
+		}
+	}
+	return len(journey.Calls), nil, nil, false
 }
 
 // Darwin keys updates by run, so a cached run can outlive a timetable change.
@@ -197,7 +248,7 @@ func reconcileDarwinRun(ctx context.Context, run *ctdf.RealtimeJourney, id, uid,
 	}
 	if run != nil && run.Journey != nil && run.Journey.PrimaryIdentifier == journey.PrimaryIdentifier &&
 		run.JourneyRunDate.Format(ctdf.YearMonthDayFormat) == serviceDate {
-		if darwinPathChanged(run.Journey.Path, journey.Path) {
+		if darwinJourneysPathChanged(run.Journey, journey) {
 			remapDarwinStopState(run, journey)
 			run.Journey = journey
 		}
