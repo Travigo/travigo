@@ -22,17 +22,24 @@ type RedisConsumer struct {
 }
 
 func (c *RedisConsumer) Setup() {
-	c.startConsumers()
-	//c.startStatsServer()
+	c.startConsumers(false)
 }
 
-func (c *RedisConsumer) startConsumers() {
+func (c *RedisConsumer) SetupWithStatsAndRetry() {
+	c.startConsumers(true)
+	go c.startStatsServer()
+}
+
+func (c *RedisConsumer) startConsumers(requeueOnPush bool) {
 	// Run the background consumers
 	log.Info().Str("queue", c.QueueName).Msg("Starting consumers")
 
 	queue, err := redis_client.QueueConnection.OpenQueue(c.QueueName)
 	if err != nil {
 		panic(err)
+	}
+	if requeueOnPush {
+		queue.SetPushQueue(queue)
 	}
 	if err := queue.StartConsuming(int64(c.NumberConsumers*c.BatchSize), c.Timeout/3); err != nil {
 		panic(err)
@@ -55,8 +62,8 @@ func (c *RedisConsumer) startStatsServer() {
 	http.Handle(endpoint, NewStatsHandler(redis_client.QueueConnection))
 	http.Handle("/health", NewHealthHandler())
 
-	log.Info().Msgf("Stats server listening on http://localhost:3333%s}", endpoint)
+	log.Info().Msgf("Stats server listening on http://localhost:3333%s", endpoint)
 	if err := http.ListenAndServe(":3333", nil); err != nil {
-		panic(err)
+		log.Error().Err(err).Msg("Queue stats server stopped")
 	}
 }

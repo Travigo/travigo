@@ -2,6 +2,8 @@ package vehicletracker
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -31,6 +33,7 @@ const suppressedSiriMatchTTL = 5 * time.Minute
 const siriLocationRetryTTL = 30 * time.Second
 const gtfsJourneyOwnershipTTL = 8 * time.Hour
 const maxSubmittedEventAge = 5 * time.Minute
+const tflBusFallbackPublishTTL = 25 * time.Second
 
 var touchIdentificationMapping = redis.NewScript(`
 local mapping = redis.call("HMGET", KEYS[1], "journey_id", "last_updated", "fixed_expiry")
@@ -371,15 +374,7 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 
 			// TODO yet another special TfL only thing that shouldn't be here
 			if err != nil && identifyingInformation["OperatorRef"] == "gb-noc-TFLO" {
-				tflEventBytes, _ := json.Marshal(map[string]string{
-					"Line":                     identifyingInformation["PublishedLineName"],
-					"DirectionRef":             identifyingInformation["DirectionRef"],
-					"NumberPlate":              vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier,
-					"OriginRef":                identifyingInformation["OriginRef"],
-					"DestinationRef":           identifyingInformation["DestinationRef"],
-					"OriginAimedDepartureTime": identifyingInformation["OriginAimedDepartureTime"],
-				})
-				consumer.TfLBusQueue.PublishBytes(tflEventBytes)
+				publishTfLBusFallback(consumer.TfLBusQueue, vehicleUpdateEvent, identifyingInformation)
 			}
 		} else if sourceType == "GTFS-RT" {
 			journeyIdentifier := identifiers.GTFSRT{
@@ -487,6 +482,56 @@ func (consumer *BatchConsumer) identifyVehicle(vehicleUpdateEvent *VehicleUpdate
 	}
 
 	return journeyID
+}
+
+func publishTfLBusFallback(queue rmq.Queue, event *VehicleUpdateEvent, identifyingInformation map[string]string) {
+	if event.VehicleLocationUpdate == nil {
+		return
+	}
+	plate := event.VehicleLocationUpdate.VehicleIdentifier
+	line := identifyingInformation["PublishedLineName"]
+	if plate == "" || line == "" {
+		return
+	}
+
+	departure := identifyingInformation["OriginAimedDepartureTime"]
+	identity := fmt.Sprintf("%s\x00%s\x00%s", line, plate, departure)
+	if departure == "" {
+		identity = event.LocalID
+	}
+	if identity == "" {
+		return
+	}
+	digest := sha256.Sum256([]byte(identity))
+	deduplicationKey := "tfl-bus-fallback:" + hex.EncodeToString(digest[:])
+	ctx := context.Background()
+	claimed, err := redis_client.Client.SetNX(ctx, deduplicationKey, "1", tflBusFallbackPublishTTL).Result()
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to claim TfL bus fallback publish")
+		return
+	}
+	if !claimed {
+		return
+	}
+
+	fallbackEvent := map[string]any{
+		"LocalID":                  event.LocalID,
+		"SubmittedAt":              time.Now().UTC(),
+		"Line":                     line,
+		"DirectionRef":             identifyingInformation["DirectionRef"],
+		"NumberPlate":              plate,
+		"OriginRef":                identifyingInformation["OriginRef"],
+		"DestinationRef":           identifyingInformation["DestinationRef"],
+		"OriginAimedDepartureTime": identifyingInformation["OriginAimedDepartureTime"],
+	}
+	payload, err := json.Marshal(fallbackEvent)
+	if err == nil {
+		err = queue.PublishBytes(payload)
+	}
+	if err != nil {
+		_ = redis_client.Client.Del(ctx, deduplicationKey).Err()
+		log.Warn().Err(err).Str("line", line).Str("vehicle", plate).Msg("Failed to publish TfL bus fallback event")
+	}
 }
 
 func gtfsJourneyOwnershipKey(linkedDataset, vehicleID, timeframe string) string {

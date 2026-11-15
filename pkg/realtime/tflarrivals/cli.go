@@ -152,7 +152,7 @@ func RegisterCLI() *cli.Command {
 						Consumer:        NewBusBatchConsumer(),
 					}
 
-					redisConsumer.Setup()
+					redisConsumer.SetupWithStatsAndRetry()
 
 					signals := make(chan os.Signal, 1)
 					signal.Notify(signals, syscall.SIGINT)
