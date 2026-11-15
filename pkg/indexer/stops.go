@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -35,6 +34,23 @@ func IndexStops(ctx context.Context) error {
 	versions := database.GetCollection("dataset_versions")
 	if err := invalidateRetiredStopIndexes(ctx, versions); err != nil {
 		return err
+	}
+	// A missing shared index invalidates every dataset checkpoint. Checking this
+	// before rebuilding any dataset prevents the first rebuild from making the
+	// index exist and hiding the missing documents from later datasets.
+	exists, err := indexExists(ctx, stopDatasetIndexName(""))
+	if err != nil {
+		return err
+	}
+	legacyIndexes, err := hasLegacyStopIndexes(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists || legacyIndexes {
+		if _, err := versions.UpdateMany(ctx, bson.M{"indexedstopsversion": bson.M{"$exists": true}},
+			bson.M{"$unset": bson.M{"indexedstopsversion": ""}}); err != nil {
+			return fmt.Errorf("invalidate stop index checkpoints for missing shared index: %w", err)
+		}
 	}
 	for _, dataset := range manager.GetRegisteredDataSets() {
 		if !dataset.SupportedObjects.Stops ||
@@ -157,8 +173,8 @@ func indexStopDataset(ctx context.Context, versions *mongo.Collection, datasetID
 	return nil
 }
 
-func stopDatasetIndexName(dataset string) string {
-	return fmt.Sprintf("travigo-stops-%s", dataset)
+func stopDatasetIndexName(_ string) string {
+	return "travigo-stops"
 }
 
 // DeleteStopDatasetIndex removes the search index of a retired stop dataset.
@@ -166,7 +182,53 @@ func DeleteStopDatasetIndex(ctx context.Context, datasetID string) error {
 	if datasetID == "" || strings.ContainsAny(datasetID, "*,?/%\\") {
 		return fmt.Errorf("invalid dataset ID for stop index deletion: %q", datasetID)
 	}
-	return deleteIndex(ctx, stopDatasetIndexName(datasetID))
+	if err := deleteStopDatasetDocuments(ctx, datasetID); err != nil {
+		return err
+	}
+	// Remove this datasource's old index too, so retirement also cleans up
+	// installations that have not yet completed the shared-index migration.
+	return deleteIndex(ctx, fmt.Sprintf("travigo-stops-%s", datasetID))
+}
+
+func deleteStopDatasetDocuments(ctx context.Context, datasetID string) error {
+	indexName := stopDatasetIndexName("")
+	exists, err := indexExists(ctx, indexName)
+	if err != nil || !exists {
+		return err
+	}
+	body, err := json.Marshal(map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{"DatasetID": datasetID},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("encode stop dataset deletion query: %w", err)
+	}
+	refresh := true
+	request := esapi.DeleteByQueryRequest{
+		Index:   []string{indexName},
+		Body:    bytes.NewReader(body),
+		Refresh: &refresh,
+	}
+	resp, err := request.Do(ctx, elastic_client.Client)
+	if err != nil {
+		return fmt.Errorf("delete stop dataset documents: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.IsError() {
+		return fmt.Errorf("delete stop dataset documents: %s", resp.String())
+	}
+	var result struct {
+		TimedOut bool              `json:"timed_out"`
+		Failures []json.RawMessage `json:"failures"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode stop dataset deletion result: %w", err)
+	}
+	if result.TimedOut || len(result.Failures) > 0 {
+		return fmt.Errorf("delete stop dataset documents incomplete: timed_out=%t failures=%d", result.TimedOut, len(result.Failures))
+	}
+	return nil
 }
 
 func indexExists(ctx context.Context, indexName string) (bool, error) {
@@ -198,34 +260,77 @@ func deleteIndex(ctx context.Context, indexName string) error {
 	return nil
 }
 
-func deleteLegacyStopIndexes(ctx context.Context) {
+func deleteLegacyStopIndexes(ctx context.Context) error {
 	resp, err := elastic_client.Client.Cat.Indices(
 		elastic_client.Client.Cat.Indices.WithContext(ctx),
 		elastic_client.Client.Cat.Indices.WithIndex("travigo-stops-*"),
 		elastic_client.Client.Cat.Indices.WithFormat("json"),
 	)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list legacy stop indexes")
-		return
+		return fmt.Errorf("list legacy stop indexes: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.IsError() {
+		return fmt.Errorf("list legacy stop indexes: %s", resp.Status())
+	}
 
 	var indexes []struct {
 		Index string `json:"index"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&indexes); err != nil {
-		log.Error().Err(err).Msg("Failed to decode stop indexes")
-		return
+		return fmt.Errorf("decode stop indexes: %w", err)
 	}
 
-	legacyPattern := regexp.MustCompile(`^travigo-stops-[0-9]+$`)
 	for _, index := range indexes {
-		if legacyPattern.MatchString(index.Index) {
+		if index.Index != stopDatasetIndexName("") {
 			if err := deleteIndex(ctx, index.Index); err != nil {
-				log.Error().Err(err).Str("index", index.Index).Msg("Failed to delete legacy stop index")
+				return fmt.Errorf("delete legacy stop index %s: %w", index.Index, err)
 			}
 		}
 	}
+	return nil
+}
+
+func setStopIndexReplicas(ctx context.Context, replicas int) error {
+	exists, err := indexExists(ctx, stopDatasetIndexName(""))
+	if err != nil || !exists {
+		return err
+	}
+	request := esapi.IndicesPutSettingsRequest{
+		Index: []string{stopDatasetIndexName("")},
+		Body:  strings.NewReader(fmt.Sprintf(`{"index":{"number_of_replicas":%d}}`, replicas)),
+	}
+	resp, err := request.Do(ctx, elastic_client.Client)
+	if err != nil {
+		return fmt.Errorf("set stop index replicas: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.IsError() {
+		return fmt.Errorf("set stop index replicas: %s", resp.String())
+	}
+	return nil
+}
+
+func hasLegacyStopIndexes(ctx context.Context) (bool, error) {
+	resp, err := elastic_client.Client.Cat.Indices(
+		elastic_client.Client.Cat.Indices.WithContext(ctx),
+		elastic_client.Client.Cat.Indices.WithIndex("travigo-stops-*"),
+		elastic_client.Client.Cat.Indices.WithFormat("json"),
+	)
+	if err != nil {
+		return false, fmt.Errorf("list legacy stop indexes: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.IsError() {
+		return false, fmt.Errorf("list legacy stop indexes: %s", resp.Status())
+	}
+	var indexes []struct {
+		Index string `json:"index"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&indexes); err != nil {
+		return false, fmt.Errorf("decode legacy stop indexes: %w", err)
+	}
+	return len(indexes) > 0, nil
 }
 
 func createStopIndex(ctx context.Context, indexName string) error {
@@ -237,10 +342,11 @@ func createStopIndex(ctx context.Context, indexName string) error {
 	mapping := `{
 		"settings": {
 			"number_of_shards": 1,
-			"number_of_replicas": 1
+			"number_of_replicas": 0
 		},
 		"mappings": {
 			"properties": {
+				"DatasetID": {"type": "keyword"},
 				"Location": {
 					"properties": {
 						"coordinates": {
@@ -335,13 +441,19 @@ func createStopIndex(ctx context.Context, indexName string) error {
 }
 
 func rebuildStopIndex(ctx context.Context, indexName, datasetID string) error {
-	// Stop search uses the dataset index directly. Replacing it in place
-	// preserves that contract, but it can be partial until the rebuild finishes.
-	if err := deleteIndex(ctx, indexName); err != nil {
+	// Dataset documents are replaced independently inside one shared index.
+	// A failed rebuild can be retried by deleting this dataset's partial rows.
+	if err := deleteStopDatasetDocuments(ctx, datasetID); err != nil {
 		return err
 	}
-	if err := createStopIndex(ctx, indexName); err != nil {
+	exists, err := indexExists(ctx, indexName)
+	if err != nil {
 		return err
+	}
+	if !exists {
+		if err := createStopIndex(ctx, indexName); err != nil {
+			return err
+		}
 	}
 
 	bulk, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
@@ -487,6 +599,7 @@ func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.Bulk
 			}
 
 			jsonStop, err := json.Marshal(map[string]interface{}{
+				"DatasetID":         datasetID,
 				"PrimaryIdentifier": stop.PrimaryIdentifier,
 				"OtherIdentifiers":  stop.OtherIdentifiers,
 				"PrimaryName":       stop.PrimaryName,
@@ -499,7 +612,7 @@ func indexStopsFromMongo(ctx context.Context, datasetID string, bulk esutil.Bulk
 				return fmt.Errorf("encode stop %s: %w", stop.PrimaryIdentifier, err)
 			}
 			if err := bulk.Add(ctx, esutil.BulkIndexerItem{
-				DocumentID: stop.PrimaryIdentifier,
+				DocumentID: datasetID + ":" + stop.PrimaryIdentifier,
 				Action:     "index",
 				Body:       bytes.NewReader(jsonStop),
 				OnFailure: func(_ context.Context, item esutil.BulkIndexerItem, response esutil.BulkIndexerResponseItem, err error) {

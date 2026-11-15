@@ -33,7 +33,12 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					deleteLegacyStopIndexes(c.Context)
+					if err := deleteLegacyStopIndexes(c.Context); err != nil {
+						return err
+					}
+					if err := setStopIndexReplicas(c.Context, 1); err != nil {
+						return err
+					}
 
 					return nil
 				},
