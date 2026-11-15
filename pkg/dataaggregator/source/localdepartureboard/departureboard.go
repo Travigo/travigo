@@ -396,13 +396,15 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 	journeysCollection := database.GetCollection("journeys")
 	currentTime := time.Now()
 
-	// This projection excludes values we dont care about - the main ones being path.*
-	// Reduces memory usage and execution time
+	// The stop reference arrays are used to find matching journeys. The board
+	// builds its results from the ordered calls.
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "creationdatetime", Value: 0},
 		bson.E{Key: "modificationdatetime", Value: 0},
 		bson.E{Key: "direction", Value: 0},
+		bson.E{Key: "originstoprefs", Value: 0},
+		bson.E{Key: "destinationstoprefs", Value: 0},
 		bson.E{Key: "track", Value: 0},
 		bson.E{Key: "trackref", Value: 0},
 		bson.E{Key: "calls.outgoing.trackref", Value: 0},
