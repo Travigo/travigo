@@ -39,9 +39,19 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 	// Schedules
 	for _, schedule := range p.Schedules {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", schedule.SSD, schedule.UID)
-		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+		snapshot, _ := realtimestore.FindForMergeUpdate(context.Background(), realtimeJourneyID)
+		var realtimeJourney *ctdf.RealtimeJourney
+		if snapshot != nil {
+			realtimeJourney = snapshot.Journey
+		}
 		if realtimeJourney == nil && schedule.RID != "" {
-			realtimeJourney, _ = realtimestore.FindByMapping(context.Background(), "nationalrailrid", schedule.RID)
+			mapped, _ := realtimestore.FindByMapping(context.Background(), "nationalrailrid", schedule.RID)
+			if mapped != nil {
+				snapshot, _ = realtimestore.FindForMergeUpdate(context.Background(), mapped.PrimaryIdentifier)
+				if snapshot != nil {
+					realtimeJourney = snapshot.Journey
+				}
+			}
 		}
 
 		realtimeJourney, err := reconcileDarwinRun(context.Background(), realtimeJourney, realtimeJourneyID, schedule.UID, schedule.SSD, now, datasource)
@@ -50,6 +60,9 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			continue
 		}
 		if realtimeJourney == nil {
+			continue
+		}
+		if snapshot == nil {
 			continue
 		}
 
@@ -165,7 +178,8 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			realtimeJourney.DataSource = datasource
 		}
 		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
-		if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+		snapshot.Journey = realtimeJourney
+		if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
 			log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to save Darwin schedule realtime state")
 			continue
 		}
@@ -177,15 +191,15 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 	}
 
 	// Parse Train Statuses
-	// Performance Review [Set L] [PR102] [P2] (realtime): Status, schedule, formation and loading
-	// sections independently fetch the same run, and several rewrite the full
-	// snapshot. Group work by canonical run within a frame, batch mapping/detail
-	// reads, and apply updates in their existing semantic order before publishing
-	// the final state/event diff. Keep allocation/loading TTLs separate and combine
-	// this with cross-writer version checks, rather than caching mutable snapshots.
+	// Schedule and status updates use optimistic merge saves because they can
+	// overlap TRUST movement updates in another process.
 	for _, trainStatus := range p.TrainStatuses {
 		realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", trainStatus.SSD, trainStatus.UID)
-		realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+		snapshot, _ := realtimestore.FindForMergeUpdate(context.Background(), realtimeJourneyID)
+		var realtimeJourney *ctdf.RealtimeJourney
+		if snapshot != nil {
+			realtimeJourney = snapshot.Journey
+		}
 
 		realtimeJourney, err := reconcileDarwinRun(context.Background(), realtimeJourney, realtimeJourneyID, trainStatus.UID, trainStatus.SSD, now, datasource)
 		if err != nil {
@@ -286,7 +300,13 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 			})
 		}
 
-		realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+		if snapshot == nil {
+			continue
+		}
+		snapshot.Journey = realtimeJourney
+		if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
+			log.Error().Err(err).Str("journey", realtimeJourneyID).Msg("Failed to save Darwin train status")
+		}
 	}
 
 	// Station Messages
@@ -427,7 +447,18 @@ func (p *PushPortData) UpdateRealtimeJourneys() {
 				}
 			}
 
-			realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+			snapshot, err := realtimestore.FindForMergeUpdate(context.Background(), realtimeJourney.PrimaryIdentifier)
+			if err != nil {
+				log.Error().Err(err).Str("journey", realtimeJourney.PrimaryIdentifier).Msg("Failed to read Darwin formation loading state")
+				continue
+			}
+			if snapshot.Journey == nil {
+				continue
+			}
+			snapshot.Journey.Occupancy = realtimeJourney.Occupancy
+			if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
+				log.Error().Err(err).Str("journey", realtimeJourney.PrimaryIdentifier).Msg("Failed to save Darwin formation loading")
+			}
 		}
 	}
 }

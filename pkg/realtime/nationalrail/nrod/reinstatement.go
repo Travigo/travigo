@@ -19,18 +19,28 @@ type TrustReinstatement struct {
 
 func (r *TrustReinstatement) Process(stompClient *StompClient) {
 	now := time.Now()
-	realtimeJourney, _ := realtimestore.FindByMapping(context.Background(), "TrainID", r.TrainID)
-
-	if realtimeJourney == nil {
+	lookup, _ := realtimestore.FindByMapping(context.Background(), "TrainID", r.TrainID)
+	if lookup == nil {
 		log.Debug().Str("trainid", r.TrainID).Str("toc", r.OperatorID).Msg("Could not find Realtime Journey for train reinstatement")
 		return
 	}
+	snapshot, err := realtimestore.FindForMergeUpdate(context.Background(), lookup.PrimaryIdentifier)
+	if err != nil || snapshot.Journey == nil {
+		if err != nil {
+			log.Error().Err(err).Str("trainid", r.TrainID).Msg("Failed to read realtime journey for reinstatement")
+		}
+		return
+	}
+	realtimeJourney := snapshot.Journey
 
 	realtimeJourney.ModificationDateTime = now
 	realtimeJourney.ActivelyTracked = true
 	realtimeJourney.Cancelled = false
 
-	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
+		log.Error().Err(err).Str("trainid", r.TrainID).Msg("Failed to save train reinstatement")
+		return
+	}
 
 	// Also delete the service alert for it
 	// TODO this doesnt seem to delete anything

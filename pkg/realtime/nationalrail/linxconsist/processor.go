@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"time"
 
@@ -47,11 +48,14 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 	// preserves needed formation metadata and the allocation TTL; batch independent
 	// reads. Distinguish Redis failures from absence so outages do not trigger the
 	// static MongoDB reconstruction path for every incoming consist.
-	realtimeJourney, _ := realtimestore.FindByIdentifier(ctx, realtimeJourneyID)
+	snapshot, err := realtimestore.FindForMergeUpdate(ctx, realtimeJourneyID)
+	if err != nil {
+		return err
+	}
+	realtimeJourney := snapshot.Journey
 	realtimeJourneyCreated := false
 
 	if realtimeJourney == nil {
-		var err error
 		realtimeJourney, err = createRealtimeJourney(ctx, realtimeJourneyID, identifier, datasource, now)
 		if err != nil {
 			return err
@@ -79,8 +83,35 @@ func ProcessPassengerTrainConsist(ctx context.Context, message PassengerTrainCon
 			realtimeJourney.DataSource = datasource
 		}
 		realtimeJourney.DataSource.Timestamp = datasource.Timestamp
-		if err := realtimestore.SaveRealtimeJourney(ctx, realtimeJourney); err != nil {
-			return err
+		snapshot.Journey = realtimeJourney
+		if err := realtimestore.SaveRealtimeJourneyMerged(ctx, snapshot); err != nil {
+			if !errors.Is(err, realtimestore.ErrRealtimeJourneyConflict) {
+				return err
+			}
+			snapshot, err = realtimestore.FindForMergeUpdate(ctx, realtimeJourneyID)
+			if err != nil {
+				return err
+			}
+			if snapshot.Journey == nil {
+				return realtimestore.ErrRealtimeJourneyConflict
+			}
+			realtimeJourney = snapshot.Journey
+			if realtimeJourney.OtherIdentifiers == nil {
+				realtimeJourney.OtherIdentifiers = map[string]string{}
+			}
+			realtimeJourney.OtherIdentifiers["TrainUID"] = identifier.TrainUID
+			realtimeJourney.OtherIdentifiers["LinxCore"] = identifier.Core
+			realtimeJourney.OtherIdentifiers["LinxHeadcode"] = identifier.Headcode
+			realtimeJourney.OtherIdentifiers["LinxWorkingTimetableHour"] = identifier.WorkingTimetableHour
+			realtimeJourney.OtherIdentifiers["LinxResponsibleRU"] = message.ResponsibleRU
+			realtimeJourney.OtherIdentifiers["LinxTOC"] = toc
+			realtimeJourney.OtherIdentifiers["LinxConsistMessageIdentifier"] = message.MessageHeader.MessageReference.MessageIdentifier
+			if identifier.OperationalTrainNumber != "" {
+				realtimeJourney.OtherIdentifiers["OperationalTrainNumber"] = identifier.OperationalTrainNumber
+			}
+			if err := realtimestore.SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
+				return err
+			}
 		}
 	} else if err := realtimestore.SaveRealtimeJourneyMappings(ctx, realtimeJourney); err != nil {
 		return err

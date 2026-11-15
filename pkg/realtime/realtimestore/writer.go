@@ -2,9 +2,12 @@ package realtimestore
 
 import (
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"time"
@@ -22,15 +25,16 @@ type storedVehicleLocation struct {
 }
 
 const (
-	defaultRealtimeJourneyTTL = 10 * time.Minute
+	defaultRealtimeJourneyTTL    = 10 * time.Minute
+	realtimeJourneyUpdateLockTTL = 5 * time.Second
 	// LINX sends formation/allocation data early in the morning for every train
 	// running that day, so it must remain available before each journey appears.
 	railAllocationTTL = 24 * time.Hour
 )
 
-// ErrRealtimeJourneyConflict means the tracker snapshot was superseded before
-// it could be saved. Callers should read a fresh snapshot and recompute once.
-var ErrRealtimeJourneyConflict = errors.New("realtime journey changed during tracker update")
+// ErrRealtimeJourneyConflict means a realtime journey snapshot was superseded
+// before it could be saved.
+var ErrRealtimeJourneyConflict = errors.New("realtime journey changed during update")
 
 var saveRealtimeJourneySnapshotScript = redis.NewScript(`
 local current = redis.call('GET', KEYS[1])
@@ -55,6 +59,13 @@ if ARGV[5] then
 end
 
 return 1
+`)
+
+var releaseRealtimeJourneyUpdateLockScript = redis.NewScript(`
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+	return redis.call('DEL', KEYS[1])
+end
+return 0
 `)
 
 func realtimeJourneyDetailsKey(identifier string) string {
@@ -203,6 +214,181 @@ func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneyS
 	}
 	publishRealtimeJourneyEvents(snapshot.previous, snapshot.Journey, true)
 	return nil
+}
+
+// SaveRealtimeJourneyMerged retries a full-record update from a snapshot
+// returned by FindForMergeUpdate, merging the caller's changes onto the latest
+// stored version. Disjoint field
+// changes are preserved; when both snapshots change the same field, the
+// incoming update wins.
+func SaveRealtimeJourneyMerged(ctx context.Context, snapshot *RealtimeJourneySnapshot) error {
+	if snapshot == nil || snapshot.Journey == nil {
+		return errors.New("realtime journey snapshot is required")
+	}
+
+	unlock, err := lockRealtimeJourneyUpdate(ctx, snapshot.identifier)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	base := snapshot.previous
+	if base == nil {
+		return SaveRealtimeJourneySnapshot(ctx, snapshot)
+	}
+
+	updated := snapshot.Journey
+	current, err := FindForTrackerUpdate(ctx, snapshot.identifier)
+	if err != nil {
+		return err
+	}
+	if current.Journey == nil {
+		return ErrRealtimeJourneyConflict
+	}
+	for attempt := 0; attempt < 8; attempt++ {
+		candidate := *current
+		candidate.Journey = mergeRealtimeJourney(reflect.ValueOf(base), reflect.ValueOf(updated), reflect.ValueOf(current.Journey)).Interface().(*ctdf.RealtimeJourney)
+		if err := SaveRealtimeJourneySnapshot(ctx, &candidate); !errors.Is(err, ErrRealtimeJourneyConflict) {
+			if err == nil {
+				*snapshot.Journey = *candidate.Journey
+			}
+			return err
+		}
+		latest, err := FindForTrackerUpdate(ctx, snapshot.identifier)
+		if err != nil {
+			return err
+		}
+		if latest.Journey == nil {
+			return ErrRealtimeJourneyConflict
+		}
+		current = latest
+	}
+	return ErrRealtimeJourneyConflict
+}
+
+func lockRealtimeJourneyUpdate(ctx context.Context, identifier string) (func(), error) {
+	var tokenBytes [16]byte
+	if _, err := cryptorand.Read(tokenBytes[:]); err != nil {
+		return nil, err
+	}
+	token := hex.EncodeToString(tokenBytes[:])
+	key := fmt.Sprintf("realtime-journey:update-lock/%s", identifier)
+
+	for {
+		locked, err := redis_client.Client.SetNX(ctx, key, token, realtimeJourneyUpdateLockTTL).Result()
+		if err != nil {
+			return nil, err
+		}
+		if locked {
+			return func() {
+				_ = releaseRealtimeJourneyUpdateLockScript.Run(context.Background(), redis_client.Client, []string{key}, token).Err()
+			}, nil
+		}
+
+		timer := time.NewTimer(10 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func mergeRealtimeJourney(base, updated, current reflect.Value) reflect.Value {
+	if !base.IsValid() || !updated.IsValid() || !current.IsValid() || base.Type() != updated.Type() || base.Type() != current.Type() {
+		return updated
+	}
+	if reflect.DeepEqual(updated.Interface(), base.Interface()) {
+		return current
+	}
+	if reflect.DeepEqual(current.Interface(), base.Interface()) {
+		return updated
+	}
+	switch updated.Kind() {
+	case reflect.Pointer:
+		if base.IsNil() || updated.IsNil() || current.IsNil() {
+			return updated
+		}
+		merged := reflect.New(updated.Type().Elem())
+		merged.Elem().Set(mergeRealtimeJourney(base.Elem(), updated.Elem(), current.Elem()))
+		return merged
+	case reflect.Struct:
+		hasExportedField := false
+		for i := 0; i < updated.NumField(); i++ {
+			if updated.Type().Field(i).PkgPath == "" {
+				hasExportedField = true
+				break
+			}
+		}
+		if !hasExportedField {
+			return updated
+		}
+		merged := reflect.New(updated.Type()).Elem()
+		merged.Set(current)
+		for i := 0; i < updated.NumField(); i++ {
+			if updated.Type().Field(i).PkgPath != "" {
+				continue
+			}
+			merged.Field(i).Set(mergeRealtimeJourney(base.Field(i), updated.Field(i), current.Field(i)))
+		}
+		return merged
+	case reflect.Map:
+		if updated.IsNil() {
+			return updated
+		}
+		merged := reflect.MakeMapWithSize(updated.Type(), current.Len()+updated.Len())
+		if !current.IsNil() {
+			iter := current.MapRange()
+			for iter.Next() {
+				merged.SetMapIndex(iter.Key(), iter.Value())
+			}
+		}
+		keys := map[any]struct{}{}
+		if !base.IsNil() {
+			iter := base.MapRange()
+			for iter.Next() {
+				keys[iter.Key().Interface()] = struct{}{}
+			}
+		}
+		iter := updated.MapRange()
+		for iter.Next() {
+			keys[iter.Key().Interface()] = struct{}{}
+		}
+		for keyValue := range keys {
+			key := reflect.ValueOf(keyValue)
+			baseValue, updatedValue, currentValue := base.MapIndex(key), updated.MapIndex(key), current.MapIndex(key)
+			if !updatedValue.IsValid() {
+				if baseValue.IsValid() {
+					merged.SetMapIndex(key, reflect.Value{})
+				}
+				continue
+			}
+			if !baseValue.IsValid() || !currentValue.IsValid() {
+				merged.SetMapIndex(key, updatedValue)
+				continue
+			}
+			merged.SetMapIndex(key, mergeRealtimeJourney(baseValue, updatedValue, currentValue))
+		}
+		return merged
+	default:
+		return updated
+	}
+}
+
+func cloneRealtimeJourney(journey *ctdf.RealtimeJourney) *ctdf.RealtimeJourney {
+	if journey == nil {
+		return nil
+	}
+	encoded, err := json.Marshal(journey)
+	if err != nil {
+		return journey
+	}
+	var clone ctdf.RealtimeJourney
+	if err := json.Unmarshal(encoded, &clone); err != nil {
+		return journey
+	}
+	return &clone
 }
 
 func SaveRealtimeJourneyMappings(ctx context.Context, realtimeJourney *ctdf.RealtimeJourney) error {

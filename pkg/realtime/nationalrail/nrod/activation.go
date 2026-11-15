@@ -48,7 +48,12 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	journeysCollection := database.GetCollection("journeys")
 
 	realtimeJourneyID := fmt.Sprintf("gb-nationalrailrealtime-%s:%s", a.TrainPlannedOriginTimestamp, a.TrainUID)
-	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+	snapshot, err := realtimestore.FindForMergeUpdate(context.Background(), realtimeJourneyID)
+	if err != nil {
+		log.Error().Err(err).Str("realtimejourney", realtimeJourneyID).Msg("Failed to read realtime journey for activation")
+		return
+	}
+	realtimeJourney := snapshot.Journey
 
 	if realtimeJourney == nil {
 		// Find the journey for this train
@@ -112,9 +117,16 @@ func (a *TrustActivation) Process(stompClient *StompClient) {
 	}
 	realtimeJourney.ModificationDateTime = now
 	realtimeJourney.OtherIdentifiers["TrainID"] = a.TrainID
+	if realtimeJourney.DataSource == nil {
+		realtimeJourney.DataSource = datasource
+	}
 	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
 
-	realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney)
+	snapshot.Journey = realtimeJourney
+	if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
+		log.Error().Err(err).Str("realtimejourney", realtimeJourneyID).Msg("Failed to save train activation")
+		return
+	}
 
 	log.Info().
 		Str("trainid", a.TrainID).

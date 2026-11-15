@@ -803,6 +803,17 @@ func FindForTrackerUpdate(ctx context.Context, identifier string) (*RealtimeJour
 	}, nil
 }
 
+// FindForMergeUpdate returns a deep working copy for source processors that
+// modify nested fields before saving with SaveRealtimeJourneyMerged.
+func FindForMergeUpdate(ctx context.Context, identifier string) (*RealtimeJourneySnapshot, error) {
+	snapshot, err := FindForTrackerUpdate(ctx, identifier)
+	if err != nil || snapshot.Journey == nil {
+		return snapshot, err
+	}
+	snapshot.Journey = cloneRealtimeJourney(snapshot.Journey)
+	return snapshot, nil
+}
+
 func copyRealtimeJourneyForTracker(previous *ctdf.RealtimeJourney) *ctdf.RealtimeJourney {
 	if previous == nil {
 		return nil

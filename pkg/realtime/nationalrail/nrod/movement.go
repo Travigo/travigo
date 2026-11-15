@@ -54,15 +54,23 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 		stopTime = observedAt
 	}
 
-	realtimeJourney, err := realtimestore.FindByMapping(context.Background(), "TrainID", m.TrainID)
+	lookup, err := realtimestore.FindByMapping(context.Background(), "TrainID", m.TrainID)
 	if err != nil {
 		log.Error().Err(err).Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Error finding Realtime Journey for train movement")
 		return
 	}
-	if realtimeJourney == nil || realtimeJourney.OtherIdentifiers["TrainID"] != m.TrainID {
+	if lookup == nil || lookup.OtherIdentifiers["TrainID"] != m.TrainID {
 		log.Debug().Str("trainid", m.TrainID).Str("toc", m.OperatorID).Msg("Could not find Realtime Journey for train movement")
 		return
 	}
+	snapshot, err := realtimestore.FindForMergeUpdate(context.Background(), lookup.PrimaryIdentifier)
+	if err != nil || snapshot.Journey == nil {
+		if err != nil {
+			log.Error().Err(err).Str("trainid", m.TrainID).Msg("Error reading realtime journey for train movement")
+		}
+		return
+	}
+	realtimeJourney := snapshot.Journey
 	if realtimeJourney.Journey == nil {
 		log.Error().Str("realtimejourneyid", realtimeJourney.PrimaryIdentifier).Msg("Somehow realtime journey had no journey attached?")
 		return
@@ -164,13 +172,9 @@ func (m *TrustMovement) Process(stompClient *StompClient) {
 	}
 
 	// Create update
-	// Performance Review [Set L] [PR114] [P1] (realtime): This replaces the complete shared run
-	// snapshot after a separate read. Concurrent Darwin status/schedule writes can
-	// be erased by this older NROD copy, including platform/cancellation changes.
-	// Define field ownership and use atomic patches or compare-and-swap with merge
-	// retries across processors/processes; a local worker mutex is insufficient.
-	// Return write errors and derive events from the successfully committed state.
-	if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
+	// Apply TRUST's changes to the latest run if Darwin or another source won the
+	// optimistic write since this snapshot was read.
+	if err := realtimestore.SaveRealtimeJourneyMerged(context.Background(), snapshot); err != nil {
 		log.Error().Err(err).Msg("Failed to save TRUST movement")
 		return
 	}
