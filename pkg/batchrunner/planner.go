@@ -29,10 +29,10 @@ var postProcessingTaskDefinitions = []fixedTaskDefinition{
 	{id: "import-td-mappings", name: "Import Network Rail SMART reporting points", kind: TaskKindTDMappings, args: []string{"data-importer", "td-mappings"}, group: journeyEnrichmentGroup},
 	{id: "remove-retired-datasets", name: "Remove retired datasets", kind: TaskKindRemoveRetiredDatasets, args: []string{"data-linker", "remove-retired-datasets"}, group: postProcessingGroup},
 	{id: "link-stops", name: "Link stops", kind: TaskKindLinkStops, args: []string{"data-linker", "run", "--type", "stops"}, group: postProcessingGroup},
-	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}, group: postProcessingGroup},
 	{id: "link-services", name: "Link services", kind: TaskKindLinkServices, args: []string{"data-linker", "run", "--type", "services"}, group: postProcessingGroup},
 	{id: "link-journeys", name: "Publish journeys", kind: TaskKindLinkJourneys, args: []string{"data-linker", "run", "--type", "journeys", "--skip-staging"}, group: journeyPublishingGroup},
 	{id: "refresh-stop-services", name: "Refresh stop-services index", kind: TaskKindStopServices, args: []string{"data-linker", "stop-services", "pending", "--timeout", "90m"}, group: journeyPublishingGroup},
+	{id: "link-stop-transfers", name: "Build stop transfers", kind: TaskKindLinkTransfers, args: []string{"data-linker", "run", "--type", "stop-transfers"}, group: journeyPublishingGroup},
 	{id: "index-stops", name: "Index stops", kind: TaskKindIndexStops, args: []string{"indexer", "stops"}, group: journeyPublishingGroup},
 }
 

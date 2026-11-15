@@ -1,6 +1,8 @@
 package stopservices
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"reflect"
 	"sort"
@@ -99,6 +101,75 @@ func TestBatchForStopsReadsPublishedStaticGenerationsAndMergesDatasets(t *testin
 		sort.Strings(sourcePairs)
 		if !reflect.DeepEqual(sourcePairs, wantPairs) {
 			mt.Fatalf("queried generations = %v, want %v", sourcePairs, wantPairs)
+		}
+	})
+}
+
+func TestCurrentStopRefsUsesStablePublishedGenerations(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("current snapshot", func(mt *mtest.T) {
+		state := bson.D{
+			{Key: "_id", Value: "static"},
+			{Key: "initialized", Value: true},
+			{Key: "eventRevision", Value: int64(8)},
+			{Key: "fullRevision", Value: int64(2)},
+			{Key: "fullPublishedRevision", Value: int64(2)},
+			{Key: "sources", Value: bson.D{
+				{Key: "a", Value: bson.D{
+					{Key: "dataset", Value: "static-a"},
+					{Key: "revision", Value: int64(3)},
+					{Key: "publishedRevision", Value: int64(3)},
+					{Key: "activeWriters", Value: int64(0)},
+					{Key: "generation", Value: "generation-a"},
+				}},
+				{Key: "dynamic", Value: bson.D{
+					{Key: "dataset", Value: "gb-networkrail-vstp"},
+					{Key: "generation", Value: "dynamic-generation"},
+				}},
+			}},
+		}
+		stateResponse := func() *bson.D {
+			response := mtest.CreateCursorResponse(0, mt.DB.Name()+"."+StateCollectionName, mtest.FirstBatch, state)
+			return &response
+		}
+		firstState := stateResponse()
+		secondState := stateResponse()
+		mt.AddMockResponses(
+			*firstState,
+			mtest.CreateCursorResponse(0, mt.DB.Name()+"."+RefsCollectionName, mtest.FirstBatch,
+				bson.D{{Key: "_id", Value: "stop-1"}},
+				bson.D{{Key: "_id", Value: "stop-2"}},
+			),
+			*secondState,
+		)
+
+		got, gotHash, revision, err := CurrentStopRefs(mt.Context(), mt.DB, 8)
+		if err != nil {
+			mt.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, map[string]struct{}{"stop-1": {}, "stop-2": {}}) {
+			mt.Fatalf("stop refs = %#v", got)
+		}
+		wantHash := sha256.Sum256([]byte("stop-1\x00stop-2\x00"))
+		if gotHash != hex.EncodeToString(wantHash[:]) || revision != 8 {
+			mt.Fatalf("snapshot hash/revision = %s/%d", gotHash, revision)
+		}
+
+		events := mt.GetAllStartedEvents()
+		if len(events) != 3 || events[0].CommandName != "find" || events[1].CommandName != "aggregate" || events[2].CommandName != "find" {
+			mt.Fatalf("expected state read, aggregate, state recheck; got %#v", events)
+		}
+		pipeline, err := events[1].Command.Lookup("pipeline").Array().Values()
+		if err != nil {
+			mt.Fatalf("read aggregation pipeline: %v", err)
+		}
+		match, ok := pipeline[0].DocumentOK()
+		if !ok {
+			mt.Fatal("first aggregate stage is not a document")
+		}
+		pairs, err := match.Lookup("$match", "$or").Array().Values()
+		if err != nil || len(pairs) != 1 || pairs[0].Document().Lookup("dataset").StringValue() != "static-a" {
+			mt.Fatalf("aggregate source generations = %v, error = %v", pairs, err)
 		}
 	})
 }

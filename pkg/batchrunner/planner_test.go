@@ -114,9 +114,10 @@ func TestStopServicesRefreshTaskSelectionAndOrder(t *testing.T) {
 	all := BuildRunTasks(plan, RunOptions{IncludeAllTasks: true})
 	journeyIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "link-journeys" })
 	refreshIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "refresh-stop-services" })
+	transferIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "link-stop-transfers" })
 	indexIndex := slices.IndexFunc(all, func(task Task) bool { return task.ID == "index-stops" })
-	if journeyIndex < 0 || refreshIndex != journeyIndex+1 || indexIndex != refreshIndex+1 {
-		t.Fatalf("journey refresh order = link:%d refresh:%d index:%d", journeyIndex, refreshIndex, indexIndex)
+	if journeyIndex < 0 || refreshIndex != journeyIndex+1 || transferIndex != refreshIndex+1 || indexIndex != transferIndex+1 {
+		t.Fatalf("journey refresh order = link:%d refresh:%d transfers:%d index:%d", journeyIndex, refreshIndex, transferIndex, indexIndex)
 	}
 }
 
@@ -164,8 +165,9 @@ func TestOSMRailTracksRunsBeforeJourneyPublishing(t *testing.T) {
 	osmIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "global-openstreetmap-gb-national-rail-tracks" })
 	journeyLinkIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "link-journeys" })
 	refreshIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "refresh-stop-services" })
+	transfersIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "link-stop-transfers" })
 	indexStopsIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.ID == "index-stops" })
-	if serviceLinkIndex < 0 || osmIndex < 0 || journeyLinkIndex < 0 || refreshIndex != journeyLinkIndex+1 || indexStopsIndex != refreshIndex+1 || !(serviceLinkIndex < osmIndex && osmIndex < journeyLinkIndex) {
+	if serviceLinkIndex < 0 || osmIndex < 0 || journeyLinkIndex < 0 || refreshIndex != journeyLinkIndex+1 || transfersIndex != refreshIndex+1 || indexStopsIndex != transfersIndex+1 || !(serviceLinkIndex < osmIndex && osmIndex < journeyLinkIndex) {
 		t.Fatalf("pipeline positions: services=%d osm=%d journeys=%d", serviceLinkIndex, osmIndex, journeyLinkIndex)
 	}
 	berthIndex := slices.IndexFunc(tasks, func(task Task) bool { return task.Kind == TaskKindTDMappings })
