@@ -83,10 +83,11 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 				{Key: "serviceref", Value: identifier + ":service"},
 				{Key: "calls", Value: bson.A{
 					bson.D{{Key: "stopref", Value: "origin"}, {Key: "start", Value: true}},
-					bson.D{{Key: "stopref", Value: "dest"}, {Key: "end", Value: true}},
+					bson.D{{Key: "stopref", Value: identifier + ":dest"}, {Key: "end", Value: true}},
 				}},
 			}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".services", mtest.FirstBatch, bson.D{{Key: "primaryidentifier", Value: "service"}}),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".stops", mtest.FirstBatch, bson.D{{Key: "primaryidentifier", Value: identifier + ":dest"}}),
 		)
 		consumers := make([]*BatchConsumer, numConsumers)
 		for i := range consumers {
@@ -106,7 +107,7 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 				<-start
 				entries[i], errs[i] = consumers[i%numConsumers].getCachedTrackedJourney(identifier, time.Now())
 				if errs[i] == nil {
-					entries[i].journeyForProgress()
+					entries[i].journeyForMatching()
 				}
 			}(i)
 		}
@@ -120,10 +121,10 @@ func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 				mt.Fatal("consumers received separate cache entries")
 			}
 		}
-		if got := len(mt.GetAllStartedEvents()); got != 2 {
-			mt.Fatalf("got %d database commands, want one journey and one service load", got)
+		if got := len(mt.GetAllStartedEvents()); got != 3 {
+			mt.Fatalf("got %d database commands, want one journey, service and stop load", got)
 		}
-		if got := entries[0].StopOccurrences["dest"]; len(got) != 1 || got[0] != 1 {
+		if got := entries[0].StopOccurrences[identifier+":dest"]; len(got) != 1 || got[0] != 1 {
 			mt.Fatalf("shared stop occurrences = %v", got)
 		}
 	})

@@ -191,43 +191,24 @@ type journeyView struct {
 }
 
 func (entry *cachedTrackedJourney) journeyForMatching() *ctdf.Journey {
-	return entry.hydratedJourney(&entry.matching)
-}
-
-func (entry *cachedTrackedJourney) journeyForProgress() *ctdf.Journey {
-	return entry.hydratedJourney(nil)
-}
-
-// A nil view needs tracks only. Matching additionally loads stop coordinates
-// for global-track projection and the stop fallback.
-func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView) *ctdf.Journey {
 	entry.hydrationMu.Lock()
 	defer entry.hydrationMu.Unlock()
-	now := time.Now()
-	if view == nil {
-		if entry.matching.expires.After(now) {
-			return entry.matching.journey
-		}
-	} else if view.expires.After(now) {
-		return view.journey
+	if entry.matching.expires.After(time.Now()) {
+		return entry.matching.journey
 	}
 
 	journey := cloneJourneyPath(entry.Journey)
-	stopsComplete := true
-	var stopErr error
-	if view != nil {
-		stopsComplete, stopErr = hydrateDestinationStops(journey)
-		if stopErr != nil {
-			log.Warn().Err(stopErr).Str("journey", entry.journeyID).Msg("Failed to hydrate journey destination stops")
-		}
+	stopsComplete, stopErr := hydrateDestinationStops(journey)
+	if stopErr != nil {
+		log.Warn().Err(stopErr).Str("journey", entry.journeyID).Msg("Failed to hydrate journey destination stops")
 	}
 	tracksOK, tracksComplete := hydrateJourneyTracksWithCache(journey)
-	if view != nil && stopErr == nil && tracksOK {
+	if stopErr == nil && tracksOK {
 		ttl := journeyTrackMissCacheTTL
 		if tracksComplete && stopsComplete {
 			ttl = journeyTrackCacheTTL
 		}
-		*view = journeyView{journey: journey, expires: time.Now().Add(ttl)}
+		entry.matching = journeyView{journey: journey, expires: time.Now().Add(ttl)}
 	}
 	return journey
 }

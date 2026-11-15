@@ -2,11 +2,14 @@ package vehicletracker
 
 import (
 	"context"
+	"slices"
 	"sort"
 	"time"
 
+	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker/identifiers"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -28,7 +31,7 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 	if sourceType == "GTFS-RT" && information["LinkedDataset"] == nyct.SubwayDataset {
 		return ""
 	}
-	if event == nil || event.VehicleLocationUpdate == nil || event.VehicleLocationUpdate.Location.Type != "Point" {
+	if event == nil || event.VehicleLocationUpdate == nil || event.VehicleLocationUpdate.Location.Type != "Point" || len(event.VehicleLocationUpdate.Location.Coordinates) < 2 {
 		return ""
 	}
 	serviceIDs := consumer.locationCandidateServiceIDs(sourceType, information, event.RecordedAt)
@@ -40,37 +43,71 @@ func (consumer *BatchConsumer) identifyJourneyFromLocation(event *VehicleUpdateE
 		serviceDate = event.RecordedAt
 	}
 
-	// Performance Review [Set J] [PR152] [P2] (tracker): Geometry hydration waits
-	// for the availability check below, but inactive candidates still load their
-	// timetable and service. Filter lightweight availability metadata first and
-	// rank eligible candidates before applying the unsorted limit of 100. Reuse
-	// resolved SIRI services after normal matching fails.
-	cursor, err := database.GetCollection("journeys").Find(context.Background(), bson.M{"serviceref": bson.M{"$in": serviceIDs}}, options.Find().SetProjection(bson.M{"primaryidentifier": 1, "availability": 1}).SetLimit(maxLocationCandidates))
+	history := loadVehicleJourneyHistory(context.Background(), event)
+	return matchLocationJourney(serviceIDs, serviceDate, event.VehicleLocationUpdate.Location, history)
+}
+
+func matchLocationJourney(serviceIDs []string, serviceDate time.Time, location ctdf.Location, history *vehicleJourneyHistory) string {
+	journeys, err := loadLocationCandidates(serviceIDs, serviceDate)
 	if err != nil {
 		return ""
 	}
-	defer cursor.Close(context.Background())
 
+	const geometryBatchSize = 16
 	candidates := make([]locationJourneyCandidate, 0, 8)
-	history := loadVehicleJourneyHistory(context.Background(), event)
-	for cursor.Next(context.Background()) {
-		var row struct {
-			PrimaryIdentifier string `bson:"primaryidentifier"`
+	for batch := range slices.Chunk(journeys, geometryBatchSize) {
+		ok, _ := hydrateJourneyTracksWithCache(batch...)
+		if !ok {
+			// An incomplete database read can hide another plausible match.
+			return ""
 		}
-		if err := cursor.Decode(&row); err != nil || row.PrimaryIdentifier == "" {
-			continue
-		}
-		journey, err := consumer.getCachedTrackedJourney(row.PrimaryIdentifier, event.RecordedAt)
-		if err != nil || journey.Journey == nil || (journey.Journey.Availability != nil && !journey.Journey.Availability.MatchDate(serviceDate)) {
-			continue
-		}
-		matchingJourney := journey.journeyForProgress()
-		match, ok := matchJourneyProgress(matchingJourney, event.VehicleLocationUpdate.Location)
-		if ok && match.DistanceMetres <= locationCandidateDistanceMetres {
-			candidates = append(candidates, locationJourneyCandidate{journeyID: row.PrimaryIdentifier, distance: match.DistanceMetres, score: scoreLocationCandidate(match.DistanceMetres, match.JourneyProgress, row.PrimaryIdentifier, history)})
+		for _, journey := range batch {
+			match, ok := matchJourneyProgress(journey, location)
+			if ok && match.DistanceMetres <= locationCandidateDistanceMetres {
+				candidates = append(candidates, locationJourneyCandidate{
+					journeyID: journey.PrimaryIdentifier,
+					distance:  match.DistanceMetres,
+					score:     scoreLocationCandidate(match.DistanceMetres, match.JourneyProgress, journey.PrimaryIdentifier, history),
+				})
+			}
 		}
 	}
 	return selectLocationCandidate(candidates)
+}
+
+func loadLocationCandidates(serviceIDs []string, serviceDate time.Time) ([]*ctdf.Journey, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.LocationCandidateQuery, time.Since(started)) }()
+	ctx := context.Background()
+	// Read only what is needed for date filtering and track-based scoring.
+	// The winning journey is loaded normally when its realtime update is applied.
+	projection := bson.M{
+		"_id": 0, "primaryidentifier": 1, "availability": 1, "trackref": 1,
+		"calls.stopref": 1, "calls.start": 1, "calls.end": 1, "calls.outgoing.trackref": 1,
+	}
+	cursor, err := database.GetCollection("journeys").Find(ctx, bson.M{
+		"serviceref": bson.M{"$in": serviceIDs},
+	}, options.Find().SetProjection(projection).SetLimit(maxLocationCandidates))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var journeys []*ctdf.Journey
+	for cursor.Next(ctx) {
+		var journey ctdf.Journey
+		if err := cursor.Decode(&journey); err != nil || journey.PrimaryIdentifier == "" {
+			continue
+		}
+		if journey.Availability != nil && !journey.Availability.MatchDate(serviceDate) {
+			continue
+		}
+		if len(journey.Calls) == 0 || journey.ValidatePath() != nil {
+			continue
+		}
+		journeys = append(journeys, &journey)
+	}
+	return journeys, cursor.Err()
 }
 
 func (consumer *BatchConsumer) locationCandidateServiceIDs(sourceType string, information map[string]string, observedAt time.Time) []string {

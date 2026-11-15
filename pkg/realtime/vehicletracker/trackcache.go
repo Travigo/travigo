@@ -3,6 +3,7 @@ package vehicletracker
 import (
 	"container/list"
 	"context"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/sync/singleflight"
 )
@@ -42,26 +44,25 @@ var (
 	journeyTrackFetches      singleflight.Group
 )
 
-func hydrateJourneyTracksWithCache(journey *ctdf.Journey) (bool, bool) {
-	if journey == nil {
-		return false, false
-	}
-	refs := make([]string, 0, len(journey.Calls)+1)
-	seen := make(map[string]struct{}, len(journey.Calls)+1)
-	if journey.TrackRef != "" {
-		refs = append(refs, journey.TrackRef)
-		seen[journey.TrackRef] = struct{}{}
-	}
-	for _, call := range journey.Calls {
-		path := call.Outgoing
-		if path == nil || path.TrackRef == "" {
-			continue
+func hydrateJourneyTracksWithCache(journeys ...*ctdf.Journey) (bool, bool) {
+	var refs []string
+	seen := make(map[string]struct{})
+	add := func(ref string) {
+		if _, ok := seen[ref]; ref != "" && !ok {
+			refs = append(refs, ref)
+			seen[ref] = struct{}{}
 		}
-		if _, ok := seen[path.TrackRef]; ok {
-			continue
+	}
+	for _, journey := range journeys {
+		if journey == nil {
+			return false, false
 		}
-		seen[path.TrackRef] = struct{}{}
-		refs = append(refs, path.TrackRef)
+		add(journey.TrackRef)
+		for _, call := range journey.Calls {
+			if call.Outgoing != nil {
+				add(call.Outgoing.TrackRef)
+			}
+		}
 	}
 	if len(refs) == 0 {
 		return true, true
@@ -80,10 +81,14 @@ func hydrateJourneyTracksWithCache(journey *ctdf.Journey) (bool, bool) {
 	}
 
 	var queryErr error
-	if len(missingRefs) > 0 {
-		loadedTracks, err := fetchJourneyTracksCoalesced(missingRefs)
-		queryErr = err
-		for _, reference := range missingRefs {
+	sort.Strings(missingRefs)
+	const trackQueryBatchSize = 128
+	for batch := range slices.Chunk(missingRefs, trackQueryBatchSize) {
+		loadedTracks, err := fetchJourneyTracksCoalesced(batch)
+		if err != nil {
+			queryErr = err
+		}
+		for _, reference := range batch {
 			track, found := loadedTracks[reference]
 			if !found {
 				if err == nil {
@@ -100,9 +105,11 @@ func hydrateJourneyTracksWithCache(journey *ctdf.Journey) (bool, bool) {
 	}
 
 	if queryErr != nil {
-		log.Warn().Err(queryErr).Str("journey", journey.PrimaryIdentifier).Int("track_references", len(missingRefs)).Msg("Failed to hydrate journey tracks")
+		log.Warn().Err(queryErr).Int("journeys", len(journeys)).Int("track_references", len(missingRefs)).Msg("Failed to hydrate journey tracks")
 	}
-	applyCachedJourneyTracks(journey, tracks)
+	for _, journey := range journeys {
+		applyCachedJourneyTracks(journey, tracks)
+	}
 	return queryErr == nil, len(tracks) == len(refs)
 }
 
@@ -126,9 +133,7 @@ func applyCachedJourneyTracks(journey *ctdf.Journey, tracks map[string]ctdf.Jour
 }
 
 func fetchJourneyTracksCoalesced(refs []string) (map[string]ctdf.JourneyTrack, error) {
-	keyRefs := append([]string(nil), refs...)
-	sort.Strings(keyRefs)
-	key := strings.Join(keyRefs, "\x00")
+	key := strings.Join(refs, "\x00")
 	result, err, _ := journeyTrackFetches.Do(key, func() (interface{}, error) {
 		return loadJourneyTracks(refs)
 	})
@@ -139,6 +144,8 @@ func fetchJourneyTracksCoalesced(refs []string) (map[string]ctdf.JourneyTrack, e
 }
 
 func loadJourneyTracks(refs []string) (map[string]ctdf.JourneyTrack, error) {
+	started := time.Now()
+	defer func() { telemetry.Observe(telemetry.JourneyTrackQuery, time.Since(started)) }()
 	cursor, err := database.GetCollection("journey_tracks").Find(context.Background(), bson.M{"primaryidentifier": bson.M{"$in": refs}})
 	if err != nil {
 		return nil, err

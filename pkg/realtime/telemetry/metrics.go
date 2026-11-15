@@ -29,12 +29,14 @@ const (
 	GTFSTripUpdate
 	AlertProcessing
 	TrackedStopQuery
+	LocationCandidateQuery
+	JourneyTrackQuery
 	stageCount
 )
 
 var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis", "siri_services",
 	"siri_candidate_query", "siri_stop_index_query", "tracked_journey_query", "gtfs_journey_query", "alert_journey_query",
-	"siri_trip_identification", "gtfs_trip_identification", "siri_trip_update", "gtfs_trip_update", "alert_processing", "tracked_stop_query",
+	"siri_trip_identification", "gtfs_trip_identification", "siri_trip_update", "gtfs_trip_update", "alert_processing", "tracked_stop_query", "location_candidate_query", "journey_track_query",
 }
 
 type measurement struct{ count, total, max atomic.Int64 }
