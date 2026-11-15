@@ -50,38 +50,52 @@ type siriJourneyCandidates struct {
 
 func getAvailableJourneys(journeysCollection *mongo.Collection, framedVehicleJourneyDate time.Time, query bson.M, exactDeparture time.Time, findOpts ...*options.FindOptions) (siriJourneyCandidates, error) {
 
-	// Keep precisely the fields consumed by availability, functional hashing,
-	// direction, endpoint and departure-time matching.
-	opts := options.Find().SetProjection(bson.D{
-		{Key: "_id", Value: 0},
-		{Key: "primaryidentifier", Value: 1},
-		{Key: "serviceref", Value: 1},
-		{Key: "direction", Value: 1},
-		{Key: "departuretime", Value: 1},
-		{Key: "destinationdisplay", Value: 1},
-		{Key: "availability", Value: 1},
-		{Key: "calls.stopref", Value: 1},
-		{Key: "calls.start", Value: 1},
-		{Key: "calls.end", Value: 1},
-		{Key: "calls.arrival", Value: 1},
-		{Key: "calls.departure", Value: 1},
-	})
-	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, true, append(findOpts, opts)...)
+	return readSiriCandidates(journeysCollection, framedVehicleJourneyDate, query, exactDeparture, telemetry.SiriCandidateDocuments, true, append(findOpts, siriCandidateProjection)...)
 }
 
-func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, documents telemetry.Counter, includePath bool, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
+var siriCandidateProjection = options.Find().SetProjection(bson.D{
+
+	{Key: "_id", Value: 0},
+	{Key: "primaryidentifier", Value: 1},
+	{Key: "serviceref", Value: 1},
+	{Key: "direction", Value: 1},
+	{Key: "departuretime", Value: 1},
+	{Key: "destinationdisplay", Value: 1},
+	{Key: "availability", Value: 1},
+	{Key: "calls.stopref", Value: 1},
+	{Key: "calls.start", Value: 1},
+	{Key: "calls.end", Value: 1},
+	{Key: "calls.arrival", Value: 1},
+	{Key: "calls.departure", Value: 1},
+})
+
+type siriCandidateRows struct {
+	journeys     []*ctdf.Journey
+	count, bytes int
+}
+
+func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, aimed time.Time, documents telemetry.Counter, includePath bool, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
+	var candidates siriJourneyCandidates
+	count, err := scanSiriCandidates(collection, query, documents, includePath, func(journey *ctdf.Journey, _ int) {
+		candidates.add(journey, date, aimed)
+	}, opts...)
+	candidates.count = count
+	return candidates, err
+}
+
+func scanSiriCandidates(collection *mongo.Collection, query bson.M, documents telemetry.Counter, includePath bool, add func(*ctdf.Journey, int), opts ...*options.FindOptions) (int, error) {
 	started := time.Now()
 	defer func() { telemetry.Observe(telemetry.SiriCandidateQuery, time.Since(started)) }()
-	var candidates siriJourneyCandidates
-	defer func() { telemetry.Add(documents, int64(candidates.count)) }()
+	count := 0
+	defer func() { telemetry.Add(documents, int64(count)) }()
 	cursor, err := collection.Find(context.Background(), query, opts...)
 	if err != nil {
-		return candidates, err
+		return 0, err
 	}
 	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
-		candidates.count++
+		count++
 		var decoded ctdf.Journey
 		if err := cursor.Decode(&decoded); err != nil {
 			log.Error().Err(err).Msg("Failed to decode journey")
@@ -89,21 +103,29 @@ func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson
 		}
 		if includePath {
 			if err := decoded.ValidatePath(); err != nil {
-				return candidates, fmt.Errorf("decode SIRI journey path %q: %w", decoded.PrimaryIdentifier, err)
+				return count, fmt.Errorf("decode SIRI journey path %q: %w", decoded.PrimaryIdentifier, err)
 			}
 		}
-		journey := &decoded
-		if !exactDeparture.IsZero() && sameDepartureMinute(journey.DepartureTime.UTC(), exactDeparture) {
-			candidates.exactCount++
-		}
-
-		// if it has no availability then we'll just ignore it
-		if journey.Availability != nil && journey.Availability.MatchDate(date) {
-			candidates.available = append(candidates.available, journey)
-		}
+		add(&decoded, len(cursor.Current))
 	}
+	return count, cursor.Err()
+}
 
-	return candidates, cursor.Err()
+func (rows siriCandidateRows) forEvent(date, exactDeparture time.Time) siriJourneyCandidates {
+	candidates := siriJourneyCandidates{count: rows.count}
+	for _, journey := range rows.journeys {
+		candidates.add(journey, date, exactDeparture)
+	}
+	return candidates
+}
+
+func (candidates *siriJourneyCandidates) add(journey *ctdf.Journey, date, exactDeparture time.Time) {
+	if !exactDeparture.IsZero() && sameDepartureMinute(journey.DepartureTime.UTC(), exactDeparture) {
+		candidates.exactCount++
+	}
+	if journey.Availability != nil && journey.Availability.MatchDate(date) {
+		candidates.available = append(candidates.available, journey)
+	}
 }
 
 func sameDepartureMinute(left, right time.Time) bool {

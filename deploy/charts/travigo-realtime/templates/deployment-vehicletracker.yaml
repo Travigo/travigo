@@ -44,6 +44,10 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+            - name: TRAVIGO_TRACKER_CONSUMERS
+              value: {{ .Values.tracker.consumers | quote }}
+            - name: TRAVIGO_TRACKER_JOURNEY_CACHE_MIB
+              value: {{ .Values.tracker.journeyCacheMiB | quote }}
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
             - name: TRAVIGO_MONGODB_CONNECTION
@@ -85,7 +89,7 @@ spec:
                   key: password
                   optional: false
           resources:
-            {{- toYaml .Values.runner.resources | nindent 12 }}
+            {{- toYaml .Values.tracker.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

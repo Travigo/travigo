@@ -35,10 +35,11 @@ func TestCommittedAgeAndProgress(t *testing.T) {
 	if Snapshot().CommittedEventAge.Count != before+1 {
 		t.Fatal("invalid commit age count")
 	}
-	BatchStarted(0)
-	BatchFinished(0)
+	ConfigureConsumers(17)
+	BatchStarted(16)
+	BatchFinished(16)
 	BatchStarted(999999)
-	if len(Progress()) != 5 || Progress()[0].LastFinishedUnixMS == 0 {
+	if len(Progress()) != 17 || Progress()[16].LastFinishedUnixMS == 0 {
 		t.Fatal("consumer progress missing")
 	}
 }

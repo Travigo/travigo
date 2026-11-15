@@ -17,10 +17,8 @@ import (
 )
 
 // Performance Review [Set J] [PR148] [P2] (tracker): Consumers now share static
-// journeys and coalesce loads. Retained-byte limits and timetable revision
-// invalidation remain follow-up work; mutable realtime state stays outside this cache.
-// Preserve the former aggregate capacity of the per-consumer caches.
-const trackedJourneyCacheMaxEntries = numConsumers * 5000
+// journeys and coalesce loads. Mutable realtime state stays outside this cache.
+const trackedJourneyCacheMaxEntries = 100000
 
 var processTrackedJourneyCache = &trackedJourneyCache{}
 
@@ -29,6 +27,7 @@ type trackedJourneyCache struct {
 	journeyCache                       map[string]*cachedTrackedJourney
 	journeyCacheHead, journeyCacheTail *cachedTrackedJourney
 	loads                              singleflight.Group
+	bytes, maxBytes                    int64
 }
 
 type cachedTrackedJourney struct {
@@ -37,6 +36,7 @@ type cachedTrackedJourney struct {
 	StopKeys        []string
 	LastUsed        time.Time
 	journeyID       string
+	bytes           int64
 	hydrationMu     sync.Mutex
 	matching        journeyView
 	previous, next  *cachedTrackedJourney
@@ -110,7 +110,7 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 			return existing, nil
 		}
 
-		journey, err := loadTrackedJourney(journeyID)
+		journey, bsonBytes, err := loadTrackedJourney(journeyID)
 		if err != nil {
 			return nil, err
 		}
@@ -128,10 +128,13 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 			StopKeys:        journeyDestinationKeys(journey),
 			LastUsed:        now,
 			journeyID:       journeyID,
+			// Include decoded calls, occurrence maps, and the optional matching
+			// view's copied calls. Shared stop and track caches have separate limits.
+			bytes: int64(bsonBytes)*2 + int64(len(journey.Calls))*512 + 1024,
 		}
 		// Keep processing the current event if the service database is temporarily
 		// unavailable, but retry the lookup on the next event for this journey.
-		if serviceErr != nil {
+		if serviceErr != nil || (cache.maxBytes > 0 && entry.bytes > cache.maxBytes) {
 			return entry, nil
 		}
 		cache.journeyCacheMu.Lock()
@@ -139,6 +142,7 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 			cache.journeyCache = map[string]*cachedTrackedJourney{}
 		}
 		cache.journeyCache[journeyID] = entry
+		cache.bytes += entry.bytes
 		cache.touchJourneyCacheLocked(entry)
 		cache.pruneJourneyCacheLocked()
 		cache.journeyCacheMu.Unlock()
@@ -158,7 +162,7 @@ func journeyStopOccurrences(journey *ctdf.Journey) map[string][]int {
 	return occurrences
 }
 
-func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
+func loadTrackedJourney(journeyID string) (*ctdf.Journey, int, error) {
 	var journey *ctdf.Journey
 	journeysCollection := database.GetCollection("journeys")
 	// Read ordered calls directly from MongoDB.
@@ -178,69 +182,7 @@ func loadTrackedJourney(journeyID string) (*ctdf.Journey, error) {
 	}
 	telemetry.ObserveTrackedJourneyLoad(journeyID, time.Since(started))
 
-	return journey, err
-}
-
-func hydrateDestinationStops(journey *ctdf.Journey, projection bson.M) error {
-	if journey == nil || len(journey.Calls) == 0 {
-		return nil
-	}
-
-	stopRefs := make([]string, 0, len(journey.Calls))
-	seenStopRefs := map[string]bool{}
-	for _, pathItem := range journey.LegCalls() {
-		if pathItem.Stop != nil || pathItem.StopRef == "" || seenStopRefs[pathItem.StopRef] {
-			continue
-		}
-
-		seenStopRefs[pathItem.StopRef] = true
-		stopRefs = append(stopRefs, pathItem.StopRef)
-	}
-
-	if len(stopRefs) == 0 {
-		return nil
-	}
-
-	stopsCollection := database.GetCollection("stops")
-	findOptions := options.Find()
-	if projection != nil {
-		findOptions.SetProjection(projection)
-	}
-	cursor, err := stopsCollection.Find(context.Background(), bson.M{
-		"$or": bson.A{
-			bson.M{"primaryidentifier": bson.M{"$in": stopRefs}},
-			bson.M{"otheridentifiers": bson.M{"$in": stopRefs}},
-		},
-	}, findOptions)
-	if err != nil {
-		return err
-	}
-	defer cursor.Close(context.Background())
-
-	stopsByIdentifier := map[string]*ctdf.Stop{}
-	for cursor.Next(context.Background()) {
-		var stop ctdf.Stop
-		if err := cursor.Decode(&stop); err != nil {
-			return err
-		}
-
-		stopCopy := stop
-		stopsByIdentifier[stopCopy.PrimaryIdentifier] = &stopCopy
-		for _, otherIdentifier := range stopCopy.OtherIdentifiers {
-			stopsByIdentifier[otherIdentifier] = &stopCopy
-		}
-	}
-	if err := cursor.Err(); err != nil {
-		return err
-	}
-
-	for _, pathItem := range journey.LegCalls() {
-		if pathItem.Stop == nil {
-			pathItem.Stop = stopsByIdentifier[pathItem.StopRef]
-		}
-	}
-
-	return nil
+	return journey, len(raw), err
 }
 
 type journeyView struct {
@@ -249,16 +191,16 @@ type journeyView struct {
 }
 
 func (entry *cachedTrackedJourney) journeyForMatching() *ctdf.Journey {
-	return entry.hydratedJourney(&entry.matching, bson.M{"primaryidentifier": 1, "otheridentifiers": 1, "location": 1})
+	return entry.hydratedJourney(&entry.matching)
 }
 
 func (entry *cachedTrackedJourney) journeyForProgress() *ctdf.Journey {
-	return entry.hydratedJourney(nil, nil)
+	return entry.hydratedJourney(nil)
 }
 
 // A nil view needs tracks only. Matching additionally loads stop coordinates
 // for global-track projection and the stop fallback.
-func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView, projection bson.M) *ctdf.Journey {
+func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView) *ctdf.Journey {
 	entry.hydrationMu.Lock()
 	defer entry.hydrationMu.Unlock()
 	now := time.Now()
@@ -271,9 +213,10 @@ func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView, projection
 	}
 
 	journey := cloneJourneyPath(entry.Journey)
+	stopsComplete := true
 	var stopErr error
 	if view != nil {
-		stopErr = hydrateDestinationStops(journey, projection)
+		stopsComplete, stopErr = hydrateDestinationStops(journey)
 		if stopErr != nil {
 			log.Warn().Err(stopErr).Str("journey", entry.journeyID).Msg("Failed to hydrate journey destination stops")
 		}
@@ -281,7 +224,7 @@ func (entry *cachedTrackedJourney) hydratedJourney(view *journeyView, projection
 	tracksOK, tracksComplete := hydrateJourneyTracksWithCache(journey)
 	if view != nil && stopErr == nil && tracksOK {
 		ttl := journeyTrackMissCacheTTL
-		if tracksComplete {
+		if tracksComplete && stopsComplete {
 			ttl = journeyTrackCacheTTL
 		}
 		*view = journeyView{journey: journey, expires: time.Now().Add(ttl)}
@@ -357,9 +300,10 @@ func (consumer *trackedJourneyCache) touchJourneyCacheLocked(entry *cachedTracke
 }
 
 func (consumer *trackedJourneyCache) pruneJourneyCacheLocked() {
-	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries {
+	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries || (consumer.maxBytes > 0 && consumer.bytes > consumer.maxBytes) {
 		entry := consumer.journeyCacheTail
 		delete(consumer.journeyCache, entry.journeyID)
+		consumer.bytes -= entry.bytes
 		telemetry.Add(telemetry.CacheEvicted, 1)
 		consumer.journeyCacheTail = entry.previous
 		if entry.previous != nil {

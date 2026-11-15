@@ -28,12 +28,13 @@ const (
 	SiriTripUpdate
 	GTFSTripUpdate
 	AlertProcessing
+	TrackedStopQuery
 	stageCount
 )
 
 var names = [stageCount]string{"identification", "cache", "geometry", "persistence", "diagnostics", "ack", "batch", "redis", "siri_services",
 	"siri_candidate_query", "siri_stop_index_query", "tracked_journey_query", "gtfs_journey_query", "alert_journey_query",
-	"siri_trip_identification", "gtfs_trip_identification", "siri_trip_update", "gtfs_trip_update", "alert_processing",
+	"siri_trip_identification", "gtfs_trip_identification", "siri_trip_update", "gtfs_trip_update", "alert_processing", "tracked_stop_query",
 }
 
 type measurement struct{ count, total, max atomic.Int64 }
@@ -80,6 +81,7 @@ const (
 	SiriExactMatches
 	AlertJourneyCacheHits
 	TrackedJourneyBytes
+	SiriStopCandidateCacheHit
 	counterCount
 )
 
@@ -87,7 +89,7 @@ var counterNames = [counterCount]string{
 	"received", "handled", "update_failed", "malformed", "stale", "cache_hit", "cache_miss", "cache_evicted",
 	"redis_commands", "redis_errors", "siri_gtfs_suppressed_fresh", "siri_gtfs_suppressed_cached",
 	"service_alerts", "service_alert_references", "service_alert_journey_lookups",
-	"siri_candidate_documents", "siri_exact_probe_documents", "siri_exact_matches", "alert_journey_cache_hits", "tracked_journey_bson_bytes",
+	"siri_candidate_documents", "siri_exact_probe_documents", "siri_exact_matches", "alert_journey_cache_hits", "tracked_journey_bson_bytes", "siri_stop_candidate_cache_hit",
 }
 var counters [counterCount]atomic.Int64
 
@@ -153,17 +155,24 @@ func Snapshot() Report {
 	return r
 }
 
-var consumers [5]struct{ started, finished, batches atomic.Int64 }
+type consumerProgress struct{ started, finished, batches atomic.Int64 }
+
+var consumers atomic.Pointer[[]consumerProgress]
+
+func ConfigureConsumers(count int) {
+	workers := make([]consumerProgress, count)
+	consumers.Store(&workers)
+}
 
 func BatchStarted(id int) {
-	if id >= 0 && id < len(consumers) {
-		consumers[id].started.Store(time.Now().UnixMilli())
+	if workers := consumers.Load(); workers != nil && id >= 0 && id < len(*workers) {
+		(*workers)[id].started.Store(time.Now().UnixMilli())
 	}
 }
 func BatchFinished(id int) {
-	if id >= 0 && id < len(consumers) {
-		consumers[id].finished.Store(time.Now().UnixMilli())
-		consumers[id].batches.Add(1)
+	if workers := consumers.Load(); workers != nil && id >= 0 && id < len(*workers) {
+		(*workers)[id].finished.Store(time.Now().UnixMilli())
+		(*workers)[id].batches.Add(1)
 	}
 }
 
@@ -175,9 +184,13 @@ type ConsumerProgress struct {
 }
 
 func Progress() []ConsumerProgress {
-	result := make([]ConsumerProgress, len(consumers))
-	for i := range consumers {
-		c := &consumers[i]
+	workers := consumers.Load()
+	if workers == nil {
+		return []ConsumerProgress{}
+	}
+	result := make([]ConsumerProgress, len(*workers))
+	for i := range *workers {
+		c := &(*workers)[i]
 		result[i] = ConsumerProgress{i, c.started.Load(), c.finished.Load(), c.batches.Load()}
 	}
 	return result

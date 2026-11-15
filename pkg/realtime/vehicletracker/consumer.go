@@ -74,7 +74,9 @@ func CreateIdentificationCache() {
 
 	identificationCache = cache.New[string](redisStore)
 }
-func StartConsumers() {
+func StartConsumers(workers int, cacheBytes int64) {
+	processTrackedJourneyCache.maxBytes = cacheBytes
+	telemetry.ConfigureConsumers(workers)
 	// Create Cache
 	CreateIdentificationCache()
 
@@ -85,11 +87,11 @@ func StartConsumers() {
 	if err != nil {
 		panic(err)
 	}
-	if err := queue.StartConsuming(numConsumers*batchSize, 1*time.Second); err != nil {
+	if err := queue.StartConsuming(int64(workers)*batchSize, 1*time.Second); err != nil {
 		panic(err)
 	}
 
-	for i := 0; i < numConsumers; i++ {
+	for i := 0; i < workers; i++ {
 		go startRealtimeConsumer(queue, i)
 	}
 }

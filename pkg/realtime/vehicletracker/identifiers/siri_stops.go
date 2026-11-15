@@ -20,9 +20,25 @@ import (
 // endpoint sets the original cursor can stream results without an ID list.
 const siriStopIDLimit = 1024
 
+// Only retain small projected candidate sets. Dates, direction and aimed
+// departure are applied after lookup so different observations can share them.
+var siriStopCandidates = lookupCache[siriCandidateRows]{limit: 128, ttl: time.Minute}
+
+const siriStopCandidateCacheMaxBytes = 512 << 10
+
 func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, direction string) (siriJourneyCandidates, error) {
 	origin, hasOrigin := query["originstoprefs"]
 	destination, hasDestination := query["destinationstoprefs"]
+	// Callers supply a scalar service or a single $in clause with sorted IDs.
+	keyFields, err := bson.Marshal(bson.D{{Key: "service", Value: query["serviceref"]}, {Key: "origin", Value: origin}, {Key: "destination", Value: destination}})
+	if err != nil {
+		return siriJourneyCandidates{}, err
+	}
+	key := collection.Database().Name() + "\x00" + collection.Name() + "\x00" + string(keyFields)
+	if entry, ok := siriStopCandidates.lookup(key); ok {
+		telemetry.Add(telemetry.SiriStopCandidateCacheHit, 1)
+		return entry.value.forStopEvent(date, exactDeparture, direction), nil
+	}
 	if !hasOrigin || !hasDestination {
 		return getAvailableJourneys(collection, date, query, exactDeparture)
 	}
@@ -115,7 +131,42 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 			}
 		}
 	}
-	return getAvailableJourneys(collection, date, fetch, exactDeparture, options.Find().SetHint("_id_"))
+	value, err, _ := siriStopCandidates.loads.Do(key, func() (any, error) {
+		if entry, ok := siriStopCandidates.lookup(key); ok {
+			return entry.value, nil
+		}
+		var rows siriCandidateRows
+		count, err := scanSiriCandidates(collection, fetch, telemetry.SiriCandidateDocuments, true, func(journey *ctdf.Journey, bytes int) {
+			rows.journeys = append(rows.journeys, journey)
+			rows.bytes += bytes
+		}, options.Find().SetHint("_id_"), siriCandidateProjection)
+		rows.count = count
+		if err == nil && count == len(rows.journeys) && rows.bytes <= siriStopCandidateCacheMaxBytes {
+			siriStopCandidates.store(key, rows, nil)
+		}
+		return rows, err
+	})
+	return value.(siriCandidateRows).forEvent(date, exactDeparture), err
+}
+
+// Reproduce the probe's numeric-direction fallback on a cached full set.
+func (rows siriCandidateRows) forStopEvent(date, aimed time.Time, direction string) siriJourneyCandidates {
+	candidates := rows.forEvent(date, aimed)
+	if aimed.IsZero() || (direction != "1" && direction != "2") {
+		return candidates
+	}
+	count := 0
+	for _, journey := range rows.journeys {
+		if journey.Direction == direction || sameDepartureMinute(journey.DepartureTime.UTC(), aimed) {
+			count++
+		}
+	}
+	if count < siriExactCandidateLimit && !slices.ContainsFunc(candidates.available, func(journey *ctdf.Journey) bool {
+		return journey.Direction == direction
+	}) {
+		candidates.exactMatch = exactSiriDepartureMatch(candidates, aimed, "")
+	}
+	return candidates
 }
 
 func findSiriStopIDs(collection *mongo.Collection, query bson.M, index string) ([]primitive.ObjectID, bool, error) {

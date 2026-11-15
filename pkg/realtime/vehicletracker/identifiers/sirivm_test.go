@@ -129,13 +129,14 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, idRow(primitive.NewObjectID()), idRow(id)),
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
 				{Key: "primaryidentifier", Value: "journey"},
-				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}},
+				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "DayOfWeek", "value": "Monday"}}}},
 				{Key: "calls", Value: siriTestCalls("a", "c", time.Time{}, time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(0, 1, 1, 9, 10, 0, 0, time.UTC))},
 			}),
 		)
 
 		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "originstoprefs": "a", "destinationstoprefs": "c"}
-		got, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, "")
+		monday := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
+		got, err := getSiriStopJourneys(mt.Coll, monday, query, time.Time{}, "")
 		if err != nil || len(got.available) != 1 || got.available[0].PrimaryIdentifier != "journey" {
 			mt.Fatalf("unexpected candidates: %+v, %v", got, err)
 		}
@@ -161,6 +162,10 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 		if err != nil || len(values) != 1 || values[0].ObjectID() != id || fetch.Lookup("hint").StringValue() != "_id_" ||
 			filter.Lookup("originstoprefs").StringValue() != "a" || filter.Lookup("destinationstoprefs").StringValue() != "c" {
 			mt.Fatalf("unexpected candidate fetch: %v", fetch)
+		}
+		nextDay, err := getSiriStopJourneys(mt.Coll, monday.AddDate(0, 0, 1), query, time.Time{}, "")
+		if err != nil || len(nextDay.available) != 0 || len(mt.GetAllStartedEvents()) != 3 {
+			mt.Fatalf("cached candidates must apply the new service date without a database read: %+v, %v", nextDay, err)
 		}
 	})
 	mt.Run("index missing", func(mt *mtest.T) {

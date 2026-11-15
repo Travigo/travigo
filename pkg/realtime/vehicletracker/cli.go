@@ -1,6 +1,7 @@
 package vehicletracker
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,7 +20,15 @@ func RegisterCLI() *cli.Command {
 			{
 				Name:  "run",
 				Usage: "run an instance of the realtime engine",
+				Flags: []cli.Flag{
+					&cli.IntFlag{Name: "consumers", EnvVars: []string{"TRAVIGO_TRACKER_CONSUMERS"}, Value: numConsumers},
+					&cli.IntFlag{Name: "journey-cache-mib", EnvVars: []string{"TRAVIGO_TRACKER_JOURNEY_CACHE_MIB"}, Value: 768},
+				},
 				Action: func(c *cli.Context) error {
+					workers, cacheMiB := c.Int("consumers"), c.Int("journey-cache-mib")
+					if workers < 1 || workers > 256 || cacheMiB < 1 || cacheMiB > 65536 {
+						return fmt.Errorf("tracker requires 1 to 256 consumers and a journey cache budget of 1 to 65536 MiB")
+					}
 					if err := database.Connect(); err != nil {
 						return err
 					}
@@ -30,7 +39,7 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					StartConsumers()
+					StartConsumers(workers, int64(cacheMiB)<<20)
 
 					StartStatsServer()
 
