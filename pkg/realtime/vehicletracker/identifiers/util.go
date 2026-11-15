@@ -72,6 +72,7 @@ var siriCandidateProjection = options.Find().SetProjection(bson.D{
 type siriCandidateRows struct {
 	journeys     []*ctdf.Journey
 	count, bytes int
+	pathErr      error
 }
 
 func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, aimed time.Time, documents telemetry.Counter, includePath bool, opts ...*options.FindOptions) (siriJourneyCandidates, error) {

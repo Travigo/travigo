@@ -1,6 +1,7 @@
 package identifiers
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -129,6 +130,7 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, idRow(primitive.NewObjectID()), idRow(id)),
 			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
 				{Key: "primaryidentifier", Value: "journey"},
+				{Key: "destinationdisplay", Value: strings.Repeat("x", 300<<10)},
 				{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "DayOfWeek", "value": "Monday"}}}},
 				{Key: "calls", Value: siriTestCalls("a", "c", time.Time{}, time.Date(0, 1, 1, 9, 0, 0, 0, time.UTC), time.Date(0, 1, 1, 9, 10, 0, 0, time.UTC))},
 			}),
@@ -136,9 +138,25 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 
 		query := bson.M{"serviceref": bson.M{"$in": []string{"service"}}, "originstoprefs": "a", "destinationstoprefs": "c"}
 		monday := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
-		got, err := getSiriStopJourneys(mt.Coll, monday, query, time.Time{}, "")
-		if err != nil || len(got.available) != 1 || got.available[0].PrimaryIdentifier != "journey" {
-			mt.Fatalf("unexpected candidates: %+v, %v", got, err)
+		const callers = 16
+		type result struct {
+			candidates siriJourneyCandidates
+			err        error
+		}
+		start, results := make(chan struct{}), make(chan result, callers)
+		for range callers {
+			go func() {
+				<-start
+				candidates, err := getSiriStopJourneys(mt.Coll, monday, query, time.Time{}, "")
+				results <- result{candidates, err}
+			}()
+		}
+		close(start)
+		for range callers {
+			got := <-results
+			if got.err != nil || len(got.candidates.available) != 1 || got.candidates.available[0].PrimaryIdentifier != "journey" {
+				mt.Errorf("unexpected candidates: %+v, %v", got.candidates, got.err)
+			}
 		}
 		commands := mt.GetAllStartedEvents()
 		if len(commands) != 3 {
@@ -180,6 +198,24 @@ func TestSiriStopLookupsFetchOnlyIntersectingJourneys(t *testing.T) {
 		fallback := mt.GetAllStartedEvents()[1].Command
 		if _, err := fallback.LookupErr("hint"); err == nil {
 			mt.Fatalf("fallback still requires a hint: %v", fallback)
+		}
+	})
+	mt.Run("confirmed empty results only", func(mt *mtest.T) {
+		query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "b"}
+		namespace := mt.DB.Name() + "." + mt.Coll.Name()
+		mt.AddMockResponses(mtest.CreateCommandErrorResponse(mtest.CommandError{Code: 50}),
+			mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch))
+		if _, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, ""); err == nil {
+			mt.Fatal("expected the database failure to propagate")
+		}
+		for range 2 {
+			candidates, err := getSiriStopJourneys(mt.Coll, time.Now(), query, time.Time{}, "")
+			if err != nil || candidates.count != 0 {
+				mt.Fatalf("got %+v, %v, want an empty result", candidates, err)
+			}
+		}
+		if got := len(mt.GetAllStartedEvents()); got != 2 {
+			mt.Fatalf("sent %d queries, want one failure and one successful empty lookup", got)
 		}
 	})
 }
@@ -331,7 +367,7 @@ func TestSiriCandidateProjectionRetainsMatchingFields(t *testing.T) {
 	})
 }
 
-func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
+func TestSiriStopLookupKeepsExistingExactMatch(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	for _, scenario := range []struct {
 		name      string
@@ -361,26 +397,15 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 				rows = append(rows, row("other"))
 			}
 			candidates := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
-			mt.AddMockResponses(ids, ids, candidates, candidates, candidates)
+			mt.AddMockResponses(ids, ids, candidates, candidates)
 			query := bson.M{"serviceref": "route", "originstoprefs": "a", "destinationstoprefs": "b"}
 			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "OUTBOUND")
 			if err != nil {
 				mt.Fatal(err)
 			}
-			wantCommands := 3
-			if scenario.ambiguous {
-				wantCommands++
-			}
 			commands := mt.GetAllStartedEvents()
-			if len(commands) != wantCommands {
-				mt.Fatalf("got %d commands, want %d", len(commands), wantCommands)
-			}
-			probe := commands[2].Command
-			if _, err := probe.LookupErr("projection", "calls"); err == nil {
-				mt.Fatal("exact probe fetched path fields")
-			}
-			if _, err := probe.LookupErr("filter", "$expr"); err != nil {
-				mt.Fatal("exact probe did not constrain departure time")
+			if len(commands) != 3 {
+				mt.Fatalf("got %d commands, want two ID lookups and one candidate fetch", len(commands))
 			}
 			baseline, err := getAvailableJourneys(mt.Coll, day, query, aimed)
 			if err != nil {
@@ -393,13 +418,46 @@ func TestSiriStopProbeKeepsExistingMatch(t *testing.T) {
 				return ""
 			}
 			if match(got) != match(baseline) || len(got.available) != len(baseline.available) {
-				mt.Fatalf("probe result differs from baseline: %v vs %v", got, baseline)
+				mt.Fatalf("stop match differs from baseline: %v vs %v", got, baseline)
 			}
 		})
 	}
 }
 
-func TestSiriStopProbeUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourney(t *testing.T) {
+func TestSiriStopExactMatchSurvivesUnrelatedInvalidPath(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("invalid off-time path", func(mt *mtest.T) {
+		namespace := mt.DB.Name() + "." + mt.Coll.Name()
+		id := primitive.NewObjectID()
+		ids := mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{{Key: "_id", Value: id}})
+		aimed := time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
+		availability := bson.M{"match": bson.A{bson.M{"type": "MatchAll"}}}
+		candidates := mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, bson.D{
+			{Key: "primaryidentifier", Value: "wanted"},
+			{Key: "departuretime", Value: aimed},
+			{Key: "availability", Value: availability},
+			{Key: "calls", Value: siriTestCalls("a", "b", aimed, aimed, aimed.Add(10*time.Minute))},
+		}, bson.D{
+			{Key: "primaryidentifier", Value: "invalid"},
+			{Key: "departuretime", Value: aimed.Add(time.Hour)},
+			{Key: "availability", Value: availability},
+		})
+		mt.AddMockResponses(ids, ids, candidates, ids, ids, candidates)
+		query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "b"}
+		got, err := getSiriStopJourneys(mt.Coll, aimed, query, aimed, "")
+		if err != nil || got.exactMatch == nil || got.exactMatch.PrimaryIdentifier != "wanted" {
+			mt.Fatalf("exact match = %+v, error = %v", got.exactMatch, err)
+		}
+		// An event that needs full path matching must still detect the invalid
+		// path. The incomplete result must not be retained in the cache.
+		_, err = getSiriStopJourneys(mt.Coll, aimed, query, time.Time{}, "")
+		if err == nil || !strings.Contains(err.Error(), "invalid") || len(mt.GetAllStartedEvents()) != 6 {
+			mt.Fatalf("invalid path returned %v after %d commands", err, len(mt.GetAllStartedEvents()))
+		}
+	})
+}
+
+func TestSiriStopLookupUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourney(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	for _, scenario := range []struct {
 		name      string
@@ -429,22 +487,15 @@ func TestSiriStopProbeUsesNumericDirectionFallbackOnlyWhenNoActivePreferredJourn
 				rows = append(rows, row("preferred", scenario.preferred, aimed.Add(time.Minute), scenario.active))
 			}
 			response := mtest.CreateCursorResponse(0, ns, mtest.FirstBatch, rows...)
-			mt.AddMockResponses(ids, ids, response, response, response)
+			mt.AddMockResponses(ids, ids, response, response)
 			query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "b"}
 			got, err := getSiriStopJourneys(mt.Coll, day, query, aimed, "1")
 			if err != nil {
 				mt.Fatal(err)
 			}
 			commands := mt.GetAllStartedEvents()
-			wantQueries := 3
-			if scenario.active {
-				wantQueries = 4
-			}
-			if len(commands) != wantQueries {
-				mt.Fatalf("got %d queries, want %d", len(commands), wantQueries)
-			}
-			if _, err := commands[2].Command.LookupErr("filter", "$expr", "$or"); err != nil {
-				mt.Fatal("probe must include off-time journeys in the preferred direction")
+			if len(commands) != 3 {
+				mt.Fatalf("got %d queries, want two ID lookups and one candidate fetch", len(commands))
 			}
 			baseline, err := getAvailableJourneys(mt.Coll, day, query, aimed)
 			if err != nil {

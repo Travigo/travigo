@@ -72,6 +72,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	withLocation := 0
 	withTripUpdate := 0
 	serviceAlertCount := 0
+	submitted, unchanged, malformed := 0, 0, 0
 
 	for _, entity := range feed.Entity {
 		vehiclePosition := entity.GetVehicle()
@@ -80,7 +81,8 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		var trip *gtfs.TripDescriptor
 		var recordedAtTime time.Time
 
-		if vehiclePosition != nil && vehiclePosition.Timestamp != nil {
+		hasObservationTime := vehiclePosition != nil && vehiclePosition.Timestamp != nil
+		if hasObservationTime {
 			trip = vehiclePosition.GetTrip()
 			recordedAtTime = time.Unix(int64(*vehiclePosition.Timestamp), 0)
 
@@ -92,12 +94,8 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			}
 
 		} else {
-			// Performance Review [Set L] [PR032] [P2] (tracker): TripUpdate-only observations, and
-			// vehicles without a timestamp, use import wall time; TripUpdate/header timestamps
-			// are ignored. Unchanged polls can therefore pass the tracker's stale-update gate
-			// and repeat predictions, writes and event comparisons. Prefer a valid source
-			// timestamp or content version, preserving separate vehicle/prediction freshness.
-			// Keep heartbeat/TTL renewal separate so deduplication does not expire a live run.
+			// Preserve the existing timestamp for submissions with no vehicle timestamp.
+			// Compare their content across polls independently of this synthetic time.
 			recordedAtTime = time.Now()
 		}
 		if tripUpdate != nil {
@@ -315,8 +313,10 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				withLocation += 1
 			}
 
+			deduplicate := trip.GetScheduleRelationship() == gtfs.TripDescriptor_SCHEDULED
 			if tripUpdate != nil {
 				for _, stopTimeUpdate := range tripUpdate.GetStopTimeUpdate() {
+					deduplicate = deduplicate && stopTimeUpdate.GetScheduleRelationship() == gtfs.TripUpdate_StopTimeUpdate_SCHEDULED
 					locationEvent.VehicleLocationUpdate.StopUpdates = append(locationEvent.VehicleLocationUpdate.StopUpdates, vehicletracker.VehicleLocationEventStopUpdate{
 						StopID:          fmt.Sprintf("%s-stop-%s", dataset.LinkedDataset, stopTimeUpdate.GetStopId()),
 						ArrivalTime:     time.Unix(stopTimeUpdate.GetArrival().GetTime(), 0),
@@ -331,15 +331,26 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				withTripUpdate += 1
 			}
 
-			locationEvent.SubmittedAt = time.Now()
-			locationEventJson, _ := json.Marshal(locationEvent)
-
-			// Performance Review [Set M] [PR034] [P1] (realtime): Each submitted vehicle update uses
-			// a separate Redis publish whose error is discarded; service-alert publish errors
-			// above are also ignored. Buffer byte/count-bounded batches for variadic PublishBytes,
-			// propagate failures to the importer, and count only confirmed submissions. Retry
-			// idempotently by source identity/version so partial publication is safe.
-			r.queue.PublishBytes(locationEventJson)
+			// Performance Review [Set M] [PR034] [P1] (realtime): Buffer bounded
+			// batches for PublishBytes and propagate service-alert publish errors too.
+			// Keep trip lifecycle messages on the normal publish path.
+			published, err := recentGTFSObservations.publish(r.queue, dataset.Identifier, &locationEvent,
+				hasObservationTime, deduplicate, time.Now())
+			if errors.Is(err, errGTFSObservationEncoding) {
+				if malformed == 0 {
+					log.Warn().Err(err).Str("dataset", dataset.Identifier).Str("entity", entity.GetId()).Msg("Skipping malformed GTFS-RT observation")
+				}
+				malformed++
+				continue
+			}
+			if err != nil {
+				return datasets.DataImportReport{}, fmt.Errorf("publish GTFS-RT observation: %w", err)
+			}
+			if published {
+				submitted++
+			} else {
+				unchanged++
+			}
 
 		} else {
 			if entity.Vehicle != nil && entity.Vehicle.Vehicle != nil && entity.Vehicle.Vehicle.GetId() != "" {
@@ -358,6 +369,9 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		Int("withtrip", withTripID).
 		Int("withlocation", withLocation).
 		Int("withtripupdate", withTripUpdate).
+		Int("submitted", submitted).
+		Int("unchanged_observations", unchanged).
+		Int("malformed_observations", malformed).
 		Int("servicealert", serviceAlertCount).
 		Int("total", len(feed.Entity)).
 		Msg("Submitted vehicle updates")

@@ -79,11 +79,13 @@ const (
 	ServiceAlertReferences
 	ServiceAlertJourneyLookups
 	SiriCandidateDocuments
+	// Retain the retired MongoDB probe counters in the diagnostics response.
 	SiriExactProbeDocuments
 	SiriExactMatches
 	AlertJourneyCacheHits
 	TrackedJourneyBytes
 	SiriStopCandidateCacheHit
+	SiriStopCandidateCacheOversize
 	counterCount
 )
 
@@ -91,7 +93,7 @@ var counterNames = [counterCount]string{
 	"received", "handled", "update_failed", "malformed", "stale", "cache_hit", "cache_miss", "cache_evicted",
 	"redis_commands", "redis_errors", "siri_gtfs_suppressed_fresh", "siri_gtfs_suppressed_cached",
 	"service_alerts", "service_alert_references", "service_alert_journey_lookups",
-	"siri_candidate_documents", "siri_exact_probe_documents", "siri_exact_matches", "alert_journey_cache_hits", "tracked_journey_bson_bytes", "siri_stop_candidate_cache_hit",
+	"siri_candidate_documents", "siri_exact_probe_documents", "siri_exact_matches", "alert_journey_cache_hits", "tracked_journey_bson_bytes", "siri_stop_candidate_cache_hit", "siri_stop_candidate_cache_oversize",
 }
 var counters [counterCount]atomic.Int64
 
