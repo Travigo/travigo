@@ -58,11 +58,15 @@ func TestGTFSObservationDeduplication(t *testing.T) {
 		}
 	}
 	publish("feed", 0, false, true, true)
-	event.RecordedAt = start.Add(10 * time.Second)
+	event.RecordedAt = start.Add(2 * time.Minute)
 	event.DataSource.Timestamp = "second poll"
-	publish("feed", 10*time.Second, false, true, false)
-	publish("other feed", 10*time.Second, false, true, true)
-	publish("feed", gtfsObservationRefresh, false, true, true)
+	publish("feed", 2*time.Minute, false, true, false)
+	publish("other feed", 2*time.Minute, false, true, true)
+	event.RecordedAt = start.Add(3 * time.Minute)
+	publish("feed", 3*time.Minute, false, true, true)
+
+	// Run the remaining cases after the window has refreshed.
+	start = start.Add(3 * time.Minute)
 
 	event.VehicleLocationUpdate.StopUpdates[0].ArrivalOffset++
 	publish("feed", 70*time.Second, false, true, true)

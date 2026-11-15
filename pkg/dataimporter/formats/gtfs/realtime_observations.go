@@ -15,7 +15,7 @@ import (
 
 // Bound suppression so predictions without a source timestamp can still
 // refresh tracker state before the ordinary 10-minute expiry.
-const gtfsObservationRefresh = time.Minute
+const gtfsObservationRefresh = 3 * time.Minute
 
 var errGTFSObservationEncoding = errors.New("encode GTFS-RT observation")
 
