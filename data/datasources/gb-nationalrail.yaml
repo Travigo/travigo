@@ -112,7 +112,7 @@ overrides:
       fallback: true
       set:
         colour: "#D70428"
-        secondarycolour: "#495965"
+        # secondarycolour: "#495965"
     - datasets: ["gb-nationalrail-toc"] 
       operators: [gb-toc-XC]  # Cross Country
       transporttypes: [Rail]
