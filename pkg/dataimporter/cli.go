@@ -208,6 +208,16 @@ func RegisterCLI() *cli.Command {
 								if waitTime.Seconds() > 0 {
 									time.Sleep(waitTime)
 								}
+
+								// A completed import releases the feed body before any queue wait.
+								if dataset.Format == datasets.DataSetFormatGTFSRealtime || dataset.Format == datasets.DataSetFormatSiriVM {
+									if err := redis_client.WaitForRealtimeQueueDrain(c.Context); err != nil {
+										if c.Context.Err() != nil {
+											return
+										}
+										log.Warn().Err(err).Str("id", dataset.Identifier).Msg("Failed to check realtime queue before next poll")
+									}
+								}
 							}
 						}(dataset)
 					}

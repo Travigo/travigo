@@ -12,7 +12,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
-	"github.com/travigo/travigo/pkg/redis_client"
 	"golang.org/x/net/html/charset"
 )
 
@@ -165,12 +164,6 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 
 	var retrievedRecords int64
 	observations := observationBatch{latest: make(map[observationRun]int)}
-	flush := func() error {
-		if err := redis_client.WaitForRealtimeQueueCapacity(len(observations.pending)); err != nil {
-			return err
-		}
-		return observations.flush(s.queue)
-	}
 
 	d := xml.NewDecoder(s.reader)
 	d.CharsetReader = charset.NewReaderLabel
@@ -197,12 +190,12 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 			}
 		}
 		if retrievedRecords%observationBatchSize == 0 {
-			if err := flush(); err != nil {
+			if err := observations.flush(s.queue); err != nil {
 				return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
 			}
 		}
 	}
-	if err := flush(); err != nil {
+	if err := observations.flush(s.queue); err != nil {
 		return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
 	}
 

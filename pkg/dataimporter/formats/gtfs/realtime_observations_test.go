@@ -13,7 +13,6 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
-	"github.com/travigo/travigo/pkg/redis_client"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -48,7 +47,7 @@ func TestGTFSObservationDeduplication(t *testing.T) {
 	publish := func(dataset string, elapsed time.Duration, sourceTime, deduplicate, want bool) {
 		t.Helper()
 		now := start.Add(elapsed)
-		got, err := cache.publish(queue, dataset, &event, sourceTime, deduplicate, now, nil)
+		got, err := cache.publish(queue, dataset, &event, sourceTime, deduplicate, now)
 		if err != nil || got != want {
 			t.Fatalf("publish at %v = %v, %v, want %v", elapsed, got, err, want)
 		}
@@ -61,12 +60,6 @@ func TestGTFSObservationDeduplication(t *testing.T) {
 	event.RecordedAt = start.Add(2 * time.Minute)
 	event.DataSource.Timestamp = "second poll"
 	publish("feed", 2*time.Minute, false, true, false)
-	admissionErr := errors.New("duplicates must not reserve queue capacity")
-	if got, err := cache.publish(queue, "feed", &event, false, true, start.Add(2*time.Minute), func() error {
-		return admissionErr
-	}); got || err != nil {
-		t.Fatalf("duplicate reserved queue capacity: %v, %v", got, err)
-	}
 	publish("other feed", 2*time.Minute, false, true, true)
 	event.RecordedAt = start.Add(4 * time.Minute)
 	publish("feed", 4*time.Minute, false, true, false)
@@ -89,24 +82,14 @@ func TestGTFSObservationDeduplication(t *testing.T) {
 
 	event.VehicleLocationUpdate.StopUpdates[0].ArrivalOffset++
 	queue.err = errors.New("queue unavailable")
-	if written, err := cache.publish(queue, "feed", &event, true, true, start.Add(93*time.Second), nil); written || !errors.Is(err, queue.err) {
+	if written, err := cache.publish(queue, "feed", &event, true, true, start.Add(93*time.Second)); written || !errors.Is(err, queue.err) {
 		t.Fatalf("failed publish = %v, %v", written, err)
 	}
 	queue.err = nil
 	publish("feed", 94*time.Second, true, true, true)
 }
 
-type emptyObservationQueueStats struct{ rmq.Connection }
-
-func (emptyObservationQueueStats) CollectStats([]string) (rmq.Stats, error) {
-	return rmq.Stats{}, nil
-}
-
 func TestGTFSRealtimeImportInterleavedObservations(t *testing.T) {
-	oldConnection := redis_client.QueueConnection
-	redis_client.QueueConnection = emptyObservationQueueStats{}
-	t.Cleanup(func() { redis_client.QueueConnection = oldConnection })
-
 	dataset := datasets.DataSet{Identifier: t.Name(), LinkedDataset: "schedule"}
 	dataset.SupportedObjects.RealtimeJourneys = true
 	datasource := &ctdf.DataSourceReference{DatasetID: dataset.Identifier}

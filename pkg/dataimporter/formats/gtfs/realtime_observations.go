@@ -17,10 +17,7 @@ import (
 // refresh tracker state before the ordinary 10-minute expiry.
 const gtfsObservationRefresh = 5 * time.Minute
 
-var (
-	errGTFSObservationEncoding = errors.New("encode GTFS-RT observation")
-	errGTFSObservationExpired  = errors.New("GTFS-RT observation expired while waiting to publish")
-)
+var errGTFSObservationEncoding = errors.New("encode GTFS-RT observation")
 
 const (
 	gtfsPositionObservation = iota
@@ -44,7 +41,7 @@ type gtfsObservationCache [64]struct {
 // and does not add Redis work. A slot collision only loses a cache hit.
 var recentGTFSObservations gtfsObservationCache
 
-func (cache *gtfsObservationCache) publish(queue rmq.Queue, dataset string, event *vehicletracker.VehicleUpdateEvent, sourceTime, deduplicate bool, now time.Time, admit func() error) (bool, error) {
+func (cache *gtfsObservationCache) publish(queue rmq.Queue, dataset string, event *vehicletracker.VehicleUpdateEvent, sourceTime, deduplicate bool, now time.Time) (bool, error) {
 	location, err := json.Marshal(event.VehicleLocationUpdate)
 	if err != nil {
 		return false, fmt.Errorf("%w: %w", errGTFSObservationEncoding, err)
@@ -72,35 +69,12 @@ func (cache *gtfsObservationCache) publish(queue rmq.Queue, dataset string, even
 	}
 	content := sha256.Sum256(append(location, event.MessageType...))
 
-	unchanged := func() bool {
-		return deduplicate && slot.stream == stream && slot.content == content && slot.observedAt == observedAt &&
-			now.Before(slot.publishedAt.Add(gtfsObservationRefresh))
-	}
 	shard.Lock()
-	if unchanged() {
-		shard.Unlock()
+	defer shard.Unlock()
+	if deduplicate && slot.stream == stream && slot.content == content && slot.observedAt == observedAt && now.Before(slot.publishedAt.Add(gtfsObservationRefresh)) {
 		return false, nil
 	}
 	submission := *event
-	if admit != nil {
-		// An import stalled on capacity must let other feed workers use this shard.
-		shard.Unlock()
-		if err := admit(); err != nil {
-			return false, err
-		}
-		now = time.Now()
-		if !sourceTime {
-			submission.RecordedAt = now
-		} else if now.Sub(event.RecordedAt) > 20*time.Minute {
-			return false, errGTFSObservationExpired
-		}
-		shard.Lock()
-		if unchanged() {
-			shard.Unlock()
-			return false, nil
-		}
-	}
-	defer shard.Unlock()
 	submission.SubmittedAt = now
 	payload, err := json.Marshal(struct {
 		*vehicletracker.VehicleUpdateEvent

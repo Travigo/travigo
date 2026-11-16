@@ -1,7 +1,9 @@
 package redis_client
 
 import (
+	"context"
 	"fmt"
+	"math/rand/v2"
 	"sync"
 	"time"
 
@@ -9,48 +11,54 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var realtimeAdmission realtimeQueueAdmission
+const realtimeQueueReadyLimit = 40000
 
-type realtimeQueueAdmission struct {
-	sync.Mutex
-	remaining int64
+// Feed workers share a short-lived queue depth sample but wait independently.
+var realtimeQueueState realtimeQueueDepth
+
+type realtimeQueueDepth struct {
+	mu        sync.Mutex
+	ready     int64
+	checkedAt time.Time
 }
 
-// WaitForRealtimeQueueCapacity shares short capacity grants among feed workers.
-// Callers reserve per submission or small publish batch.
-func WaitForRealtimeQueueCapacity(count int) error {
-	return realtimeAdmission.wait(QueueConnection, int64(count))
-}
-
-func (admission *realtimeQueueAdmission) wait(connection rmq.Connection, count int64) error {
-	if count == 0 {
-		return nil
-	}
+func (depth *realtimeQueueDepth) readyCount(connection rmq.Connection, now time.Time) (int64, error) {
 	if connection == nil {
-		return ErrQueueConnectionNotInitialized
+		return 0, ErrQueueConnectionNotInitialized
 	}
-	const readyLimit = 40000
-	const grantSize = 512
-	admission.Lock()
-	defer admission.Unlock()
+	depth.mu.Lock()
+	defer depth.mu.Unlock()
+	if now.Before(depth.checkedAt.Add(time.Second)) {
+		return depth.ready, nil
+	}
+	stats, err := connection.CollectStats([]string{"realtime-queue"})
+	if err != nil {
+		return 0, fmt.Errorf("read realtime queue depth: %w", err)
+	}
+	depth.ready = stats.QueueStats["realtime-queue"].ReadyCount
+	depth.checkedAt = now
+	return depth.ready, nil
+}
 
+// WaitForRealtimeQueueDrain delays the next feed poll while ready work is high.
+func WaitForRealtimeQueueDrain(ctx context.Context) error {
 	waited := false
-	for admission.remaining < count {
-		stats, err := connection.CollectStats([]string{"realtime-queue"})
-		if err != nil {
-			return fmt.Errorf("read realtime queue depth: %w", err)
-		}
-		ready := stats.QueueStats["realtime-queue"].ReadyCount
-		if ready+count <= readyLimit {
-			admission.remaining = min(grantSize, readyLimit-ready)
-			break
+	for ctx.Err() == nil {
+		ready, err := realtimeQueueState.readyCount(QueueConnection, time.Now())
+		if err != nil || ready < realtimeQueueReadyLimit {
+			return err
 		}
 		if !waited {
-			log.Info().Int64("queuesize", ready).Msg("Waiting for realtime queue capacity during import")
+			log.Info().Int64("queuesize", ready).Msg("Waiting for realtime queue to drain before next poll")
 			waited = true
 		}
-		time.Sleep(time.Second)
+
+		timer := time.NewTimer(time.Duration(30+rand.IntN(20)) * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+		case <-timer.C:
+		}
 	}
-	admission.remaining -= count
-	return nil
+	return ctx.Err()
 }

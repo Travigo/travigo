@@ -72,7 +72,6 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	withTripUpdate := 0
 	serviceAlertCount := 0
 	submitted, unchanged, malformed := 0, 0, 0
-	admit := func() error { return redis_client.WaitForRealtimeQueueCapacity(1) }
 
 	for _, entity := range feed.Entity {
 		vehiclePosition := entity.GetVehicle()
@@ -190,9 +189,6 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					RecordedAt: recordedAtTime,
 				}
 
-				if err := admit(); err != nil {
-					return datasets.DataImportReport{}, err
-				}
 				updateEvent.SubmittedAt = time.Now()
 				updateEventJSON, err := json.Marshal(updateEvent)
 				if err != nil {
@@ -341,10 +337,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 			// Keep trip lifecycle messages on the normal publish path.
 			published, err := recentGTFSObservations.publish(r.queue, dataset.Identifier, &locationEvent,
-				hasObservationTime, deduplicate, time.Now(), admit)
-			if errors.Is(err, errGTFSObservationExpired) {
-				continue
-			}
+				hasObservationTime, deduplicate, time.Now())
 			if errors.Is(err, errGTFSObservationEncoding) {
 				if malformed == 0 {
 					log.Warn().Err(err).Str("dataset", dataset.Identifier).Str("entity", entity.GetId()).Msg("Skipping malformed GTFS-RT observation")

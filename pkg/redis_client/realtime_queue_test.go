@@ -3,6 +3,7 @@ package redis_client
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/adjust/rmq/v5"
 )
@@ -21,26 +22,26 @@ func (connection *realtimeQueueStatsStub) CollectStats([]string) (rmq.Stats, err
 	return stats, connection.err
 }
 
-func TestRealtimeQueueAdmissionRechecksBeforePublishing(t *testing.T) {
-	connection := &realtimeQueueStatsStub{ready: 39998}
-	var admission realtimeQueueAdmission
-	for range 2 {
-		if err := admission.wait(connection, 1); err != nil {
-			t.Fatal(err)
+func TestRealtimeQueueDepthSharesRecentSamplesAndRetriesErrors(t *testing.T) {
+	now := time.Now()
+	connection := &realtimeQueueStatsStub{ready: realtimeQueueReadyLimit}
+	var depth realtimeQueueDepth
+	assertReady := func(at time.Time, want int64, wantCalls int) {
+		t.Helper()
+		got, err := depth.readyCount(connection, at)
+		if err != nil || got != want || connection.calls != wantCalls {
+			t.Fatalf("depth = %d, error = %v, checks = %d, want %d and %d checks", got, err, connection.calls, want, wantCalls)
 		}
 	}
-	if connection.calls != 1 {
-		t.Fatalf("got %d queue checks for two spots in the shared grant", connection.calls)
-	}
+	assertReady(now, realtimeQueueReadyLimit, 1)
+	connection.ready = 1000
+	assertReady(now.Add(500*time.Millisecond), realtimeQueueReadyLimit, 1)
 
+	next := now.Add(time.Second)
 	connection.err = errors.New("Redis unavailable")
-	if err := admission.wait(connection, 1); !errors.Is(err, connection.err) || connection.calls != 2 {
-		t.Fatalf("exhausted grant did not recheck the queue: %v, %d calls", err, connection.calls)
+	if _, err := depth.readyCount(connection, next); !errors.Is(err, connection.err) {
+		t.Fatalf("failed queue check returned %v", err)
 	}
-
 	connection.err = nil
-	connection.ready = 39000
-	if err := admission.wait(connection, 128); err != nil || admission.remaining != 384 {
-		t.Fatalf("batch grant left %d slots, error: %v", admission.remaining, err)
-	}
+	assertReady(next, 1000, 3)
 }
