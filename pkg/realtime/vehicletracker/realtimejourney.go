@@ -45,7 +45,11 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		return fmt.Errorf("invalid realtime timeframe %q: %w", update.Timeframe, err)
 	}
 	realtimeJourneyIdentifier := fmt.Sprintf(ctdf.RealtimeJourneyIDFormat, update.Timeframe, journeyID)
-	snapshot, err := realtimestore.FindForTrackerUpdate(ctx, realtimeJourneyIdentifier)
+	cachedJourney, err := consumer.getCachedTrackedJourney(journeyID, currentTime)
+	if err != nil {
+		return err
+	}
+	snapshot, err := realtimestore.FindForVehicleTrackerUpdate(ctx, realtimeJourneyIdentifier, cachedJourney.schedule)
 	if err != nil {
 		return err
 	}
@@ -65,10 +69,6 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	var historyKey string
 	if update.Location.Type == "Point" {
 		historyKey = vehicleHistoryKey(vehicleUpdateEvent)
-	}
-	cachedJourney, err := consumer.getCachedTrackedJourney(journeyID, currentTime)
-	if err != nil {
-		return err
 	}
 	journey := cachedJourney.Journey
 	if journey == nil || len(journey.Calls) == 0 {
@@ -234,7 +234,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 		_ = snapshot.SetLocation(update.Location, update.Bearing, currentTime)
 	}
 	persistenceStarted := time.Now()
-	saveErr := realtimestore.SaveRealtimeJourneySnapshot(ctx, snapshot)
+	saveErr := realtimestore.SaveVehicleTrackerSnapshot(ctx, snapshot, cachedJourney.schedule)
 	telemetry.Observe(telemetry.Persistence, time.Since(persistenceStarted))
 	if saveErr != nil {
 		// Consume still acknowledges failed deliveries after identification has

@@ -1,6 +1,7 @@
 package realtimestore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,63 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
+
+func TestVehicleTrackerSnapshotReusesScheduleWithoutChangingRedisFormat(t *testing.T) {
+	setupMemoryTestRedis(t)
+	ctx := context.Background()
+	const identifier = "tracker-prepared-schedule"
+	departure := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	timetable := &ctdf.Journey{PrimaryIdentifier: "scheduled-journey", Calls: ctdf.JourneyCallsFromLegs(&ctdf.JourneyPathItem{
+		OriginStopRef: "a", DestinationStopRef: "b",
+		OriginDepartureTime: departure, DestinationArrivalTime: departure.Add(time.Minute),
+	})}
+	initial := &ctdf.RealtimeJourney{PrimaryIdentifier: identifier, Journey: timetable, ModificationDateTime: departure}
+	if err := SaveRealtimeJourney(ctx, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	prepared := PrepareTrackerSchedule(timetable)
+	matching, err := FindForVehicleTrackerUpdate(ctx, identifier, prepared)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if &matching.previous.Journey.Calls[0] != &timetable.Calls[0] {
+		t.Fatal("matching timetable was decoded again")
+	}
+
+	revised := *timetable
+	revised.Calls = append([]ctdf.JourneyCall(nil), timetable.Calls...)
+	revised.Calls[0].Departure = departure.Add(time.Minute)
+	revisedSchedule := PrepareTrackerSchedule(&revised)
+	snapshot, err := FindForVehicleTrackerUpdate(ctx, identifier, revisedSchedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := snapshot.previous.Journey.Calls[0].Departure; !got.Equal(departure) {
+		t.Fatalf("event comparison lost the stored timetable: %v", got)
+	}
+	snapshot.Journey.Journey = &revised
+	snapshot.Journey.NextStopRef = "b"
+	if err := SaveVehicleTrackerSnapshot(ctx, snapshot, revisedSchedule); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveVehicleTrackerSnapshot(ctx, matching, prepared); !errors.Is(err, ErrRealtimeJourneyConflict) {
+		t.Fatalf("stale save returned %v, want conflict", err)
+	}
+
+	raw, err := redis_client.Client.Get(ctx, realtimeJourneyDetailsKey(identifier)).Bytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil || !bytes.Equal(fields["j"], revisedSchedule.encoded) {
+		t.Fatalf("revised timetable was not saved in the regular Redis field: %v", err)
+	}
+	latest, err := FindByIdentifier(ctx, identifier)
+	if err != nil || latest.NextStopRef != "b" || !latest.Journey.Calls[0].Departure.Equal(revised.Calls[0].Departure) {
+		t.Fatalf("regular reader did not recover the revised snapshot: %+v, %v", latest, err)
+	}
+}
 
 func TestTrackerSnapshotCASRejectsStaleWriteAndCommitsLocation(t *testing.T) {
 	server := setupMemoryTestRedis(t)

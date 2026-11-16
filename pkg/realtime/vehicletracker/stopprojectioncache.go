@@ -10,7 +10,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
-const stopProjectionCacheMaxEntries = 4096
+const stopProjectionCacheMaxEntries = 65536
 
 // A weak reference distinguishes replacement generations of a shared TrackRef
 // without keeping the track's backing array alive after journey and track-cache
@@ -29,6 +29,7 @@ type stopProjectionKey struct {
 
 type stopProjection struct {
 	key      stopProjectionKey
+	once     sync.Once
 	progress float64
 	valid    bool
 }
@@ -67,37 +68,30 @@ func cachedStopProgress(shape stopProjectionShape, stop ctdf.Location, track []c
 		latitude:  math.Float64bits(stop.Coordinates[1]),
 	}
 
-	globalStopProjectionCache.mu.Lock()
-	if element := globalStopProjectionCache.entries[key]; element != nil {
-		globalStopProjectionCache.lru.MoveToFront(element)
-		projection := element.Value.(stopProjection)
-		globalStopProjectionCache.mu.Unlock()
-		runtime.KeepAlive(track)
-		return projection.progress, projection.valid
+	cache := &globalStopProjectionCache
+	cache.mu.Lock()
+	var projection *stopProjection
+	if element := cache.entries[key]; element != nil {
+		cache.lru.MoveToFront(element)
+		projection = element.Value.(*stopProjection)
+	} else {
+		if cache.entries == nil {
+			cache.entries = make(map[stopProjectionKey]*list.Element)
+		}
+		projection = &stopProjection{key: key}
+		cache.entries[key] = cache.lru.PushFront(projection)
+		if cache.lru.Len() > stopProjectionCacheMaxEntries {
+			oldest := cache.lru.Back()
+			delete(cache.entries, oldest.Value.(*stopProjection).key)
+			cache.lru.Remove(oldest)
+		}
 	}
-	globalStopProjectionCache.mu.Unlock()
+	cache.mu.Unlock()
 
-	_, progress, valid := closestTrackPosition(stop, track)
-	globalStopProjectionCache.mu.Lock()
-	defer globalStopProjectionCache.mu.Unlock()
-	if element := globalStopProjectionCache.entries[key]; element != nil {
-		globalStopProjectionCache.lru.MoveToFront(element)
-		projection := element.Value.(stopProjection)
-		runtime.KeepAlive(track)
-		return projection.progress, projection.valid
-	}
-	if globalStopProjectionCache.entries == nil {
-		globalStopProjectionCache.entries = make(map[stopProjectionKey]*list.Element)
-	}
-	element := globalStopProjectionCache.lru.PushFront(stopProjection{key: key, progress: progress, valid: valid})
-	globalStopProjectionCache.entries[key] = element
-	if globalStopProjectionCache.lru.Len() > stopProjectionCacheMaxEntries {
-		oldest := globalStopProjectionCache.lru.Back()
-		delete(globalStopProjectionCache.entries, oldest.Value.(stopProjection).key)
-		globalStopProjectionCache.lru.Remove(oldest)
-	}
-	// Keep the array live until after the weak key has been created and the
-	// projection is complete, but never retain it in the cache itself.
+	// Cold workers requesting the same stop and shape share one geometry scan.
+	projection.once.Do(func() {
+		_, projection.progress, projection.valid = closestTrackPosition(stop, track)
+	})
 	runtime.KeepAlive(track)
-	return progress, valid
+	return projection.progress, projection.valid
 }

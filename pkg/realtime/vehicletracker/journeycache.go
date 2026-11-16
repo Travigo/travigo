@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -34,6 +35,7 @@ type trackedJourneyCache struct {
 
 type cachedTrackedJourney struct {
 	Journey         *ctdf.Journey
+	schedule        *realtimestore.TrackerSchedule
 	StopOccurrences map[string][]int
 	StopKeys        []string
 	LastUsed        time.Time
@@ -125,15 +127,17 @@ func (cache *trackedJourneyCache) getCachedTrackedJourney(journeyID string, now 
 		}
 		service, serviceErr := cachedTrackedService(journey.ServiceRef)
 		journey.Service = service
+		schedule := realtimestore.PrepareTrackerSchedule(journey)
 		entry := &cachedTrackedJourney{
 			Journey:         journey,
+			schedule:        schedule,
 			StopOccurrences: journeyStopOccurrences(journey),
 			StopKeys:        journeyDestinationKeys(journey),
 			LastUsed:        now,
 			journeyID:       journeyID,
 			// Include decoded calls, occurrence maps, and the optional matching
 			// view's copied calls. Shared stop and track caches have separate limits.
-			bytes: int64(bsonBytes)*2 + int64(len(journey.Calls))*512 + 1024,
+			bytes: int64(bsonBytes)*2 + int64(len(journey.Calls))*512 + int64(schedule.EncodedSize()) + 1024,
 		}
 		// Keep processing the current event if the service database is temporarily
 		// unavailable, but retry the lookup on the next event for this journey.

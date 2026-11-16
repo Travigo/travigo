@@ -173,6 +173,13 @@ func (snapshot *RealtimeJourneySnapshot) SetLocation(location ctdf.Location, bea
 // the persisted details still match the value returned by FindForTrackerUpdate.
 // A location overlay set with SetLocation is committed in the same script.
 func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneySnapshot) error {
+	return SaveVehicleTrackerSnapshot(ctx, snapshot, nil)
+}
+
+// SaveVehicleTrackerSnapshot uses the prepared representation of the scheduled
+// journey selected by the tracker. Live fields and overlays are still encoded
+// and committed with the original compare-and-set.
+func SaveVehicleTrackerSnapshot(ctx context.Context, snapshot *RealtimeJourneySnapshot, schedule *TrackerSchedule) error {
 	if snapshot == nil || snapshot.Journey == nil {
 		return errors.New("realtime journey snapshot is required")
 	}
@@ -180,8 +187,18 @@ func SaveRealtimeJourneySnapshot(ctx context.Context, snapshot *RealtimeJourneyS
 		return errors.New("realtime journey snapshot identifier does not match journey")
 	}
 
-	storedRealtimeJourney := storedRealtimeJourneyFromCTDF(snapshot.Journey)
-	realtimeJourneyJSON, err := json.Marshal(storedRealtimeJourney)
+	var realtimeJourneyJSON []byte
+	var err error
+	if journey := snapshot.Journey.Journey; schedule != nil && journey != nil &&
+		journey.PrimaryIdentifier == schedule.timetable.PrimaryIdentifier && journey.PrimaryIdentifier != snapshot.identifier &&
+		journey.ModificationDateTime.Equal(schedule.timetable.ModificationDateTime) {
+		realtimeJourneyJSON, err = json.Marshal(storedTrackerSnapshot{
+			storedRealtimeJourney: storedRealtimeJourneyWithoutSchedule(snapshot.Journey),
+			Timetable:             schedule.encoded,
+		})
+	} else {
+		realtimeJourneyJSON, err = json.Marshal(storedRealtimeJourneyFromCTDF(snapshot.Journey))
+	}
 	if err != nil {
 		return err
 	}

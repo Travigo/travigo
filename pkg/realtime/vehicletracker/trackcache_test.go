@@ -36,6 +36,18 @@ func TestJourneyTrackCacheSharesImmutableTrackAndFreshness(t *testing.T) {
 	if !found || missing || &got.Track[0] != &newerTrack.Track[0] {
 		t.Fatal("a newer fetched track should replace an older concurrent cache value")
 	}
+
+	expired := now.Add(journeyTrackCacheTTL + time.Minute)
+	if _, found, _ := cache.get("track", expired); found {
+		t.Fatal("expired tracks must be fetched again")
+	}
+	refresh := newerTrack
+	refresh.Track = append([]ctdf.Location(nil), newerTrack.Track...)
+	refresh.ModificationDateTime = expired
+	refreshed, ok := cache.put("track", refresh, false, expired)
+	if !ok || &refreshed.Track[0] != &newerTrack.Track[0] || !refreshed.ModificationDateTime.Equal(expired) {
+		t.Fatal("unchanged geometry should retain its projection identity and update its metadata")
+	}
 }
 
 func TestJourneyTrackCacheBoundsEntriesAndExpiresNegativeMisses(t *testing.T) {

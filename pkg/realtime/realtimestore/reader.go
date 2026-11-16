@@ -761,6 +761,12 @@ func FindForUpdate(ctx context.Context, identifier string) (*ctdf.RealtimeJourne
 // mutable working copy with the same location overlays as FindForUpdate.
 // SaveRealtimeJourneySnapshot uses the private raw value for its atomic CAS.
 func FindForTrackerUpdate(ctx context.Context, identifier string) (*RealtimeJourneySnapshot, error) {
+	return FindForVehicleTrackerUpdate(ctx, identifier, nil)
+}
+
+// FindForVehicleTrackerUpdate may reuse the immutable scheduled timetable.
+// The tracker supplies the same prepared schedule when replacing the path.
+func FindForVehicleTrackerUpdate(ctx context.Context, identifier string, schedule *TrackerSchedule) (*RealtimeJourneySnapshot, error) {
 	if identifier == "" {
 		return nil, errors.New("realtime journey identifier is required")
 	}
@@ -780,7 +786,7 @@ func FindForTrackerUpdate(ctx context.Context, identifier string) (*RealtimeJour
 		return nil, err
 	}
 
-	previous, err := decodeStoredRealtimeJourney(ctx, raw, false)
+	previous, err := decodeTrackerSnapshot(ctx, raw, schedule)
 	if err != nil {
 		return nil, err
 	}

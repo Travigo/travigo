@@ -1,6 +1,7 @@
 package realtimestore
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"strings"
@@ -96,16 +97,81 @@ type storedRealtimeStop struct {
 	Cancelled        bool                             `json:"c,omitempty"`
 }
 
+// TrackerSchedule holds the unchanged timetable portion of the Redis document.
+type TrackerSchedule struct {
+	timetable *ctdf.Journey
+	encoded   json.RawMessage
+}
+
+// PrepareTrackerSchedule accepts an immutable scheduled journey. Dynamic and
+// merge writers use their regular encoding path.
+func PrepareTrackerSchedule(journey *ctdf.Journey) *TrackerSchedule {
+	if journey == nil || journey.PrimaryIdentifier == "" {
+		return nil
+	}
+	encoded, err := json.Marshal(storedJourneyFromCTDF(journey, ""))
+	if err != nil {
+		return nil
+	}
+	return &TrackerSchedule{timetable: journey, encoded: encoded}
+}
+
+func (schedule *TrackerSchedule) EncodedSize() int {
+	if schedule == nil {
+		return 0
+	}
+	return len(schedule.encoded)
+}
+
+// The raw field shadows the normal timetable while preserving the Redis format.
+type storedTrackerSnapshot struct {
+	*storedRealtimeJourney
+	Timetable json.RawMessage `json:"j,omitempty"`
+}
+
+func decodeTrackerSnapshot(ctx context.Context, data []byte, schedule *TrackerSchedule) (*ctdf.RealtimeJourney, error) {
+	if schedule == nil {
+		return decodeStoredRealtimeJourney(ctx, data, false)
+	}
+	stored := storedTrackerSnapshot{storedRealtimeJourney: &storedRealtimeJourney{}}
+	if err := json.Unmarshal(data, &stored); err != nil || stored.PrimaryIdentifier == "" {
+		return decodeStoredRealtimeJourney(ctx, data, false)
+	}
+	if !bytes.Equal(stored.Timetable, schedule.encoded) {
+		// Previous stop predictions must still be compared against the exact
+		// timetable version that was saved with them.
+		if len(stored.Timetable) != 0 {
+			if err := json.Unmarshal(stored.Timetable, &stored.Journey); err != nil {
+				return decodeStoredRealtimeJourney(ctx, data, false)
+			}
+		}
+		return stored.toCTDF(ctx, false), nil
+	}
+
+	previous := stored.toCTDF(ctx, false)
+	timetable := *schedule.timetable
+	timetable.Service = previous.Service
+	if len(timetable.Calls) > 0 {
+		timetable.DepartureTime = timetable.Calls[0].Departure
+	}
+	previous.Journey = &timetable
+	return previous, nil
+}
+
 func storedRealtimeJourneyFromCTDF(realtimeJourney *ctdf.RealtimeJourney) *storedRealtimeJourney {
 	if realtimeJourney == nil {
 		return nil
 	}
+	stored := storedRealtimeJourneyWithoutSchedule(realtimeJourney)
+	stored.Journey = storedJourneyFromCTDF(realtimeJourney.Journey, realtimeJourney.PrimaryIdentifier)
+	return stored
+}
 
+func storedRealtimeJourneyWithoutSchedule(realtimeJourney *ctdf.RealtimeJourney) *storedRealtimeJourney {
 	stored := &storedRealtimeJourney{
 		PrimaryIdentifier:          realtimeJourney.PrimaryIdentifier,
 		OtherIdentifiers:           realtimeJourney.OtherIdentifiers,
 		ActivelyTracked:            realtimeJourney.ActivelyTracked,
-		Journey:                    storedJourneyFromCTDF(realtimeJourney.Journey, realtimeJourney.PrimaryIdentifier),
 		Service:                    storedServiceFromCTDF(realtimeJourney.Service),
 		JourneyRunDate:             realtimeJourney.JourneyRunDate,
 		CreationDateTime:           realtimeJourney.CreationDateTime,

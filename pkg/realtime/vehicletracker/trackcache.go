@@ -182,7 +182,8 @@ func (cache *journeyTrackCache) get(reference string, now time.Time) (ctdf.Journ
 	}
 	entry := element.Value.(*journeyTrackCacheEntry)
 	if !entry.expiresAt.After(now) {
-		cache.removeLocked(element)
+		// Leave within the existing LRU budget until a refresh can compare
+		// the geometry. Expired tracks are never served by this lookup.
 		return ctdf.JourneyTrack{}, false, false
 	}
 	cache.lru.MoveToFront(element)
@@ -210,22 +211,23 @@ func (cache *journeyTrackCache) put(reference string, track ctdf.JourneyTrack, m
 	if existing := cache.entries[reference]; existing != nil {
 		current := existing.Value.(*journeyTrackCacheEntry)
 		if current.expiresAt.After(now) {
-			if !current.missing {
-				if !missing && track.ModificationDateTime.After(current.track.ModificationDateTime) {
-					cache.removeLocked(existing)
-				} else {
-					cache.lru.MoveToFront(existing)
-					return current.track, true
-				}
+			if !current.missing && (missing || !track.ModificationDateTime.After(current.track.ModificationDateTime)) {
+				cache.lru.MoveToFront(existing)
+				return current.track, true
 			}
 			if missing {
 				cache.lru.MoveToFront(existing)
 				return ctdf.JourneyTrack{}, false
 			}
 		}
-		if cache.entries[reference] == existing {
-			cache.removeLocked(existing)
+		if !missing && !current.missing && slices.EqualFunc(current.track.Track, track.Track, func(a, b ctdf.Location) bool {
+			return a.Type == b.Type && slices.Equal(a.Coordinates, b.Coordinates)
+		}) {
+			// Keep the shape identity for cached lengths and stop projections.
+			// The refreshed record still supplies the latest provenance.
+			track.Track = current.track.Track
 		}
+		cache.removeLocked(existing)
 	}
 	entry := &journeyTrackCacheEntry{
 		reference: reference,
