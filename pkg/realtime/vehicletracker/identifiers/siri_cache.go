@@ -103,3 +103,12 @@ func (c *lookupCache[T]) lookup(key string) (siriCacheEntry[T], bool) {
 	c.recent.MoveToFront(element)
 	return entry, true
 }
+
+func (c *lookupCache[T]) remove(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if element := c.entries[key]; element != nil {
+		delete(c.entries, key)
+		c.recent.Remove(element)
+	}
+}

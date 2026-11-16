@@ -440,9 +440,9 @@ func TestSiriStopExactMatchSurvivesUnrelatedInvalidPath(t *testing.T) {
 		}, bson.D{
 			{Key: "primaryidentifier", Value: "invalid"},
 			{Key: "departuretime", Value: aimed.Add(time.Hour)},
-			{Key: "availability", Value: availability},
+			{Key: "availability", Value: bson.M{"match": bson.A{bson.M{"type": "DayOfWeek", "value": "Sunday"}}}},
 		})
-		mt.AddMockResponses(ids, ids, candidates, ids, ids, candidates)
+		mt.AddMockResponses(ids, ids, candidates, ids, ids, candidates, ids, ids, candidates)
 		query := bson.M{"serviceref": "service", "originstoprefs": "a", "destinationstoprefs": "b"}
 		got, err := getSiriStopJourneys(mt.Coll, aimed, query, aimed, "")
 		if err != nil || got.exactMatch == nil || got.exactMatch.PrimaryIdentifier != "wanted" {
@@ -453,6 +453,10 @@ func TestSiriStopExactMatchSurvivesUnrelatedInvalidPath(t *testing.T) {
 		_, err = getSiriStopJourneys(mt.Coll, aimed, query, time.Time{}, "")
 		if err == nil || !strings.Contains(err.Error(), "invalid") || len(mt.GetAllStartedEvents()) != 6 {
 			mt.Fatalf("invalid path returned %v after %d commands", err, len(mt.GetAllStartedEvents()))
+		}
+		got, err = getSiriStopJourneys(mt.Coll, aimed.AddDate(0, 0, 1), query, time.Time{}, "")
+		if err != nil || len(got.available) != 1 || len(got.available[0].Calls) != 2 {
+			mt.Fatalf("inactive path should not affect available candidates: %+v, %v", got, err)
 		}
 	})
 }

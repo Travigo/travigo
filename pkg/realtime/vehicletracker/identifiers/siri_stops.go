@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
@@ -26,6 +28,28 @@ var siriStopCandidates = lookupCache[siriCandidateRows]{limit: 128, ttl: 3 * tim
 
 const siriStopCandidateCacheMaxBytes = 512 << 10
 
+// Cache metadata and raw calls so inactive candidates and exact matches
+// never need their full call sequence decoded.
+type siriStopCandidate struct {
+	PrimaryIdentifier  string
+	ServiceRef         string
+	Direction          string
+	DepartureTime      time.Time
+	DestinationDisplay string
+	Availability       *ctdf.Availability
+	Calls              bson.RawValue
+
+	pathOnce sync.Once
+	path     []ctdf.JourneyCall
+	pathErr  error
+}
+
+type siriCandidateRows struct {
+	rows              []*siriStopCandidate
+	count, bytes      int
+	missingCallArrays bool
+}
+
 var errSiriStopScanRequired = errors.New("SIRI stop lookup requires a direct query")
 
 func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bson.M, exactDeparture time.Time, direction string) (siriJourneyCandidates, error) {
@@ -42,7 +66,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 	key := collection.Database().Name() + "\x00" + collection.Name() + "\x00" + string(keyFields)
 	if entry, ok := siriStopCandidates.lookup(key); ok {
 		telemetry.Add(telemetry.SiriStopCandidateCacheHit, 1)
-		return entry.value.forStopEvent(date, exactDeparture, direction)
+		return entry.value.forStopEvent(key, date, exactDeparture, direction)
 	}
 	value, err, _ := siriStopCandidates.loads.Do(key, func() (any, error) {
 		if entry, ok := siriStopCandidates.lookup(key); ok {
@@ -56,7 +80,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 		}
 		if rows.count == 0 {
 			siriStopCandidates.store(key, rows, errSiriJourney)
-		} else if rows.pathErr == nil && rows.count == len(rows.journeys) && rows.bytes <= siriStopCandidateCacheMaxBytes {
+		} else if !rows.missingCallArrays && rows.count == len(rows.rows) && rows.bytes <= siriStopCandidateCacheMaxBytes {
 			siriStopCandidates.store(key, rows, nil)
 		} else if rows.bytes > siriStopCandidateCacheMaxBytes {
 			telemetry.Add(telemetry.SiriStopCandidateCacheOversize, 1)
@@ -69,7 +93,7 @@ func getSiriStopJourneys(collection *mongo.Collection, date time.Time, query bso
 	if err != nil {
 		return siriJourneyCandidates{}, err
 	}
-	return value.(siriCandidateRows).forStopEvent(date, exactDeparture, direction)
+	return value.(siriCandidateRows).forStopEvent(key, date, exactDeparture, direction)
 }
 
 func loadSiriStopRows(collection *mongo.Collection, services, origin, destination any) (siriCandidateRows, error) {
@@ -120,31 +144,64 @@ func loadSiriStopRows(collection *mongo.Collection, services, origin, destinatio
 		"destinationstoprefs": destination,
 	}
 	var rows siriCandidateRows
-	count, err := scanSiriCandidates(collection, fetch, telemetry.SiriCandidateDocuments, false, func(journey *ctdf.Journey, bytes int) {
-		if rows.pathErr == nil {
-			rows.pathErr = journey.ValidatePath()
-			if rows.pathErr != nil {
-				rows.pathErr = fmt.Errorf("decode SIRI journey path %q: %w", journey.PrimaryIdentifier, rows.pathErr)
-			}
+	count, err := scanSiriCandidateDocuments(collection, fetch, telemetry.SiriCandidateDocuments, func(cursor *mongo.Cursor) error {
+		row := new(siriStopCandidate)
+		if err := cursor.Decode(row); err != nil {
+			log.Error().Err(err).Msg("Failed to decode SIRI stop candidate")
+			return nil
 		}
-		rows.journeys = append(rows.journeys, journey)
-		rows.bytes += bytes
+		rows.missingCallArrays = rows.missingCallArrays || row.Calls.Type != bson.TypeArray
+		rows.rows = append(rows.rows, row)
+		rows.bytes += len(cursor.Current)
+		return nil
 	}, options.Find().SetHint("_id_"), siriCandidateProjection)
 	rows.count = count
 	return rows, err
 }
 
-func (rows siriCandidateRows) forStopEvent(date, aimed time.Time, direction string) (siriJourneyCandidates, error) {
-	candidates := rows.forEvent(date, aimed)
-	if !aimed.IsZero() && rows.count == len(rows.journeys) {
+func (rows siriCandidateRows) forStopEvent(key string, date, aimed time.Time, direction string) (siriJourneyCandidates, error) {
+	candidates := siriJourneyCandidates{count: rows.count}
+	var activeRows []int
+	for index, row := range rows.rows {
+		if !aimed.IsZero() && sameDepartureMinute(row.DepartureTime.UTC(), aimed) {
+			candidates.exactCount++
+		}
+		if row.Availability == nil || !row.Availability.MatchDate(date) {
+			continue
+		}
+		activeRows = append(activeRows, index)
+		candidates.available = append(candidates.available, &ctdf.Journey{
+			PrimaryIdentifier: row.PrimaryIdentifier, ServiceRef: row.ServiceRef, Direction: row.Direction,
+			DepartureTime: row.DepartureTime, DestinationDisplay: row.DestinationDisplay, Availability: row.Availability,
+		})
+	}
+
+	if !aimed.IsZero() && rows.count == len(rows.rows) {
 		candidates.exactMatch = rows.exactStopDeparture(candidates, aimed, direction)
+		if candidates.exactMatch != nil {
+			return candidates, nil
+		}
 	}
-	// Exact departure only requires metadata. An invalid path still blocks
-	// the broader fallback, where it could otherwise hide a competing match.
-	if candidates.exactMatch != nil {
-		return candidates, nil
+	for active, index := range activeRows {
+		row := rows.rows[index]
+		journey := candidates.available[active]
+		row.pathOnce.Do(func() {
+			if row.Calls.Type != 0 {
+				row.pathErr = row.Calls.Unmarshal(&row.path)
+				row.Calls = bson.RawValue{}
+			}
+			if row.pathErr == nil {
+				path := ctdf.Journey{PrimaryIdentifier: row.PrimaryIdentifier, Calls: row.path}
+				row.pathErr = path.ValidatePath()
+			}
+		})
+		if row.pathErr != nil {
+			siriStopCandidates.remove(key)
+			return candidates, fmt.Errorf("decode SIRI journey path %q: %w", journey.PrimaryIdentifier, row.pathErr)
+		}
+		journey.Calls = row.path
 	}
-	return candidates, rows.pathErr
+	return candidates, nil
 }
 
 func (rows siriCandidateRows) exactStopDeparture(candidates siriJourneyCandidates, aimed time.Time, direction string) *ctdf.Journey {
@@ -152,7 +209,7 @@ func (rows siriCandidateRows) exactStopDeparture(candidates siriJourneyCandidate
 		return exactSiriDepartureMatch(candidates, aimed, direction)
 	}
 	count := 0
-	for _, journey := range rows.journeys {
+	for _, journey := range rows.rows {
 		if journey.Direction == direction || sameDepartureMinute(journey.DepartureTime.UTC(), aimed) {
 			count++
 		}

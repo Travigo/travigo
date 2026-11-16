@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"time"
 
 	"github.com/adjust/rmq/v5"
@@ -166,6 +165,12 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 
 	var retrievedRecords int64
 	observations := observationBatch{latest: make(map[observationRun]int)}
+	flush := func() error {
+		if err := redis_client.WaitForRealtimeQueueCapacity(len(observations.pending)); err != nil {
+			return err
+		}
+		return observations.flush(s.queue)
+	}
 
 	d := xml.NewDecoder(s.reader)
 	d.CharsetReader = charset.NewReaderLabel
@@ -192,12 +197,12 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 			}
 		}
 		if retrievedRecords%observationBatchSize == 0 {
-			if err := observations.flush(s.queue); err != nil {
+			if err := flush(); err != nil {
 				return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
 			}
 		}
 	}
-	if err := observations.flush(s.queue); err != nil {
+	if err := flush(); err != nil {
 		return datasets.DataImportReport{}, fmt.Errorf("publish SIRI-VM observations: %w", err)
 	}
 
@@ -211,22 +216,5 @@ func (s *SiriVM) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		Int64("superseded_observations", observations.replaced).
 		Msg("Submitted vehicle updates")
 
-	// Wait for queue to empty
-	checkQueueSize()
-
 	return datasets.DataImportReport{}, nil
-}
-
-func checkQueueSize() {
-	for {
-		stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
-		inQueue := stats.QueueStats["realtime-queue"].ReadyCount
-
-		if inQueue < 40000 {
-			break
-		}
-
-		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
-		time.Sleep(time.Duration(30+rand.IntN(20)) * time.Second)
-	}
 }

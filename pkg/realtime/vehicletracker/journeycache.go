@@ -1,6 +1,7 @@
 package vehicletracker
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"slices"
@@ -23,11 +24,12 @@ const trackedJourneyCacheMaxEntries = 100000
 var processTrackedJourneyCache = &trackedJourneyCache{}
 
 type trackedJourneyCache struct {
-	journeyCacheMu                     sync.Mutex
-	journeyCache                       map[string]*cachedTrackedJourney
-	journeyCacheHead, journeyCacheTail *cachedTrackedJourney
-	loads                              singleflight.Group
-	bytes, maxBytes                    int64
+	journeyCacheMu  sync.Mutex
+	journeyCache    map[string]*cachedTrackedJourney
+	recent, reused  list.List
+	reusedBytes     int64
+	loads           singleflight.Group
+	bytes, maxBytes int64
 }
 
 type cachedTrackedJourney struct {
@@ -39,7 +41,8 @@ type cachedTrackedJourney struct {
 	bytes           int64
 	hydrationMu     sync.Mutex
 	matching        journeyView
-	previous, next  *cachedTrackedJourney
+	cachePosition   *list.Element
+	reused          bool
 	offsetsOnce     sync.Once
 	stopOffsets     []int
 	legOffsets      []int
@@ -256,43 +259,50 @@ func (consumer *BatchConsumer) loadLocation(name string) *time.Location {
 	return loadedLocation
 }
 
-// Access order is independent of feed timestamps, which may arrive out of order.
+// A first read enters the recent list. A second access protects the journey
+// from one pass over a large feed, within half the existing cache budget.
 func (consumer *trackedJourneyCache) touchJourneyCacheLocked(entry *cachedTrackedJourney) {
-	if consumer.journeyCacheHead == entry {
+	if entry.cachePosition == nil {
+		entry.cachePosition = consumer.recent.PushFront(entry)
 		return
 	}
-	if entry.previous != nil {
-		entry.previous.next = entry.next
+	if entry.reused {
+		consumer.reused.MoveToFront(entry.cachePosition)
+		return
 	}
-	if entry.next != nil {
-		entry.next.previous = entry.previous
+	consumer.recent.Remove(entry.cachePosition)
+	entry.reused = true
+	entry.cachePosition = consumer.reused.PushFront(entry)
+	consumer.reusedBytes += entry.bytes
+	for consumer.reused.Len() > trackedJourneyCacheMaxEntries/2 ||
+		(consumer.maxBytes > 0 && consumer.reusedBytes > consumer.maxBytes/2) {
+		oldest := consumer.reused.Back()
+		demoted := oldest.Value.(*cachedTrackedJourney)
+		consumer.reused.Remove(oldest)
+		consumer.reusedBytes -= demoted.bytes
+		demoted.reused = false
+		demoted.cachePosition = consumer.recent.PushFront(demoted)
 	}
-	if consumer.journeyCacheTail == entry {
-		consumer.journeyCacheTail = entry.previous
-	}
-	entry.previous = nil
-	entry.next = consumer.journeyCacheHead
-	if entry.next != nil {
-		entry.next.previous = entry
-	} else {
-		consumer.journeyCacheTail = entry
-	}
-	consumer.journeyCacheHead = entry
 }
 
 func (consumer *trackedJourneyCache) pruneJourneyCacheLocked() {
 	for len(consumer.journeyCache) > trackedJourneyCacheMaxEntries || (consumer.maxBytes > 0 && consumer.bytes > consumer.maxBytes) {
-		entry := consumer.journeyCacheTail
+		oldest := consumer.recent.Back()
+		if oldest == nil {
+			oldest = consumer.reused.Back()
+		}
+		entry := oldest.Value.(*cachedTrackedJourney)
+		if entry.reused {
+			consumer.reused.Remove(oldest)
+			consumer.reusedBytes -= entry.bytes
+		} else {
+			consumer.recent.Remove(oldest)
+		}
 		delete(consumer.journeyCache, entry.journeyID)
 		consumer.bytes -= entry.bytes
+		entry.cachePosition = nil
+		entry.reused = false
 		telemetry.Add(telemetry.CacheEvicted, 1)
-		consumer.journeyCacheTail = entry.previous
-		if entry.previous != nil {
-			entry.previous.next = nil
-		} else {
-			consumer.journeyCacheHead = nil
-		}
-		entry.previous, entry.next = nil, nil
 	}
 }
 

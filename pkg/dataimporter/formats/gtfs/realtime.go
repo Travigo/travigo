@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
 	"time"
 
 	"github.com/MobilityData/gtfs-realtime-bindings/golang/gtfs"
@@ -73,6 +72,7 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	withTripUpdate := 0
 	serviceAlertCount := 0
 	submitted, unchanged, malformed := 0, 0, 0
+	admit := func() error { return redis_client.WaitForRealtimeQueueCapacity(1) }
 
 	for _, entity := range feed.Entity {
 		vehiclePosition := entity.GetVehicle()
@@ -190,9 +190,17 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					RecordedAt: recordedAtTime,
 				}
 
+				if err := admit(); err != nil {
+					return datasets.DataImportReport{}, err
+				}
 				updateEvent.SubmittedAt = time.Now()
-				updateEventJson, _ := json.Marshal(updateEvent)
-				r.queue.PublishBytes(updateEventJson)
+				updateEventJSON, err := json.Marshal(updateEvent)
+				if err != nil {
+					return datasets.DataImportReport{}, fmt.Errorf("encode GTFS-RT alert: %w", err)
+				}
+				if err := r.queue.PublishBytes(updateEventJSON); err != nil {
+					return datasets.DataImportReport{}, fmt.Errorf("publish GTFS-RT alert: %w", err)
+				}
 
 				serviceAlertCount += 1
 			}
@@ -331,11 +339,12 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				withTripUpdate += 1
 			}
 
-			// Performance Review [Set M] [PR034] [P1] (realtime): Buffer bounded
-			// batches for PublishBytes and propagate service-alert publish errors too.
 			// Keep trip lifecycle messages on the normal publish path.
 			published, err := recentGTFSObservations.publish(r.queue, dataset.Identifier, &locationEvent,
-				hasObservationTime, deduplicate, time.Now())
+				hasObservationTime, deduplicate, time.Now(), admit)
+			if errors.Is(err, errGTFSObservationExpired) {
+				continue
+			}
 			if errors.Is(err, errGTFSObservationEncoding) {
 				if malformed == 0 {
 					log.Warn().Err(err).Str("dataset", dataset.Identifier).Str("entity", entity.GetId()).Msg("Skipping malformed GTFS-RT observation")
@@ -376,8 +385,6 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		Int("total", len(feed.Entity)).
 		Msg("Submitted vehicle updates")
 
-	checkQueueSize()
-
 	return datasets.DataImportReport{}, nil
 }
 
@@ -388,24 +395,6 @@ func firstAlertTranslation(value *gtfs.TranslatedString) string {
 		}
 	}
 	return ""
-}
-
-func checkQueueSize() {
-	// Performance Review [Set M] [PR035] [P2] (realtime): Throttling starts only after the entire
-	// feed has been queued, allowing concurrent importers to overshoot together;
-	// recursion also retains another frame every 30-49s of sustained backlog.
-	// Use iterative, cancellable admission checks between bounded publish batches
-	// (also in SIRI-VM), handle stats errors, and monitor queued bytes/oldest event age.
-	// Bound retained feed data as well as queued work while waiting for capacity.
-	stats, _ := redis_client.QueueConnection.CollectStats([]string{"realtime-queue"})
-	inQueue := stats.QueueStats["realtime-queue"].ReadyCount
-
-	if inQueue >= 40000 {
-		log.Info().Int64("queuesize", inQueue).Msg("Queue size too long, hanging back for a bit")
-		time.Sleep(time.Duration(30+rand.IntN(20)) * time.Second)
-
-		checkQueueSize()
-	}
 }
 
 func realtimeTripLocalID(dataset, linkedDataset, timeframe, tripID string) string {

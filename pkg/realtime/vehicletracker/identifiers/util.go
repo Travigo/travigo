@@ -69,12 +69,6 @@ var siriCandidateProjection = options.Find().SetProjection(bson.D{
 	{Key: "calls.departure", Value: 1},
 })
 
-type siriCandidateRows struct {
-	journeys     []*ctdf.Journey
-	count, bytes int
-	pathErr      error
-}
-
 func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson.M, aimed time.Time, documents telemetry.Counter, includePath bool, opts ...*options.FindOptions) (siriJourneyCandidates, error) {
 	var candidates siriJourneyCandidates
 	count, err := scanSiriCandidates(collection, query, documents, includePath, func(journey *ctdf.Journey, _ int) {
@@ -85,39 +79,41 @@ func readSiriCandidates(collection *mongo.Collection, date time.Time, query bson
 }
 
 func scanSiriCandidates(collection *mongo.Collection, query bson.M, documents telemetry.Counter, includePath bool, add func(*ctdf.Journey, int), opts ...*options.FindOptions) (int, error) {
+	return scanSiriCandidateDocuments(collection, query, documents, func(cursor *mongo.Cursor) error {
+		var decoded ctdf.Journey
+		if err := cursor.Decode(&decoded); err != nil {
+			log.Error().Err(err).Msg("Failed to decode journey")
+			return nil
+		}
+		if includePath {
+			if err := decoded.ValidatePath(); err != nil {
+				return fmt.Errorf("decode SIRI journey path %q: %w", decoded.PrimaryIdentifier, err)
+			}
+		}
+		add(&decoded, len(cursor.Current))
+		return nil
+	}, opts...)
+}
+
+func scanSiriCandidateDocuments(collection *mongo.Collection, query bson.M, documents telemetry.Counter, visit func(*mongo.Cursor) error, opts ...*options.FindOptions) (int, error) {
 	started := time.Now()
 	defer func() { telemetry.Observe(telemetry.SiriCandidateQuery, time.Since(started)) }()
 	count := 0
 	defer func() { telemetry.Add(documents, int64(count)) }()
-	cursor, err := collection.Find(context.Background(), query, opts...)
+	ctx := context.Background()
+	cursor, err := collection.Find(ctx, query, opts...)
 	if err != nil {
 		return 0, err
 	}
-	defer cursor.Close(context.Background())
+	defer cursor.Close(ctx)
 
-	for cursor.Next(context.Background()) {
+	for cursor.Next(ctx) {
 		count++
-		var decoded ctdf.Journey
-		if err := cursor.Decode(&decoded); err != nil {
-			log.Error().Err(err).Msg("Failed to decode journey")
-			continue
+		if err := visit(cursor); err != nil {
+			return count, err
 		}
-		if includePath {
-			if err := decoded.ValidatePath(); err != nil {
-				return count, fmt.Errorf("decode SIRI journey path %q: %w", decoded.PrimaryIdentifier, err)
-			}
-		}
-		add(&decoded, len(cursor.Current))
 	}
 	return count, cursor.Err()
-}
-
-func (rows siriCandidateRows) forEvent(date, exactDeparture time.Time) siriJourneyCandidates {
-	candidates := siriJourneyCandidates{count: rows.count}
-	for _, journey := range rows.journeys {
-		candidates.add(journey, date, exactDeparture)
-	}
-	return candidates
 }
 
 func (candidates *siriJourneyCandidates) add(journey *ctdf.Journey, date, exactDeparture time.Time) {

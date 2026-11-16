@@ -64,6 +64,31 @@ func TestPruneJourneyCacheLockedRemovesOldestEntries(t *testing.T) {
 	}
 }
 
+func TestJourneyCacheKeepsReusedJourneysThroughAFeedScan(t *testing.T) {
+	cache := trackedJourneyCache{journeyCache: map[string]*cachedTrackedJourney{}, maxBytes: 4}
+	add := func(id string) {
+		entry := &cachedTrackedJourney{journeyID: id, bytes: 1}
+		cache.journeyCache[id] = entry
+		cache.bytes++
+		cache.touchJourneyCacheLocked(entry)
+		cache.pruneJourneyCacheLocked()
+	}
+	add("reused")
+	cache.touchJourneyCacheLocked(cache.journeyCache["reused"])
+	for _, id := range []string{"one", "two", "three", "four", "five", "six"} {
+		add(id)
+	}
+	if cache.journeyCache["reused"] == nil || cache.journeyCache["three"] != nil || cache.bytes != cache.maxBytes {
+		t.Fatalf("feed scan evicted the wrong entries: %v", cache.journeyCache)
+	}
+	// New repeat accesses can replace protected entries within the same budget.
+	cache.touchJourneyCacheLocked(cache.journeyCache["four"])
+	cache.touchJourneyCacheLocked(cache.journeyCache["five"])
+	if cache.reusedBytes != 2 || cache.journeyCache["reused"].reused {
+		t.Fatal("old protected entries must give way to newer repeat accesses")
+	}
+}
+
 func TestConsumersShareJourneyLoadAndHydration(t *testing.T) {
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	mt.Run("concurrent consumers", func(mt *mtest.T) {
