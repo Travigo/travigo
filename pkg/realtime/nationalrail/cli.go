@@ -25,6 +25,10 @@ func RegisterCLI() *cli.Command {
 			{
 				Name:  "darwin",
 				Usage: "run an instance an instance of the Darwin train tracker",
+				Flags: []cli.Flag{
+					&cli.IntFlag{Name: "workers", EnvVars: []string{"TRAVIGO_NATIONALRAIL_DARWIN_WORKERS"}, Value: darwin.DefaultWorkers, Usage: "Number of ordered Darwin update workers"},
+					&cli.IntFlag{Name: "queue-depth", EnvVars: []string{"TRAVIGO_NATIONALRAIL_DARWIN_QUEUE_DEPTH"}, Value: darwin.DefaultQueueDepth, Usage: "Maximum queued Darwin updates"},
+				},
 				Action: func(c *cli.Context) error {
 					env := util.GetEnvironmentVariables()
 					if env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"] == "" {
@@ -44,10 +48,12 @@ func RegisterCLI() *cli.Command {
 					log.Info().Msg("Starting National Rail Darwin Push Port train tracker")
 
 					stompClient := darwin.StompClient{
-						Address:   "darwin-dist-44ae45.nationalrail.co.uk:61613",
-						Username:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"],
-						Password:  env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD"],
-						QueueName: "/topic/darwin.pushport-v16",
+						Address:    "darwin-dist-44ae45.nationalrail.co.uk:61613",
+						Username:   env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_USERNAME"],
+						Password:   env["TRAVIGO_NATIONALRAIL_DARWIN_STOMP_PASSWORD"],
+						QueueName:  "/topic/darwin.pushport-v16",
+						Workers:    c.Int("workers"),
+						QueueDepth: c.Int("queue-depth"),
 					}
 
 					stompClient.Run()

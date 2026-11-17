@@ -90,3 +90,10 @@ type RailCarriageToilet struct {
 	Type   string `groups:"basic,web-journey,web-journey-realtime"`
 	Status string `groups:"basic,web-journey,web-journey-realtime"`
 }
+
+type JourneyDetailedBus struct {
+	RegistrationNumber string `groups:"detailed,web-journey,web-journey-realtime"`
+	VehicleMake        string `groups:"detailed,web-journey,web-journey-realtime"`
+	VehicleColour      string `groups:"detailed,web-journey,web-journey-realtime"`
+	PowerType          string `groups:"detailed,web-journey,web-journey-realtime"`
+}

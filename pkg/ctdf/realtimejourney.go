@@ -61,6 +61,7 @@ type RealtimeJourney struct {
 
 	// Detailed realtime journey information
 	DetailedRailInformation JourneyDetailedRail `groups:"detailed,web-journey,web-journey-realtime"`
+	DetailedBusInformation  JourneyDetailedBus  `groups:"detailed,web-journey,web-journey-realtime"`
 }
 
 func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {

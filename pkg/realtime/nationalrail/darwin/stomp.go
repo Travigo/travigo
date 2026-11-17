@@ -3,6 +3,7 @@ package darwin
 import (
 	"bytes"
 	"compress/gzip"
+	"time"
 
 	"github.com/go-stomp/stomp/v3"
 	"github.com/rs/zerolog/log"
@@ -10,10 +11,12 @@ import (
 )
 
 type StompClient struct {
-	Address   string
-	Username  string
-	Password  string
-	QueueName string
+	Address    string
+	Username   string
+	Password   string
+	QueueName  string
+	Workers    int
+	QueueDepth int
 }
 
 var stopCache railutils.StopCache
@@ -24,7 +27,11 @@ func (s *StompClient) Run() {
 	stopCache = railutils.StopCache{}
 	stopCache.Setup()
 
-	go RetryRecords()
+	dispatcher := newDarwinDispatcher(s.Workers, s.QueueDepth)
+	defer dispatcher.Close()
+	dispatcher.LogStats(30 * time.Second)
+
+	go RetryRecords(dispatcher)
 
 	// Start stomp client
 	var stompOptions []func(*stomp.Conn) error = []func(*stomp.Conn) error{
@@ -65,12 +72,12 @@ func (s *StompClient) Run() {
 				log.Fatal().Err(err).Msg("Failed to parse push port data xml")
 			}
 
-			// Apply schedule revisions and predictions in feed order.
-			// Performance Review [Set M] [PR105] [P1]: Serial processing bounds
-			// dispatch on this subscription. Coordinate with RetryRecords, set
-			// dependency deadlines, and acknowledge only after successful processing
-			// or durable handoff. Verify replay semantics and measure oldest pending age.
-			pushPortData.UpdateRealtimeJourneys()
+			// Independent train runs are processed concurrently, while updates
+			// for the same run stay in feed order on one dispatcher shard.
+			// Performance Review [Set M] [PR105] [P1]: AckAuto still follows
+			// delivery rather than durable processing; acknowledgement and retry
+			// semantics are tracked separately.
+			pushPortData.UpdateRealtimeJourneys(dispatcher)
 		}
 	}
 }

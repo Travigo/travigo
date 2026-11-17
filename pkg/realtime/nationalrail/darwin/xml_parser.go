@@ -3,6 +3,7 @@ package darwin
 import (
 	"encoding/xml"
 	"io"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/html/charset"
@@ -32,6 +33,18 @@ func ParseXMLFile(reader io.Reader) (PushPortData, error) {
 		switch ty := tok.(type) {
 		case xml.StartElement:
 			switch ty.Name.Local {
+			case "Pport":
+				for _, attribute := range ty.Attr {
+					if attribute.Name.Local != "ts" {
+						continue
+					}
+					for _, layout := range []string{time.RFC3339Nano, "2006-01-02T15:04:05.9999999Z0700"} {
+						if timestamp, err := time.Parse(layout, attribute.Value); err == nil {
+							pushPortData.GeneratedAt = timestamp
+							break
+						}
+					}
+				}
 			case "TS":
 				var trainStatus TrainStatus
 
