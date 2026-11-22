@@ -29,9 +29,10 @@ func TestVehicleEnrichmentRunsOnlyAfterJourneyCreation(t *testing.T) {
 	}
 	event := &VehicleUpdateEvent{
 		SourceType: "GTFS-RT",
+		DataSource: &ctdf.DataSourceReference{DatasetID: "gb-dft-bods-gtfs-realtime"},
 		RecordedAt: time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC),
 		VehicleLocationUpdate: &VehicleLocationUpdate{
-			Timeframe: "2026-11-21", VehicleRegistration: "AA19AAA", VehicleDataProvider: dvlaves.ProviderID,
+			Timeframe: "2026-11-21", VehicleRegistration: "AA19AAA", VehicleDataProvider: dvlaves.ProviderID, VehicleIdentifier: "15327",
 			StopUpdates: []VehicleLocationEventStopUpdate{{StopID: "destination"}},
 		},
 	}
@@ -90,6 +91,7 @@ func TestVehicleEnrichmentRunsOnlyAfterJourneyCreation(t *testing.T) {
 	}
 
 	event.VehicleLocationUpdate.VehicleRegistration = ""
+	event.VehicleLocationUpdate.VehicleIdentifier = ""
 	update()
 	attach()
 	check(details)
@@ -97,9 +99,20 @@ func TestVehicleEnrichmentRunsOnlyAfterJourneyCreation(t *testing.T) {
 	check(details)
 
 	event.VehicleLocationUpdate.VehicleRegistration = "AB20XYZ"
+	event.VehicleLocationUpdate.VehicleIdentifier = "other-feed-ref"
+	event.DataSource = &ctdf.DataSourceReference{DatasetID: "gb-dft-bods-sirivm-all"}
 	update()
 	attach() // A delayed result from the original vehicle is no longer applicable.
 	check(ctdf.JourneyDetailedBus{})
+	journey, err := realtimestore.FindByIdentifier(ctx, identifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if journey.VehicleRefs["gb-dft-bods-gtfs-realtime"] != "15327" ||
+		journey.VehicleRefs["gb-dft-bods-sirivm-all"] != "other-feed-ref" ||
+		journey.VehicleRef != "other-feed-ref" {
+		t.Fatalf("unexpected persisted vehicle references: %v (latest %q)", journey.VehicleRefs, journey.VehicleRef)
+	}
 }
 
 type testVehicleDataProvider struct {

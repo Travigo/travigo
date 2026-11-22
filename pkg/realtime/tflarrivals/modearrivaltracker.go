@@ -9,6 +9,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,6 +24,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -240,6 +242,15 @@ func (l *ModeArrivalTracker) ParseArrivals(lineArrivals []ArrivalPrediction) {
 }
 
 func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSourceReference) error {
+	err := l.tryParseGroupedArrivals(realtimeJourneyID, predictions, datasource)
+	if errors.Is(err, realtimestore.ErrRealtimeJourneyConflict) {
+		return l.tryParseGroupedArrivals(realtimeJourneyID, predictions, datasource)
+	}
+	return err
+}
+
+func (l *ModeArrivalTracker) tryParseGroupedArrivals(realtimeJourneyID string, predictions []ArrivalPrediction, datasource *ctdf.DataSourceReference) error {
+	ctx := context.Background()
 	tflOperator := &ctdf.Operator{
 		PrimaryIdentifier: "gb-noc-TFLO",
 		PrimaryName:       "Transport for London",
@@ -253,12 +264,20 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 		return nil
 	}
 
-	// Performance Review [Set J] [PR133] [P2] (realtime): FindByIdentifier also fetches location,
-	// description, rail allocation and loading, although TfL only needs its update
-	// state. SaveRealtimeJourney reads the previous details again for event diffs.
-	// Batch-prefetch the required state across groups and use a narrow update read;
-	// preserve any existing location and an immutable previous snapshot for events.
-	realtimeJourney, _ := realtimestore.FindByIdentifier(context.Background(), realtimeJourneyID)
+	var realtimeJourney *ctdf.RealtimeJourney
+	var snapshot *realtimestore.RealtimeJourneySnapshot
+	if l.Mode.ModeID == "bus" {
+		// Commit against the version read so an asynchronous DVLA result
+		// survives concurrent prediction updates.
+		var err error
+		snapshot, err = realtimestore.FindForMergeUpdate(ctx, realtimeJourneyID)
+		if err != nil {
+			return err
+		}
+		realtimeJourney = snapshot.Journey
+	} else {
+		realtimeJourney, _ = realtimestore.FindByIdentifier(ctx, realtimeJourneyID)
+	}
 
 	if realtimeJourney == nil {
 		journeyDate := time.Now() // TODO may not always be correct?
@@ -289,6 +308,12 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
+		if snapshot != nil && strings.TrimSpace(os.Getenv(dvlaves.APIKeyEnvironmentVariable)) != "" {
+			realtimeJourney.VehicleRegistration = dvlaves.RegistrationFromVehicleRef(predictions[0].VehicleID)
+		}
+	}
+	if snapshot != nil {
+		realtimeJourney.RecordVehicleRef(predictions[0].VehicleID, datasource)
 	}
 
 	// Add new predictions to the realtime journey
@@ -512,16 +537,24 @@ func (l *ModeArrivalTracker) parseGroupedArrivals(realtimeJourneyID string, pred
 
 	// Update database
 	realtimeJourney.ModificationDateTime = now
-	realtimeJourney.DataSource.Timestamp = datasource.Timestamp
+	realtimeJourney.DataSource = datasource
 
-	if err := realtimestore.UpdateLocationDescription(context.Background(), realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription); err != nil {
+	if snapshot != nil {
+		snapshot.Journey = realtimeJourney
+		if err := realtimestore.SaveRealtimeJourneySnapshot(ctx, snapshot); err != nil {
+			return err
+		}
+	}
+	if err := realtimestore.UpdateLocationDescription(ctx, realtimeJourney.PrimaryIdentifier, realtimeJourney.VehicleLocationDescription); err != nil {
 		return err
 	}
-	if err := realtimestore.SaveRealtimeJourney(context.Background(), realtimeJourney); err != nil {
-		return err
+	if snapshot == nil {
+		if err := realtimestore.SaveRealtimeJourney(ctx, realtimeJourney); err != nil {
+			return err
+		}
 	}
 
-	return realtimestore.IndexTFLDepartureBoardJourney(context.Background(), realtimeJourney)
+	return realtimestore.IndexTFLDepartureBoardJourney(ctx, realtimeJourney)
 }
 
 func reconcileTFLRealtimeStops(previousStops map[string]*ctdf.RealtimeJourneyStops, currentStops []*ctdf.RealtimeJourneyStops, occurrenceLimits map[string]int) []*ctdf.RealtimeJourneyStops {

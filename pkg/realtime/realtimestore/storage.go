@@ -33,6 +33,7 @@ type storedRealtimeJourney struct {
 	Offset                     time.Duration                       `json:"off,omitempty"`
 	Reliability                ctdf.RealtimeJourneyReliabilityType `json:"rel,omitempty"`
 	VehicleRef                 string                              `json:"veh,omitempty"`
+	VehicleRefs                map[string]string                   `json:"vehs,omitempty"`
 	VehicleRegistration        string                              `json:"vrn,omitempty"`
 	Cancelled                  bool                                `json:"can,omitempty"`
 	SuppressFromDepartures     bool                                `json:"sfd,omitempty"`
@@ -189,6 +190,7 @@ func storedRealtimeJourneyWithoutSchedule(realtimeJourney *ctdf.RealtimeJourney)
 		Offset:                     realtimeJourney.Offset,
 		Reliability:                realtimeJourney.Reliability,
 		VehicleRef:                 realtimeJourney.VehicleRef,
+		VehicleRefs:                realtimeJourney.VehicleRefs,
 		VehicleRegistration:        realtimeJourney.VehicleRegistration,
 		Cancelled:                  realtimeJourney.Cancelled,
 		SuppressFromDepartures:     realtimeJourney.SuppressFromDepartures,
@@ -350,6 +352,7 @@ func (stored *storedRealtimeJourney) toCTDF(ctx context.Context, hydrateJourney 
 		Offset:                     stored.Offset,
 		Reliability:                stored.Reliability,
 		VehicleRef:                 stored.VehicleRef,
+		VehicleRefs:                stored.VehicleRefs,
 		VehicleRegistration:        stored.VehicleRegistration,
 		Cancelled:                  stored.Cancelled,
 		SuppressFromDepartures:     stored.SuppressFromDepartures,

@@ -100,6 +100,8 @@ func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomain
 		ActivelyTracked:           true,
 		NextStopRef:               "stop-2",
 		NextStopIndex:             3,
+		VehicleRef:                "15327",
+		VehicleRefs:               map[string]string{"sample-feed": "15327"},
 		VehicleLocationObservedAt: &observedAt,
 		VehicleLocationSource:     "TD",
 		VehicleLocationConfidence: "mapped",
@@ -117,7 +119,14 @@ func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomain
 	forbidKeys(t, result, "PrimaryIdentifier", "Journey", "DepartedStop", "NextStop", "JourneyRunDate", "DataSource")
 	requireKeys(t, result, "VehicleLocationObservedAt", "VehicleLocationSource", "VehicleLocationConfidence")
 	requireKeys(t, result, "DetailedMotorvehicleInformation")
-	forbidKeys(t, result, "DetailedBusInformation")
+	forbidKeys(t, result, "DetailedBusInformation", "VehicleRefs")
+	if got := result["VehicleRef"]; got != "15327" {
+		t.Fatalf("unexpected vehicle reference %v", got)
+	}
+	journey := marshalSheriffMap(t, []string{"web-journey"}, &ctdf.Journey{RealtimeJourney: realtime})
+	if got := journey["RealtimeJourney"].(map[string]interface{})["VehicleRef"]; got != "15327" {
+		t.Fatalf("unexpected nested vehicle reference %v", got)
+	}
 	details := result["DetailedMotorvehicleInformation"].(map[string]interface{})
 	if got := details["RegistrationNumber"]; got != "AB24XYZ" {
 		t.Fatalf("unexpected vehicle registration %v", got)

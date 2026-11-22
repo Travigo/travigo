@@ -90,8 +90,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 
 			CreationDateTime: currentTime,
 
-			VehicleRef: vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier,
-			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
+			Stops: map[string]*ctdf.RealtimeJourneyStops{},
 		}
 		if consumer.vehicleEnrichmentEnabled && update.VehicleDataProvider == dvlaves.ProviderID {
 			realtimeJourney.VehicleRegistration = update.VehicleRegistration
@@ -233,7 +232,7 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 	realtimeJourney.ModificationDateTime = currentTime
 	realtimeJourney.Occupancy = vehicleUpdateEvent.VehicleLocationUpdate.Occupancy
 	realtimeJourney.Reliability = realtimeJourneyReliability
-	realtimeJourney.VehicleRef = vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier
+	realtimeJourney.RecordVehicleRef(update.VehicleIdentifier, vehicleUpdateEvent.DataSource)
 	realtimeJourney.DataSource = vehicleUpdateEvent.DataSource
 
 	realtimeJourney.Offset = offset

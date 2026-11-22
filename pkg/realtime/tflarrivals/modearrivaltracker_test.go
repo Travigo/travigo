@@ -1,11 +1,17 @@
 package tflarrivals
 
 import (
+	"context"
 	"net/url"
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/realtime/realtimestore"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
+	"github.com/travigo/travigo/pkg/redis_client"
 )
 
 func TestModeArrivalsURLRequestsAllPredictionsPerStop(t *testing.T) {
@@ -180,5 +186,78 @@ func realtimeStop(stopRef string, arrival time.Time, timeType ctdf.RealtimeJourn
 		ArrivalTime:   arrival,
 		DepartureTime: arrival,
 		TimeType:      timeType,
+	}
+}
+
+func TestTfLBusArrivalsQueueDVLAEnrichmentOnlyWhenCreated(t *testing.T) {
+	ctx := context.Background()
+	server := miniredis.RunT(t)
+	old := redis_client.Client
+	redis_client.Client = redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() {
+		_ = redis_client.Client.Close()
+		redis_client.Client = old
+	})
+	t.Setenv(dvlaves.APIKeyEnvironmentVariable, "test-key")
+
+	now := time.Now().UTC()
+	stopIDs := []string{"dvla-test-stop-a", "dvla-test-stop-b"}
+	stopTflStopCacheMutex.Lock()
+	for _, id := range stopIDs {
+		stopTflStopCache[id] = &ctdf.Stop{PrimaryIdentifier: id, Timezone: "Europe/London"}
+		stopTflStopCacheExpires[id] = now.Add(time.Minute)
+	}
+	stopTflStopCacheMutex.Unlock()
+	t.Cleanup(func() {
+		stopTflStopCacheMutex.Lock()
+		defer stopTflStopCacheMutex.Unlock()
+		for _, id := range stopIDs {
+			delete(stopTflStopCache, id)
+			delete(stopTflStopCacheExpires, id)
+		}
+	})
+	const dataset = "gb-tfl-mode/bus/arrivals"
+	source := &ctdf.DataSourceReference{DatasetID: dataset}
+	tracker := &ModeArrivalTracker{Mode: &TfLMode{ModeID: "bus", Lines: map[string]*TfLLine{
+		"1": {Service: &ctdf.Service{PrimaryIdentifier: "test-line", TransportType: ctdf.TransportTypeBus}},
+	}}}
+	update := func(journeyID, vehicleID string) {
+		t.Helper()
+		predictions := []ArrivalPrediction{
+			{LineID: "1", NaptanID: stopIDs[0], VehicleID: vehicleID, ExpectedArrival: now.Add(time.Minute).Format(time.RFC3339)},
+			{LineID: "1", NaptanID: stopIDs[1], VehicleID: vehicleID, ExpectedArrival: now.Add(2 * time.Minute).Format(time.RFC3339)},
+		}
+		if err := tracker.parseGroupedArrivals(journeyID, predictions, source); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const identifier = "test-tfl-bus-plate"
+	update(identifier, "AB24XYZ")
+	update("test-tfl-bus-fleet-id", "15327")
+
+	jobs, err := redis_client.Client.XRange(ctx, realtimestore.VehicleEnrichmentStream, "-", "+").Result()
+	if err != nil || len(jobs) != 1 || jobs[0].Values["journey"] != identifier || jobs[0].Values["registration"] != "AB24XYZ" {
+		t.Fatalf("expected only the plate-backed journey to be queued: %v, %v", jobs, err)
+	}
+	fleetJourney, err := realtimestore.FindForTrackerUpdate(ctx, "test-tfl-bus-fleet-id")
+	if err != nil || fleetJourney.Journey == nil || fleetJourney.Journey.VehicleRefs[dataset] != "15327" {
+		t.Fatalf("expected the opaque TfL vehicle reference to be retained: %v", err)
+	}
+
+	initial, err := realtimestore.FindForTrackerUpdate(ctx, identifier)
+	if err != nil || initial.Journey == nil {
+		t.Fatalf("read initial bus journey: %v", err)
+	}
+	details := ctdf.JourneyDetailedBus{RegistrationNumber: "AB24XYZ", VehicleMake: "VOLVO"}
+	if err := realtimestore.UpdateBusDetails(ctx, identifier, initial.Journey.CreationDateTime, details); err != nil {
+		t.Fatal(err)
+	}
+	update(identifier, "AB24XYZ")
+	refreshed, err := realtimestore.FindForTrackerUpdate(ctx, identifier)
+	if err != nil || refreshed.Journey == nil || refreshed.Journey.DetailedMotorvehicleInformation != details {
+		t.Fatalf("TfL refresh lost vehicle details: %v", err)
+	}
+	if count, err := redis_client.Client.XLen(ctx, realtimestore.VehicleEnrichmentStream).Result(); err != nil || count != 1 {
+		t.Fatalf("TfL refresh changed the enrichment queue length to %d: %v", count, err)
 	}
 }

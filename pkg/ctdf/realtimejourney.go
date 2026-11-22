@@ -2,6 +2,7 @@ package ctdf
 
 import (
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -47,8 +48,9 @@ type RealtimeJourney struct {
 
 	Reliability RealtimeJourneyReliabilityType `groups:"basic,web-board,web-journey,web-journey-realtime"`
 
-	VehicleRef          string `groups:"internal"`
-	VehicleRegistration string `groups:"internal" json:",omitempty" bson:",omitempty"`
+	VehicleRef          string            `groups:"internal,web-journey,web-journey-realtime"`
+	VehicleRefs         map[string]string `json:"-" bson:"-"` // Most recent non-empty vehicle reference by dataset.
+	VehicleRegistration string            `groups:"internal" json:",omitempty" bson:",omitempty"`
 
 	Cancelled bool `groups:"basic,web-journey,web-journey-realtime"`
 
@@ -63,6 +65,27 @@ type RealtimeJourney struct {
 	// Detailed realtime journey information
 	DetailedRailInformation         JourneyDetailedRail `groups:"detailed,web-journey,web-journey-realtime"`
 	DetailedMotorvehicleInformation JourneyDetailedBus  `groups:"detailed,web-journey,web-journey-realtime"`
+}
+
+// RecordVehicleRef retains each feed's identifier in its own namespace.
+func (r *RealtimeJourney) RecordVehicleRef(ref string, source *DataSourceReference) {
+	if len(r.VehicleRefs) == 0 && r.VehicleRef != "" && r.DataSource != nil && r.DataSource.DatasetID != "" {
+		r.VehicleRefs = map[string]string{r.DataSource.DatasetID: r.VehicleRef}
+	}
+	if ref == "" {
+		return
+	}
+	r.VehicleRef = ref
+	if source == nil || source.DatasetID == "" || r.VehicleRefs[source.DatasetID] == ref {
+		return
+	}
+	// Tracker snapshots share the previous value for event comparison.
+	references := maps.Clone(r.VehicleRefs)
+	if references == nil {
+		references = make(map[string]string)
+	}
+	references[source.DatasetID] = ref
+	r.VehicleRefs = references
 }
 
 func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {

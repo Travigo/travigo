@@ -335,7 +335,9 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 					})
 				}
 
-				locationEvent.VehicleLocationUpdate.VehicleIdentifier = tripUpdate.Vehicle.GetId()
+				if vehicleID := tripUpdate.Vehicle.GetId(); vehicleID != "" {
+					locationEvent.VehicleLocationUpdate.VehicleIdentifier = vehicleID
+				}
 
 				withTripUpdate += 1
 			}

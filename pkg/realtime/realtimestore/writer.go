@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strconv"
@@ -418,6 +419,7 @@ func cloneRealtimeJourney(journey *ctdf.RealtimeJourney) *ctdf.RealtimeJourney {
 	if err := json.Unmarshal(encoded, &clone); err != nil {
 		return journey
 	}
+	clone.VehicleRefs = maps.Clone(journey.VehicleRefs)
 	return &clone
 }
 
