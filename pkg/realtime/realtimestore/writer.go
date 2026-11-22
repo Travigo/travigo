@@ -42,17 +42,24 @@ if (current or '') ~= ARGV[1] then
 	return 0
 end
 
+local mappingEnd = #KEYS
+if ARGV[5] ~= '' then
+	-- Append first. If the stream write fails, leave the journey uncreated.
+	redis.call('XADD', KEYS[#KEYS], '*', 'journey', ARGV[4], 'created', ARGV[6], 'registration', ARGV[5])
+	mappingEnd = mappingEnd - 1
+end
+
 local ttl = ARGV[3]
 redis.call('SET', KEYS[1], ARGV[2], 'EX', ttl)
-for index = 4, #KEYS do
+for index = 4, mappingEnd do
 	redis.call('SET', KEYS[index], ARGV[4], 'EX', ttl)
 end
 
-if ARGV[5] then
-	redis.call('SET', KEYS[2], ARGV[5], 'EX', ttl)
+if ARGV[7] then
+	redis.call('SET', KEYS[2], ARGV[7], 'EX', ttl)
 	-- Keep the overlay even if the geo-index update fails.
-	if ARGV[6] then
-		redis.pcall('GEOADD', KEYS[3], ARGV[6], ARGV[7], ARGV[4])
+	if ARGV[8] then
+		redis.pcall('GEOADD', KEYS[3], ARGV[8], ARGV[9], ARGV[4])
 	else
 		redis.pcall('ZREM', KEYS[3], ARGV[4])
 	end
@@ -215,7 +222,13 @@ func SaveVehicleTrackerSnapshot(ctx context.Context, snapshot *RealtimeJourneySn
 	for mappingType, identifier := range snapshot.Journey.OtherIdentifiers {
 		keys = append(keys, realtimeJourneyMappingKey(mappingType, identifier))
 	}
-	args := []interface{}{snapshot.raw, realtimeJourneyJSON, int64(timeoutDuration / time.Second), snapshot.identifier}
+	registration, createdAt := "", ""
+	if len(snapshot.raw) == 0 && snapshot.Journey.VehicleRegistration != "" {
+		keys = append(keys, VehicleEnrichmentStream)
+		registration = snapshot.Journey.VehicleRegistration
+		createdAt = snapshot.Journey.CreationDateTime.Format(time.RFC3339Nano)
+	}
+	args := []interface{}{snapshot.raw, realtimeJourneyJSON, int64(timeoutDuration / time.Second), snapshot.identifier, registration, createdAt}
 	if snapshot.location != nil {
 		args = append(args, snapshot.location)
 		if snapshot.point != nil {

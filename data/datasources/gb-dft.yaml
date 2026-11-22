@@ -124998,6 +124998,7 @@ datasets:
   supportedobjects:
     realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule-*
+  vehicledataprovider: gb-dvla-ves
   unpackbundle: zip
   importdestination: realtime-queue
 - identifier: bods-gtfs-realtime
@@ -125010,6 +125011,7 @@ datasets:
   supportedobjects:
     realtimejourneys: true
   linkeddataset: gb-dft-bods-gtfs-schedule-*
+  vehicledataprovider: gb-dvla-ves
   unpackbundle: zip
   importdestination: realtime-queue
 - identifier: bods-sirisx-all

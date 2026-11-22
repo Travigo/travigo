@@ -33,12 +33,14 @@ type storedRealtimeJourney struct {
 	Offset                     time.Duration                       `json:"off,omitempty"`
 	Reliability                ctdf.RealtimeJourneyReliabilityType `json:"rel,omitempty"`
 	VehicleRef                 string                              `json:"veh,omitempty"`
+	VehicleRegistration        string                              `json:"vrn,omitempty"`
 	Cancelled                  bool                                `json:"can,omitempty"`
 	SuppressFromDepartures     bool                                `json:"sfd,omitempty"`
 	SuppressFromDepartureDates []string                            `json:"sfdd,omitempty"`
 	ReplacedByJourneyRef       string                              `json:"rbr,omitempty"`
 	Occupancy                  *ctdf.RealtimeJourneyOccupancy      `json:"occ,omitempty"`
 	DetailedRail               *ctdf.JourneyDetailedRail           `json:"rail,omitempty"`
+	DetailedBus                *ctdf.JourneyDetailedBus            `json:"bus,omitempty"`
 }
 
 type storedJourney struct {
@@ -187,6 +189,7 @@ func storedRealtimeJourneyWithoutSchedule(realtimeJourney *ctdf.RealtimeJourney)
 		Offset:                     realtimeJourney.Offset,
 		Reliability:                realtimeJourney.Reliability,
 		VehicleRef:                 realtimeJourney.VehicleRef,
+		VehicleRegistration:        realtimeJourney.VehicleRegistration,
 		Cancelled:                  realtimeJourney.Cancelled,
 		SuppressFromDepartures:     realtimeJourney.SuppressFromDepartures,
 		SuppressFromDepartureDates: realtimeJourney.SuppressFromDepartureDates,
@@ -202,6 +205,10 @@ func storedRealtimeJourneyWithoutSchedule(realtimeJourney *ctdf.RealtimeJourney)
 	if hasOccupancy(realtimeJourney.Occupancy) {
 		occupancy := realtimeJourney.Occupancy
 		stored.Occupancy = &occupancy
+	}
+	if realtimeJourney.DetailedMotorvehicleInformation != (ctdf.JourneyDetailedBus{}) {
+		details := realtimeJourney.DetailedMotorvehicleInformation
+		stored.DetailedBus = &details
 	}
 	return stored
 }
@@ -343,6 +350,7 @@ func (stored *storedRealtimeJourney) toCTDF(ctx context.Context, hydrateJourney 
 		Offset:                     stored.Offset,
 		Reliability:                stored.Reliability,
 		VehicleRef:                 stored.VehicleRef,
+		VehicleRegistration:        stored.VehicleRegistration,
 		Cancelled:                  stored.Cancelled,
 		SuppressFromDepartures:     stored.SuppressFromDepartures,
 		SuppressFromDepartureDates: stored.SuppressFromDepartureDates,
@@ -357,6 +365,9 @@ func (stored *storedRealtimeJourney) toCTDF(ctx context.Context, hydrateJourney 
 	}
 	if stored.DetailedRail != nil {
 		realtimeJourney.DetailedRailInformation = *stored.DetailedRail
+	}
+	if stored.DetailedBus != nil {
+		realtimeJourney.DetailedMotorvehicleInformation = *stored.DetailedBus
 	}
 	if realtimeJourney.Journey != nil && realtimeJourney.Journey.Service == nil {
 		realtimeJourney.Journey.Service = realtimeJourney.Service

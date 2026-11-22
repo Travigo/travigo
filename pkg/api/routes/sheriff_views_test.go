@@ -107,12 +107,21 @@ func TestWebRealtimeJourneySheriffViewKeepsOccurrenceIdentityWithoutNestedDomain
 			"stop-2@3": {StopRef: "stop-2", JourneyStopIndex: 3, Stop: &ctdf.Stop{PrimaryIdentifier: "unused-full-stop"}},
 		},
 		Reliability: ctdf.RealtimeJourneyReliabilityLocationWithTrack,
+		DetailedMotorvehicleInformation: ctdf.JourneyDetailedBus{
+			RegistrationNumber: "AB24XYZ",
+		},
 	}
 
 	result := marshalSheriffMap(t, []string{"web-journey-realtime"}, realtime)
 	requireKeys(t, result, "ActivelyTracked", "NextStopRef", "NextStopIndex", "Stops", "Reliability")
 	forbidKeys(t, result, "PrimaryIdentifier", "Journey", "DepartedStop", "NextStop", "JourneyRunDate", "DataSource")
 	requireKeys(t, result, "VehicleLocationObservedAt", "VehicleLocationSource", "VehicleLocationConfidence")
+	requireKeys(t, result, "DetailedMotorvehicleInformation")
+	forbidKeys(t, result, "DetailedBusInformation")
+	details := result["DetailedMotorvehicleInformation"].(map[string]interface{})
+	if got := details["RegistrationNumber"]; got != "AB24XYZ" {
+		t.Fatalf("unexpected vehicle registration %v", got)
+	}
 	stop := result["Stops"].(map[string]interface{})["stop-2@3"].(map[string]interface{})
 	requireKeys(t, stop, "StopRef", "JourneyStopIndex")
 	forbidKeys(t, stop, "Stop")

@@ -12,6 +12,7 @@ import (
 	"github.com/adjust/rmq/v5"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"google.golang.org/protobuf/proto"
 )
@@ -137,4 +138,88 @@ func TestGTFSRealtimeImportInterleavedObservations(t *testing.T) {
 	position.Position.Longitude = proto.Float32(0.2)
 	// A newer GPS update can replace predictions, so submit them again.
 	run(4)
+}
+
+func TestBODSGTFSRealtimePublishesRegistrationForJourneyCreation(t *testing.T) {
+	const plate = "AB24XYZ"
+	now := time.Now()
+	trip := func(startTime string) *gtfsrt.TripDescriptor {
+		return &gtfsrt.TripDescriptor{
+			TripId: proto.String("trip"), StartDate: proto.String(now.Format("20060102")), StartTime: proto.String(startTime),
+		}
+	}
+	position := func(run, vehicleID, registration string) *gtfsrt.FeedEntity {
+		return &gtfsrt.FeedEntity{
+			Id: proto.String(vehicleID),
+			Vehicle: &gtfsrt.VehiclePosition{
+				Trip:     trip(run),
+				Vehicle:  &gtfsrt.VehicleDescriptor{Id: proto.String(vehicleID), LicensePlate: proto.String(registration)},
+				Position: &gtfsrt.Position{Latitude: proto.Float32(51), Longitude: proto.Float32(0.1)},
+			},
+		}
+	}
+	prediction := func(vehicleID, registration string) *gtfsrt.FeedEntity {
+		return &gtfsrt.FeedEntity{
+			Id: proto.String("prediction"),
+			TripUpdate: &gtfsrt.TripUpdate{
+				Trip:    trip("12:00:00"),
+				Vehicle: &gtfsrt.VehicleDescriptor{Id: proto.String(vehicleID), LicensePlate: proto.String(registration)},
+				StopTimeUpdate: []*gtfsrt.TripUpdate_StopTimeUpdate{{
+					StopId: proto.String("stop"), Arrival: &gtfsrt.TripUpdate_StopTimeEvent{Delay: proto.Int32(60)},
+				}},
+			},
+		}
+	}
+	for _, test := range []struct {
+		name     string
+		entities []*gtfsrt.FeedEntity
+		want     string
+		disabled bool
+	}{
+		{"BODS vehicle ID without timestamp", []*gtfsrt.FeedEntity{position("12:00:00", "ABCD-AB24XYZ", "")}, plate, false},
+		{"explicit position plate overrides ID", []*gtfsrt.FeedEntity{position("12:00:00", "ABCD-AB24ABC", "ab24 xyz")}, plate, false},
+		{"explicit trip plate", []*gtfsrt.FeedEntity{prediction("123", "ab24 xyz")}, plate, false},
+		{"BODS trip vehicle ID", []*gtfsrt.FeedEntity{prediction("ABCD-AB24_XYZ", "")}, plate, false},
+		{"prediction arrives before separate position", []*gtfsrt.FeedEntity{prediction("", ""), position("12:00:00", "ABCD-AB24XYZ", "")}, plate, false},
+		{"separate position for different vehicle", []*gtfsrt.FeedEntity{prediction("ABCD-12345", ""), position("12:00:00", "ABCD-AB24XYZ", "")}, "", false},
+		{"separate position for different run", []*gtfsrt.FeedEntity{prediction("", ""), position("13:00:00", "ABCD-AB24XYZ", "")}, "", false},
+		{"ambiguous positions", []*gtfsrt.FeedEntity{prediction("", ""), position("12:00:00", "ABCD-AB24XYZ", ""), position("12:00:00", "ABCD-AB25XYZ", "")}, "", false},
+		{"fleet identifier", []*gtfsrt.FeedEntity{position("12:00:00", "ABCD-12345", "")}, "", false},
+		{"provider disabled", []*gtfsrt.FeedEntity{position("12:00:00", "ABCD-AB24XYZ", "")}, "", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dataset := datasets.DataSet{
+				Identifier: t.Name() + now.Format(time.RFC3339Nano), LinkedDataset: "gb-dft-bods-gtfs-schedule-*",
+				VehicleDataProvider: dvlaves.ProviderID,
+			}
+			if test.disabled {
+				dataset.VehicleDataProvider = ""
+			}
+			dataset.SupportedObjects.RealtimeJourneys = true
+			raw, err := proto.Marshal(&gtfsrt.FeedMessage{
+				Header: &gtfsrt.FeedHeader{GtfsRealtimeVersion: proto.String("2.0")}, Entity: test.entities,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			queue := rmq.NewTestQueue("realtime-queue")
+			importer := Realtime{reader: bytes.NewReader(raw), queue: queue}
+			if _, err := importer.Import(dataset, &ctdf.DataSourceReference{DatasetID: dataset.Identifier}); err != nil {
+				t.Fatal(err)
+			}
+			if len(queue.LastDeliveries) == 0 {
+				t.Fatal("no realtime message was queued")
+			}
+			var event vehicletracker.VehicleUpdateEvent
+			if err := json.Unmarshal([]byte(queue.LastDeliveries[0]), &event); err != nil {
+				t.Fatal(err)
+			}
+			if event.SourceType != "GTFS-RT" || event.MessageType != vehicletracker.VehicleUpdateEventTypeTrip ||
+				event.VehicleLocationUpdate == nil || event.VehicleLocationUpdate.VehicleRegistration != test.want ||
+				event.VehicleLocationUpdate.VehicleDataProvider != dataset.VehicleDataProvider {
+				t.Fatalf("wrong event for journey creation: %+v, update %+v", event, event.VehicleLocationUpdate)
+			}
+		})
+	}
 }

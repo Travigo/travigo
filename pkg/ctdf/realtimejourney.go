@@ -47,7 +47,8 @@ type RealtimeJourney struct {
 
 	Reliability RealtimeJourneyReliabilityType `groups:"basic,web-board,web-journey,web-journey-realtime"`
 
-	VehicleRef string `groups:"internal"`
+	VehicleRef          string `groups:"internal"`
+	VehicleRegistration string `groups:"internal" json:",omitempty" bson:",omitempty"`
 
 	Cancelled bool `groups:"basic,web-journey,web-journey-realtime"`
 
@@ -60,8 +61,8 @@ type RealtimeJourney struct {
 	Occupancy RealtimeJourneyOccupancy `groups:"detailed,web-journey,web-journey-realtime"`
 
 	// Detailed realtime journey information
-	DetailedRailInformation JourneyDetailedRail `groups:"detailed,web-journey,web-journey-realtime"`
-	DetailedBusInformation  JourneyDetailedBus  `groups:"detailed,web-journey,web-journey-realtime"`
+	DetailedRailInformation         JourneyDetailedRail `groups:"detailed,web-journey,web-journey-realtime"`
+	DetailedMotorvehicleInformation JourneyDetailedBus  `groups:"detailed,web-journey,web-journey-realtime"`
 }
 
 func (r *RealtimeJourney) SuppressesBoardAt(date time.Time) bool {

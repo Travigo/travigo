@@ -28,10 +28,13 @@ type DataSet struct {
 
 	LinkedDataset string
 
-	// Internal only
-	Queue            *rmq.Queue         `json:"-"`
 	OperatorAliases  map[string]string  `yaml:"-" json:"-"`
 	OperatorMetadata []OperatorMetadata `yaml:"-" json:"-"`
+
+	VehicleDataProvider string
+
+	// Internal only
+	Queue *rmq.Queue `json:"-"`
 }
 
 type SourceAuthentication struct {

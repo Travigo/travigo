@@ -18,6 +18,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/dataimporter/formats/gtfs/nyct"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"github.com/travigo/travigo/pkg/redis_client"
 	"google.golang.org/protobuf/proto"
@@ -67,6 +68,11 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		return datasets.DataImportReport{}, err
 	}
 
+	var registrationPositions map[realtimeRegistrationRun]*gtfs.VehicleDescriptor
+	if dataset.VehicleDataProvider == dvlaves.ProviderID {
+		registrationPositions = indexRegistrationPositions(feed.Entity, time.Now())
+	}
+
 	withTripID := 0
 	withLocation := 0
 	withTripUpdate := 0
@@ -77,12 +83,11 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		vehiclePosition := entity.GetVehicle()
 		tripUpdate := entity.GetTripUpdate()
 
-		var trip *gtfs.TripDescriptor
+		trip := vehiclePosition.GetTrip()
 		var recordedAtTime time.Time
 
 		hasObservationTime := vehiclePosition != nil && vehiclePosition.Timestamp != nil
 		if hasObservationTime {
-			trip = vehiclePosition.GetTrip()
 			recordedAtTime = time.Unix(int64(*vehiclePosition.Timestamp), 0)
 
 			recordedAtDifference := time.Now().UTC().Sub(recordedAtTime)
@@ -333,6 +338,19 @@ func (r *Realtime) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 				locationEvent.VehicleLocationUpdate.VehicleIdentifier = tripUpdate.Vehicle.GetId()
 
 				withTripUpdate += 1
+			}
+
+			if dataset.VehicleDataProvider == dvlaves.ProviderID {
+				update := locationEvent.VehicleLocationUpdate
+				update.VehicleDataProvider = dataset.VehicleDataProvider
+				positionVehicle := vehiclePosition.GetVehicle()
+				if vehiclePosition == nil {
+					positionVehicle = registrationPositions[registrationRun(trip)]
+				} else if positionTrip := vehiclePosition.GetTrip(); positionTrip.GetTripId() != "" &&
+					registrationRun(positionTrip) != registrationRun(trip) {
+					positionVehicle = nil
+				}
+				update.VehicleRegistration = bodsVehicleRegistration(tripUpdate.GetVehicle(), positionVehicle)
 			}
 
 			// Keep trip lifecycle messages on the normal publish path.

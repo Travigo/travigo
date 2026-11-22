@@ -74,7 +74,7 @@ func CreateIdentificationCache() {
 
 	identificationCache = cache.New[string](redisStore)
 }
-func StartConsumers(workers int, cacheBytes int64) {
+func StartConsumers(ctx context.Context, workers int, cacheBytes int64) {
 	processTrackedJourneyCache.maxBytes = cacheBytes
 	telemetry.ConfigureConsumers(workers)
 	// Create Cache
@@ -91,14 +91,17 @@ func StartConsumers(workers int, cacheBytes int64) {
 		panic(err)
 	}
 
+	vehicleEnrichmentEnabled := startVehicleEnrichment(ctx)
 	for i := 0; i < workers; i++ {
-		go startRealtimeConsumer(queue, i)
+		go startRealtimeConsumer(queue, i, vehicleEnrichmentEnabled)
 	}
 }
-func startRealtimeConsumer(queue rmq.Queue, id int) {
+func startRealtimeConsumer(queue rmq.Queue, id int, vehicleEnrichmentEnabled bool) {
 	log.Info().Msgf("Starting realtime consumer %d", id)
 
-	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), batchSize, 2*time.Second, NewBatchConsumer(id)); err != nil {
+	consumer := NewBatchConsumer(id)
+	consumer.vehicleEnrichmentEnabled = vehicleEnrichmentEnabled
+	if _, err := queue.AddBatchConsumer(fmt.Sprintf("realtime-queue-%d", id), batchSize, 2*time.Second, consumer); err != nil {
 		panic(err)
 	}
 }
@@ -107,8 +110,9 @@ type BatchConsumer struct {
 	id          int
 	TfLBusQueue rmq.Queue
 	*trackedJourneyCache
-	locationCacheMu sync.RWMutex
-	locationCache   map[string]*time.Location
+	vehicleEnrichmentEnabled bool
+	locationCacheMu          sync.RWMutex
+	locationCache            map[string]*time.Location
 }
 
 func NewBatchConsumer(id int) *BatchConsumer {

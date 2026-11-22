@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"github.com/travigo/travigo/pkg/realtime/vehicletracker"
 	"golang.org/x/net/html/charset"
 )
@@ -102,6 +103,11 @@ func vehicleUpdate(vehicle *VehicleActivity, dataset datasets.DataSet, datasourc
 		},
 		DataSource: datasource,
 		RecordedAt: recordedAtTime,
+	}
+
+	if dataset.VehicleDataProvider == dvlaves.ProviderID {
+		locationEvent.VehicleLocationUpdate.VehicleDataProvider = dataset.VehicleDataProvider
+		locationEvent.VehicleLocationUpdate.VehicleRegistration = dvlaves.RegistrationFromVehicleRef(vehicleRef)
 	}
 
 	// Calculate occupancy

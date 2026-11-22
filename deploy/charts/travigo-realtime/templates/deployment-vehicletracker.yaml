@@ -48,6 +48,12 @@ spec:
               value: {{ .Values.tracker.consumers | quote }}
             - name: TRAVIGO_TRACKER_JOURNEY_CACHE_MIB
               value: {{ .Values.tracker.journeyCacheMiB | quote }}
+            - name: TRAVIGO_DVLA_VES_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.dvla.vesApiKeySecret | quote }}
+                  key: api_key
+                  optional: true
             - name: TRAVIGO_LOG_FORMAT
               value: JSON
             - name: TRAVIGO_MONGODB_CONNECTION

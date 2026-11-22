@@ -40,7 +40,9 @@ type VehicleLocationUpdate struct {
 
 	Occupancy ctdf.RealtimeJourneyOccupancy
 
-	VehicleIdentifier string
+	VehicleIdentifier   string
+	VehicleDataProvider string `json:",omitempty"`
+	VehicleRegistration string `json:",omitempty"`
 }
 
 type VehicleLocationEventStopUpdate struct {

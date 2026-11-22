@@ -10,6 +10,7 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/realtime/telemetry"
+	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"github.com/travigo/travigo/pkg/redis_client"
 )
 
@@ -92,10 +93,18 @@ func (consumer *BatchConsumer) tryUpdateRealtimeJourney(journeyID string, vehicl
 			VehicleRef: vehicleUpdateEvent.VehicleLocationUpdate.VehicleIdentifier,
 			Stops:      map[string]*ctdf.RealtimeJourneyStops{},
 		}
+		if consumer.vehicleEnrichmentEnabled && update.VehicleDataProvider == dvlaves.ProviderID {
+			realtimeJourney.VehicleRegistration = update.VehicleRegistration
+		}
 		newRealtimeJourney = true
 	} else {
 		realtimeJourney.Journey = journey
 		realtimeJourney.Service = journey.Service
+		if realtimeJourney.VehicleRegistration != "" && update.VehicleRegistration != "" &&
+			update.VehicleRegistration != realtimeJourney.VehicleRegistration {
+			realtimeJourney.VehicleRegistration = ""
+			realtimeJourney.DetailedMotorvehicleInformation = ctdf.JourneyDetailedBus{}
+		}
 	}
 	realtimeJourney.JourneyRunDate = serviceDate
 

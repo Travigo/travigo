@@ -1,6 +1,7 @@
 package vehicletracker
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -39,7 +40,9 @@ func RegisterCLI() *cli.Command {
 						return err
 					}
 
-					StartConsumers(workers, int64(cacheMiB)<<20)
+					ctx, cancel := context.WithCancel(c.Context)
+					defer cancel()
+					StartConsumers(ctx, workers, int64(cacheMiB)<<20)
 
 					StartStatsServer()
 

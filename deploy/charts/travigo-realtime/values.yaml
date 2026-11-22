@@ -29,6 +29,9 @@ elasticsearch:
   address: "https://primary-es-http.elastic:9200"
   accountSecret: "travigo-elasticsearch-user"
 
+dvla:
+  vesApiKeySecret: travigo-dvla-ves-api-key
+
 tfl:
   apiKeySecret: travigo-tfl-api-key
 
