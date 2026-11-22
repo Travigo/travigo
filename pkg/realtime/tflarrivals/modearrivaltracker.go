@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/railclasses"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 	"github.com/travigo/travigo/pkg/realtime/vehicledataprovider/dvlaves"
 	"go.mongodb.org/mongo-driver/bson"
@@ -550,6 +551,16 @@ func (l *ModeArrivalTracker) tryParseGroupedArrivals(realtimeJourneyID string, p
 	}
 	if snapshot == nil {
 		if err := realtimestore.SaveRealtimeJourney(ctx, realtimeJourney); err != nil {
+			return err
+		}
+	}
+	if l.Mode.ModeID == "tube" {
+		detailedRail := ctdf.JourneyDetailedRail{}
+		if train, ok := railclasses.TfLTubeTrain(line.LineID, lastPrediction.VehicleID); ok {
+			railclasses.Enrich(&train)
+			detailedRail.Trains = []ctdf.RailTrain{train}
+		}
+		if err := realtimestore.UpdateRailDetailedAllocation(ctx, realtimeJourney.PrimaryIdentifier, detailedRail); err != nil {
 			return err
 		}
 	}

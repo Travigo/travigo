@@ -26,7 +26,8 @@ func (s Source) ServicesByStopQuery(q query.ServicesByStop) ([]*ctdf.Service, er
 		return nil, fmt.Errorf("load services for stop: stop is nil")
 	}
 	services, err := s.ServicesByStopsQuery(query.ServicesByStops{
-		Stops: []*ctdf.Stop{q.Stop},
+		Stops:          []*ctdf.Stop{q.Stop},
+		IncludeAliases: q.IncludeAliases,
 	})
 	if err != nil {
 		return nil, err
@@ -46,10 +47,10 @@ func (s Source) ServicesByStopsQuery(q query.ServicesByStops) (map[string][]*ctd
 	ctx, cancel := context.WithTimeout(ctx, stopServicesLookupTimeout)
 	defer cancel()
 
-	return s.materializedServicesByStops(ctx, q.Stops)
+	return s.materializedServicesByStops(ctx, q.Stops, q.IncludeAliases)
 }
 
-func (s Source) materializedServicesByStops(ctx context.Context, stops []*ctdf.Stop) (map[string][]*ctdf.Service, error) {
+func (s Source) materializedServicesByStops(ctx context.Context, stops []*ctdf.Stop, includeAliases bool) (map[string][]*ctdf.Service, error) {
 	result := make(map[string][]*ctdf.Service, len(stops))
 	stopIDsByPrimary := make(map[string][]string, len(stops))
 	allStopIDs := make(map[string]struct{})
@@ -122,9 +123,12 @@ func (s Source) materializedServicesByStops(ctx context.Context, stops []*ctdf.S
 					continue
 				}
 				seenServices[service.PrimaryIdentifier] = struct{}{}
-				serviceForResponse := *service
-				serviceForResponse.OtherIdentifiers = nil
-				result[primaryID] = append(result[primaryID], &serviceForResponse)
+				if !includeAliases {
+					serviceForResponse := *service
+					serviceForResponse.OtherIdentifiers = nil
+					service = &serviceForResponse
+				}
+				result[primaryID] = append(result[primaryID], service)
 			}
 		}
 		sort.Slice(result[primaryID], func(i, j int) bool {

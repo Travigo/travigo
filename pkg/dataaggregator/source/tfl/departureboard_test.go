@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/integration/mtest"
 )
 
 func TestTfLRealtimeRespectsSelectedWindow(t *testing.T) {
@@ -34,150 +37,135 @@ func TestTfLCancellationLookupGroupsByOperatingDate(t *testing.T) {
 	}
 }
 
-func TestFilterScheduledBoardByDirectionUsesIndependentWatermarks(t *testing.T) {
-	baseTime := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)
-	stopIDs := []string{"station", "station-platform"}
-
-	towardsB := boardEntry("service", "station", "stop-b", baseTime.Add(20*time.Minute), ctdf.BoardTypeDeparture)
-	towardsC := boardEntry("service", "station-platform", "stop-c", baseTime.Add(5*time.Minute), ctdf.BoardTypeDeparture)
-	watermarks := map[boardDirectionKey]time.Time{}
-	for _, entry := range []*ctdf.DepartureBoard{towardsB, towardsC} {
-		direction, ok := departureBoardDirection(entry, stopIDs, ctdf.BoardTypeDeparture)
-		if !ok {
-			t.Fatal("expected realtime entry to have a direction")
-		}
-		watermarks[direction] = entry.Time
+func TestTfLBackfillUsesTimetableDirectionWithSparseLivePaths(t *testing.T) {
+	base := time.Date(2026, 11, 22, 12, 14, 0, 0, time.UTC)
+	stopIDs := map[string]struct{}{"station": {}, "station-platform": {}}
+	service := &ctdf.Service{
+		PrimaryIdentifier: "jubilee", OperatorRef: tflOperatorRef,
+		OtherIdentifiers: []string{"jubilee-timetable"},
 	}
-
-	beforeB := boardEntry("service", "station", "stop-b", baseTime.Add(15*time.Minute), ctdf.BoardTypeDeparture)
-	afterB := boardEntry("service", "station", "stop-b", baseTime.Add(25*time.Minute), ctdf.BoardTypeDeparture)
-	afterC := boardEntry("service", "station", "stop-c", baseTime.Add(10*time.Minute), ctdf.BoardTypeDeparture)
-	noRealtimeDirection := boardEntry("service", "station", "stop-d", baseTime.Add(time.Minute), ctdf.BoardTypeDeparture)
-	otherService := boardEntry("other-service", "station", "stop-b", baseTime.Add(2*time.Minute), ctdf.BoardTypeDeparture)
-
-	filtered := filterScheduledBoardByDirection(
-		[]*ctdf.DepartureBoard{beforeB, afterB, afterC, noRealtimeDirection, otherService},
-		stopIDs,
-		ctdf.BoardTypeDeparture,
-		watermarks,
+	services := loadTFLBoardServices([]*ctdf.Service{service}, nil)
+	westbound := &ctdf.DepartureBoard{
+		Time: base.Add(5 * time.Minute), Type: ctdf.DepartureBoardRecordTypeRealtimeTracked,
+		Journey: &ctdf.Journey{ServiceRef: "jubilee"},
+	}
+	eastbound := &ctdf.DepartureBoard{
+		Time: base.Add(time.Minute), Type: ctdf.DepartureBoardRecordTypeRealtimeTracked,
+		Journey: &ctdf.Journey{ServiceRef: "jubilee"},
+	}
+	cancelled := &ctdf.DepartureBoard{Time: base.Add(10 * time.Minute), Type: ctdf.DepartureBoardRecordTypeCancelled}
+	livePaths := map[*ctdf.DepartureBoard]boardDirectionPath{
+		westbound: {before: []string{"east"}, after: []string{"west"}},
+		eastbound: {before: []string{"west"}, after: []string{"east"}},
+	}
+	keep := tflBackfillFilter(
+		[]*ctdf.DepartureBoard{eastbound, westbound, cancelled}, livePaths, stopIDs, ctdf.BoardTypeDeparture,
+		services, map[string]string{"west-platform": "west", "east-platform": "east"},
 	)
-
-	expected := []*ctdf.DepartureBoard{afterB, afterC, noRealtimeDirection, otherService}
-	assertBoardEntries(t, filtered, expected)
+	for _, tc := range []struct {
+		name    string
+		service string
+		minutes int
+		calls   []string
+		keep    bool
+	}{
+		{"westbound before live", "jubilee-timetable", 2, []string{"east", "station-platform", "near-west", "west-platform"}, false},
+		{"westbound at live time", "jubilee-timetable", 5, []string{"east", "station-platform", "near-west", "west-platform"}, false},
+		{"westbound after live", "jubilee-timetable", 6, []string{"east", "station-platform", "near-west", "west-platform"}, true},
+		{"eastbound before live", "jubilee-timetable", 0, []string{"west", "station", "near-east", "east-platform"}, false},
+		{"eastbound after its own live time", "jubilee-timetable", 2, []string{"west", "station", "near-east", "east-platform"}, true},
+		{"shared approach from east, different branch", "jubilee-timetable", 2, []string{"east", "station", "branch"}, true},
+		{"another line", "bakerloo", 2, []string{"east", "station", "west"}, true},
+		{"insufficient direction evidence", "jubilee-timetable", 2, []string{"station", "other"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			entry := &ctdf.DepartureBoard{
+				Time:    base.Add(time.Duration(tc.minutes) * time.Minute),
+				Type:    ctdf.DepartureBoardRecordTypeScheduled,
+				Journey: &ctdf.Journey{ServiceRef: tc.service, Calls: directionTestCalls(tc.calls...)},
+			}
+			if got := keep(entry); got != tc.keep {
+				t.Errorf("keep = %t, want %t", got, tc.keep)
+			}
+		})
+	}
+	if !keep(cancelled) || !keep(westbound) {
+		t.Fatal("the timetable filter should retain cancellations and live departures")
+	}
+	if filter := tflBackfillFilter([]*ctdf.DepartureBoard{cancelled}, nil, stopIDs, ctdf.BoardTypeDeparture, services, nil); filter != nil {
+		t.Fatal("a board with no live predictions should use the full timetable")
+	}
 }
 
-func TestDepartureBoardDirectionUsesPreviousStopForArrivals(t *testing.T) {
-	entry := boardEntry(
-		"service",
-		"previous-stop",
-		"station",
-		time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC),
-		ctdf.BoardTypeArrival,
-	)
-
-	direction, ok := departureBoardDirection(entry, []string{"station"}, ctdf.BoardTypeArrival)
-	if !ok {
-		t.Fatal("expected arrival entry to have a direction")
+func TestTfLArrivalBackfillMatchesApproachAndRepeatedStop(t *testing.T) {
+	now := time.Date(2026, 11, 22, 12, 14, 0, 0, time.UTC)
+	stopIDs := map[string]struct{}{"station": {}}
+	calls := directionTestCalls("west", "station", "loop", "east", "station")
+	journey := &ctdf.Journey{PrimaryIdentifier: "loop train", ServiceRef: "line", Calls: calls}
+	eastbound := &ctdf.DepartureBoard{
+		Time: now.Add(time.Minute), Type: ctdf.DepartureBoardRecordTypeRealtimeTracked, Journey: journey,
 	}
-	if direction.adjacentStopRef != "previous-stop" {
-		t.Fatalf("adjacent stop = %q, want %q", direction.adjacentStopRef, "previous-stop")
-	}
-}
-
-func TestDepartureBoardDirectionUsesMatchingRepeatedStopOccurrence(t *testing.T) {
-	firstTime := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)
-	secondTime := firstTime.Add(30 * time.Minute)
+	paths := map[*ctdf.DepartureBoard]boardDirectionPath{eastbound: {before: []string{"east"}}}
+	keep := tflBackfillFilter([]*ctdf.DepartureBoard{eastbound}, paths, stopIDs, ctdf.BoardTypeArrival, nil, nil)
 	entry := &ctdf.DepartureBoard{
-		Time: secondTime,
-		Journey: &ctdf.Journey{
-			ServiceRef: "service",
-			Calls: ctdf.JourneyCallsFromLegs(
-				&ctdf.JourneyPathItem{
-					OriginStopRef:       "station",
-					DestinationStopRef:  "first-next-stop",
-					OriginDepartureTime: firstTime,
-				},
-				&ctdf.JourneyPathItem{
-					OriginStopRef:       "station",
-					DestinationStopRef:  "second-next-stop",
-					OriginDepartureTime: secondTime,
-				}),
-		},
+		Time: now, Type: ctdf.DepartureBoardRecordTypeScheduled,
+		ServiceDate: now.Format(ctdf.YearMonthDayFormat), Journey: journey,
 	}
-
-	direction, ok := departureBoardDirection(entry, []string{"station"}, ctdf.BoardTypeDeparture)
-	if !ok {
-		t.Fatal("expected repeated stop entry to have a direction")
+	entry.OccurrenceIdentifier = ctdf.BoardOccurrenceIdentifier(journey.PrimaryIdentifier, entry.ServiceDate, 1, ctdf.BoardTypeArrival)
+	if !keep(entry) {
+		t.Error("the first visit approaches from the west and should retain its timetable")
 	}
-	if direction.adjacentStopRef != "second-next-stop" {
-		t.Fatalf("adjacent stop = %q, want %q", direction.adjacentStopRef, "second-next-stop")
+	entry.OccurrenceIdentifier = ctdf.BoardOccurrenceIdentifier(journey.PrimaryIdentifier, entry.ServiceDate, 4, ctdf.BoardTypeArrival)
+	if keep(entry) {
+		t.Error("the second visit approaches from the east and should use the live cutoff")
 	}
 }
 
-func TestDepartureBoardDirectionUsesNextPathTimeForRepeatedArrival(t *testing.T) {
-	firstTime := time.Date(2026, 7, 26, 10, 0, 0, 0, time.UTC)
-	secondTime := firstTime.Add(30 * time.Minute)
-	entry := &ctdf.DepartureBoard{
-		Time: secondTime,
-		Journey: &ctdf.Journey{
-			ServiceRef: "service",
-			Calls: ctdf.JourneyCallsFromLegs(
-				&ctdf.JourneyPathItem{
-					OriginStopRef:      "first-previous-stop",
-					DestinationStopRef: "station",
-				},
-				&ctdf.JourneyPathItem{
-					OriginStopRef:      "station",
-					OriginArrivalTime:  firstTime,
-					DestinationStopRef: "middle-stop",
-				},
-				&ctdf.JourneyPathItem{
-					OriginStopRef:      "second-previous-stop",
-					DestinationStopRef: "station",
-				},
-				&ctdf.JourneyPathItem{
-					OriginStopRef:      "station",
-					OriginArrivalTime:  secondTime,
-					DestinationStopRef: "final-stop",
-				}),
+func TestTfLLiveDirectionUsesObservedOccurrenceWhenRouteRepeatsStop(t *testing.T) {
+	calls := directionTestCalls("prefix", "station", "east", "loop", "station", "west")
+	prediction := &ctdf.RealtimeJourneyStops{StopRef: "station", JourneyStopIndex: 2}
+	journey := &ctdf.RealtimeJourney{
+		Journey: &ctdf.Journey{Calls: calls},
+		Stops: map[string]*ctdf.RealtimeJourneyStops{
+			"loop":    {StopRef: "loop", JourneyStopIndex: 1},
+			"station": prediction,
+			"west":    {StopRef: "west", JourneyStopIndex: 3},
 		},
 	}
-
-	direction, ok := departureBoardDirection(entry, []string{"station"}, ctdf.BoardTypeArrival)
-	if !ok {
-		t.Fatal("expected repeated arrival stop entry to have a direction")
-	}
-	if direction.adjacentStopRef != "second-previous-stop" {
-		t.Fatalf("adjacent stop = %q, want %q", direction.adjacentStopRef, "second-previous-stop")
+	got := liveBoardDirectionPath(journey, prediction, map[string]struct{}{"station": {}})
+	want := boardDirectionPath{before: []string{"loop"}, after: []string{"west"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("direction path = %#v, want %#v", got, want)
 	}
 }
 
-func boardEntry(serviceRef, originStopRef, destinationStopRef string, boardTime time.Time, boardType ctdf.BoardType) *ctdf.DepartureBoard {
-	pathItem := &ctdf.JourneyPathItem{
-		OriginStopRef:          originStopRef,
-		DestinationStopRef:     destinationStopRef,
-		OriginArrivalTime:      boardTime,
-		OriginDepartureTime:    boardTime,
-		DestinationArrivalTime: boardTime,
-	}
-	return &ctdf.DepartureBoard{
-		Time: boardTime,
-		Journey: &ctdf.Journey{
-			PrimaryIdentifier: serviceRef + originStopRef + destinationStopRef + boardTime.String(),
-			ServiceRef:        serviceRef,
-			Calls:             ctdf.JourneyCallsFromLegs(pathItem),
-		},
-	}
-}
-
-func assertBoardEntries(t *testing.T, got []*ctdf.DepartureBoard, want []*ctdf.DepartureBoard) {
-	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("entries = %d, want %d", len(got), len(want))
-	}
-	for index := range want {
-		if got[index] != want[index] {
-			t.Fatalf("entry %d = %#v, want %#v", index, got[index], want[index])
+func TestTfLDirectionStopAliasesPreferParentStation(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("parent and platform records", func(mt *mtest.T) {
+		previousDB := database.Instance
+		database.Instance = &database.MongoInstance{Client: mt.Client, Database: mt.DB}
+		mt.Cleanup(func() { database.Instance = previousDB })
+		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+".stops", mtest.FirstBatch,
+			bson.D{{Key: "primaryidentifier", Value: "west"}},
+			bson.D{{Key: "primaryidentifier", Value: "east"}, {Key: "platforms", Value: bson.A{
+				bson.M{"primaryidentifier": "east-platform"},
+			}}},
+			bson.D{{Key: "primaryidentifier", Value: "east-platform"}},
+		))
+		paths := map[*ctdf.DepartureBoard]boardDirectionPath{
+			{}: {before: []string{"west"}, after: []string{"east-platform"}},
 		}
+		want := map[string]string{"west": "west", "east": "east", "east-platform": "east"}
+		if got := loadDirectionStopAliases(paths); !reflect.DeepEqual(got, want) {
+			mt.Fatalf("aliases = %#v, want %#v", got, want)
+		}
+	})
+}
+
+func directionTestCalls(refs ...string) []ctdf.JourneyCall {
+	calls := make([]ctdf.JourneyCall, len(refs))
+	for i, ref := range refs {
+		calls[i] = ctdf.JourneyCall{StopRef: ref, Start: i == 0, End: i == len(refs)-1}
 	}
+	return calls
 }

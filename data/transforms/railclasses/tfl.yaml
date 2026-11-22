@@ -1,0 +1,491 @@
+# TfL Underground stock formations and passenger features.
+# Formations are based on TfL's Passenger Rolling Stock and LU Safety Certificate.
+# New Piccadilly stock is catalogued here; line-to-stock matching stays on 1973 stock
+# until TfL arrival vehicle IDs identify the new sets in passenger service.
+# Sources: https://content.tfl.gov.uk/06-lu-rolling-stock.pdf
+#          https://content.tfl.gov.uk/london-underground-safety-certificate-and-safety-authorisation.pdf
+#          https://tfl.gov.uk/travel-information/improvements-and-projects/piccadilly-line-upgrade
+#          https://content.tfl.gov.uk/delivering-the-mayors-transport-strategy-2022-23-.pdf
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1972"
+Data:
+  VehicleTypeName: "1972 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1972"
+  TrainLength: 7
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1973"
+Data:
+  VehicleTypeName: "1973 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1973"
+  TrainLength: 6
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1992-central"
+Data:
+  VehicleTypeName: "1992 Tube Stock (Central line)"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1992-central"
+  TrainLength: 8
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "8"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1992-waterloo-city"
+Data:
+  VehicleTypeName: "1992 Tube Stock (Waterloo & City line)"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1992-waterloo-city"
+  TrainLength: 4
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1995"
+Data:
+  VehicleTypeName: "1995 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1995"
+  TrainLength: 6
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1996"
+Data:
+  VehicleTypeName: "1996 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-1996"
+  TrainLength: 7
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-2009"
+Data:
+  VehicleTypeName: "2009 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: false
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-2009"
+  TrainLength: 8
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "8"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-s7"
+Data:
+  VehicleTypeName: "S7 Stock"
+  PowerType: "Electric"
+  AirConditioning: true
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+  DisabledAccess: true
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-s7"
+  TrainLength: 7
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-s8"
+Data:
+  VehicleTypeName: "S8 Stock"
+  PowerType: "Electric"
+  AirConditioning: true
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+  DisabledAccess: true
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-s8"
+  TrainLength: 8
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "8"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-2024"
+Data:
+  VehicleTypeName: "2024 Tube Stock"
+  PowerType: "Electric"
+  AirConditioning: true
+  Toilets: false
+  WiFi: false
+  PowerPlugs: false
+  USBPlugs: false
+  BicycleSpaces: false
+  DisabledAccess: true
+---
+Type: ctdf.RailTrain
+Match:
+  VehicleType: "gb-tfl-stock-2024"
+  TrainLength: 9
+Data:
+  Carriages:
+  - ID: "1"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "2"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "3"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "4"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "5"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "6"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "7"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "8"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1
+  - ID: "9"
+    SeatingClasses:
+    - "Standard"
+    Occupancy: -1

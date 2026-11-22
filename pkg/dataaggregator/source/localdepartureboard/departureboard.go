@@ -33,6 +33,12 @@ func (s Source) DepartureBoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBo
 }
 
 func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, error) {
+	return s.BoardQueryWithEntryFilter(q, nil)
+}
+
+// BoardQueryWithEntryFilter applies keep to generated entries before deciding
+// whether enough calls are available to skip the following service date.
+func (s Source) BoardQueryWithEntryFilter(q query.DepartureBoard, keep func(*ctdf.DepartureBoard) bool) ([]*ctdf.DepartureBoard, error) {
 	queryStart := time.Now()
 	var departureBoard []*ctdf.DepartureBoard
 
@@ -114,7 +120,11 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		// A successful, unsaturated graph window is complete even when it has
 		// no realtime updates (or no departures). Realtime coverage is not a
 		// reason to reload the same timetable from MongoDB.
-		departureBoard = append(departureBoard, entries...)
+		for _, entry := range entries {
+			if keep == nil || keep(entry) {
+				departureBoard = append(departureBoard, entry)
+			}
+		}
 	}
 
 	log.Debug().

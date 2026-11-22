@@ -20,13 +20,15 @@ func (s *Service) ToBson() bson.M {
 }
 
 type ServicesByStop struct {
-	Stop *ctdf.Stop
+	Stop           *ctdf.Stop
+	IncludeAliases bool
 }
 
 // ServicesByStops resolves service references for multiple stops in one batch.
 // Context is optional; callers performing a long-running index can pass their
 // cancellation/deadline through to the underlying source.
 type ServicesByStops struct {
-	Stops   []*ctdf.Stop
-	Context context.Context
+	Stops          []*ctdf.Stop
+	Context        context.Context
+	IncludeAliases bool
 }

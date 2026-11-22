@@ -246,6 +246,21 @@ func TestBoardUsesCompleteGraphWithoutRealtime(t *testing.T) {
 					mt.Fatalf("got %d journey reads, want only the dynamic amendments query", journeyReads)
 				}
 			}
+			if !empty {
+				nextDate := serviceDate.AddDate(0, 0, 1)
+				mt.AddMockResponses(
+					mtest.CreateCursorResponse(0, mt.DB.Name()+".journeys", mtest.FirstBatch),
+					mtest.CreateCursorResponse(0, mt.DB.Name()+".service_alerts", mtest.FirstBatch),
+					mtest.CreateCursorResponse(0, mt.DB.Name()+".service_alerts", mtest.FirstBatch),
+				)
+				q := query.DepartureBoard{Stop: &ctdf.Stop{PrimaryIdentifier: "stop"}, Count: 1, StartDateTime: serviceDate.Add(9 * time.Hour)}
+				entries, err := source.BoardQueryWithEntryFilter(q, func(entry *ctdf.DepartureBoard) bool {
+					return !entry.Time.Before(nextDate)
+				})
+				if err != nil || len(entries) != 1 || entries[0].ServiceDate != nextDate.Format(ctdf.YearMonthDayFormat) {
+					mt.Fatalf("entries = %v, err = %v, want the following day's departure after filtering", entries, err)
+				}
+			}
 		})
 	}
 }
