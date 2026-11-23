@@ -8,7 +8,13 @@ import (
 	"github.com/travigo/travigo/pkg/ctdf"
 )
 
-var excludedDescriptorValues = map[string]bool{"": true, "-": true, "--": true, "unknown": true}
+var excludedDescriptorValues = map[string]bool{
+	"": true, "-": true, "--": true, "unknown": true, "tba": true, "tbd": true, "n/a": true, "na": true, "none": true, "null": true,
+	"not applicable": true, "not known": true, "not provided": true, "not recorded": true, "not specified": true, "unspecified": true,
+	"no information": true, "no data": true, "no details": true, "no description": true, "no descriptor": true, "no name": true,
+	"not available": true, "not given": true, "not supplied": true, "not stated": true, "not listed": true,
+	"not reported": true, "not indicated": true, "not mentioned": true, "not identified": true, "not defined": true,
+}
 
 type StopPoint struct {
 	CreationDateTime     string `xml:",attr"`
