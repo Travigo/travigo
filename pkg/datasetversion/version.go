@@ -49,17 +49,34 @@ func ChangedDatasets(ctx context.Context, derivedDataset string, sourceDatasets 
 		return nil, nil
 	}
 
-	changed := make([]string, 0, len(sourceDatasets))
-	for _, sourceDataset := range sourceDatasets {
+	// Read source versions together, then walk the caller's slice so the result
+	// keeps its ordering (and any duplicate source IDs).
+	cursor, err := database.GetCollection("dataset_versions").Find(ctx, bson.M{
+		"dataset":      bson.M{"$in": sourceDatasets},
+		"lastmodified": bson.M{"$gt": derivedVersion.LastModified},
+	}, options.Find().SetProjection(bson.M{"_id": 0, "dataset": 1, "lastmodified": 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	newer := make(map[string]bool)
+	for cursor.Next(ctx) {
 		var sourceVersion ctdf.DatasetVersion
-		err = database.GetCollection("dataset_versions").FindOne(ctx, bson.M{"dataset": sourceDataset}).Decode(&sourceVersion)
-		if err == mongo.ErrNoDocuments {
-			continue
-		}
-		if err != nil {
+		if err := cursor.Decode(&sourceVersion); err != nil {
 			return nil, err
 		}
 		if sourceVersion.LastModified.After(derivedVersion.LastModified) {
+			newer[sourceVersion.Dataset] = true
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	changed := make([]string, 0, len(sourceDatasets))
+	for _, sourceDataset := range sourceDatasets {
+		if newer[sourceDataset] {
 			changed = append(changed, sourceDataset)
 		}
 	}

@@ -40,9 +40,32 @@ func (l Linker[T]) GetBaseCollectionName() string {
 }
 
 func (l Linker[T]) Run() error {
+	ctx := context.Background()
+	var stopChangeToken string
+	var stopStagingCollectionName string
+	var stopPublicationFinished bool
+	if l.objectName == "stop" {
+		var err error
+		stopChangeToken, stopStagingCollectionName, err = beginLinkedStopChangePublication(ctx)
+		if err != nil {
+			return err
+		}
+		stopHeartbeat := maintainLinkedStopChangeLease(ctx, stopChangeToken)
+		defer func() {
+			stopHeartbeat()
+			if !stopPublicationFinished {
+				if err := releaseLinkedStopChangePublication(ctx, stopChangeToken); err != nil {
+					log.Error().Err(err).Msg("Failed to release stop-change publication")
+				}
+			}
+		}()
+	}
 	liveCollectionName := l.GetBaseCollectionName()
 	rawCollectionName := fmt.Sprintf("%s_raw", liveCollectionName)
 	stagingCollectionName := fmt.Sprintf("%s_staging", liveCollectionName)
+	if stopStagingCollectionName != "" {
+		stagingCollectionName = stopStagingCollectionName
+	}
 
 	rawCollection := database.GetCollection(rawCollectionName)
 	stagingCollection := database.GetCollection(stagingCollectionName)
@@ -59,8 +82,10 @@ func (l Linker[T]) Run() error {
 	// Get matching records
 	cursor, err := rawCollection.Aggregate(context.Background(), l.aggregation)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("aggregate %s for linking: %w", rawCollectionName, err)
 	}
+
+	defer cursor.Close(ctx)
 
 	var operations []mongo.WriteModel
 	var mergeGroups [][]string
@@ -73,7 +98,7 @@ func (l Linker[T]) Run() error {
 		}
 		err := cursor.Decode(&aggregatedRecords)
 		if err != nil {
-			log.Error().Err(err).Msg("Failed to decode aggregatedRecords")
+			return fmt.Errorf("decode linked %s group: %w", l.objectName, err)
 		}
 
 		var identifiers []string
@@ -88,13 +113,16 @@ func (l Linker[T]) Run() error {
 		mergeGroups = append(mergeGroups, identifiers)
 	}
 
+	if err := cursor.Err(); err != nil {
+		return fmt.Errorf("iterate linked %s groups: %w", l.objectName, err)
+	}
 	log.Info().Msg("Fetching aggregate records finished")
 
 	log.Info().Msg("Data linking started")
 	mergeGroups = mergeOverlappingIdentifierGroups(mergeGroups)
 	primaryRecordsByIdentifier, err := loadLinkerPrimaryRecords[T](context.Background(), rawCollection, mergeGroups)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to batch load linker records")
+		return fmt.Errorf("batch load %s linker records: %w", l.objectName, err)
 	}
 
 	for _, mergeGroup := range mergeGroups {
@@ -165,21 +193,26 @@ func (l Linker[T]) Run() error {
 	if len(operations) > 0 {
 		_, err := stagingCollection.BulkWrite(context.Background(), operations, &options.BulkWriteOptions{})
 		if err != nil {
-			log.Fatal().Err(err).Msg("Failed to bulk write")
+			return fmt.Errorf("write staged %s records: %w", l.objectName, err)
 		}
 	}
 
 	// Delete any remaining manual merge entries from staging
-	stagingCollection.DeleteMany(context.Background(), bson.M{"primaryidentifier": bson.M{"$regex": "^travigo-internalmerge-"}})
+	if _, err := stagingCollection.DeleteMany(ctx, bson.M{"primaryidentifier": bson.M{"$regex": "^travigo-internalmerge-"}}); err != nil {
+		return fmt.Errorf("remove staged merge markers: %w", err)
+	}
 
 	if l.objectName == "service" {
 		if err := enrichStagedServices(context.Background(), stagingCollection); err != nil {
 			return err
 		}
 	}
-
-	// Copy staging to live
-	if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
+	if l.objectName == "stop" {
+		if err := publishLinkedStops(ctx, stagingCollection, database.GetCollection(liveCollectionName), stopChangeToken); err != nil {
+			return err
+		}
+		stopPublicationFinished = true
+	} else if err := copyCollection(stagingCollectionName, liveCollectionName); err != nil {
 		return err
 	}
 
@@ -193,6 +226,19 @@ func (l Linker[T]) Run() error {
 		Dataset:      datasetversion.LinkerDataset(l.objectName),
 		LastModified: time.Now(),
 	})
+}
+
+func copyLinkedStopsWithPublicationToken(ctx context.Context, staging *mongo.Collection, destination, token string) error {
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$set", Value: bson.M{"_linkerpublicationtoken": token}}},
+		bson.D{{Key: "$out", Value: destination}},
+	}
+	cursor, err := staging.Aggregate(ctx, pipeline)
+	if err != nil {
+		return fmt.Errorf("publish token-stamped linked stops: %w", err)
+	}
+	defer cursor.Close(ctx)
+	return cursor.Err()
 }
 
 type identifierMergeGroup struct {

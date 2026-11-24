@@ -199,7 +199,7 @@ func TestWriteStopTransfersPrunesStaleEdgesGlobally(t *testing.T) {
 	})
 }
 
-func TestStopTransferRetirementRebuild(t *testing.T) {
+func TestStandaloneStopTransferRetirementRebuild(t *testing.T) {
 	requestedAt := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
 	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
 	for _, linked := range []bool{false, true} {
@@ -232,7 +232,7 @@ func TestStopTransferRetirementRebuild(t *testing.T) {
 					success, success, success,
 				)
 			}
-			err := BuildStopTransfers(StopTransferBuildConfig{})
+			err := buildStandaloneStopTransfers(StopTransferBuildConfig{})
 			events := mt.GetAllStartedEvents()
 			if !linked {
 				if err == nil || len(events) != 2 {

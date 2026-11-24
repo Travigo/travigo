@@ -117,12 +117,16 @@ func (config StopTransferBuildConfig) withDefaults() StopTransferBuildConfig {
 	return config
 }
 
-func BuildStopTransfers(config StopTransferBuildConfig) error {
+func buildStandaloneStopTransfers(config StopTransferBuildConfig) error {
+	config = config.withDefaults()
+	rules := transferRules(config)
 	ctx := context.Background()
 	buildStartedAt := time.Now()
 	versions := database.GetCollection("dataset_versions")
 	filter := bson.M{"dataset": datasetversion.StopTransfersDataset}
 	var version struct {
+		StandaloneRules      string    `bson:"standalonerules"`
+		IncrementalRules     string    `bson:"transferrules"`
 		RebuildAfter         time.Time `bson:"rebuildafter"`
 		StopServicesRevision int64     `bson:"stopservicesrevision"`
 		ServiceStopRefsHash  string    `bson:"servicestoprefshash"`
@@ -153,7 +157,7 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 			return fmt.Errorf("link stops after dataset retirement before rebuilding stop transfers")
 		}
 	}
-	stopSourcesChanged := len(changedDatasets) > 0
+	stopSourcesChanged := len(changedDatasets) > 0 || version.StandaloneRules != rules
 
 	serviceRevision, servicesCurrent, err := stopservices.CurrentRevision(ctx, database.Instance.Database)
 	if err != nil {
@@ -195,7 +199,6 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 		return nil
 	}
 
-	config = config.withDefaults()
 	start := time.Now()
 
 	phaseStart := time.Now()
@@ -225,6 +228,14 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 	log.Info().Dur("duration", time.Since(phaseStart)).Msg("Stop transfer phase completed: nearby walk scan")
 
 	phaseStart = time.Now()
+	// If this database later rejoins a replica set, its previous incremental
+	// snapshots must be reconciled with any standalone writes, including a
+	// standalone refresh that failed partway through.
+	if version.IncrementalRules != "" {
+		if _, err := versions.UpdateOne(ctx, filter, bson.M{"$set": bson.M{"fullrepair": true}}); err != nil {
+			return err
+		}
+	}
 	if err := writeStopTransfers(ctx, transfers, config); err != nil {
 		return err
 	}
@@ -245,7 +256,7 @@ func BuildStopTransfers(config StopTransferBuildConfig) error {
 	// Anchor it before the source scan so an import that completes during this
 	// rebuild remains newer and is picked up by the next run. Subtract one
 	// millisecond to account for BSON date precision.
-	checkpointFields := bson.M{"lastmodified": buildStartedAt.Add(-time.Millisecond)}
+	checkpointFields := bson.M{"lastmodified": buildStartedAt.Add(-time.Millisecond), "standalonerules": rules}
 	if serviceSnapshotCurrent {
 		checkpointFields["stopservicesrevision"] = serviceRevision
 		checkpointFields["servicestoprefshash"] = serviceStopRefsHash
@@ -372,7 +383,24 @@ func ensureStopLinksCurrent(ctx context.Context, changedDatasets []string) error
 }
 
 func loadTransferStops(ctx context.Context, serviceStopRefs map[string]struct{}) ([]*transferStop, error) {
-	stopsCollection := database.GetCollection("stops")
+	var stops []*transferStop
+	err := scanTransferStops(ctx, nil, func(stop *ctdf.Stop) error {
+		stops = append(stops, transferStopFromCTDF(stop, len(stops), stopHasService(stop, serviceStopRefs)))
+		return nil
+	})
+	return stops, err
+}
+
+func transferStopFromCTDF(stop *ctdf.Stop, index int, served bool) *transferStop {
+	latitude := stop.Location.Coordinates[1]
+	return &transferStop{PrimaryIdentifier: stop.PrimaryIdentifier, Index: index, HasService: served, Location: stop.Location, Latitude: latitude, Longitude: stop.Location.Coordinates[0], CosLatitude: math.Cos(latitude * math.Pi / 180), Associations: stop.Associations, Platforms: stop.Platforms}
+}
+
+func scanTransferStops(ctx context.Context, match bson.M, visit func(*ctdf.Stop) error) error {
+	return scanTransferCollection(ctx, database.GetCollection("stops"), match, visit)
+}
+
+func scanTransferCollection(ctx context.Context, stopsCollection *mongo.Collection, match bson.M, visit func(*ctdf.Stop) error) error {
 	query := bson.M{
 		"$and": bson.A{
 			bson.M{"location.type": "Point"},
@@ -385,61 +413,48 @@ func loadTransferStops(ctx context.Context, serviceStopRefs map[string]struct{})
 			},
 		},
 	}
+	if match != nil {
+		query["$and"] = append(query["$and"].(bson.A), match)
+	}
 	opts := options.Find().SetProjection(bson.D{
 		bson.E{Key: "_id", Value: 0},
 		bson.E{Key: "primaryidentifier", Value: 1},
 		bson.E{Key: "otheridentifiers", Value: 1},
 		bson.E{Key: "transporttypes", Value: 1},
 		bson.E{Key: "location", Value: 1},
-		bson.E{Key: "associations", Value: 1},
-		bson.E{Key: "platforms", Value: 1},
+		bson.E{Key: "associations.type", Value: 1},
+		bson.E{Key: "associations.associatedidentifier", Value: 1},
+		bson.E{Key: "platforms.primaryidentifier", Value: 1},
 	})
 
 	cursor, err := stopsCollection.Find(ctx, query, opts)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer cursor.Close(ctx)
 
-	stops := make([]*transferStop, 0, 100000)
 	for cursor.Next(ctx) {
 		var stop ctdf.Stop
 		if err := cursor.Decode(&stop); err != nil {
-			return nil, err
+			return err
 		}
-		if stop.PrimaryIdentifier == "" || !validTransferLocation(stop.Location) {
-			continue
+		if stop.PrimaryIdentifier != "" && validTransferLocation(stop.Location) {
+			if err := visit(&stop); err != nil {
+				return err
+			}
 		}
-		hasService := stopHasService(&stop, serviceStopRefs)
-
-		latitude := stop.Location.Coordinates[1]
-		longitude := stop.Location.Coordinates[0]
-		stops = append(stops, &transferStop{
-			PrimaryIdentifier: stop.PrimaryIdentifier,
-			Index:             len(stops),
-			HasService:        hasService,
-			Location:          stop.Location,
-			Latitude:          latitude,
-			Longitude:         longitude,
-			CosLatitude:       math.Cos(latitude * math.Pi / 180),
-			Associations:      stop.Associations,
-			Platforms:         stop.Platforms,
-		})
 	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-
-	log.Info().Int("stops", len(stops)).Msg("Loaded stops for transfer generation")
-
-	return stops, nil
+	return cursor.Err()
 }
 
 func stopHasService(stop *ctdf.Stop, serviceStopRefs map[string]struct{}) bool {
 	if len(serviceStopRefs) == 0 {
 		return true
 	}
+	return stopMatchesService(stop, serviceStopRefs)
+}
+
+func stopMatchesService(stop *ctdf.Stop, serviceStopRefs map[string]struct{}) bool {
 	if _, found := serviceStopRefs[stop.PrimaryIdentifier]; found {
 		return true
 	}
@@ -494,6 +509,11 @@ func buildSameStopGroupTransfers(stops []*transferStop, transfers map[transferKe
 			for j := i + 1; j < len(groupStops); j++ {
 				fromStop := groupStops[i]
 				toStop := groupStops[j]
+				// Use a stable geographic origin for the asymmetric longitude
+				// distance calculation, independent of Mongo iteration order.
+				if toStop.PrimaryIdentifier < fromStop.PrimaryIdentifier {
+					fromStop, toStop = toStop, fromStop
+				}
 
 				distanceSquared := squaredStopDistanceMetres(fromStop, toStop)
 				if distanceSquared >= maxDistanceSquared {
