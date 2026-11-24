@@ -14,6 +14,7 @@ import (
 	"github.com/travigo/travigo/pkg/dataaggregator/query"
 	"github.com/travigo/travigo/pkg/dataaggregator/source/cachedresults"
 	"github.com/travigo/travigo/pkg/database"
+	"github.com/travigo/travigo/pkg/departuregraph"
 	"github.com/travigo/travigo/pkg/realtime/nationalrail/railutils"
 	"github.com/travigo/travigo/pkg/realtime/realtimestore"
 
@@ -421,7 +422,10 @@ func (s Source) getDateJourneys(baseCacheItemPath string, journeyQuery bson.M, d
 		bson.E{Key: "calls.outgoing.passingpath", Value: 0},
 	})
 
-	cursor, err := journeysCollection.Find(context.Background(), journeyQuery, opts)
+	dateFilter := departuregraph.ServiceDateMongoFilter([]time.Time{dateTime})
+	cursor, err := journeysCollection.Find(context.Background(), bson.M{
+		"$and": bson.A{journeyQuery, dateFilter},
+	}, opts)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to query Journeys")
 		return nil, fmt.Errorf("query board journeys: %w", err)

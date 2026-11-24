@@ -3,6 +3,7 @@ package departuregraph
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -734,9 +735,13 @@ func (d *graphData) completeRollingScan(dates []time.Time) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	keepDays := make(map[dayKey]bool, len(dates))
+	newlyCompletedDays := make(map[dayKey]struct{}, len(dates))
 	for _, serviceDate := range dates {
 		day := makeDayKey(serviceDate)
 		keepDays[day] = true
+		if !d.CompleteDays[day] {
+			newlyCompletedDays[day] = struct{}{}
+		}
 		d.CompleteDays[day] = true
 	}
 	for day := range d.CompleteDays {
@@ -751,17 +756,28 @@ func (d *graphData) completeRollingScan(dates []time.Time) {
 	// memory rather than duplicating the whole graph, and profile lock waiting and
 	// request tail latency during rolling completion.
 	d.compactRollingDaysLocked(keepDays)
-	d.sortDepartureBucketsLocked()
+	// Existing completed-day buckets are already ordered. Compaction remaps live
+	// journey IDs monotonically, preserving their tie order; only newly scanned
+	// dates need sorting. Lazy-fill batches skip dates once this scan completes.
+	d.sortDepartureBucketsLocked(newlyCompletedDays)
 	d.ScanDays = nil
 	d.ScanCursor = ""
 	d.ScanProcessed = 0
 	d.ScanActive = 0
-	d.buildStaticRoutingIndexesLocked()
+	// All retained dates are complete now. Discard stale off-window membership
+	// records and release construction maps before rebuilding large routing indexes.
+	d.JourneyDays = nil
 	d.sealBuildIndexesLocked()
+	d.buildStaticRoutingIndexesLocked()
 }
 
-func (d *graphData) sortDepartureBucketsLocked() {
+func (d *graphData) sortDepartureBucketsLocked(days map[dayKey]struct{}) {
 	for key, entries := range d.Departures {
+		if days != nil {
+			if _, sortDay := days[key.Day]; !sortDay {
+				continue
+			}
+		}
 		sort.Slice(entries, func(i, j int) bool {
 			if entries[i].departureSeconds() != entries[j].departureSeconds() {
 				return entries[i].departureSeconds() < entries[j].departureSeconds()
@@ -859,10 +875,6 @@ func (d *graphData) compactRollingDaysLocked(keepDays map[dayKey]bool) {
 		}
 	}
 
-	d.JourneyIDs = make(map[journeyKey]journeyID, len(d.Journeys))
-	for index, journey := range d.Journeys {
-		d.JourneyIDs[journeyKey{PrimaryID: journey.PrimaryID}] = journeyID(index)
-	}
 }
 
 func rollingDates(now time.Time, behind int, ahead int) []time.Time {
@@ -1010,6 +1022,9 @@ func (d *graphData) stringValue(id stringID) string {
 func (d *graphData) addJourneys(day dayKey, journeys []*ctdf.Journey) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.CompleteDays[day] {
+		return
+	}
 	for _, journey := range journeys {
 		d.addJourneyLocked(day, journey)
 	}
@@ -1106,6 +1121,13 @@ func (d *graphData) addJourneyLocked(day dayKey, journey *ctdf.Journey) bool {
 
 		id = journeyID(len(d.Journeys))
 		d.Journeys = append(d.Journeys, record)
+		if d.StaticRoutingReady {
+			// The route pattern indexes describe the published complete dates.
+			// Keep the per-journey slice aligned while new-date data is appended;
+			// the sentinel leaves new journeys out of those indexes until the
+			// rolling scan atomically rebuilds them.
+			d.JourneyPatterns = append(d.JourneyPatterns, math.MaxUint32)
+		}
 		d.JourneyIDs[key] = id
 	}
 
@@ -1148,6 +1170,9 @@ func (d *graphData) stopComplete(day dayKey, canonical string) bool {
 func (d *graphData) markStopComplete(day dayKey, canonical string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.CompleteDays[day] {
+		return
+	}
 	d.ensureBuildIndexesLocked()
 	d.CompleteStops[bucketKey{Day: day, StopRef: d.internStop(canonical)}] = true
 }

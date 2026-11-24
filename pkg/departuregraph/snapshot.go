@@ -345,7 +345,7 @@ func (g *Graph) restore(path string) error {
 		// Release the legacy four-byte index before rebuilding the static
 		// corridor structures; migration temporarily holds both formats.
 		snapshot.Departures = nil
-		restored.sortDepartureBucketsLocked()
+		restored.sortDepartureBucketsLocked(nil)
 	}
 	snapshot.ArrivalJourneyOffsets = nil
 	snapshot.ArrivalJourneys = nil
@@ -360,17 +360,33 @@ func (g *Graph) restore(path string) error {
 			return err
 		}
 	}
-	for _, path := range restored.Paths {
-		for _, stopID := range []stringID{path.OriginStopRef, path.DestinationStopRef} {
-			if value := restored.stringValue(stopID); value != "" {
-				restored.StopIDs[value] = stopID
-			}
+	// Paths repeat stop IDs many times. Deduplicate by compact numeric ID before
+	// hashing the corresponding stop string into StopIDs; with large snapshots
+	// this avoids hundreds of millions of redundant map writes.
+	seenStopIDs := make([]uint64, (len(restored.Strings)+63)/64)
+	addStopID := func(stopID stringID) {
+		index := int(stopID)
+		if index >= len(restored.Strings) {
+			return
 		}
+		value := restored.Strings[index]
+		if value == "" {
+			return
+		}
+		word := index / 64
+		mask := uint64(1) << uint(index%64)
+		if seenStopIDs[word]&mask != 0 {
+			return
+		}
+		seenStopIDs[word] |= mask
+		restored.StopIDs[value] = stopID
+	}
+	for _, path := range restored.Paths {
+		addStopID(path.OriginStopRef)
+		addStopID(path.DestinationStopRef)
 	}
 	for _, identifier := range restored.StopIdentifiers {
-		if value := restored.stringValue(identifier.Identifier); value != "" {
-			restored.StopIDs[value] = identifier.Identifier
-		}
+		addStopID(identifier.Identifier)
 	}
 	restored.buildStopIndexByStringIDLocked()
 	restored.rebuildIncomingJourneyStateStopsLocked()
@@ -382,10 +398,9 @@ func (g *Graph) restore(path string) error {
 		}
 	}
 	for key := range restored.CompleteStops {
-		if value := restored.stringValue(key.StopRef); value != "" {
-			restored.StopIDs[value] = key.StopRef
-		}
+		addStopID(key.StopRef)
 	}
+	seenStopIDs = nil
 	if len(restored.ScanDays) > 0 || len(restored.CompleteDays) == 0 {
 		restored.ensureBuildIndexesLocked()
 	} else {
@@ -483,7 +498,7 @@ func (d *graphData) repairLegacySnapshotTimes() error {
 			}
 		}
 	}
-	d.sortDepartureBucketsLocked()
+	d.sortDepartureBucketsLocked(nil)
 	d.StaticRoutingReady = false
 	log.Info().Int("journeys", len(repaired)).Msg("Repaired missing times in legacy departure graph snapshot")
 	return nil

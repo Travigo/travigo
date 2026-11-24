@@ -83,15 +83,10 @@ func (MongoLoader) LoadStopJourneys(ctx context.Context, stopRefs []string, serv
 	if len(stopRefs) == 0 {
 		return nil, nil
 	}
-	// Performance Review [Set K] [PR081] [P2] (boards): Cold fills decode every matching timetable
-	// journey at this stop, regardless of service date, before MatchDate filters them in
-	// Go; the Mongo board fallback has the same shape. Add a conservative date prefilter
-	// or a published stop/day lookup while retaining MatchDate as the final authority.
-	// Compare rows examined/decoded at busy stops and bound projection/query batches.
-	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, bson.M{
-		"originstoprefs":       bson.M{"$in": stopRefs},
-		"datasource.datasetid": bson.M{"$ne": railutils.DarwinAmendmentDataset},
-	}, departureGraphFindOptions())
+	filter := ServiceDateMongoFilter([]time.Time{serviceDate})
+	filter["originstoprefs"] = bson.M{"$in": stopRefs}
+	filter["datasource.datasetid"] = bson.M{"$ne": railutils.DarwinAmendmentDataset}
+	cursor, err := database.GetCollection(database.JourneysCollectionName).Find(ctx, filter, departureGraphFindOptions())
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +197,14 @@ func journeyServiceDateFilter(serviceDates []time.Time) bson.M {
 		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityDate, "value": bson.M{"$in": dates}}}},
 		bson.M{"availability.match": bson.M{"$elemMatch": bson.M{"type": ctdf.AvailabilityDayOfWeek, "value": bson.M{"$in": weekdays}}}},
 	}}
+}
+
+// ServiceDateMongoFilter returns a conservative MongoDB predicate for journeys
+// whose primary availability rules could match one of the requested dates.
+// Callers must still use Availability.MatchDate after decoding because
+// secondary, condition, and exclusion rules are evaluated in Go.
+func ServiceDateMongoFilter(serviceDates []time.Time) bson.M {
+	return journeyServiceDateFilter(serviceDates)
 }
 
 func departureGraphFindOptions() *options.FindOptions {
