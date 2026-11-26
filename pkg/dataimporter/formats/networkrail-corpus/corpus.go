@@ -57,6 +57,9 @@ func (c *Corpus) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceRef
 		primaryID := fmt.Sprintf("travigo-internalmerge-%s-%s-%s", dataset.Identifier, tiploc, stanox)
 
 		otherIDs := []string{stanoxID, tiplocID}
+		if tiplocData.NLC > 0 {
+			otherIDs = append(otherIDs, fmt.Sprintf("gb-nlc-%04d", tiplocData.NLC))
+		}
 		if threeAlpha != "" {
 			otherIDs = append(otherIDs, threeAlphaID)
 		}

@@ -184,6 +184,9 @@ type JourneyPathItem struct {
 	OriginStopRef      string `groups:"basic,departureboard-cache,web-journey"`
 	DestinationStopRef string `groups:"basic,departureboard-cache,web-journey"`
 
+	OriginFareLocationRef      string `bson:"originfarelocationref,omitempty" json:"-" groups:"internal"`
+	DestinationFareLocationRef string `bson:"destinationfarelocationref,omitempty" json:"-" groups:"internal"`
+
 	OriginStop      *Stop `groups:"basic,web-journey"`
 	DestinationStop *Stop `groups:"basic,web-journey"`
 

@@ -29,11 +29,87 @@ func createIndexes() error {
 	}
 	createSavedObjectsIndexes()
 	createDatasetImportReportIndexes()
+	if err := createFareIndexes(); err != nil {
+		return err
+	}
 	EnsureDatasetRetirementIndexes(context.Background())
 	createUserNotificationSubscriptionsIndexes()
 	createUserCommutesIndexes()
 	if err := EnsureTDMappingsIndex(context.Background()); err != nil {
 		log.Error().Err(err).Msg("Creating rail TD mappings index")
+	}
+	return nil
+}
+
+func createFareIndexes() error {
+	ctx := context.Background()
+	for _, collectionName := range []string{"fare_locations", "fare_tariffs", "fare_products", "fare_rider_categories", "fare_media", "fare_networks", "fare_route_networks", "fare_timeframes", "fare_offers", "fare_leg_rules", "fare_transfer_rules", "fare_effective_leg_joins", "fare_caps"} {
+		_, err := GetCollection(collectionName).Indexes().CreateMany(ctx, []mongo.IndexModel{
+			{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}}},
+			{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "primaryidentifier", Value: 1}}, Options: options.Index().SetUnique(true)},
+		})
+		if err != nil {
+			return fmt.Errorf("create fare indexes for %s: %w", collectionName, err)
+		}
+	}
+	_, err := GetCollection("fare_leg_rules").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "originref", Value: 1}, {Key: "destinationref", Value: 1}}},
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "routeref", Value: 1}}},
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "leggroupref", Value: 1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare leg rule lookup indexes: %w", err)
+	}
+	_, err = GetCollection("fare_locations").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "stoprefs", Value: 1}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare location stop lookup index: %w", err)
+	}
+	_, err = GetCollection("fare_route_networks").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "routeref", Value: 1}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare route network lookup index: %w", err)
+	}
+	_, err = GetCollection("fare_offers").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "productref", Value: 1}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare offer product lookup index: %w", err)
+	}
+	_, err = GetCollection("fare_transfer_rules").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "fromleggroupref", Value: 1}, {Key: "toleggroupref", Value: 1}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare transfer rule lookup index: %w", err)
+	}
+	_, err = GetCollection("fare_effective_leg_joins").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "fromstopref", Value: 1}, {Key: "tostopref", Value: 1}}},
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "fromnetworkref", Value: 1}, {Key: "tonetworkref", Value: 1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare effective join lookup indexes: %w", err)
+	}
+	_, err = GetCollection("fare_timeframes").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "groupref", Value: 1}},
+	})
+	if err != nil {
+		return fmt.Errorf("create fare timeframe lookup index: %w", err)
+	}
+	_, err = GetCollection("fare_versions").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "datasetid", Value: 1}}, Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		return fmt.Errorf("create fare version head index: %w", err)
+	}
+	_, err = GetCollection("rsps5045_source_records").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}}},
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "filetype", Value: 1}, {Key: "sourcekey", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "filetype", Value: 1}, {Key: "flowid", Value: 1}, {Key: "recordtype", Value: 1}}},
+	})
+	if err != nil {
+		return fmt.Errorf("create RSPS5045 source snapshot indexes: %w", err)
 	}
 	return nil
 }

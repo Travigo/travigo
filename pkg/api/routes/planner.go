@@ -77,6 +77,11 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 			"error": "Parameter max_search_seconds should be an integer",
 		})
 	}
+	includeFares, err := strconv.ParseBool(c.Query("include_fares", "false"))
+	if err != nil {
+		c.SendStatus(fiber.StatusBadRequest)
+		return c.JSON(fiber.Map{"error": "Parameter include_fares should be a boolean"})
+	}
 
 	startDateTimeString := c.Query("datetime")
 
@@ -152,6 +157,9 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		DestinationStop:           destinationStop,
 		DestinationLocation:       destinationLocation,
 		Count:                     count,
+		IncludeFares:              includeFares,
+		FareRider:                 strings.TrimSpace(c.Query("fare_rider")),
+		FareMedia:                 strings.TrimSpace(c.Query("fare_media")),
 		StartDateTime:             startDateTime,
 		MaxChanges:                maxChanges,
 		MaxTransferDistanceMetres: maxTransferDistanceMetres,

@@ -689,9 +689,24 @@ func (doc *TransXChange) Import(dataset datasets.DataSet, datasource *ctdf.DataS
 						destinationActivity = []ctdf.JourneyPathItemActivity{ctdf.JourneyPathItemActivityPass}
 					}
 
+					originFareStageNumber := journeyPatternTimingLink.From.FareStageNumber
+					destinationFareStageNumber := journeyPatternTimingLink.To.FareStageNumber
+					if vehicleJourneyTimingLink != nil {
+						if vehicleJourneyTimingLink.From.FareStageNumber != "" {
+							originFareStageNumber = vehicleJourneyTimingLink.From.FareStageNumber
+						}
+						if vehicleJourneyTimingLink.To.FareStageNumber != "" {
+							destinationFareStageNumber = vehicleJourneyTimingLink.To.FareStageNumber
+						}
+					}
+
 					pathItem := ctdf.JourneyPathItem{
 						OriginStopRef:      fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.From.StopPointRef),
 						DestinationStopRef: fmt.Sprintf(ctdf.GBStopIDFormat, journeyPatternTimingLink.To.StopPointRef),
+						OriginFareLocationRef: ctdf.FareLocationIdentifier(
+							dataset.Identifier, ctdf.FareLocationTypeStage, originFareStageNumber),
+						DestinationFareLocationRef: ctdf.FareLocationIdentifier(
+							dataset.Identifier, ctdf.FareLocationTypeStage, destinationFareStageNumber),
 
 						Distance: routeLink.Distance,
 

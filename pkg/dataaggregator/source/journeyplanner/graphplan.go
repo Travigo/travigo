@@ -155,16 +155,18 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		var previousArrival time.Time
 		for _, leg := range graphPlan.Legs {
 			item := ctdf.JourneyPlanRouteItem{
-				Type:                     leg.Type,
-				TransferType:             leg.TransferType,
-				OriginStopRef:            leg.OriginStopRef,
-				DestinationStopRef:       leg.DestinationStopRef,
-				StartTime:                leg.StartTime,
-				ArrivalTime:              leg.ArrivalTime,
-				DistanceMetres:           leg.DistanceMetres,
-				WalkDurationSeconds:      leg.WalkDurationSeconds,
-				MinChangeDurationSeconds: leg.MinChangeDurationSeconds,
-				TotalDurationSeconds:     leg.TotalDurationSeconds,
+				Type:                        leg.Type,
+				JourneyOriginStopIndex:      leg.JourneyOriginStopIndex,
+				JourneyDestinationStopIndex: leg.JourneyDestinationStopIndex,
+				TransferType:                leg.TransferType,
+				OriginStopRef:               leg.OriginStopRef,
+				DestinationStopRef:          leg.DestinationStopRef,
+				StartTime:                   leg.StartTime,
+				ArrivalTime:                 leg.ArrivalTime,
+				DistanceMetres:              leg.DistanceMetres,
+				WalkDurationSeconds:         leg.WalkDurationSeconds,
+				MinChangeDurationSeconds:    leg.MinChangeDurationSeconds,
+				TotalDurationSeconds:        leg.TotalDurationSeconds,
 			}
 			if leg.JourneyRef != "" {
 				item.Journey = journeys[leg.JourneyRef]
@@ -184,6 +186,8 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 					valid = false
 					break
 				}
+				item.ScheduledStartTime = item.StartTime
+				item.ScheduledArrivalTime = item.ArrivalTime
 				if !applyRealtimeLegTimes(&item, leg.JourneyOriginStopIndex, leg.JourneyDestinationStopIndex) {
 					invalidJourneyRefs[leg.JourneyRef] = true
 					valid = false
@@ -249,6 +253,9 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 			}
 		}
 		return s.JourneyPlanQuery(retry)
+	}
+	if q.IncludeFares {
+		addFareQuotes(ctx, result.JourneyPlans, q.FareRider, q.FareMedia)
 	}
 	return result, nil
 }

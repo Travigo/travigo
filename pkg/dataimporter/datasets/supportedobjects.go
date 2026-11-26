@@ -9,6 +9,7 @@ type SupportedObjects struct {
 	Services       bool `groups:"web-datasource"`
 	Journeys       bool `groups:"web-datasource"`
 	JourneyTracks  bool `groups:"web-datasource"`
+	Fares          bool `groups:"web-datasource"`
 
 	RealtimeJourneys bool `groups:"web-datasource"`
 	ServiceAlerts    bool `groups:"web-datasource"`

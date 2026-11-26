@@ -14,6 +14,9 @@ type JourneyPlan struct {
 	DestinationStop     *ctdf.Stop
 	DestinationLocation *ctdf.Location
 	Count               int
+	IncludeFares        bool
+	FareRider           string
+	FareMedia           string
 	StartDateTime       time.Time
 	ArrivalByDateTime   time.Time
 

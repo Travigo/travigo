@@ -155,6 +155,16 @@ datasets:
     custom: "gb-nationalrail-login"
   supportedobjects:
     journeys: true
+- identifier: fares
+  format: gb-rsps5045-fares
+  source: "https://opendata.nationalrail.co.uk/api/staticfeeds/2.0/fares"
+  refreshinterval: 168h
+  datasetsize: large
+  sourceauthentication:
+    custom: "gb-nationalrail-login"
+  supportedobjects:
+    fares: true
+  linkeddataset: gb-nationalrail-timetable
 - identifier: darwin
   format: xml-darwin
   source: "https://opendata.nationalrail.co.uk/"

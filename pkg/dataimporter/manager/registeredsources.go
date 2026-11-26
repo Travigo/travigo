@@ -35,10 +35,14 @@ func GetRegisteredDataSets() []datasets.DataSet {
 					StopGroups:     true,
 					Services:       true,
 					Journeys:       true,
+					Fares:          dataset.Format == datasets.DataSetFormatGTFSSchedule || dataset.Format == datasets.DataSetFormatNetExFares || dataset.Format == datasets.DataSetFormatNationalRailFares,
 
 					RealtimeJourneys: true,
 					ServiceAlerts:    true,
 				}
+			}
+			if dataset.Format == datasets.DataSetFormatGTFSSchedule || dataset.Format == datasets.DataSetFormatNetExFares || dataset.Format == datasets.DataSetFormatNationalRailFares {
+				dataset.SupportedObjects.Fares = true
 			}
 
 			registeredDatasets = append(registeredDatasets, dataset)

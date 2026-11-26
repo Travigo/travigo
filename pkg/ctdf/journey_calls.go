@@ -25,12 +25,14 @@ type JourneyCall struct {
 // JourneyLeg holds metadata for the connection to the next call. Its
 // coordinates and provenance are populated from journey_tracks on demand.
 type JourneyLeg struct {
-	Distance           int                  `bson:"distance,omitempty" groups:"basic"`
-	DestinationDisplay string               `bson:"destinationdisplay,omitempty" groups:"basic,departureboard-cache,web-journey"`
-	TrackRef           string               `bson:"trackref,omitempty" json:",omitempty" groups:"internal"`
-	PassingPath        []string             `bson:"passingpath,omitempty" json:"-"`
-	Track              []Location           `bson:"-" json:",omitempty" groups:"basic,web-journey"`
-	TrackDataSource    *DataSourceReference `bson:"-" json:",omitempty" groups:"basic,web-journey"`
+	Distance                   int                  `bson:"distance,omitempty" groups:"basic"`
+	DestinationDisplay         string               `bson:"destinationdisplay,omitempty" groups:"basic,departureboard-cache,web-journey"`
+	OriginFareLocationRef      string               `bson:"originfarelocationref,omitempty" json:"-" groups:"internal"`
+	DestinationFareLocationRef string               `bson:"destinationfarelocationref,omitempty" json:"-" groups:"internal"`
+	TrackRef                   string               `bson:"trackref,omitempty" json:",omitempty" groups:"internal"`
+	PassingPath                []string             `bson:"passingpath,omitempty" json:"-"`
+	Track                      []Location           `bson:"-" json:",omitempty" groups:"basic,web-journey"`
+	TrackDataSource            *DataSourceReference `bson:"-" json:",omitempty" groups:"basic,web-journey"`
 }
 
 // LegCalls yields the endpoints of each leg in order, skipping gaps.
@@ -176,10 +178,11 @@ func journeyCallsFromLegs(legs []*JourneyPathItem) ([]JourneyCall, error) {
 			Arrival: leg.OriginArrivalTime, Departure: leg.OriginDepartureTime,
 			Platform: leg.OriginPlatform, Activity: leg.OriginActivity,
 		}
-		if leg.Distance != 0 || leg.DestinationDisplay != "" || leg.TrackRef != "" ||
+		if leg.Distance != 0 || leg.DestinationDisplay != "" || leg.OriginFareLocationRef != "" || leg.DestinationFareLocationRef != "" || leg.TrackRef != "" ||
 			len(leg.PassingPath) != 0 || len(leg.Track) != 0 || leg.TrackDataSource != nil {
 			call.Outgoing = &JourneyLeg{
 				Distance: leg.Distance, DestinationDisplay: leg.DestinationDisplay,
+				OriginFareLocationRef: leg.OriginFareLocationRef, DestinationFareLocationRef: leg.DestinationFareLocationRef,
 				TrackRef: leg.TrackRef, PassingPath: leg.PassingPath,
 				Track: leg.Track, TrackDataSource: leg.TrackDataSource,
 			}
@@ -281,6 +284,8 @@ func journeyPathItem(origin, destination *JourneyCall) JourneyPathItem {
 	if origin.Outgoing != nil {
 		item.Distance = origin.Outgoing.Distance
 		item.DestinationDisplay = origin.Outgoing.DestinationDisplay
+		item.OriginFareLocationRef = origin.Outgoing.OriginFareLocationRef
+		item.DestinationFareLocationRef = origin.Outgoing.DestinationFareLocationRef
 		item.PassingPath = origin.Outgoing.PassingPath
 		item.TrackRef = origin.Outgoing.TrackRef
 		item.Track = origin.Outgoing.Track

@@ -33,11 +33,14 @@ type Schedule struct {
 	calendarMapping     map[string]*Calendar
 	calendarDateMapping map[string][]*CalendarDate
 
-	ctdfServices  map[string]*ctdf.Service
-	routeMap      map[string]Route
-	stopLocations map[string]ctdf.Location
-	stopNames     map[string]string
-	frequencies   map[string][]frequencyWindow
+	ctdfServices       map[string]*ctdf.Service
+	routeMap           map[string]Route
+	stopLocations      map[string]ctdf.Location
+	stopNames          map[string]string
+	stopChildren       map[string][]string
+	fareStopRefs       map[string][]string
+	agencyOperatorRefs map[string]string
+	frequencies        map[string][]frequencyWindow
 
 	// translationIndex maps "table\x00field\x00language\x00value" -> translated value
 	// for O(1) lookups instead of a linear scan of every translation per record.
@@ -315,7 +318,15 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 			}
 			bsonRep, _ := bson.Marshal(update)
 			updateModel := mongo.NewUpdateOneModel()
-			updateModel.SetFilter(bson.M{"primaryidentifier": parsedObjectIdentifier})
+			filter := bson.M{"primaryidentifier": parsedObjectIdentifier}
+			if fareRecord, ok := parsedObject.(interface {
+				GetFareDatasetID() string
+				GetFareVersionID() string
+			}); ok {
+				filter["datasetid"] = fareRecord.GetFareDatasetID()
+				filter["fareversionid"] = fareRecord.GetFareVersionID()
+			}
+			updateModel.SetFilter(filter)
 			updateModel.SetUpdate(bsonRep)
 			updateModel.SetUpsert(true)
 			processingQueue.Add(updateModel)
@@ -433,29 +444,44 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	// TODO this mapping is hardcoding for the 1 UK datset and will need replacing later on to be more generic
 	agencyNOCMapping := map[string]string{}
 	agenciesMap := map[string]*Agency{}
+	g.agencyOperatorRefs = map[string]string{}
 	for _, agency := range g.Agencies {
 		agenciesMap[agency.ID] = &agency
 
 		if agency.NOC == "" {
 			log.Debug().Str("agency", agency.ID).Msg("has no NOC mapping")
+			operatorRef := fmt.Sprintf("%s-operator-%s", dataset.Identifier, agency.ID)
+			if alias := dataset.OperatorAliases[operatorRef]; alias != "" {
+				operatorRef = alias
+			}
+			g.agencyOperatorRefs[agency.ID] = operatorRef
 			continue
 		}
 		agencyNOCMapping[agency.ID] = fmt.Sprintf("gb-noc-%s", agency.NOC)
+		operatorRef := agencyNOCMapping[agency.ID]
+		if alias := dataset.OperatorAliases[operatorRef]; alias != "" {
+			operatorRef = alias
+		}
+		g.agencyOperatorRefs[agency.ID] = operatorRef
 	}
 
 	//// Stops ////
 	g.stopLocations = map[string]ctdf.Location{}
 	g.stopNames = map[string]string{}
+	g.stopChildren = map[string][]string{}
+	g.fareStopRefs = map[string][]string{}
 	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
 		timezone := s.Timezone
 
-		if timezone == "" {
-			timezone = g.Agencies[0].Timezone
-		}
-
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, s.ID)
+		if s.ZoneID != "" {
+			g.fareStopRefs[s.ZoneID] = append(g.fareStopRefs[s.ZoneID], gtfsStopReference(dataset.Identifier, s.ID))
+		}
 		stopName := g.GetTranslation("stops", "stop_name", "en", s.Name)
 		g.stopNames[s.ID] = stopName
+		if s.Parent != "" {
+			g.stopChildren[s.Parent] = append(g.stopChildren[s.Parent], s.ID)
+		}
 		ctdfStop := &ctdf.Stop{
 			PrimaryIdentifier:    stopID,
 			OtherIdentifiers:     []string{stopID},
@@ -618,7 +644,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ServiceName:          serviceName,
 			Description:          r.Description,
 			Website:              r.URL,
-			NetworkRef:           r.NetworkID,
+			NetworkRef:           gtfsNetworkReference(dataset.Identifier, r.NetworkID),
 			OperatorRef:          operatorRef,
 			Routes:               []ctdf.Route{},
 			BrandColour:          r.Colour,
@@ -722,8 +748,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		journey := &ctdf.Journey{
 			PrimaryIdentifier: journeyID,
 			OtherIdentifiers: map[string]string{
-				"GTFS-TripID":  t.ID,
-				"GTFS-RouteID": t.RouteID,
+				"GTFS-TripID":    t.ID,
+				"GTFS-RouteID":   t.RouteID,
+				"GTFS-ServiceID": t.ServiceID,
 			},
 			CreationDateTime:     time.Now(),
 			ModificationDateTime: time.Now(),
@@ -1019,11 +1046,32 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 	log.Info().Msg("Finished Journeys")
 
+	fareReport := fareImportSummary{}
+	if dataset.SupportedObjects.Fares {
+		fareReport, err = g.importFareData(dataset, datasource)
+		if err != nil {
+			return datasets.DataImportReport{}, err
+		}
+	}
+
 	return datasets.DataImportReport{
-		ImportedOperators: len(g.Agencies),
-		ImportedStops:     len(g.stopLocations),
-		ImportedServices:  len(g.ctdfServices),
-		ImportedJourneys:  importedJourneys,
+		ImportedOperators:           len(g.Agencies),
+		ImportedStops:               len(g.stopLocations),
+		ImportedServices:            len(g.ctdfServices),
+		ImportedJourneys:            importedJourneys,
+		FareDataPresent:             fareReport.Present,
+		ImportedFareLocations:       fareReport.Locations,
+		ImportedFareProducts:        fareReport.Products,
+		ImportedFareOffers:          fareReport.Offers,
+		ImportedFareRules:           fareReport.Rules,
+		ImportedFareMedia:           fareReport.Media,
+		ImportedFareRiderCategories: fareReport.Riders,
+		ImportedFareTariffs:         fareReport.Tariffs,
+		ImportedFareNetworks:        fareReport.Networks,
+		ImportedFareRouteNetworks:   fareReport.RouteNetworks,
+		ImportedFareTimeframes:      fareReport.Timeframes,
+		ImportedFareLegJoins:        fareReport.LegJoins,
+		ImportedFareTransferRules:   fareReport.Transfers,
 	}, nil
 }
 

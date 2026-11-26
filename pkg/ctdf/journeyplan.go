@@ -24,6 +24,7 @@ type JourneyPlanResults struct {
 
 type JourneyPlan struct {
 	RouteItems []JourneyPlanRouteItem `groups:"basic,detailed,web-planner"`
+	Fare       *FareQuote             `groups:"basic,web-planner" json:",omitempty"`
 
 	StartTime   time.Time     `groups:"basic,detailed,web-planner"`
 	ArrivalTime time.Time     `groups:"basic,detailed,web-planner"`
@@ -35,16 +36,20 @@ type JourneyPlanRouteItem struct {
 
 	Journey *Journey `groups:"basic,detailed,web-planner" json:",omitempty"`
 
-	JourneyType  DepartureBoardRecordType `groups:"basic,detailed,web-planner" json:",omitempty"`
-	TransferType StopTransferType         `groups:"basic,detailed,web-planner" json:",omitempty"`
+	JourneyType                 DepartureBoardRecordType `groups:"basic,detailed,web-planner" json:",omitempty"`
+	TransferType                StopTransferType         `groups:"basic,detailed,web-planner" json:",omitempty"`
+	JourneyOriginStopIndex      int                      `json:"-" bson:"-"`
+	JourneyDestinationStopIndex int                      `json:"-" bson:"-"`
 
 	OriginStopRef      string `groups:"basic,detailed,web-planner"`
 	DestinationStopRef string `groups:"basic,detailed,web-planner"`
 	OriginStop         *Stop  `groups:"web-planner" bson:"-" json:",omitempty"`
 	DestinationStop    *Stop  `groups:"web-planner" bson:"-" json:",omitempty"`
 
-	StartTime   time.Time `groups:"basic,detailed,web-planner"`
-	ArrivalTime time.Time `groups:"basic,detailed,web-planner"`
+	StartTime            time.Time `groups:"basic,detailed,web-planner"`
+	ArrivalTime          time.Time `groups:"basic,detailed,web-planner"`
+	ScheduledStartTime   time.Time `json:"-" bson:"-"`
+	ScheduledArrivalTime time.Time `json:"-" bson:"-"`
 
 	DistanceMetres           int `groups:"basic,detailed,web-planner" json:",omitempty"`
 	WalkDurationSeconds      int `groups:"basic,detailed,web-planner" json:",omitempty"`

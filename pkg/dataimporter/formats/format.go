@@ -25,3 +25,11 @@ type APIFormat interface {
 	Format
 	ImportAPI(datasets.DataSet, *ctdf.DataSourceReference) (datasets.DataImportReport, error)
 }
+
+// ArchiveFormat consumes a complete archive as one dataset. It is used when
+// records in different members refer to each other and cannot be imported as
+// independent files.
+type ArchiveFormat interface {
+	Format
+	ParseArchive(io.ReaderAt, int64) error
+}
