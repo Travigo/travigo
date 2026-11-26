@@ -378,34 +378,25 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	matrix := map[string]netexDistanceMatrixElement{}
 	for _, frame := range frames {
 		currency := frameCurrency(frame)
-		for _, price := range findNodes(frame, "GeographicalIntervalPrice") {
-			id, amount := nodeAttr(price, "id"), nodeText(price, "Amount")
-			if id == "" || amount == "" {
-				continue
+		for _, priceType := range []string{"FarePrice", "GeographicalIntervalPrice"} {
+			for _, price := range findNodes(frame, priceType) {
+				id, amount := nodeAttr(price, "id"), nodeText(price, "Amount")
+				if id == "" || amount == "" {
+					continue
+				}
+				money, err := moneyFromDecimal(amount, currency)
+				if err != nil {
+					return report, fmt.Errorf("NeTEx price %s: %w", id, err)
+				}
+				amounts[format.scopeSourceID(id)] = money
 			}
-			money, err := moneyFromDecimal(amount, currency)
-			if err != nil {
-				return report, fmt.Errorf("NeTEx price %s: %w", id, err)
-			}
-			amounts[format.scopeSourceID(id)] = money
 		}
 		for _, group := range findNodes(frame, "PriceGroup") {
 			groupID := nodeAttr(group, "id")
 			if groupID == "" {
 				continue
 			}
-			priceIDs := make([]string, 0)
-			for _, price := range findNodes(group, "GeographicalIntervalPrice") {
-				if id := nodeAttr(price, "id"); id != "" {
-					priceIDs = append(priceIDs, id)
-				}
-			}
-			for _, priceRef := range findNodes(group, "GeographicalIntervalPriceRef") {
-				if id := nodeAttr(priceRef, "ref"); id != "" {
-					priceIDs = append(priceIDs, id)
-				}
-			}
-			priceGroups[format.scopeSourceID(groupID)] = uniqueStrings(priceIDs)
+			priceGroups[format.scopeSourceID(groupID)] = farePriceIDs(group)
 		}
 		for _, element := range findNodes(frame, "DistanceMatrixElement") {
 			id := nodeAttr(element, "id")
@@ -547,7 +538,7 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 		}
 	}
 	if report.ImportedFareRules == 0 {
-		return report, fmt.Errorf("NeTEx fare frames contain no supported priced origin/destination rules")
+		return report, fmt.Errorf("NeTEx fare frames contain no supported priced fare rules")
 	}
 	return report, nil
 }
@@ -562,11 +553,7 @@ func fareTablePrices(table *xmlNode, matrix map[string]netexDistanceMatrixElemen
 		matrixID := nodeAttr(firstRef(cell, "DistanceMatrixElementRef"), "ref")
 		priceIDs := make([]string, 0)
 		groupIDs := make([]string, 0)
-		for _, priceRef := range findNodes(cell, "GeographicalIntervalPriceRef") {
-			if id := nodeAttr(priceRef, "ref"); id != "" {
-				priceIDs = append(priceIDs, id)
-			}
-		}
+		priceIDs = append(priceIDs, farePriceIDs(cell)...)
 		for _, groupRef := range findNodes(cell, "PriceGroupRef") {
 			if id := nodeAttr(groupRef, "ref"); id != "" {
 				groupIDs = append(groupIDs, id)
@@ -604,6 +591,28 @@ func fareTablePrices(table *xmlNode, matrix map[string]netexDistanceMatrixElemen
 		}
 	}
 	return prices, nil
+}
+
+// farePriceIDs collects both NeTEx price reference forms and inline prices.
+// Flat BODS fares use FarePrice while zone and point-to-point tables generally
+// use GeographicalIntervalPrice.
+func farePriceIDs(root *xmlNode) []string {
+	ids := make([]string, 0)
+	for _, name := range []string{"FarePriceRef", "GeographicalIntervalPriceRef"} {
+		for _, ref := range findNodes(root, name) {
+			if id := nodeAttr(ref, "ref"); id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	for _, name := range []string{"FarePrice", "GeographicalIntervalPrice"} {
+		for _, price := range findNodes(root, name) {
+			if id := nodeAttr(price, "id"); id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return uniqueStrings(ids)
 }
 
 func findNodes(root *xmlNode, name string) []*xmlNode {
