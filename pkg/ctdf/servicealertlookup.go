@@ -56,13 +56,13 @@ func ActiveJourneyCancellationAlertIDs(ctx context.Context, journeyIDs []string,
 	return cancelledJourneyIDs, cursor.Err()
 }
 
-// ActiveSuspendedServiceAlertIDs returns service identifiers matched by
-// currently valid ServiceSuspended alerts. The caller supplies the bounded set
-// of services relevant to a board.
-func ActiveSuspendedServiceAlertIDs(ctx context.Context, serviceIDs []string, now time.Time) (map[string]struct{}, error) {
-	suspendedServiceIDs := make(map[string]struct{})
+// ActiveDisruptedServiceAlertIDs returns service identifiers matched by
+// currently valid suspension or severe delay alerts. The caller supplies the
+// bounded set of services relevant to a board.
+func ActiveDisruptedServiceAlertIDs(ctx context.Context, serviceIDs []string, now time.Time) (map[string]struct{}, error) {
+	disruptedServiceIDs := make(map[string]struct{})
 	if len(serviceIDs) == 0 {
-		return suspendedServiceIDs, nil
+		return disruptedServiceIDs, nil
 	}
 	requestedServiceIDs := make(map[string]struct{}, len(serviceIDs))
 	for _, serviceID := range serviceIDs {
@@ -71,7 +71,11 @@ func ActiveSuspendedServiceAlertIDs(ctx context.Context, serviceIDs []string, no
 
 	collection := database.GetCollection("service_alerts")
 	cursor, err := collection.Find(ctx, bson.M{
-		"alerttype":          ServiceAlertTypeServiceSuspended,
+		"alerttype": bson.M{"$in": bson.A{
+			ServiceAlertTypeServiceSuspended,
+			ServiceAlertTypeServicePartSuspended,
+			ServiceAlertTypeSevereDelays,
+		}},
 		"matchedidentifiers": bson.M{"$in": serviceIDs},
 		"validfrom":          bson.M{"$lt": now},
 		"validuntil":         bson.M{"$gt": now},
@@ -88,12 +92,12 @@ func ActiveSuspendedServiceAlertIDs(ctx context.Context, serviceIDs []string, no
 		}
 		for _, identifier := range alert.MatchedIdentifiers {
 			if _, requested := requestedServiceIDs[identifier]; requested {
-				suspendedServiceIDs[identifier] = struct{}{}
+				disruptedServiceIDs[identifier] = struct{}{}
 			}
 		}
 	}
 
-	return suspendedServiceIDs, cursor.Err()
+	return disruptedServiceIDs, cursor.Err()
 }
 
 func mapKeys(values map[string]string) []string {

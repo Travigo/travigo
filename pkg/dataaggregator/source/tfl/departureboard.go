@@ -125,16 +125,16 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 		}
 	}
 	servicesByRef := loadTFLBoardServices(services, realtimeJourneys)
-	suspendedServiceRefs := make([]string, 0, len(services))
+	serviceRefs := make([]string, 0, len(services))
 	for _, service := range services {
 		if service != nil && service.OperatorRef == tflOperatorRef && service.PrimaryIdentifier != "" {
-			suspendedServiceRefs = append(suspendedServiceRefs, service.PrimaryIdentifier)
+			serviceRefs = append(serviceRefs, service.PrimaryIdentifier)
 		}
 	}
-	suspendedServices, err := ctdf.ActiveSuspendedServiceAlertIDs(context.Background(), suspendedServiceRefs, now)
+	disruptedServices, err := ctdf.ActiveDisruptedServiceAlertIDs(context.Background(), serviceRefs, now)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to query suspended TfL service alerts")
-		suspendedServices = nil
+		log.Error().Err(err).Msg("Failed to query disrupted TfL service alerts")
+		disruptedServices = nil
 	}
 
 	log.Debug().Str("Length", time.Now().Sub(now).String()).Msg("Query TfL realtime journeys")
@@ -209,7 +209,7 @@ func (s Source) BoardQuery(q query.DepartureBoard) ([]*ctdf.DepartureBoard, erro
 	departureBoard = ctdf.DeduplicateBoardEntries(departureBoard)
 
 	localDepartures, err := getBackfillSource().BoardQueryWithEntryFilter(q, tflBackfillFilter(
-		departureBoard, livePaths, stopIDsSet, q.Type, servicesByRef, loadDirectionStopAliases(livePaths), suspendedServices,
+		departureBoard, livePaths, stopIDsSet, q.Type, servicesByRef, loadDirectionStopAliases(livePaths), disruptedServices,
 	))
 	if err != nil {
 		return nil, err

@@ -139,7 +139,7 @@ func tflBackfillFilter(
 	boardType ctdf.BoardType,
 	servicesByRef map[string]*ctdf.Service,
 	stopAliases map[string]string,
-	suspendedServices map[string]struct{},
+	disruptedServices map[string]struct{},
 ) func(*ctdf.DepartureBoard) bool {
 	canonicalStop := func(ref string) string {
 		if canonical := stopAliases[ref]; canonical != "" {
@@ -168,7 +168,7 @@ func tflBackfillFilter(
 			liveByService[ref] = append(liveByService[ref], timedDirectionPath{time: entry.Time, path: path})
 		}
 	}
-	if len(liveByService) == 0 && len(suspendedServices) == 0 {
+	if len(liveByService) == 0 && len(disruptedServices) == 0 {
 		return nil
 	}
 	for _, predictions := range liveByService {
@@ -180,7 +180,7 @@ func tflBackfillFilter(
 			return true
 		}
 		service := serviceRef(entry.Journey)
-		if _, suspended := suspendedServices[service]; suspended {
+		if _, disrupted := disruptedServices[service]; disrupted {
 			return false
 		}
 		predictions := liveByService[service]
