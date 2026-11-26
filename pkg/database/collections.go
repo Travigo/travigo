@@ -322,21 +322,8 @@ func createStopsIndexes() {
 		log.Error().Err(err).Msg("Creating Index")
 	}
 
-	// Stops staging
-	stopsStagingCollection := GetCollection("stops_staging")
-	stopsStagingIndex := []mongo.IndexModel{
-		{
-			Keys: bson.D{{Key: "primaryidentifier", Value: 1}},
-		},
-		{
-			Keys: bson.D{{Key: "otheridentifiers", Value: 1}},
-		},
-	}
-
-	opts = options.CreateIndexes()
-	_, err = stopsStagingCollection.Indexes().CreateMany(context.Background(), stopsStagingIndex, opts)
-	if err != nil {
-		log.Error().Err(err).Msg("Creating Index")
+	if err := EnsureStopStagingIndexes(context.Background(), "stops_staging"); err != nil {
+		log.Error().Err(err).Msg("Creating stop staging indexes")
 	}
 
 	// Stop Groups
@@ -352,6 +339,20 @@ func createStopsIndexes() {
 	if err != nil {
 		log.Error().Err(err).Msg("Creating Index")
 	}
+}
+
+// EnsureStopStagingIndexes creates the indexes used by stop-linker staging
+// collections. Stop publication uses token-specific collection names, so these
+// indexes must be ensured on the active collection after it has been copied.
+func EnsureStopStagingIndexes(ctx context.Context, collectionName string) error {
+	indexes := []mongo.IndexModel{
+		{Keys: bson.D{{Key: "primaryidentifier", Value: 1}}},
+		{Keys: bson.D{{Key: "otheridentifiers", Value: 1}}},
+	}
+	if _, err := GetCollection(collectionName).Indexes().CreateMany(ctx, indexes); err != nil {
+		return fmt.Errorf("create stop staging indexes for %s: %w", collectionName, err)
+	}
+	return nil
 }
 
 func createOperatorsIndexes() {

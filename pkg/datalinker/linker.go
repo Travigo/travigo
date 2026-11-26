@@ -76,6 +76,11 @@ func (l Linker[T]) Run() error {
 	if err := copyCollection(rawCollectionName, stagingCollectionName); err != nil {
 		return err
 	}
+	if l.objectName == "stop" {
+		if err := database.EnsureStopStagingIndexes(ctx, stagingCollectionName); err != nil {
+			return fmt.Errorf("index staged stops: %w", err)
+		}
+	}
 
 	log.Info().Msg("Fetching aggregate records started")
 
