@@ -56,6 +56,46 @@ func ActiveJourneyCancellationAlertIDs(ctx context.Context, journeyIDs []string,
 	return cancelledJourneyIDs, cursor.Err()
 }
 
+// ActiveSuspendedServiceAlertIDs returns service identifiers matched by
+// currently valid ServiceSuspended alerts. The caller supplies the bounded set
+// of services relevant to a board.
+func ActiveSuspendedServiceAlertIDs(ctx context.Context, serviceIDs []string, now time.Time) (map[string]struct{}, error) {
+	suspendedServiceIDs := make(map[string]struct{})
+	if len(serviceIDs) == 0 {
+		return suspendedServiceIDs, nil
+	}
+	requestedServiceIDs := make(map[string]struct{}, len(serviceIDs))
+	for _, serviceID := range serviceIDs {
+		requestedServiceIDs[serviceID] = struct{}{}
+	}
+
+	collection := database.GetCollection("service_alerts")
+	cursor, err := collection.Find(ctx, bson.M{
+		"alerttype":          ServiceAlertTypeServiceSuspended,
+		"matchedidentifiers": bson.M{"$in": serviceIDs},
+		"validfrom":          bson.M{"$lt": now},
+		"validuntil":         bson.M{"$gt": now},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var alert ServiceAlert
+		if err := cursor.Decode(&alert); err != nil {
+			return nil, err
+		}
+		for _, identifier := range alert.MatchedIdentifiers {
+			if _, requested := requestedServiceIDs[identifier]; requested {
+				suspendedServiceIDs[identifier] = struct{}{}
+			}
+		}
+	}
+
+	return suspendedServiceIDs, cursor.Err()
+}
+
 func mapKeys(values map[string]string) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {

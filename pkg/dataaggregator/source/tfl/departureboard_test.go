@@ -60,7 +60,7 @@ func TestTfLBackfillUsesTimetableDirectionWithSparseLivePaths(t *testing.T) {
 	}
 	keep := tflBackfillFilter(
 		[]*ctdf.DepartureBoard{eastbound, westbound, cancelled}, livePaths, stopIDs, ctdf.BoardTypeDeparture,
-		services, map[string]string{"west-platform": "west", "east-platform": "east"},
+		services, map[string]string{"west-platform": "west", "east-platform": "east"}, nil,
 	)
 	for _, tc := range []struct {
 		name    string
@@ -92,7 +92,7 @@ func TestTfLBackfillUsesTimetableDirectionWithSparseLivePaths(t *testing.T) {
 	if !keep(cancelled) || !keep(westbound) {
 		t.Fatal("the timetable filter should retain cancellations and live departures")
 	}
-	if filter := tflBackfillFilter([]*ctdf.DepartureBoard{cancelled}, nil, stopIDs, ctdf.BoardTypeDeparture, services, nil); filter != nil {
+	if filter := tflBackfillFilter([]*ctdf.DepartureBoard{cancelled}, nil, stopIDs, ctdf.BoardTypeDeparture, services, nil, nil); filter != nil {
 		t.Fatal("a board with no live predictions should use the full timetable")
 	}
 }
@@ -106,7 +106,7 @@ func TestTfLArrivalBackfillMatchesApproachAndRepeatedStop(t *testing.T) {
 		Time: now.Add(time.Minute), Type: ctdf.DepartureBoardRecordTypeRealtimeTracked, Journey: journey,
 	}
 	paths := map[*ctdf.DepartureBoard]boardDirectionPath{eastbound: {before: []string{"east"}}}
-	keep := tflBackfillFilter([]*ctdf.DepartureBoard{eastbound}, paths, stopIDs, ctdf.BoardTypeArrival, nil, nil)
+	keep := tflBackfillFilter([]*ctdf.DepartureBoard{eastbound}, paths, stopIDs, ctdf.BoardTypeArrival, nil, nil, nil)
 	entry := &ctdf.DepartureBoard{
 		Time: now, Type: ctdf.DepartureBoardRecordTypeScheduled,
 		ServiceDate: now.Format(ctdf.YearMonthDayFormat), Journey: journey,
