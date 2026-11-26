@@ -484,8 +484,7 @@ func (g *Schedule) importGTFSFaresV1(dataset datasets.DataSet, datasource *ctdf.
 		ruleGroups := map[gtfsFareRuleGroupKey]*gtfsFareRuleGroup{}
 		sequence := 0
 		if err := importObject[gtfsFareRule](g, "fare_rules.txt", "fare_leg_rules", true, func(row gtfsFareRule) (any, string) {
-			productRef, exists := productIDs[row.FareID]
-			if !exists {
+			if _, exists := productIDs[row.FareID]; !exists {
 				parseErr = fmt.Errorf("GTFS fare_rules.txt references unknown fare_id %q", row.FareID)
 				return nil, ""
 			}
