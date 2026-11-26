@@ -45,7 +45,7 @@ func BuildPlan() Plan {
 	}
 
 	for _, dataset := range manager.GetRegisteredDataSets() {
-		if dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue || dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
+		if dataset.ExcludeFromAutomatedImport || dataset.ImportDestination == datasets.ImportDestinationRealtimeQueue || dataset.ImportDestination == datasets.ImportDestinationSpecificRunner {
 			continue
 		}
 
@@ -148,6 +148,9 @@ func taskFromPlanTask(item PlanTask, options RunOptions) (Task, bool) {
 	for _, definition := range postProcessingTaskDefinitions {
 		if definition.id == item.Identifier {
 			task := fixedTask(definition.id, definition.name, definition.kind, definition.args)
+			if options.ForceImport && item.Identifier == "link-stops" {
+				task.Args = append(task.Args, "--force")
+			}
 			task.Size = definition.group
 			return task, true
 		}

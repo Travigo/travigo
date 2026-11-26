@@ -16,8 +16,9 @@ type DataSet struct {
 	Source               string                `groups:"web-datasource"`
 	SourceAuthentication *SourceAuthentication `json:"-"`
 
-	DatasetSize     string
-	RefreshInterval time.Duration
+	DatasetSize                string
+	RefreshInterval            time.Duration
+	ExcludeFromAutomatedImport bool `yaml:"excludeautomatedimport,omitempty"`
 
 	UnpackBundle      BundleFormat     `json:"-"`
 	SupportedObjects  SupportedObjects `groups:"web-datasource"`

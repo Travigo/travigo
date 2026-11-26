@@ -144,6 +144,10 @@ func RegisterCLI() *cli.Command {
 						Name:  "skip-staging",
 						Usage: "Incrementally publish changed journey datasets with per-dataset checkpoints",
 					},
+					&cli.BoolFlag{
+						Name:  "force",
+						Usage: "Force recovery of an in-progress stop publication lease",
+					},
 					&cli.IntFlag{
 						Name:  "oplog-clear-size-mb",
 						Usage: "Temporary oplog size in MB used while clearing the oplog after the stops linker",
@@ -196,7 +200,7 @@ func RegisterCLI() *cli.Command {
 							bson.D{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
 							bson.D{{Key: "$match", Value: bson.D{{Key: "count", Value: bson.D{{Key: "$gt", Value: 1}}}}}},
 						})
-						if err := linker.Run(); err != nil {
+						if err := linker.RunWithForce(c.Bool("force")); err != nil {
 							return err
 						}
 						if !c.Bool("skip-stop-linker-oplog-maintenance") {

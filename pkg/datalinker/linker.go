@@ -40,13 +40,17 @@ func (l Linker[T]) GetBaseCollectionName() string {
 }
 
 func (l Linker[T]) Run() error {
+	return l.RunWithForce(false)
+}
+
+func (l Linker[T]) RunWithForce(force bool) error {
 	ctx := context.Background()
 	var stopChangeToken string
 	var stopStagingCollectionName string
 	var stopPublicationFinished bool
 	if l.objectName == "stop" {
 		var err error
-		stopChangeToken, stopStagingCollectionName, err = beginLinkedStopChangePublication(ctx)
+		stopChangeToken, stopStagingCollectionName, err = beginLinkedStopChangePublicationWithForce(ctx, force)
 		if err != nil {
 			return err
 		}

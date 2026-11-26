@@ -46,6 +46,10 @@ type linkedStopChangeRecord struct {
 const linkedStopChangeMaxIDsPerRevision = 5000
 
 func beginLinkedStopChangePublication(ctx context.Context) (string, string, error) {
+	return beginLinkedStopChangePublicationWithForce(ctx, false)
+}
+
+func beginLinkedStopChangePublicationWithForce(ctx context.Context, force bool) (string, string, error) {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", "", fmt.Errorf("create stop-change publication token: %w", err)
@@ -59,12 +63,16 @@ func beginLinkedStopChangePublication(ctx context.Context) (string, string, erro
 	staging := "stops_staging_" + token
 	if err == nil {
 		if old.Building {
-			if old.StartedAt.IsZero() || time.Since(old.StartedAt) < time.Hour {
+			if !force && (old.StartedAt.IsZero() || time.Since(old.StartedAt) < time.Hour) {
 				return "", "", fmt.Errorf("stop-linker change publication is already in progress")
 			}
 			forceFullScan = true
 			filter["token"] = old.Token
-			filter["startedat"] = old.StartedAt
+			if old.StartedAt.IsZero() {
+				filter["startedat"] = bson.M{"$in": bson.A{nil, time.Time{}}}
+			} else {
+				filter["startedat"] = old.StartedAt
+			}
 		} else {
 			filter["building"] = bson.M{"$ne": true}
 			if old.Token != "" {
