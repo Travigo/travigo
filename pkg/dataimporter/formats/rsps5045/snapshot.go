@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"go.mongodb.org/mongo-driver/bson"
@@ -47,8 +48,22 @@ var snapshotMarkerTypes = map[string]bool{"FFL": true, "FNS": true, "FSC": true,
 // the merged rows as a synthetic full-refresh ZIP to the existing importer.
 // This keeps all conversion paths identical for full and incremental feeds.
 func (format *Fares) prepareSourceArchive(ctx context.Context, datasetID, fareVersionID string, datasource *ctdf.DataSourceReference) (func(), error) {
+	started := time.Now()
 	collection := database.GetCollection(sourceRecordCollection)
+	validateRequiredRows := func() error {
+		for _, fileType := range []string{"FFL", "FSC", "LOC", "RTE", "TTY"} {
+			count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType})
+			if err != nil {
+				return fmt.Errorf("count RSPS5045 %s source rows: %w", fileType, err)
+			}
+			if count == 0 {
+				return fmt.Errorf("RSPS5045 source snapshot is missing required %s rows; import a full refresh", fileType)
+			}
+		}
+		return nil
+	}
 	if format.mode == 'F' {
+		log.Info().Str("dataset", datasetID).Str("sequence", format.seq).Msg("Storing full RSPS5045 source snapshot")
 		if err := ensureFareImportLease(ctx, datasource); err != nil {
 			return nil, err
 		}
@@ -66,7 +81,16 @@ func (format *Fares) prepareSourceArchive(ctx context.Context, datasetID, fareVe
 				}
 			}
 		}
+		// The downloaded full refresh is already the archive we need to import.
+		// Rebuilding it from Mongo would scan and rewrite the entire FFL file
+		// before the importer scans that same file again.
+		if err := validateRequiredRows(); err != nil {
+			return nil, err
+		}
+		log.Info().Str("dataset", datasetID).Str("sequence", format.seq).Dur("elapsed", time.Since(started)).Msg("Stored full RSPS5045 source snapshot")
+		return func() {}, nil
 	} else {
+		log.Info().Str("dataset", datasetID).Str("sequence", format.seq).Msg("Merging RSPS5045 change feed into source snapshot")
 		var active ctdf.FareVersionHead
 		if err := database.GetCollection("fare_versions").FindOne(ctx, bson.M{"datasetid": datasetID}).Decode(&active); err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -96,16 +120,11 @@ func (format *Fares) prepareSourceArchive(ctx context.Context, datasetID, fareVe
 		}
 	}
 
-	for _, fileType := range []string{"FFL", "FSC", "LOC", "RTE", "TTY"} {
-		count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType})
-		if err != nil {
-			return nil, fmt.Errorf("count RSPS5045 %s source rows: %w", fileType, err)
-		}
-		if count == 0 {
-			return nil, fmt.Errorf("RSPS5045 source snapshot is missing required %s rows; import a full refresh", fileType)
-		}
+	if err := validateRequiredRows(); err != nil {
+		return nil, err
 	}
 
+	buildStarted := time.Now()
 	file, err := buildSnapshotArchive(ctx, datasetID, fareVersionID, format.seq)
 	if err != nil {
 		return nil, err
@@ -129,6 +148,7 @@ func (format *Fares) prepareSourceArchive(ctx context.Context, datasetID, fareVe
 	format.archive = archive
 	format.files = files
 	format.mode = 'F'
+	log.Info().Str("dataset", datasetID).Str("sequence", format.seq).Dur("elapsed", time.Since(buildStarted)).Dur("total_elapsed", time.Since(started)).Msg("Built merged RSPS5045 import archive")
 	cleanup := func() {
 		_ = file.Close()
 		_ = os.Remove(file.Name())
@@ -650,6 +670,9 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 		}
 		buffer := bufio.NewWriterSize(member, 64*1024)
 		var rows int64
+		fileStarted := time.Now()
+		lastProgress := fileStarted
+		log.Info().Str("dataset", datasetID).Str("file_type", fileType).Int64("records", count).Msg("Rebuilding RSPS5045 snapshot member")
 		for cursor.Next(ctx) {
 			var row sourceRecord
 			if err := cursor.Decode(&row); err != nil {
@@ -667,6 +690,16 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 				return failed(fmt.Errorf("write merged RSPS5045 %s row: %w", fileType, err))
 			}
 			rows++
+			if rspsProgressDue(rows, lastProgress) {
+				log.Info().
+					Str("dataset", datasetID).
+					Str("file_type", fileType).
+					Int64("records", rows).
+					Int64("expected_records", count).
+					Dur("elapsed", time.Since(fileStarted)).
+					Msg("RSPS5045 snapshot rebuild progress")
+				lastProgress = time.Now()
+			}
 		}
 		cursorErr := cursor.Err()
 		_ = cursor.Close(ctx)
@@ -687,6 +720,7 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 			return failed(fmt.Errorf("write merged RSPS5045 %s footer: %w", fileType, err))
 		}
 		manifestNames = append(manifestNames, memberName)
+		log.Info().Str("dataset", datasetID).Str("file_type", fileType).Int64("records", rows).Dur("elapsed", time.Since(fileStarted)).Msg("Rebuilt RSPS5045 snapshot member")
 	}
 	manifestName := "RJFAF" + sequence + ".DAT"
 	manifest, err := writer.Create(manifestName)

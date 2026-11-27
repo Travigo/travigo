@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
@@ -367,7 +368,16 @@ func (format *Fares) filesByExtension(extension string) []*zip.File {
 
 type recordHandler func([]byte, int64) error
 
+func rspsProgressDue(records int64, lastLogged time.Time) bool {
+	return records%250_000 == 0 || records%10_000 == 0 && time.Since(lastLogged) >= 30*time.Second
+}
+
 func scanFile(file *zip.File, name, expectedType string, lengths map[byte]int, handle recordHandler) (fileHeader, int64, error) {
+	started := time.Now()
+	lastProgress := started
+	if expectedType == "FFL" {
+		log.Info().Str("file", name).Msg("Starting RSPS5045 FFL scan")
+	}
 	reader, err := file.Open()
 	if err != nil {
 		return fileHeader{}, 0, fmt.Errorf("open RSPS5045 member %s: %w", name, err)
@@ -462,6 +472,14 @@ func scanFile(file *zip.File, name, expectedType string, lengths map[byte]int, h
 						return header, records, fmt.Errorf("%s line %d: %w", name, lines, err)
 					}
 				}
+				if expectedType == "FFL" && rspsProgressDue(records, lastProgress) {
+					log.Info().
+						Str("file", name).
+						Int64("records", records).
+						Dur("elapsed", time.Since(started)).
+						Msg("RSPS5045 FFL scan progress")
+					lastProgress = time.Now()
+				}
 			}
 		}
 		if errors.Is(readErr, io.EOF) {
@@ -479,6 +497,13 @@ func scanFile(file *zip.File, name, expectedType string, lengths map[byte]int, h
 	}
 	if records != header.records {
 		return header, records, fmt.Errorf("%s header declares %d records but contains %d", name, header.records, records)
+	}
+	if expectedType == "FFL" {
+		log.Info().
+			Str("file", name).
+			Int64("records", records).
+			Dur("elapsed", time.Since(started)).
+			Msg("Completed RSPS5045 FFL scan")
 	}
 	return header, records, nil
 }
@@ -539,11 +564,15 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	if err := ctx.Err(); err != nil {
 		return datasets.DataImportReport{}, err
 	}
+	importStarted := time.Now()
+	log.Info().Str("dataset", dataset.Identifier).Str("sequence", format.seq).Msg("Starting RSPS5045 fare import")
+	phaseStarted := time.Now()
 	cleanupArchive, err := format.prepareSourceArchive(ctx, dataset.Identifier, datasource.FareVersionID, datasource)
 	if err != nil {
 		return datasets.DataImportReport{}, err
 	}
 	defer cleanupArchive()
+	log.Info().Str("dataset", dataset.Identifier).Dur("elapsed", time.Since(phaseStarted)).Msg("Prepared RSPS5045 source snapshot")
 	defer func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -590,11 +619,16 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	if err != nil {
 		return report, err
 	}
+	log.Info().Str("dataset", dataset.Identifier).Msg("Importing RSPS5045 ticket definitions")
+	phaseStarted = time.Now()
 	tickets, ticketCount, err := format.importTicketTypes(dataset, record, adultRef, railRestrictionCatalog.calendars)
 	if err != nil {
 		return report, err
 	}
 	report.ImportedFareProducts = ticketCount
+	log.Info().Str("dataset", dataset.Identifier).Int("products", ticketCount).Dur("elapsed", time.Since(phaseStarted)).Msg("Imported RSPS5045 ticket definitions")
+	log.Info().Str("dataset", dataset.Identifier).Msg("Importing RSPS5045 fare locations")
+	phaseStarted = time.Now()
 	nlcRefs, clusterRefs, locationCount, linkedLocations, unlinkedLocations, err := format.importLocations(dataset, record)
 	if err != nil {
 		return report, err
@@ -602,6 +636,7 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	report.ImportedFareLocations += locationCount
 	report.FareLocationsLinkedToStops = linkedLocations
 	report.FareLocationsWithoutStopLink = unlinkedLocations
+	log.Info().Str("dataset", dataset.Identifier).Int("locations", locationCount).Dur("elapsed", time.Since(phaseStarted)).Msg("Imported RSPS5045 fare locations")
 	routes, err := format.importRoutes()
 	if err != nil {
 		return report, err
@@ -620,6 +655,14 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	if err := format.writeFlowFares(dataset, datasource, record, tickets, adultRef, nlcRefs, clusterRefs, routes, fareTOCRefs, railRestrictionCatalog.restrictions, advancePurchase, tocSpecificTickets, &report); err != nil {
 		return report, err
 	}
+	log.Info().
+		Str("dataset", dataset.Identifier).
+		Int("products", report.ImportedFareProducts).
+		Int("locations", report.ImportedFareLocations).
+		Int("offers", report.ImportedFareOffers).
+		Int("rules", report.ImportedFareRules).
+		Dur("elapsed", time.Since(importStarted)).
+		Msg("Completed RSPS5045 fare import")
 	return report, nil
 }
 
@@ -1625,6 +1668,12 @@ func normalizeNLC(code string) string {
 }
 
 func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, datasource *ctdf.DataSourceReference) error {
+	started := time.Now()
+	log.Info().
+		Str("dataset", datasource.DatasetID).
+		Str("sequence", format.seq).
+		Uint64("uncompressed_bytes", file.UncompressedSize64).
+		Msg("Staging RSPS5045 flows and fare rows")
 	runID := datasource.FareVersionID
 	flowCollection := database.GetCollection(flowStageCollection)
 	fareCollection := database.GetCollection(fareStageCollection)
@@ -1653,6 +1702,7 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 		return fmt.Errorf("clear RSPS5045 fare staging: %w", err)
 	}
 	var flowWrites, fareWrites []mongo.WriteModel
+	var flowCount, fareCount, rowCount int64
 	flush := func(collection *mongo.Collection, writes *[]mongo.WriteModel) error {
 		if len(*writes) == 0 {
 			return nil
@@ -1676,6 +1726,7 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 		}
 		switch line[1] {
 		case 'F':
+			flowCount++
 			flowID := strings.TrimSpace(string(line[42:49]))
 			if flowID == "" {
 				return errors.New("flow record has no FLOW_ID")
@@ -1700,6 +1751,7 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 				}
 			}
 		case 'T':
+			fareCount++
 			flowID := strings.TrimSpace(string(line[2:9]))
 			ticketCode := strings.TrimSpace(string(line[9:12]))
 			priceText := strings.TrimSpace(string(line[12:20]))
@@ -1722,6 +1774,7 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 		default:
 			return fmt.Errorf("unsupported FFL record type %q", line[1])
 		}
+		rowCount++
 		return nil
 	})
 	if err != nil {
@@ -1733,6 +1786,14 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 	if err := flush(fareCollection, &fareWrites); err != nil {
 		return fmt.Errorf("flush FFL fare records: %w", err)
 	}
+	log.Info().
+		Str("dataset", datasource.DatasetID).
+		Str("sequence", format.seq).
+		Int64("rows", rowCount).
+		Int64("flows", flowCount).
+		Int64("fares", fareCount).
+		Dur("elapsed", time.Since(started)).
+		Msg("Staged RSPS5045 flows and fare rows")
 	return nil
 }
 
@@ -1786,6 +1847,8 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 	if err != nil {
 		return fmt.Errorf("count staged RSPS5045 fares: %w", err)
 	}
+	started := time.Now()
+	log.Info().Str("dataset", dataset.Identifier).Int64("fare_rows", expectedFares).Msg("Converting staged RSPS5045 fares")
 	pipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: bson.M{"runid": runID}}},
 		bson.D{{Key: "$lookup", Value: bson.D{
@@ -1805,6 +1868,7 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 	offerWriter := newFareBulkWriter(ctx, datasource, "fare_offers")
 	ruleWriter := newFareBulkWriter(ctx, datasource, "fare_leg_rules")
 	var joined int64
+	lastProgress := started
 	for cursor.Next(ctx) {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -1814,6 +1878,17 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 			return fmt.Errorf("decode joined RSPS5045 fare: %w", err)
 		}
 		joined++
+		if rspsProgressDue(joined, lastProgress) {
+			log.Info().
+				Str("dataset", dataset.Identifier).
+				Int64("joined_rows", joined).
+				Int64("expected_rows", expectedFares).
+				Int("offers", report.ImportedFareOffers).
+				Int("rules", report.ImportedFareRules).
+				Dur("elapsed", time.Since(started)).
+				Msg("RSPS5045 fare conversion progress")
+			lastProgress = time.Now()
+		}
 		flow, fare := row.Flow, row.Fare
 		if flow.StatusCode != "000" {
 			continue
@@ -1950,6 +2025,14 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 		}
 		return errors.New("RSPS5045 full feed contains no adult fares to import")
 	}
+	log.Info().
+		Str("dataset", dataset.Identifier).
+		Int64("joined_rows", joined).
+		Int64("expected_rows", expectedFares).
+		Int("offers", report.ImportedFareOffers).
+		Int("rules", report.ImportedFareRules).
+		Dur("elapsed", time.Since(started)).
+		Msg("Converted staged RSPS5045 fares")
 	return nil
 }
 

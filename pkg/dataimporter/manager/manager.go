@@ -902,6 +902,7 @@ func deleteFareVersionRecords(ctx context.Context, datasetID string, fareVersion
 func validateFareVersion(datasetID, fareVersionID string) error {
 	filter := bson.M{"datasetid": datasetID, "fareversionid": fareVersionID}
 	ctx := context.Background()
+	log.Info().Str("dataset", datasetID).Str("fare_version", fareVersionID).Msg("Validating candidate fare version")
 	for _, collection := range []struct {
 		name string
 		walk func() error
@@ -946,9 +947,12 @@ func validateFareVersion(datasetID, fareVersionID string) error {
 			return walkFareVersionRecords[ctdf.FareCap](ctx, "fare_caps", filter, datasetID, fareVersionID, validateFareCap)
 		}},
 	} {
+		started := time.Now()
+		log.Info().Str("dataset", datasetID).Str("collection", collection.name).Msg("Validating fare records")
 		if err := collection.walk(); err != nil {
 			return fmt.Errorf("validate %s: %w", collection.name, err)
 		}
+		log.Info().Str("dataset", datasetID).Str("collection", collection.name).Dur("elapsed", time.Since(started)).Msg("Validated fare records")
 	}
 
 	for _, ref := range []struct {
@@ -989,10 +993,23 @@ func validateFareVersion(datasetID, fareVersionID string) error {
 		{"fare_caps", "eligibleriderrefs", true, "fare_rider_categories", "primaryidentifier"},
 		{"fare_caps", "locationrefs", true, "fare_locations", "primaryidentifier"},
 	} {
+		started := time.Now()
+		log.Info().
+			Str("dataset", datasetID).
+			Str("collection", ref.collection).
+			Str("field", ref.field).
+			Msg("Checking fare references")
 		if err := checkFareReference(ctx, ref.collection, filter, ref.field, ref.array, ref.target, ref.targetKey); err != nil {
 			return err
 		}
+		log.Info().
+			Str("dataset", datasetID).
+			Str("collection", ref.collection).
+			Str("field", ref.field).
+			Dur("elapsed", time.Since(started)).
+			Msg("Checked fare references")
 	}
+	log.Info().Str("dataset", datasetID).Str("fare_version", fareVersionID).Msg("Validated candidate fare version")
 	return nil
 }
 
@@ -1003,11 +1020,14 @@ type fareVersionedRecord interface {
 }
 
 func walkFareVersionRecords[T fareVersionedRecord](ctx context.Context, collectionName string, filter bson.M, datasetID, fareVersionID string, validate func(T) error) error {
+	started := time.Now()
 	cursor, err := database.GetCollection(collectionName).Find(ctx, filter, options.Find().SetBatchSize(256))
 	if err != nil {
 		return fmt.Errorf("read records: %w", err)
 	}
 	defer cursor.Close(ctx)
+	var checked int64
+	lastProgress := started
 	for cursor.Next(ctx) {
 		var value T
 		if err := cursor.Decode(&value); err != nil {
@@ -1024,6 +1044,16 @@ func walkFareVersionRecords[T fareVersionedRecord](ctx context.Context, collecti
 			if err := validate(value); err != nil {
 				return fmt.Errorf("record %q: %w", record.PrimaryIdentifier, err)
 			}
+		}
+		checked++
+		if checked%250_000 == 0 || checked%10_000 == 0 && time.Since(lastProgress) >= 30*time.Second {
+			log.Info().
+				Str("dataset", datasetID).
+				Str("collection", collectionName).
+				Int64("records", checked).
+				Dur("elapsed", time.Since(started)).
+				Msg("Fare record validation progress")
+			lastProgress = time.Now()
 		}
 	}
 	if err := cursor.Err(); err != nil {
