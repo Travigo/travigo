@@ -89,6 +89,8 @@ func createDatasetFormat(dataset *datasets.DataSet) (formats.Format, error) {
 		format = &siri_sx.SiriSX{}
 	case datasets.DataSetFormatGTFSSchedule:
 		format = &gtfs.Schedule{}
+	case datasets.DataSetFormatNetExSchedule:
+		format = &netex.Schedule{}
 	case datasets.DataSetFormatNetExFares:
 		format = &netex.Fares{}
 	case datasets.DataSetFormatNationalRailFares:
@@ -135,6 +137,7 @@ func ImportDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 
 func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool, sourceOverride string, overrideETag string) error {
 	importStartedAt := time.Now()
+	isNetExSchedule := dataset.Format == datasets.DataSetFormatNetExSchedule
 	datasetVersionCollection := database.GetCollection("dataset_versions")
 	datasetImportReportCollection := database.GetCollection("dataset_import_reports")
 
@@ -171,12 +174,16 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	// distinguishable. Before parallelising datasets/retries, enforce per-dataset
 	// ownership and a unique fenced generation; publish only after every batch is
 	// complete, then retire the previous generation without touching an active run.
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	if isNetExSchedule {
+		timestamp = fmt.Sprintf("%d", importStartedAt.UnixNano())
+	}
 	datasource := &ctdf.DataSourceReference{
 		OriginalFormat: string(dataset.Format),
 		ProviderName:   dataset.Provider.Name,
 		ProviderID:     dataset.DataSourceRef,
 		DatasetID:      dataset.Identifier,
-		Timestamp:      fmt.Sprintf("%d", time.Now().Unix()),
+		Timestamp:      timestamp,
 		FareVersionID:  fmt.Sprintf("%s-%d", dataset.Identifier, time.Now().UnixNano()),
 	}
 	stagingFareVersionRegistered := false
@@ -312,7 +319,8 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 	if err != nil {
 		return err
 	}
-	if archiveImporter, ok := archiveFormat.(formats.ArchiveFormat); ok {
+	var importReports []datasets.DataImportReport
+	if archiveImporter, ok := archiveFormat.(formats.ArchiveFormat); ok && !isNetExSchedule {
 		archiveInfo, err := file.Stat()
 		if err != nil {
 			return fmt.Errorf("stat fare archive: %w", err)
@@ -352,7 +360,6 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		_, err = datasetImportReportCollection.InsertOne(context.Background(), importReport)
 		return err
 	}
-
 	switch dataset.UnpackBundle {
 	case datasets.BundleFormatNone, "":
 		sourceFileReaders = append(sourceFileReaders, file)
@@ -365,6 +372,21 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 
 		sourceFileReaders = append(sourceFileReaders, gzipDecoder)
 	case datasets.BundleFormatZIP:
+		if schedule, ok := archiveFormat.(*netex.Schedule); ok {
+			archiveInfo, err := file.Stat()
+			if err != nil {
+				return fmt.Errorf("stat NeTEx archive: %w", err)
+			}
+			if err := schedule.ParseArchive(file, archiveInfo.Size()); err != nil {
+				return err
+			}
+			importReport, err := schedule.Import(*dataset, datasource)
+			if err != nil {
+				return err
+			}
+			importReports = append(importReports, importReport)
+			break
+		}
 		archive, err := zip.OpenReader(source)
 		if err != nil {
 			return err
@@ -392,7 +414,6 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		return errors.New(fmt.Sprintf("Cannot handle bundle format %s", dataset.UnpackBundle))
 	}
 
-	importReports := make([]datasets.DataImportReport, len(sourceFileReaders))
 	for i, sourceFileReader := range sourceFileReaders {
 		format, err := createDatasetFormat(dataset)
 		if err != nil {
@@ -413,7 +434,7 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		if err != nil {
 			return err
 		}
-		importReports[i] = importReport
+		importReports = append(importReports, importReport)
 	}
 
 	if dataset.SupportedObjects.JourneyTracks {
@@ -422,27 +443,28 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 		}
 	}
 	if !skipCleanup {
-		if dataset.SupportedObjects.Stops {
-			cleanupOldRecords("stops_raw", datasource)
+		cleanupCollections := []struct {
+			name    string
+			support bool
+		}{
+			{"stops_raw", dataset.SupportedObjects.Stops},
+			{"stop_groups", dataset.SupportedObjects.StopGroups},
+			{"operators", dataset.SupportedObjects.Operators},
+			{"operator_groups", dataset.SupportedObjects.OperatorGroups},
+			{"services_raw", dataset.SupportedObjects.Services},
+			{database.JourneysRawCollectionName, dataset.SupportedObjects.Journeys},
 		}
-		if dataset.SupportedObjects.StopGroups {
-			cleanupOldRecords("stop_groups", datasource)
+		for _, item := range cleanupCollections {
+			if !item.support {
+				continue
+			}
+			if err := cleanupOldRecords(item.name, datasource); err != nil && isNetExSchedule {
+				return fmt.Errorf("clean stale NeTEx %s: %w", item.name, err)
+			}
 		}
-		if dataset.SupportedObjects.Operators {
-			cleanupOldRecords("operators", datasource)
-		}
-		if dataset.SupportedObjects.OperatorGroups {
-			cleanupOldRecords("operator_groups", datasource)
-		}
-		if dataset.SupportedObjects.Services {
-			cleanupOldRecords("services_raw", datasource)
-		}
-		if dataset.SupportedObjects.Journeys {
-			cleanupOldRecords(database.JourneysRawCollectionName, datasource)
-			if dataset.Format != datasets.DataSetFormatOSMRailTracks {
-				if err := journeytracks.CleanupStaleUnreferencedTracks(context.Background(), datasource); err != nil {
-					return fmt.Errorf("clean stale journey tracks: %w", err)
-				}
+		if dataset.SupportedObjects.Journeys && dataset.Format != datasets.DataSetFormatOSMRailTracks {
+			if err := journeytracks.CleanupStaleUnreferencedTracks(context.Background(), datasource); err != nil {
+				return fmt.Errorf("clean stale journey tracks: %w", err)
 			}
 		}
 	}
@@ -1328,7 +1350,7 @@ func isValidUrl(toTest string) bool {
 	return true
 }
 
-func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) {
+func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReference) error {
 	// Performance Review [Set O] [PR069] [P2] (batch): This runs once per supported collection for
 	// every changed dataset. Declared journeys_raw and journey_tracks indexes cover this predicate,
 	// but stops_raw lacks a datasource cleanup index, so repeated stop imports can scan unrelated
@@ -1346,13 +1368,12 @@ func cleanupOldRecords(collectionName string, datasource *ctdf.DataSourceReferen
 			}},
 		},
 	}
-
-	result, _ := collection.DeleteMany(context.Background(), query)
-
+	result, err := collection.DeleteMany(context.Background(), query)
 	if result != nil {
 		log.Info().
 			Str("collection", collectionName).
 			Int64("num", result.DeletedCount).
 			Msg("Cleaned up old records")
 	}
+	return err
 }

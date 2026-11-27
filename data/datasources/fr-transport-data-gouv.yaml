@@ -1,7 +1,7 @@
 # Generated from the transport.data.gouv.fr public-transit API.
 # Repeated provider names are consolidated into one datasource; individual catalogue pages and resources remain documented below.
 # Non-public-transit categories are excluded.
-# NeTEx and SIRI Lite are not active importer formats. Unsupported-only feeds are left commented out below.
+# NeTEx resources that overlap an active schedule and unsupported SIRI Lite resources are left commented out below.
 ---
 identifier: fr-horaires-ave-espagne-france
 region: fr
@@ -1572,19 +1572,37 @@ provider:
   name: "Navettes Aéroport Paris Beauvais"
   website: "https://transport.data.gouv.fr/datasets/navettes-aeroport-paris-beauvais-aerobus"
 datasets:
-  # TODO: Enable when a NeTEx importer is supported.
-# Resource 83580: Ligne A01 Aeroport Paris-Beauvais - Paris Porte-Maillot (NetexV2) [NeTEx]
-# Source: https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071559/offre-ligne-c02179-paris-porte-maillot-aeroport-paris-beauvais-20261020124646z.zip
-# Catalogue resource: https://transport.data.gouv.fr/resources/83580
+  # Both lines are already scheduled by fr-ile-de-france-mobilites-gtfs-schedule-80921.
+  # Resource 83580: Ligne A01 Aeroport Paris-Beauvais - Paris Porte-Maillot (NetexV2) [NeTEx]
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83580
+  # GTFS route: IDFM:C02179
   # - identifier: netex-83580
   #   format: netex
-  #   source: "https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071559/offre-ligne-c02179-paris-porte-maillot-aeroport-paris-beauvais-20261020124646z.zip"
-# Resource 83044: Ligne A04 Aeroport Paris-Beauvais - La Villette (NetexV2) [NeTEx]
-# Source: https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071615/offre-ligne-c02723-paris-porte-de-la-villette-aeroport-paris-beauvais-20261020124646z.zip
-# Catalogue resource: https://transport.data.gouv.fr/resources/83044
+  #   source: "https://www.data.gouv.fr/api/1/datasets/r/b7bfd97e-1343-4970-a5bd-af13fba2e950"
+  #   unpackbundle: zip
+  #   customconfig:
+  #     timezone: Europe/Paris
+  #   supportedobjects:
+  #     operators: true
+  #     stops: true
+  #     stopgroups: true
+  #     services: true
+  #     journeys: true
+  # Resource 83044: Ligne A04 Aeroport Paris-Beauvais - La Villette (NetexV2) [NeTEx]
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83044
+  # GTFS route: IDFM:C02723
   # - identifier: netex-83044
   #   format: netex
-  #   source: "https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071615/offre-ligne-c02723-paris-porte-de-la-villette-aeroport-paris-beauvais-20261020124646z.zip"
+  #   source: "https://www.data.gouv.fr/api/1/datasets/r/1f082844-4595-4690-ab38-d20b1486293a"
+  #   unpackbundle: zip
+  #   customconfig:
+  #     timezone: Europe/Paris
+  #   supportedobjects:
+  #     operators: true
+  #     stops: true
+  #     stopgroups: true
+  #     services: true
+  #     journeys: true
 ---
 identifier: fr-reseaux-de-transports-en-commun-de-la-metropole-daix-marseille-provence-et-des-bouches-du-rhone
 region: fr
@@ -12546,7 +12564,7 @@ datasets:
 # Catalogue items excluded from active import:
 # - SSIM flight-plan datasets: public-transit category label, but these are airline schedules.
 # - Two public-transit records have no available GTFS static or unsupported-format resource.
-# - Unsupported SIRI Lite and NeTEx resources alongside GTFS sources are not enabled here.
+# - SIRI Lite and alternative NeTEx resources alongside GTFS sources are not enabled here.
 ---
 identifier: fr-fr-200052264-t0030-0000-1
 region: fr

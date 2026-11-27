@@ -30,15 +30,15 @@ func GetRegisteredDataSets() []datasets.DataSet {
 			if (dataset.SupportedObjects == datasets.SupportedObjects{}) {
 				dataset.SupportedObjects = datasets.SupportedObjects{
 					Operators:      true,
-					OperatorGroups: true,
+					OperatorGroups: dataset.Format != datasets.DataSetFormatNetExSchedule,
 					Stops:          true,
 					StopGroups:     true,
 					Services:       true,
 					Journeys:       true,
 					Fares:          dataset.Format == datasets.DataSetFormatGTFSSchedule || dataset.Format == datasets.DataSetFormatNetExFares || dataset.Format == datasets.DataSetFormatNationalRailFares,
 
-					RealtimeJourneys: true,
-					ServiceAlerts:    true,
+					RealtimeJourneys: dataset.Format != datasets.DataSetFormatNetExSchedule,
+					ServiceAlerts:    dataset.Format != datasets.DataSetFormatNetExSchedule,
 				}
 			}
 			if dataset.Format == datasets.DataSetFormatGTFSSchedule || dataset.Format == datasets.DataSetFormatNetExFares || dataset.Format == datasets.DataSetFormatNationalRailFares {

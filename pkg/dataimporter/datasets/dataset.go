@@ -61,6 +61,7 @@ const (
 	DataSetFormatSiriVM                          = "eu-siri-vm"
 	DataSetFormatSiriSX                          = "eu-siri-sx"
 	DataSetFormatGTFSSchedule                    = "gtfs-schedule"
+	DataSetFormatNetExSchedule                   = "netex"
 	DataSetFormatNetExFares                      = "gb-netex-fares"
 	DataSetFormatNationalRailFares               = "gb-rsps5045-fares"
 	DataSetFormatGTFSRealtime                    = "gtfs-realtime"
