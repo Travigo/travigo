@@ -11,13 +11,16 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
+	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/util"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 const (
@@ -114,7 +117,18 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 	}
 
 	report := datasets.DataImportReport{}
+	failedDatasetIDs := make([]string, 0)
+	var firstDatasetError error
+	recordDatasetFailure := func(entryID string, err error) {
+		failedDatasetIDs = append(failedDatasetIDs, entryID)
+		if firstDatasetError == nil {
+			firstDatasetError = err
+		}
+	}
 	for index, entry := range metadata {
+		if err := ctx.Err(); err != nil {
+			return report, fmt.Errorf("BODS fare import cancelled after %d datasets: %w", index, err)
+		}
 		entryStarted := time.Now()
 		entryID := entry.identifier()
 		entryLog := log.With().
@@ -126,19 +140,22 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		if entry.identifier() == "unknown" {
 			err := fmt.Errorf("BODS fare dataset metadata has no dataset id")
 			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		downloadURL := entry.downloadURL()
 		if downloadURL == "" {
 			err := fmt.Errorf("BODS fare dataset %s has no downloadable NeTEx URL", entryID)
 			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		downloadURL, err = resolveBODSFaresURL(dataset.Source, downloadURL)
 		if err != nil {
 			err = fmt.Errorf("BODS fare dataset %s: %w", entryID, err)
 			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		downloadStarted := time.Now()
 		entryLog.Info().Msg("Downloading BODS fare dataset")
@@ -146,7 +163,8 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		if err != nil {
 			err = fmt.Errorf("download BODS fare dataset %s: %w", entryID, err)
 			entryLog.Error().Err(err).Str("stage", "download").Dur("stage_elapsed", time.Since(downloadStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		entryLog.Info().Int("download_bytes", len(body)).Dur("stage_elapsed", time.Since(downloadStarted)).Msg("Downloaded BODS fare dataset")
 		feed := &Fares{SourceNamespace: entry.namespace(), SourceOperators: entry.operatorRefs()}
@@ -155,7 +173,8 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		if err := feed.parseNeTExPayload(body); err != nil {
 			err = fmt.Errorf("parse BODS fare dataset %s: %w", entryID, err)
 			entryLog.Error().Err(err).Str("stage", "parse").Int("download_bytes", len(body)).Dur("stage_elapsed", time.Since(parseStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		entryLog.Info().Int("fare_frames", len(findNodes(feed.root, "FareFrame"))).Dur("stage_elapsed", time.Since(parseStarted)).Msg("Parsed BODS fare dataset")
 		feedImportStarted := time.Now()
@@ -163,8 +182,14 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		feedReport, err := feed.Import(dataset, &importDatasource)
 		if err != nil {
 			err = fmt.Errorf("import BODS fare dataset %s: %w", entryID, err)
+			if cleanupErr := discardFailedBODSFareDataset(ctx, dataset.Identifier, datasource.FareVersionID, entry.namespace()); cleanupErr != nil {
+				cleanupErr = fmt.Errorf("discard partial records for failed BODS fare dataset %s: %w", entryID, cleanupErr)
+				entryLog.Error().Err(cleanupErr).Str("stage", "cleanup").Dur("stage_elapsed", time.Since(feedImportStarted)).Msg("BODS fare dataset cleanup failed")
+				return report, errors.Join(err, cleanupErr)
+			}
 			entryLog.Error().Err(err).Str("stage", "import").Int("download_bytes", len(body)).Int("fare_frames", len(findNodes(feed.root, "FareFrame"))).Dur("stage_elapsed", time.Since(feedImportStarted)).Msg("BODS fare dataset failed")
-			return datasets.DataImportReport{}, err
+			recordDatasetFailure(entryID, err)
+			continue
 		}
 		entryLog.Info().
 			Int("fare_products", feedReport.ImportedFareProducts).
@@ -188,15 +213,58 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		report.ImportedFareTransferRules += feedReport.ImportedFareTransferRules
 		report.MergeFareValidityGaps(feedReport)
 	}
-	log.Info().
+	if err := ctx.Err(); err != nil {
+		return report, fmt.Errorf("BODS fare import cancelled: %w", err)
+	}
+	failedDatasetIDsForLog := failedDatasetIDs
+	if len(failedDatasetIDsForLog) > 5 {
+		failedDatasetIDsForLog = append(append([]string(nil), failedDatasetIDsForLog[:5]...), "...")
+	}
+	completionLog := log.With().
 		Str("dataset", dataset.Identifier).
 		Int("fare_dataset_count", len(metadata)).
+		Int("failed_fare_datasets", len(failedDatasetIDs)).
+		Strs("failed_fare_dataset_ids", failedDatasetIDsForLog).
 		Int("fare_products", report.ImportedFareProducts).
 		Int("fare_offers", report.ImportedFareOffers).
 		Int("fare_rules", report.ImportedFareRules).
 		Dur("elapsed", time.Since(importStarted)).
-		Msg("Completed BODS fare API import")
+		Logger()
+	if len(failedDatasetIDs) > 0 {
+		completionLog.Warn().Msg("Completed BODS fare API import with failed datasets")
+	} else {
+		completionLog.Info().Msg("Completed BODS fare API import")
+	}
+	if len(failedDatasetIDs) == len(metadata) {
+		return report, fmt.Errorf("all %d published BODS fare datasets failed (sample ids=%v): %w", len(metadata), failedDatasetIDsForLog, firstDatasetError)
+	}
 	return report, nil
+}
+
+func bodsFareFeedRecordFilter(datasetID, fareVersionID, namespace string) bson.M {
+	return bson.M{
+		"datasetid":        datasetID,
+		"fareversionid":    fareVersionID,
+		"sourceidentifier": bson.M{"$regex": "^" + regexp.QuoteMeta(namespace) + ":"},
+	}
+}
+
+func discardFailedBODSFareDataset(ctx context.Context, datasetID, fareVersionID, namespace string) error {
+	filter := bodsFareFeedRecordFilter(datasetID, fareVersionID, namespace)
+	for _, collection := range []string{
+		"fare_locations",
+		"fare_rider_categories",
+		"fare_media",
+		"fare_products",
+		"fare_tariffs",
+		"fare_offers",
+		"fare_leg_rules",
+	} {
+		if _, err := database.GetCollection(collection).DeleteMany(ctx, filter); err != nil {
+			return fmt.Errorf("delete partial records from %s: %w", collection, err)
+		}
+	}
+	return nil
 }
 
 func (format *Fares) loadFaresMetadata(ctx context.Context, client *http.Client, source, apiKey string) ([]faresMetadataEntry, error) {

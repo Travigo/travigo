@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestSafeBODSFaresRequestErrorIncludesCauseWithoutLeakingAPIKey(t *testing.T) {
@@ -36,5 +38,16 @@ func TestSafeBODSFaresRequestErrorIncludesCauseWithoutLeakingAPIKey(t *testing.T
 				t.Errorf("safeBODSFaresRequestError() leaked request credentials: %q", got)
 			}
 		})
+	}
+}
+
+func TestBODSFareFeedRecordFilterScopesFailedFeedCleanup(t *testing.T) {
+	filter := bodsFareFeedRecordFilter("bods-fares", "candidate-v2", "bods-feed-feed.1875")
+	if filter["datasetid"] != "bods-fares" || filter["fareversionid"] != "candidate-v2" {
+		t.Fatalf("fare cleanup filter = %#v, want the candidate fare version", filter)
+	}
+	sourceIdentifier, ok := filter["sourceidentifier"].(bson.M)
+	if !ok || sourceIdentifier["$regex"] != `^bods-feed-feed\.1875:` {
+		t.Fatalf("source identifier filter = %#v, want escaped feed namespace prefix", filter["sourceidentifier"])
 	}
 }

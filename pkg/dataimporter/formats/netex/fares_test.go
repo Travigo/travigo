@@ -133,6 +133,41 @@ func TestFareTablePricesFlatPrices(t *testing.T) {
 	}
 }
 
+func TestFareTablePricesTimeIntervalPrice(t *testing.T) {
+	format := &Fares{}
+	input := `<FareFrame><FrameDefaults><DefaultCurrency>GBP</DefaultCurrency></FrameDefaults>
+		<fareTables><FareTable id="service-table"><includes><FareTable id="offer-table">
+			<pricesFor><SalesOfferPackageRef ref="weekly-pass-package"/></pricesFor>
+			<includes><FareTable id="adult-table"><cells><Cell>
+				<TimeIntervalPrice id="adult-weekly"><Amount>27.50</Amount><TimeIntervalRef ref="week"/></TimeIntervalPrice>
+			</Cell></cells></FareTable></includes>
+		</FareTable></includes></FareTable></fareTables>
+	</FareFrame>`
+	if err := format.ParseFile(strings.NewReader(input)); err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+
+	frame := findNodes(format.root, "FareFrame")[0]
+	tables := findFareTables(frame)
+	if len(tables) != 1 || nodeAttr(tables[0], "id") != "service-table" {
+		t.Fatalf("findFareTables() = %v, want the containing fare table", tableIDs(tables))
+	}
+	prices, err := fareTablePrices(tables[0], nil, nil, nil, func(id string) string { return id })
+	if err != nil {
+		t.Fatalf("fareTablePrices() error = %v", err)
+	}
+	if len(prices) != 1 || prices[0].priceID != "adult-weekly" || prices[0].originRef != "" || prices[0].destinationRef != "" {
+		t.Fatalf("fareTablePrices() = %#v, want one flat time-interval price", prices)
+	}
+	amounts, err := fareFrameAmounts(frame, func(id string) string { return id })
+	if err != nil {
+		t.Fatalf("fareFrameAmounts() error = %v", err)
+	}
+	if got := amounts[prices[0].priceID]; got.AmountMinor != 2750 || got.Currency != "GBP" || got.Exponent != 2 {
+		t.Errorf("time-interval price amount = %#v, want 2750 GBP minor units", got)
+	}
+}
+
 func TestFareTablePricesFromSalesPackageAndInlineMatrixPrice(t *testing.T) {
 	format := &Fares{}
 	input := `<PublicationDelivery><CompositeFrame><frames>

@@ -209,7 +209,7 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 						PrimaryIdentifier: stageRef,
 						DatasetID:         dataset.Identifier,
 						FareVersionID:     datasource.FareVersionID,
-						SourceIdentifier:  stageNumber,
+						SourceIdentifier:  format.scopeSourceID(stageNumber),
 						DataSource:        datasource,
 						CreationDateTime:  time.Now(),
 					},
@@ -657,7 +657,7 @@ func salesOfferProductRefs(salesPackage *xmlNode) []string {
 func fareFrameAmounts(frame *xmlNode, scopeSourceID func(string) string) (map[string]ctdf.FareMoney, error) {
 	amounts := make(map[string]ctdf.FareMoney)
 	currency := frameCurrency(frame)
-	for _, priceType := range []string{"FarePrice", "GeographicalIntervalPrice", "DistanceMatrixElementPrice"} {
+	for _, priceType := range []string{"FarePrice", "GeographicalIntervalPrice", "DistanceMatrixElementPrice", "TimeIntervalPrice"} {
 		for _, price := range findNodes(frame, priceType) {
 			id, amount := nodeAttr(price, "id"), nodeText(price, "Amount")
 			if id == "" || amount == "" {
@@ -739,19 +739,18 @@ func fareTablePrices(table *xmlNode, matrix map[string]netexDistanceMatrixElemen
 	return prices, nil
 }
 
-// farePriceIDs collects both NeTEx price reference forms and inline prices.
-// Flat BODS fares use FarePrice while zone and point-to-point tables generally
-// use GeographicalIntervalPrice.
+// farePriceIDs collects NeTEx price references and inline prices. FarePrice
+// represents a flat fare; other price types can include an interval selector.
 func farePriceIDs(root *xmlNode) []string {
 	ids := make([]string, 0)
-	for _, name := range []string{"FarePriceRef", "GeographicalIntervalPriceRef"} {
+	for _, name := range []string{"FarePriceRef", "GeographicalIntervalPriceRef", "DistanceMatrixElementPriceRef", "TimeIntervalPriceRef"} {
 		for _, ref := range findNodes(root, name) {
 			if id := nodeAttr(ref, "ref"); id != "" {
 				ids = append(ids, id)
 			}
 		}
 	}
-	for _, name := range []string{"FarePrice", "GeographicalIntervalPrice"} {
+	for _, name := range []string{"FarePrice", "GeographicalIntervalPrice", "TimeIntervalPrice"} {
 		for _, price := range findNodes(root, name) {
 			if id := nodeAttr(price, "id"); id != "" {
 				ids = append(ids, id)
