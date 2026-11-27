@@ -183,6 +183,12 @@ overrides:
       set:
         colour: "#60399E"
         icon: "/icons/tfl-roundel-elizabeth-line.svg"
+    # The National Rail TOC import supplies its default rail icon, so explicitly
+    # replace that icon for Elizabeth line services.
+    - operators: [gb-toc-XR]
+      transporttypes: [Rail]
+      set:
+        icon: "/icons/tfl-roundel-elizabeth-line.svg"
 datasets:
 - identifier: tfl-api
   format: tfl-json
