@@ -1,7 +1,12 @@
 # Generated from the transport.data.gouv.fr public-transit API.
-# Repeated provider names are consolidated into one datasource; individual catalogue pages and resources remain documented below.
-# Non-public-transit categories are excluded.
-# NeTEx resources that overlap an active schedule and unsupported SIRI Lite resources are left commented out below.
+# Regenerate with: go run ./scripts/generate-fr-transport-data-gouv.go
+# Repeated provider names are consolidated; existing source IDs and reviewed importer choices are retained.
+# SNCF remains in its dedicated datasource file.
+# Airline SSIM feeds and records without a supported feed are excluded.
+# NeTEx alternatives to a GTFS schedule and the two overlapping Aérobus feeds remain disabled.
+# The Aérobus A01 and A04 routes are already included in IDFM GTFS (IDFM:C02179 and IDFM:C02723).
+# Unsupported SIRI profiles and SIRI Lite resources remain commented for review.
+# The Pybus GTFS-RT endpoint stays disabled until the publisher confirms it is correct.
 ---
 identifier: fr-horaires-ave-espagne-france
 region: fr
@@ -173,19 +178,20 @@ datasets:
   # - identifier: siri-lite-80923
   #   format: eu-siri-lite
   #   source: "https://prim.iledefrance-mobilites.fr/marketplace/general-message"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 80924: Prochains passages (plateforme Île-de-France Mobilités) - Requête globale [SIRI Lite]
   # Source: https://prim.iledefrance-mobilites.fr/marketplace/estimated-timetable
   # Catalogue resource: https://transport.data.gouv.fr/resources/80924
   # - identifier: siri-lite-80924
   #   format: eu-siri-lite
   #   source: "https://prim.iledefrance-mobilites.fr/marketplace/estimated-timetable"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 80925: Prochains passages (plateforme Île-de-France Mobilités) - Requête unitaire [SIRI Lite]
   # Source: https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring
   # Catalogue resource: https://transport.data.gouv.fr/resources/80925
   # - identifier: siri-lite-80925
   #   format: eu-siri-lite
   #   source: "https://prim.iledefrance-mobilites.fr/marketplace/stop-monitoring"
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/horaires-theoriques-et-temps-reel-du-reseau-titus-rosny-sous-bois-gtfs-gtfs-rt
   # Horaires temps-réel du réseau Titus (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/8201
@@ -207,6 +213,39 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
+---
+identifier: fr-ilevia-lille
+region: fr
+provider:
+  name: "Ilévia"
+  website: "http://www.ilevia.fr"
+datasets:
+  # Catalogue record: https://transport.data.gouv.fr/datasets/ilevia-localisation-des-arrets-bus-metro-et-tram-gtfs
+  # Télécharger depuis un site web
+  # Official resource: https://transport.data.gouv.fr/resources/81995
+  - identifier: gtfs-schedule
+    format: gtfs-schedule
+    source: "https://media.ilevia.fr/opendata/gtfs.zip"
+    datasetsize: medium
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
+  # GTFS - RT
+  # Official resource: https://transport.data.gouv.fr/resources/81981
+  - identifier: gtfs-realtime
+    format: gtfs-realtime
+    source: "https://proxy.transport.data.gouv.fr/resource/ilevia-lille-gtfs-rt"
+    linkeddataset: fr-ilevia-lille-gtfs-schedule
+    importdestination: realtime-queue
+    supportedobjects:
+      realtimejourneys: true
+      servicealerts: true
+  # TODO: SIRI Stop Monitoring is not supported; current SIRI importers handle VM and SX.
+  # Resource 84111: Horaire temps réel (SIRI SM) - réseau Ilévia [SIRI]
+  # Source: https://urldefense.com/v3/__https://proxy.transport.data.gouv.fr/resource/ilevia-lille-siri-sm__;!!DY3y3TSHDxRwb2ne!hSc-lB3PmShqNFJ78gUHJhwSqy_bkuSUBAkh6Ih3zAFp04_YkTdTqjQV0hyC9InTHwCxxapjqk_VPtRCVIpb3jaqashDBiO7h7P4$
+  # Catalogue resource: https://transport.data.gouv.fr/resources/84111
 ---
 identifier: fr-horaires-des-lignes-transilien-1
 region: fr
@@ -256,16 +295,16 @@ provider:
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-loire-42
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-ain-01
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-puy-de-dome-63
-  # - https://transport.data.gouv.fr/datasets/reseau-interurbain-et-scolaire-cars-region-drome-26
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-savoie-73
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-allier-03
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-ardeche-07
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-haute-loire-43
   # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-cantal-15
   # - https://transport.data.gouv.fr/datasets/flux-gtfs-realtime-des-lignes-cars-region-loire-l19-et-l32-fournis-par-pysae
+  # - https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-drome-26
 datasets:
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-express
-  # GTFS Cars Région Express
+  # GTFS - Cars Région Express
   # Official resource: https://transport.data.gouv.fr/resources/83112
   - identifier: gtfs-schedule-83112
     format: gtfs-schedule
@@ -276,9 +315,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/desserte-des-stations-de-ski-iseroises-transaltitude-38
-  # Transaltitude
+  # GTFS - Transaltitude
   # Official resource: https://transport.data.gouv.fr/resources/82729
   - identifier: gtfs-schedule-82729
     format: gtfs-schedule
@@ -289,7 +327,7 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # Desserte des stations de ski iséroises Transaltitude - Temps réel
+  # GTFS-RT Service Alert - Transaltitude
   # Official resource: https://transport.data.gouv.fr/resources/83954
   - identifier: gtfs-realtime-83954
     format: gtfs-realtime
@@ -299,9 +337,8 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-isere-38-1
-  # cars Région Isère (38) - Offre théorique au format GTFS
+  # GTFS - Cars Région Isère (38)
   # Official resource: https://transport.data.gouv.fr/resources/40287
   - identifier: gtfs-schedule-40287
     format: gtfs-schedule
@@ -312,7 +349,7 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # cars Région Isère (38) - Offre temps-réel au format GTFS-RT (PB)
+  # GTFS-RT Trip Update - Cars Région Isère (38)
   # Official resource: https://transport.data.gouv.fr/resources/79035
   - identifier: gtfs-realtime-79035
     format: gtfs-realtime
@@ -322,7 +359,7 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-  # cars Région Isère (38) - Offre temps réel - Perturbations GTFS RT
+  # GTFS-RT Service Alert - Cars Région Isère (38)
   # Official resource: https://transport.data.gouv.fr/resources/82300
   - identifier: gtfs-realtime-82300
     format: gtfs-realtime
@@ -332,9 +369,8 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-haute-savoie-74
-  # GTFS_haute_savoie.zip
+  # GTFS - Cars Région Haute-Savoie (74)
   # Official resource: https://transport.data.gouv.fr/resources/80964
   - identifier: gtfs-schedule-80964
     format: gtfs-schedule
@@ -345,9 +381,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-loire-42
-  # GTFS LOIRE
+  # GTFS - Cars Région Loire (42)
   # Official resource: https://transport.data.gouv.fr/resources/83114
   - identifier: gtfs-schedule-83114
     format: gtfs-schedule
@@ -358,9 +393,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-ain-01
-  # GTFS AIN
+  # GTFS - Cars Région Ain (01)
   # Official resource: https://transport.data.gouv.fr/resources/83113
   - identifier: gtfs-schedule-83113
     format: gtfs-schedule
@@ -371,9 +405,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-puy-de-dome-63
-  # GTFS PUY DE DOME
+  # GTFS - Puy-de-Dôme (63)
   # Official resource: https://transport.data.gouv.fr/resources/38888
   - identifier: gtfs-schedule-38888
     format: gtfs-schedule
@@ -384,22 +417,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
-  # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-et-scolaire-cars-region-drome-26
-  # GTFS_drome.zip
-  # Official resource: https://transport.data.gouv.fr/resources/80960
-  - identifier: gtfs-schedule-80960
-    format: gtfs-schedule
-    source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=DROME&dataFormat=GTFS&dataProfil=OPENDATA"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-savoie-73
-  # GTFS Car région Savoie
+  # GTFS - Car Région Savoie lignes régulières (73)
   # Official resource: https://transport.data.gouv.fr/resources/81244
   - identifier: gtfs-schedule-81244
     format: gtfs-schedule
@@ -410,7 +429,7 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # GTFS des cars Région Savoie Lignes touristiques
+  # GTFS - Cars Région Savoie lignes touristiques (73)
   # Official resource: https://transport.data.gouv.fr/resources/84247
   - identifier: gtfs-schedule-84247
     format: gtfs-schedule
@@ -421,9 +440,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-allier-03
-  # GTFS
+  # GTFS - Cars Région Allier (03)
   # Official resource: https://transport.data.gouv.fr/resources/38889
   - identifier: gtfs-schedule-38889
     format: gtfs-schedule
@@ -434,9 +452,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-ardeche-07
-  # GTFS_ardeche.zip
+  # GTFS - Cars Région Ardèche (07)
   # Official resource: https://transport.data.gouv.fr/resources/80961
   - identifier: gtfs-schedule-80961
     format: gtfs-schedule
@@ -447,9 +464,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-haute-loire-43
-  # GTFS
+  # GTFS - Cars Région Haute-Loire (43)
   # Official resource: https://transport.data.gouv.fr/resources/38881
   - identifier: gtfs-schedule-38881
     format: gtfs-schedule
@@ -460,9 +476,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-cantal-15
-  # GTFS Car Région Cantal
+  # GTFS - Car Région Cantal (15)
   # Official resource: https://transport.data.gouv.fr/resources/81245
   - identifier: gtfs-schedule-81245
     format: gtfs-schedule
@@ -473,7 +488,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/flux-gtfs-realtime-des-lignes-cars-region-loire-l19-et-l32-fournis-par-pysae
   # LIGNES_L19-L32_-_11-2025.zip
   # Official resource: https://transport.data.gouv.fr/resources/84281
@@ -496,6 +510,18 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
+  # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-interurbain-cars-region-drome-26
+  # GTFS - Cars Région Drôme (26)
+  # Official resource: https://transport.data.gouv.fr/resources/80960
+  - identifier: gtfs-schedule-80960
+    format: gtfs-schedule
+    source: "https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=DROME&dataFormat=GTFS&dataProfil=OPENDATA"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
 ---
 identifier: fr-arrets-horaires-et-parcours-theoriques-des-reseaux-nva-mobilite-agreges-1
 region: fr
@@ -578,7 +604,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-scolaire-et-interurbain-59-nord
   # Fichier GTFS commercial et scolaire du Nord – Périmètre 1
   # Official resource: https://transport.data.gouv.fr/resources/81828
@@ -624,7 +649,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-interurbain-62-pas-de-calais-1
   # Fichier GTFS commercial du Pas-de-Calais
   # Official resource: https://transport.data.gouv.fr/resources/82169
@@ -637,7 +661,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-scolaire-62-pas-de-calais
   # Fichier GTFS scolaire du Pas-de-Calais
   # Official resource: https://transport.data.gouv.fr/resources/81833
@@ -650,7 +673,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-du-reseau-routier-regional-de-transport-scolaire-et-interurbain-60-oise-1
   # Fichier GTFS commercial et scolaire de l’Oise – Périmètre 3
   # Official resource: https://transport.data.gouv.fr/resources/81822
@@ -696,7 +718,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-interurbain-80-somme
   # Fichier GTFS commercial de la Somme
   # Official resource: https://transport.data.gouv.fr/resources/82277
@@ -709,7 +730,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-scolaire-80-somme-1
   # Fichier GTFS scolaire de la Somme
   # Official resource: https://transport.data.gouv.fr/resources/84110
@@ -722,7 +742,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-interurbain-02-aisne
   # Fichier GTFS commercial de l'Aisne
   # Official resource: https://transport.data.gouv.fr/resources/82170
@@ -735,7 +754,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-gtfs-du-reseau-routier-regional-de-transport-scolaire-02-aisne
   # Fichier GTFS scolaire de l'Aisne
   # Official resource: https://transport.data.gouv.fr/resources/82276
@@ -796,7 +814,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-bas-rhin-67
   # Horaires théoriques du réseau Fluo Grand Est dans le Bas-Rhin (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80417
@@ -809,7 +826,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-moselle-57
   # Horaires théoriques du réseau Fluo Grand Est en Moselle (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80427
@@ -822,7 +838,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-haut-rhin-68
   # Horaires théoriques du réseau Fluo Grand Est dans le Haut-Rin (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80419
@@ -863,7 +878,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-meurthe-et-moselle-54
   # Horaires théoriques du réseau Fluo Grand Est en Meurthe-et-Moselle (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80423
@@ -876,7 +890,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-marne-51
   # Horaires théoriques du réseau Fluo Grand Est dans la Marne (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80421
@@ -889,7 +902,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-vosges-88
   # Horaires théoriques du réseau Fluo Grand Est dans les Vosges (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80429
@@ -902,7 +914,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-aube-10
   # Horaires théoriques du réseau Fluo Grand Est dans l'Aube (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80415
@@ -915,7 +926,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-ardennes-08
   # Horaires théoriques du réseau Fluo Grand Est dans les Ardennes (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80413
@@ -928,7 +938,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-meuse-55
   # Horaires théoriques du réseau Fluo Grand Est dans la Meuse (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/80425
@@ -941,7 +950,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-fluo-grand-est-haute-marne-52
   # Horaires théoriques du réseau Fluo Grand Est en Haute-Marne (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/81989
@@ -997,7 +1005,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/lignes-des-reseaux-transport-zou-provence-alpes-cote-d-azur-express-3-3
   # ZOU_Réseau Express GTFS.Zip
   # Official resource: https://transport.data.gouv.fr/resources/82285
@@ -1029,7 +1036,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/lignes-des-reseaux-transport-zou-provence-alpes-cote-d-azur-scolaire-1-3
   # ZOU_Réseau Scolaire GTFS.Zip
   # Official resource: https://transport.data.gouv.fr/resources/82136
@@ -1051,7 +1057,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/trains-zou-en-provence-alpes-cote-dazur
   # Trains ZOU ( Format GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/83990
@@ -1082,7 +1087,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/zou
   # GTFS Schedule : les horaires théoriques, les arrêts, les calendriers et les itinéraires.
   # Official resource: https://transport.data.gouv.fr/resources/83448
@@ -1212,7 +1216,7 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # Breizhgo 35
+  # Breizhgo Car 35
   # Official resource: https://transport.data.gouv.fr/resources/81463
   - identifier: gtfs-schedule-81463
     format: gtfs-schedule
@@ -1265,7 +1269,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/breizhgo-ter
   # Breizhgo TER
   # Official resource: https://transport.data.gouv.fr/resources/81474
@@ -1278,9 +1281,8 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/breizhgo-35-experimentation
-  # Breizhgo 35
+  # Breizhgo Car 35
   # Official resource: https://transport.data.gouv.fr/resources/81486
   - identifier: gtfs-schedule-81486
     format: gtfs-schedule
@@ -1291,7 +1293,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/breizhgo-bateaux
   # Breizhgo Bateaux Arz
   # Official resource: https://transport.data.gouv.fr/resources/81478
@@ -1348,7 +1349,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/81942
   - identifier: gtfs-schedule-81942
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/base-de-donnees-multimodale-des-reseaux-de-transport-public-normands/20261109-093412/pt-th-offer-atoumod-gtfs-20261109-562-opendata.zip"
+    source: "https://static.data.gouv.fr/resources/base-de-donnees-multimodale-des-reseaux-de-transport-public-normands/20261127-084748/pt-th-offer-atoumod-gtfs-20261126-594-opendata.zip"
     datasetsize: medium
     supportedobjects:
       stops: true
@@ -1387,14 +1388,13 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82317
   - identifier: gtfs-schedule-82317
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/nomad-car-region-normandie/20260820-122844/pt-th-offer-nomad-gtfs-20260820-816-opendata-1-.zip"
+    source: "https://static.data.gouv.fr/resources/nomad-car-region-normandie/20261127-082559/pt-th-offer-nomad-gtfs-20261126-594-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/bacs-de-seine-departement-seine-maritime
   # Jeu de données théorique du réseau Bacs de Seine (Seine-Maritime)
   # Official resource: https://transport.data.gouv.fr/resources/82308
@@ -1573,12 +1573,13 @@ provider:
   website: "https://transport.data.gouv.fr/datasets/navettes-aeroport-paris-beauvais-aerobus"
 datasets:
   # Both lines are already scheduled by fr-ile-de-france-mobilites-gtfs-schedule-80921.
-  # Resource 83580: Ligne A01 Aeroport Paris-Beauvais - Paris Porte-Maillot (NetexV2) [NeTEx]
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83580
-  # GTFS route: IDFM:C02179
-  # - identifier: netex-83580
+  # Resource 83044: Ligne A04 Aeroport Paris-Beauvais - La Villette (NetexV2) [NeTEx]
+  # Source: https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071615/offre-ligne-c02723-paris-porte-de-la-villette-aeroport-paris-beauvais-20261020124646z.zip
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83044
+  # GTFS route: IDFM:C02723
+  # - identifier: netex-83044
   #   format: netex
-  #   source: "https://www.data.gouv.fr/api/1/datasets/r/b7bfd97e-1343-4970-a5bd-af13fba2e950"
+  #   source: "https://www.data.gouv.fr/api/1/datasets/r/1f082844-4595-4690-ab38-d20b1486293a"
   #   unpackbundle: zip
   #   customconfig:
   #     timezone: Europe/Paris
@@ -1588,12 +1589,13 @@ datasets:
   #     stopgroups: true
   #     services: true
   #     journeys: true
-  # Resource 83044: Ligne A04 Aeroport Paris-Beauvais - La Villette (NetexV2) [NeTEx]
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83044
-  # GTFS route: IDFM:C02723
-  # - identifier: netex-83044
+  # Resource 83580: Ligne A01 Aeroport Paris-Beauvais - Paris Porte-Maillot (NetexV2) [NeTEx]
+  # Source: https://static.data.gouv.fr/resources/navettes-aeroport-paris-beauvais-aerobus/20261021-071559/offre-ligne-c02179-paris-porte-maillot-aeroport-paris-beauvais-20261020124646z.zip
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83580
+  # GTFS route: IDFM:C02179
+  # - identifier: netex-83580
   #   format: netex
-  #   source: "https://www.data.gouv.fr/api/1/datasets/r/1f082844-4595-4690-ab38-d20b1486293a"
+  #   source: "https://www.data.gouv.fr/api/1/datasets/r/b7bfd97e-1343-4970-a5bd-af13fba2e950"
   #   unpackbundle: zip
   #   customconfig:
   #     timezone: Europe/Paris
@@ -1785,69 +1787,9 @@ datasets:
     supportedobjects:
       servicealerts: true
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83943: Données Temps Réel des lignes du réseau Bus de l’Etang [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/BDE_URB
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83943
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83952: Données Temps Réel de la ligne Aéroport A1 gérée par TRANSDEV [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/AER_TRANSDEV
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83952
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83955: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Azur Evasion [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTZ_AZU
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83955
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83937: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par Transdev [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTB_TRANSDEV
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83937
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83941: Données Temps Réel des lignes du réseau Lignes de l’Agglo Aubagne [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/AUB_TPE
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83941
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83949: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par Suma [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/PAM_SUMA
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83949
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83946: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par RDT13 [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTB_RDT13
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83946
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83934: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par RTMOM [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/ULY_RTMOM
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83934
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83939: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Transdev [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTZ_TRANSDEV
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83939
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83950: Données Temps Réel des lignes du réseau marseillais RTM gérée par RTM [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/RTM
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83950
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83961: Données Temps Réel d'une partie des lignes du réseau Bus des Collines gérées par Suma [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/COL_SUMA
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83961
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83936: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Keolis [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTZ_KEOLIS
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83936
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83948: Données Temps Réel d'une partie des lignes du réseau Ulysse gérées par Keolis [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/ULY_KEOLIS
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83948
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83958: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par Sumian [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/PAM_SUMIAN
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83958
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83947: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par Azur Evasion [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/CTB_AZU
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83947
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83944: Données Temps Réel des lignes du réseau Libébus [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/LIB_URB
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83944
+  # Resource 83935: Données Temps Réel d'une partie des lignes du réseau Ulysse gérées par Transdev [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/ULY_TRANSDEV
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83935
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83940: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Suma [SIRI]
   # Source: https://siri.lametropolemobilite.fr/CTZ_SUMA
@@ -1857,37 +1799,113 @@ datasets:
   # Source: https://siri.lametropolemobilite.fr/KPA
   # Catalogue resource: https://transport.data.gouv.fr/resources/83927
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83960: Données Temps Réel d'une partie des lignes du réseau Marcouline gérées par Suma [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/MRC_SUMA
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83960
-  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83938: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par Transdev [SIRI]
   # Source: https://siri.lametropolemobilite.fr/PAM_TRANSDEV
   # Catalogue resource: https://transport.data.gouv.fr/resources/83938
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
-  # Resource 83935: Données Temps Réel d'une partie des lignes du réseau Ulysse gérées par Transdev [SIRI]
-  # Source: https://siri.lametropolemobilite.fr/ULY_TRANSDEV
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83935
+  # Resource 83944: Données Temps Réel des lignes du réseau Libébus [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/LIB_URB
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83944
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83945: Données Temps Réel d'une partie des lignes du réseau Bus des Collines gérées par RTMEM [SIRI]
   # Source: https://siri.lametropolemobilite.fr/COL_RTMEM
   # Catalogue resource: https://transport.data.gouv.fr/resources/83945
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83941: Données Temps Réel des lignes du réseau Lignes de l’Agglo Aubagne [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/AUB_TPE
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83941
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83955: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Azur Evasion [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTZ_AZU
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83955
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83933: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par RDT13 [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTZ_RDT13
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83933
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83959: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par SAP [SIRI]
   # Source: https://siri.lametropolemobilite.fr/PAM_SAP
   # Catalogue resource: https://transport.data.gouv.fr/resources/83959
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83951: Données Temps Réel des lignes du réseau Ciotabus gérée par RTMEM [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CIO_RTMEM
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83951
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83952: Données Temps Réel de la ligne Aéroport A1 gérée par TRANSDEV [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/AER_TRANSDEV
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83952
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83932: Données Temps Réel d'une partie des lignes du réseau Marcouline gérées par Azur Evasion [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/MRC_AZU
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83932
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83956: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par la Régie de Gardanne [SIRI]
   # Source: https://siri.lametropolemobilite.fr/PAM_REG_GAR
   # Catalogue resource: https://transport.data.gouv.fr/resources/83956
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83961: Données Temps Réel d'une partie des lignes du réseau Bus des Collines gérées par Suma [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/COL_SUMA
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83961
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83946: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par RDT13 [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTB_RDT13
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83946
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83948: Données Temps Réel d'une partie des lignes du réseau Ulysse gérées par Keolis [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/ULY_KEOLIS
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83948
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83943: Données Temps Réel des lignes du réseau Bus de l’Etang [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/BDE_URB
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83943
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83950: Données Temps Réel des lignes du réseau marseillais RTM gérée par RTM [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/RTM
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83950
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83936: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Keolis [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTZ_KEOLIS
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83936
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83934: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par RTMOM [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/ULY_RTMOM
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83934
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83949: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par Suma [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/PAM_SUMA
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83949
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83947: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par Azur Evasion [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTB_AZU
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83947
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83957: Données Temps Réel d'une partie des lignes du réseau Bus des Collines gérées par Sumian [SIRI]
   # Source: https://siri.lametropolemobilite.fr/COL_SUMIAN
   # Catalogue resource: https://transport.data.gouv.fr/resources/83957
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83958: Données Temps Réel d'une partie des lignes du réseau Pays d’Aix Mobilités gérées par Sumian [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/PAM_SUMIAN
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83958
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83960: Données Temps Réel d'une partie des lignes du réseau Marcouline gérées par Suma [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/MRC_SUMA
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83960
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83937: Données Temps Réel d'une partie des lignes du réseau Côte Bleue gérées par Transdev [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTB_TRANSDEV
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83937
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83939: Données Temps Réel d'une partie des lignes du réseau Cartreize gérées par Transdev [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/CTZ_TRANSDEV
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83939
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83942: Données Temps Réel des lignes du réseau Bus des Cigales gérées par RTMEM [SIRI]
   # Source: https://siri.lametropolemobilite.fr/CIG_RTMEM
   # Catalogue resource: https://transport.data.gouv.fr/resources/83942
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83953: Données Temps Réel de la ligne Aéroport A2 gérée par RDT13 [SIRI]
+  # Source: https://siri.lametropolemobilite.fr/AER_RDT13
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83953
 ---
 identifier: fr-horaires-theoriques-du-reseau-transports-en-commun-lyonnais
 region: fr
@@ -1913,12 +1931,14 @@ datasets:
   # - identifier: siri-lite-84028
   #   format: eu-siri-lite
   #   source: "https://data.grandlyon.com/siri-lite/2.0/vehicle-monitoring.json"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 84026: Horaires théoriques du réseau Transports en Commun Lyonnais [SIRI Lite]
   # Source: https://data.grandlyon.com/siri-lite/2.0/estimated-timetables.json
   # Catalogue resource: https://transport.data.gouv.fr/resources/84026
   # - identifier: siri-lite-84026
   #   format: eu-siri-lite
   #   source: "https://data.grandlyon.com/siri-lite/2.0/estimated-timetables.json"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 84027: Horaires théoriques du réseau Transports en Commun Lyonnais [SIRI Lite]
   # Source: https://data.grandlyon.com/siri-lite/2.0/situation-exchange.json
   # Catalogue resource: https://transport.data.gouv.fr/resources/84027
@@ -1957,7 +1977,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-bac-nva-m
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82382
@@ -1970,7 +1989,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-pat-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82346
@@ -1983,7 +2001,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-cma-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82326
@@ -1996,7 +2013,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-vie-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82332
@@ -2009,7 +2025,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-lan-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82342
@@ -2022,7 +2037,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-dor-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82336
@@ -2039,7 +2053,6 @@ datasets:
   # Resource 83284: API du réseau de la Dordogne [SIRI]
   # Source: https://api.okina.fr/gateway/nam/realtime/anshar/ws/services/?datasetId=DORDOGNE
   # Catalogue resource: https://transport.data.gouv.fr/resources/83284
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-dse-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82334
@@ -2052,7 +2065,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-hvi-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82340
@@ -2065,7 +2077,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-cha-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82324
@@ -2078,7 +2089,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-lga-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82344
@@ -2091,7 +2101,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-cor-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82328
@@ -2104,7 +2113,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-cre-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82330
@@ -2254,36 +2262,41 @@ datasets:
     supportedobjects:
       realtimejourneys: true
   # TODO: Add a SIRI Lite importer before enabling these realtime resources.
-  # Resource 83029: SIRI-Lite lines-discovery [SIRI Lite]
-  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/lines-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83029
-  # - identifier: siri-lite-83029
-  #   format: eu-siri-lite
-  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/lines-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt"
   # Resource 83031: SIRI-Lite stop-monitoring [SIRI Lite]
   # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stop-monitoring.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&MonitoringRef=bordeaux:StopPoint:BP:5173:LOC
   # Catalogue resource: https://transport.data.gouv.fr/resources/83031
   # - identifier: siri-lite-83031
   #   format: eu-siri-lite
   #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stop-monitoring.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&MonitoringRef=bordeaux:StopPoint:BP:5173:LOC"
-  # Resource 83032: SIRI-Lite estimated-timetable [SIRI Lite]
-  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/estimated-timetable.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&LineRef=bordeaux:Line:01:LOC&DirectionRef=0
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83032
-  # - identifier: siri-lite-83032
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
+  # Resource 83029: SIRI-Lite lines-discovery [SIRI Lite]
+  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/lines-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83029
+  # - identifier: siri-lite-83029
   #   format: eu-siri-lite
-  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/estimated-timetable.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&LineRef=bordeaux:Line:01:LOC&DirectionRef=0"
-  # Resource 83028: SIRI-Lite stoppoints-discovery [SIRI Lite]
-  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stoppoints-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
-  # Catalogue resource: https://transport.data.gouv.fr/resources/83028
-  # - identifier: siri-lite-83028
-  #   format: eu-siri-lite
-  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stoppoints-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt"
+  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/lines-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 83030: SIRI-Lite general-message [SIRI Lite]
   # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/general-message.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
   # Catalogue resource: https://transport.data.gouv.fr/resources/83030
   # - identifier: siri-lite-83030
   #   format: eu-siri-lite
   #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/general-message.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
+  # Resource 83028: SIRI-Lite stoppoints-discovery [SIRI Lite]
+  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stoppoints-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83028
+  # - identifier: siri-lite-83028
+  #   format: eu-siri-lite
+  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/stoppoints-discovery.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
+  # Resource 83032: SIRI-Lite estimated-timetable [SIRI Lite]
+  # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/estimated-timetable.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&LineRef=bordeaux:Line:01:LOC&DirectionRef=0
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83032
+  # - identifier: siri-lite-83032
+  #   format: eu-siri-lite
+  #   source: "https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/estimated-timetable.json?AccountKey=opendata-bordeaux-metropole-flux-gtfs-rt&LineRef=bordeaux:Line:01:LOC&DirectionRef=0"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 83033: SIRI-Lite check-status [SIRI Lite]
   # Source: https://bdx.mecatran.com/utw/ws/siri/2.0/bordeaux/check-status.json
   # Catalogue resource: https://transport.data.gouv.fr/resources/83033
@@ -2335,13 +2348,22 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       servicealerts: true
+  # https://proxy.transport.data.gouv.fr/resource/naolib-nantes-gtfs-rt-trip-update
+  # Official resource: https://transport.data.gouv.fr/resources/84184
+  - identifier: gtfs-realtime-84184
+    format: gtfs-realtime
+    source: "https://proxy.transport.data.gouv.fr/resource/naolib-nantes-gtfs-rt-trip-update"
+    linkeddataset: fr-reseau-de-transports-collectifs-naolib-gtfs-schedule-84101
+    importdestination: realtime-queue
+    supportedobjects:
+      realtimejourneys: true
   # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 83920: Siri-lite [SIRI Lite]
-  # Source: https://www.data.gouv.fr/api/1/datasets/r/0e5261ce-4093-4f88-b3e0-aaa58cbb772c
+  # Source: https://api.okina.fr/gateway/sem/realtime/siri?api-key=transportdatagouv
   # Catalogue resource: https://transport.data.gouv.fr/resources/83920
   # - identifier: siri-lite-83920
   #   format: eu-siri-lite
-  #   source: "https://www.data.gouv.fr/api/1/datasets/r/0e5261ce-4093-4f88-b3e0-aaa58cbb772c"
+  #   source: "https://api.okina.fr/gateway/sem/realtime/siri?api-key=transportdatagouv"
   # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
   # Resource 83320: SIRI [SIRI]
   # Source: https://api.okina.fr/gateway/sem/realtime/anshar/services
@@ -2370,7 +2392,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/horaires-theoriques-du-reseau-tag
   # Horaires théoriques du réseau TAG
   # Official resource: https://transport.data.gouv.fr/resources/83459
@@ -2383,7 +2404,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/horaires-theoriques-du-telepherique-de-la-bastille
   # Horaires théoriques téléphérique de Grenoble
   # Official resource: https://transport.data.gouv.fr/resources/81618
@@ -2396,7 +2416,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/horaires-theoriques-du-reseau-tougo
   # Horaires théoriques du réseau TouGo
   # Official resource: https://transport.data.gouv.fr/resources/81794
@@ -2409,7 +2428,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/horaires-theoriques-du-reseau-transport-du-pays-voironnais
   # Horaires théoriques du réseau Transport du Pays Voironnais
   # Official resource: https://transport.data.gouv.fr/resources/83462
@@ -2505,30 +2523,34 @@ datasets:
   # - identifier: siri-lite-81118
   #   format: eu-siri-lite
   #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/stop-monitoring"
-  # Resource 81171: Infos trafic : API SIRI-lite general-message [SIRI Lite]
-  # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/general-message
-  # Catalogue resource: https://transport.data.gouv.fr/resources/81171
-  # - identifier: siri-lite-81171
-  #   format: eu-siri-lite
-  #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/general-message"
-  # Resource 81170: Horaires en temps réel : API SIRI-lite estimated-timetable [SIRI Lite]
-  # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/estimated-timetable
-  # Catalogue resource: https://transport.data.gouv.fr/resources/81170
-  # - identifier: siri-lite-81170
-  #   format: eu-siri-lite
-  #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/estimated-timetable"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 81173: Liste des lignes : API SIRI-lite lines-discovery [SIRI Lite]
   # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/lines-discovery
   # Catalogue resource: https://transport.data.gouv.fr/resources/81173
   # - identifier: siri-lite-81173
   #   format: eu-siri-lite
   #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/lines-discovery"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
+  # Resource 81170: Horaires en temps réel : API SIRI-lite estimated-timetable [SIRI Lite]
+  # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/estimated-timetable
+  # Catalogue resource: https://transport.data.gouv.fr/resources/81170
+  # - identifier: siri-lite-81170
+  #   format: eu-siri-lite
+  #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/estimated-timetable"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
   # Resource 81172: Liste des arrêts : API SIRI-lite stoppoints-discovery [SIRI Lite]
   # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/stoppoints-discovery
   # Catalogue resource: https://transport.data.gouv.fr/resources/81172
   # - identifier: siri-lite-81172
   #   format: eu-siri-lite
   #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/stoppoints-discovery"
+  # TODO: Add a SIRI Lite importer before enabling these realtime resources.
+  # Resource 81171: Infos trafic : API SIRI-lite general-message [SIRI Lite]
+  # Source: https://api.cts-strasbourg.eu/v1/siri/2.0/general-message
+  # Catalogue resource: https://transport.data.gouv.fr/resources/81171
+  # - identifier: siri-lite-81171
+  #   format: eu-siri-lite
+  #   source: "https://api.cts-strasbourg.eu/v1/siri/2.0/general-message"
 ---
 identifier: fr-offre-de-transport-tam-en-temps-reel-gtfs-rt-urbain-et-suburbain
 region: fr
@@ -2743,7 +2765,7 @@ provider:
   name: "Métropole Toulon-Provence-Méditerranée"
   website: "https://transport.data.gouv.fr/datasets/reseau-de-transport-urbain-de-la-metropole-toulon-provence-mediterranee"
   # Other grouped catalogue pages:
-  # - https://transport.data.gouv.fr/datasets/telepherique-du-mont-faron
+  # - https://transport.data.gouv.fr/datasets/telepherique-du-mont-faron-ferme-dec-jan
 datasets:
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-de-transport-urbain-de-la-metropole-toulon-provence-mediterranee
   # Horaires théoriques du Réseau de transport urbain de la Métropole Toulon Provence Méditerranée
@@ -2788,13 +2810,12 @@ datasets:
   # Resource 81029: API temps réel au format SIRI [SIRI]
   # Source: https://saes.ratpdev.com/rdtpm
   # Catalogue resource: https://transport.data.gouv.fr/resources/81029
-
-  # Catalogue record: https://transport.data.gouv.fr/datasets/telepherique-du-mont-faron
-  # Téléphérique - AOU TO NOV
+  # Catalogue record: https://transport.data.gouv.fr/datasets/telepherique-du-mont-faron-ferme-dec-jan
+  # Téléphérique - 2027 - PART1
   # Official resource: https://transport.data.gouv.fr/resources/83739
   - identifier: gtfs-schedule-83739
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/telepherique-du-mont-faron/20260828-131706/tel-a-to-n.zip"
+    source: "https://static.data.gouv.fr/resources/telepherique-du-mont-faron-ferme-dec-jan/20261126-162333/gtfs-tel-2027-part1.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -2812,7 +2833,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83427
   - identifier: gtfs-schedule-83427
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-des-traversees-brittany-ferries/20261104-223127/gtfs-brittanyferries.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-des-traversees-brittany-ferries/20261125-223126/gtfs-brittanyferries.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -2871,7 +2892,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-du-transport-scolaire-en-martinique
   # gtfs-scolaire-mt.zip
   # Official resource: https://transport.data.gouv.fr/resources/82289
@@ -2884,7 +2904,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-urbain-de-la-zone-centre
   # gtfs-centre-rtm.zip
   # Official resource: https://transport.data.gouv.fr/resources/79898
@@ -2924,7 +2943,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-urbain-de-la-zone-sud
   # gtfs-sud-sudlib.zip
   # Official resource: https://transport.data.gouv.fr/resources/79897
@@ -2958,7 +2976,17 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
+  # gtfs-sud-sudlib_v2.zip
+  # Official resource: https://transport.data.gouv.fr/resources/80394
+  - identifier: gtfs-schedule-80394
+    format: gtfs-schedule
+    source: "https://static.data.gouv.fr/resources/gtfs-urbain-de-la-zone-sud/20230109-181149/gtfs-sud-sudlib.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-urbain-de-la-zone-nord-cap-nord
   # gtfs-nord-rtm.zip
   # Official resource: https://transport.data.gouv.fr/resources/80606
@@ -3127,7 +3155,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-transport-horaires-chemins-de-fer-corse-1
   # Chemin de fer de la Corse
   # Official resource: https://transport.data.gouv.fr/resources/83882
@@ -3140,7 +3167,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-transport-via-corsica-corte-a-la-vallee-de-la-restonica-ligne-c13
   # via-corsica-restonica-c13.zip
   # Official resource: https://transport.data.gouv.fr/resources/82998
@@ -3182,7 +3208,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83510
   - identifier: gtfs-schedule-83510
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/programme-des-rotations-corsica-linea/20261110-215002/gtfszipv5exo1.zip"
+    source: "https://static.data.gouv.fr/resources/programme-des-rotations-corsica-linea/20261126-215002/gtfszipuahoby.zip"
     datasetsize: medium
     supportedobjects:
       stops: true
@@ -3268,7 +3294,6 @@ datasets:
   # Resource 81006: API temps réel au format SIRI [SIRI]
   # Source: https://ara-api.enroute.mobi/irigo/siri
   # Catalogue resource: https://transport.data.gouv.fr/resources/81006
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/bacs-de-ecouflant-cantenay-epinard-et-pruille
   # bacs_alm_gtfs.zip
   # Official resource: https://transport.data.gouv.fr/resources/84018
@@ -3391,7 +3416,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83465
   - identifier: gtfs-schedule-83465
     format: gtfs-schedule
-    source: "https://opendata.clermontmetropole.eu/api/v2/catalog/datasets/gtfs-smtc/alternative_exports/gtfs"
+    source: "https://opendata.clermontmetropole.eu/api/explore/v2.1/catalog/datasets/gtfs-smtc/alternative_exports/gtfs/"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -3408,6 +3433,17 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
+  # GTFS
+  # Official resource: https://transport.data.gouv.fr/resources/84309
+  - identifier: gtfs-schedule-84309
+    format: gtfs-schedule
+    source: "https://opendata.clermontmetropole.eu/api/explore/v2.1/catalog/datasets/gtfs-smtc/files/400d7da94eaacb5e52c612f8ac28e420"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
 ---
 identifier: fr-orleans-metropole
 region: fr
@@ -3439,13 +3475,23 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/description-de-loffre-tad-tao-gtfs-flex-orleans-metropole
   # GTFS-flex-TAO-012026-062026.zip
   # Official resource: https://transport.data.gouv.fr/resources/83784
   - identifier: gtfs-schedule-83784
     format: gtfs-schedule
     source: "https://data.orleans-metropole.fr/api/v2/catalog/datasets/om-mobilite-tao-tad-gtfsflex/alternative_exports/gtfs_flex_tao_012026_062026_zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
+  # GTFS Flex TAO janvier - juin 2026
+  # Official resource: https://transport.data.gouv.fr/resources/81413
+  - identifier: gtfs-schedule-81413
+    format: gtfs-schedule
+    source: "https://data.orleans-metropole.fr/api/explore/v2.1/catalog/datasets/om-mobilite-tao-tad-gtfsflex/alternative_exports/gtfs_flex_tao_012026_062026_zip/"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -3474,7 +3520,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83734
   - identifier: gtfs-schedule-83734
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-sankeo/20261026-132315/gtfssankeo.zip"
+    source: "https://static.data.gouv.fr/resources/gtfs-sankeo/20261125-082815/gtfs-sankeo.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -3501,6 +3547,17 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
+  # Réseau Sankéo - Lignes Régulières
+  # Official resource: https://transport.data.gouv.fr/resources/82900
+  - identifier: gtfs-schedule-82900
+    format: gtfs-schedule
+    source: "https://eur.mecatran.com/utw/ws/gtfsfeed/static/perpignan?apiKey=612f606b5e3b0a3e6e1f441a2c4a050f6a345b55"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
 ---
 identifier: fr-caen-la-mer-reseau-twisto-gtfs-siri-3
 region: fr
@@ -3563,7 +3620,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-solea-et-tram-train-en-format-gtfs-1
   # Offre de Transport Soléa et Tram-Train en format GTFS
   # Official resource: https://transport.data.gouv.fr/resources/80492
@@ -3655,7 +3711,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82911
   - identifier: gtfs-schedule-82911
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-tango-de-nimes-metropole-gtfs-gtfs-rt/20260915-035239/gtfs-production.zip"
+    source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-tango-de-nimes-metropole-gtfs-gtfs-rt/20261119-155657/gtfs-production.zip"
     datasetsize: medium
     supportedobjects:
       stops: true
@@ -3720,7 +3776,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80742
   - identifier: gtfs-schedule-80742
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-diviamobilites/20261106-092158/gtfs-diviamobilites-current.zip"
+    source: "https://static.data.gouv.fr/resources/gtfs-diviamobilites/20261118-131801/gtfs-diviamobilites-current.zip"
     datasetsize: medium
     supportedobjects:
       stops: true
@@ -3930,7 +3986,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/citalis-telepherique-papang
   # PAP1_GTFS_2024-12-01--2028-03-01.zip
   # Official resource: https://transport.data.gouv.fr/resources/82880
@@ -4004,7 +4059,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80100
   - identifier: gtfs-schedule-80100
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/offre-de-transports-sibra-a-annecy-gtfs/20261106-075925/gtfs-sibra.zip"
+    source: "https://static.data.gouv.fr/resources/offre-de-transports-sibra-a-annecy-gtfs/20261112-080150/gtfs-sibra.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4229,7 +4284,7 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # GTFS-RT - Prochains passages & positions des véhicules
+  # GTFS-RT - Horaires en temps réel
   # Official resource: https://transport.data.gouv.fr/resources/83857
   - identifier: gtfs-realtime-83857
     format: gtfs-realtime
@@ -4316,7 +4371,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80223
   - identifier: gtfs-schedule-80223
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/ametis/20261102-092623/gtfs-prod.zip"
+    source: "https://static.data.gouv.fr/resources/ametis/20261118-104606/keolis-amiens-v1-2026-11-18.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4327,7 +4382,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80705
   - identifier: gtfs-schedule-80705
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/ametis/20261105-092130/sae-20261105-1003.zip"
+    source: "https://static.data.gouv.fr/resources/ametis/20261118-110319/keolis-amiens-v1-2026-11-18.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4423,7 +4478,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/79831
   - identifier: gtfs-schedule-79831
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-theoriques-et-en-temps-reel-des-bus-et-autocars-circulant-sur-le-reseau-cap-cotentin/20261105-133233/gtfs-capcotentin-051126-au-27062027.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-theoriques-et-en-temps-reel-des-bus-et-autocars-circulant-sur-le-reseau-cap-cotentin/20261124-151706/gtfs-capcotentin-231126-au-27062027.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4439,6 +4494,15 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
+  # Perturbation du réseau Cap Cotentin au format GTFS-RT Alert
+  # Official resource: https://transport.data.gouv.fr/resources/84328
+  - identifier: gtfs-realtime-84328
+    format: gtfs-realtime
+    source: "https://capcotentin.api.instant-system.com/public/disruptions/gtfs-rt/alert.pb?apikey=e4aad070c3d9d533cf0fb062ec1a788f"
+    linkeddataset: fr-horaires-theoriques-et-en-temps-reel-des-bus-et-autocars-circulant-sur-le-reseau-cap-cotentin-gtfs-schedule-79831
+    importdestination: realtime-queue
+    supportedobjects:
+      servicealerts: true
 ---
 identifier: fr-reseau-urbain-kiceo
 region: fr
@@ -4450,7 +4514,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82553
   - identifier: gtfs-schedule-82553
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/reseau-urbain-kiceo/20261110-153114/gtfs-20261110-162843-kiceo.zip"
+    source: "https://static.data.gouv.fr/resources/reseau-urbain-kiceo/20261121-103309/gtfs-20261121-112920-kiceo.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4505,7 +4569,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/79847
   - identifier: gtfs-schedule-79847
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/donnees-tcat-troyes-champagne-metropole-1/20261026-142704/gtfsnavineo.zip"
+    source: "https://static.data.gouv.fr/resources/donnees-tcat-troyes-champagne-metropole-1/20261123-091058/gtfsnavineo.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4561,7 +4625,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/fichier-des-donnees-theoriques-du-reseau-idelis-au-format-gtfs
   # https://opendata.idelis.fr/?file=GTFS_MultiRoutes/Data.GTFS.zip
   # Official resource: https://transport.data.gouv.fr/resources/83632
@@ -4601,24 +4664,10 @@ identifier: fr-cc-du-sud-corse
 region: fr
 provider:
   name: "CC du Sud Corse"
-  website: "https://transport.data.gouv.fr/datasets/gtfs-transport-maritime-via-mare"
+  website: "https://transport.data.gouv.fr/datasets/gtfs-transport-horaires-des-lignes-de-la-communaute-de-communes-corse-du-sud-a-berlina"
   # Other grouped catalogue pages:
-  # - https://transport.data.gouv.fr/datasets/gtfs-transport-horaires-des-lignes-de-la-communaute-de-communes-corse-du-sud-a-berlina
   # - https://transport.data.gouv.fr/datasets/reseau-a-citadina-porto-vecchio-horaires-theoriques-et-temps-reel
 datasets:
-  # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-transport-maritime-via-mare
-  # Via-Mare.zip
-  # Official resource: https://transport.data.gouv.fr/resources/82305
-  - identifier: gtfs-schedule-82305
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-transport-maritime-via-mare/20260707-130622/via-mare.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-transport-horaires-des-lignes-de-la-communaute-de-communes-corse-du-sud-a-berlina
   # A-Berlina
   # Official resource: https://transport.data.gouv.fr/resources/82995
@@ -4631,7 +4680,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-a-citadina-porto-vecchio-horaires-theoriques-et-temps-reel
   # Horaires du réseau de transport A Citadina au format GTFS
   # Official resource: https://transport.data.gouv.fr/resources/81252
@@ -4699,6 +4747,10 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       servicealerts: true
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 84304: Flux temps réel - SIRI [SIRI]
+  # Source: https://94.143.218.15:39435/ProfilSiri2_0pIDF2_4Producer-CANNES/SiriServices
+  # Catalogue resource: https://transport.data.gouv.fr/resources/84304
 ---
 identifier: fr-gtfs-du-reseau-de-transports-publics-de-saint-brieuc-armor-agglomeration
 region: fr
@@ -4717,6 +4769,10 @@ datasets:
       services: true
       journeys: true
       operators: true
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 83726: Flux temps réel - SIRI [SIRI]
+  # Source: http://134.90.136.118:8080/irys_server
+  # Catalogue resource: https://transport.data.gouv.fr/resources/83726
 ---
 identifier: fr-agence-agglobus
 region: fr
@@ -4773,11 +4829,11 @@ provider:
   name: "SM transports publics du bassin d'Alès"
   website: "https://transport.data.gouv.fr/datasets/horaires-theoriques-des-lignes-urbaines-et-interurbaines-sur-le-reseau-alesy-gtfs"
 datasets:
-  # gtfs-is-20261102.zip
+  # gtfs-is-20261123.zip
   # Official resource: https://transport.data.gouv.fr/resources/75062
   - identifier: gtfs-schedule-75062
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-theoriques-des-lignes-urbaines-et-interurbaines-sur-le-reseau-alesy-gtfs/20261102-092556/gtfs-is-20261102.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-theoriques-des-lignes-urbaines-et-interurbaines-sur-le-reseau-alesy-gtfs/20261123-071958/gtfs-is-20261123.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -4987,7 +5043,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/rubis-horaires-theoriques-du-reseau-de-transport-urbain-de-grand-bourg-agglomeration
   # Offre TC théorique RUBIS
   # Official resource: https://transport.data.gouv.fr/resources/80147
@@ -5011,7 +5066,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80586
   - identifier: gtfs-schedule-80586
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/reseau-urbain-illygo/20261029-105249/gtfs-20261029-104658-illygo.zip"
+    source: "https://static.data.gouv.fr/resources/reseau-urbain-illygo/20261124-153541/gtfs-20261123-174115-illygo.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -5255,6 +5310,10 @@ datasets:
       services: true
       journeys: true
       operators: true
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 82354: API SIRI du réseau Niortais [SIRI]
+  # Source: https://api.okina.fr/gateway/nam/realtime/anshar/ws/services/?datasetId=CA_DU_NIORTAIS
+  # Catalogue resource: https://transport.data.gouv.fr/resources/82354
 ---
 identifier: fr-lot-gtfs-stibus
 region: fr
@@ -5456,7 +5515,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-tedbus-lignes-regulieres-dracenie-provence-verdon-agglomeration
   # TEDbus - Horaires.GTFS.Zip
   # Official resource: https://transport.data.gouv.fr/resources/81907
@@ -5548,7 +5606,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80613
   - identifier: gtfs-schedule-80613
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/transurbain-evreux-portes-de-normandie/20260903-072711/pt-th-offer-transurbain-gtfs-20260901-305-opendata.zip"
+    source: "https://static.data.gouv.fr/resources/transurbain-evreux-portes-de-normandie/20261112-130154/pt-th-offer-transurbain-gtfs-20261110-901-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -5626,13 +5684,14 @@ provider:
   name: "CA Porte de l'Isère (CAPI)"
   website: "https://transport.data.gouv.fr/datasets/reseau-ruban"
 datasets:
-  # GTFS-RT requires a matching static GTFS schedule before it can be enabled.
-# Resource 79036: RUBAN - Offre temps-réel au format GTFS-RT (PB) [gtfs-rt]
-# Source: https://app.pysae.com/api/v2/groups/keolis-9cc4/gtfs-rt
-# Catalogue resource: https://transport.data.gouv.fr/resources/79036
-  # - identifier: gtfs-realtime-79036
-  #   format: gtfs-realtime
-  #   source: "https://app.pysae.com/api/v2/groups/keolis-9cc4/gtfs-rt"
+  # RUBAN - Offre temps-réel au format GTFS-RT (PB)
+  # Official resource: https://transport.data.gouv.fr/resources/79036
+  - identifier: gtfs-realtime-79036
+    format: gtfs-realtime
+    source: "https://app.pysae.com/api/v2/groups/keolis-9cc4/gtfs-rt"
+    importdestination: realtime-queue
+    supportedobjects:
+      realtimejourneys: true
 ---
 identifier: fr-fr-200052264-t0009-0000-1
 region: fr
@@ -5804,7 +5863,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/79352
   - identifier: gtfs-schedule-79352
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-theoriques-reseau-choletbus/20260928-084113/gtfs.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-theoriques-reseau-choletbus/20261116-090022/gtfs.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -5987,7 +6046,6 @@ datasets:
   # Resource 81144: Horaire temps réel (SIRI SM) - réseau Corolis (interurbain) [SIRI]
   # Source: https://api.oisemob.cityway.fr/dataflow/horaire-tc-tr/download?provider=COROLIS_INT&dataFormat=SIRI-SM
   # Catalogue resource: https://transport.data.gouv.fr/resources/81144
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/donnees-theoriques-et-temps-reel-du-reseau-corolis-urbain-communaute-dagglomeration-du-beauvaisis
   # Arrêts, horaires et parcours théoriques (GTFS) - réseau Corolis (urbain)
   # Official resource: https://transport.data.gouv.fr/resources/81074
@@ -6329,7 +6387,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/fr-200052264-t0008-0000-1
   # Horaires théoriques du réseau Ritmo (CA de Haguenau) - GTFS
   # Official resource: https://transport.data.gouv.fr/resources/80449
@@ -6445,7 +6502,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/start-horaires-du-reseau-de-lagglomeration-de-thonon
   # GTFS du réseau STAR'T (Thonon Agglomération)
   # Official resource: https://transport.data.gouv.fr/resources/84108
@@ -6563,7 +6619,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83300
   - identifier: gtfs-schedule-83300
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/reseau-urbain-glazgo/20260929-080256/gtfs-20260928-115800-glazgo.zip"
+    source: "https://static.data.gouv.fr/resources/reseau-urbain-glazgo/20261125-150553/gtfs-20261125-150156-glazgo.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -6707,7 +6763,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/donnees-gtfs-du-reseau-de-transport-public-cara-bus
   # GTFS
   # Official resource: https://transport.data.gouv.fr/resources/79499
@@ -6823,7 +6878,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/81522
   - identifier: gtfs-schedule-81522
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/offre-de-transports-du-grand-albigeois-gtfs/20260813-074150/libea-reseau-periurbain.zip"
+    source: "https://static.data.gouv.fr/resources/offre-de-transports-du-grand-albigeois-gtfs/20261120-101739/libea-periurbain.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -6921,7 +6976,6 @@ datasets:
   # Resource 81152: Horaire temps réel (SIRI SM) - réseau TIC (interurbain) [SIRI]
   # Source: https://api.oisemob.cityway.fr/dataflow/horaire-tc-tr/download?provider=TIC_INT&dataFormat=SIRI-SM
   # Catalogue resource: https://transport.data.gouv.fr/resources/81152
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/donnees-theoriques-et-temps-reel-du-reseau-tic-urbain-communaute-dagglomeration-de-la-region-de-compiegne-et-de-la-basse-automne
   # Arrêts, horaires et parcours théoriques (GTFS) - réseau TIC (urbain)
   # Official resource: https://transport.data.gouv.fr/resources/81066
@@ -6965,7 +7019,6 @@ datasets:
   # Resource 81136: Horaire temps réel (SIRI SM) - réseau TIC (urbain) [SIRI]
   # Source: https://api.oisemob.cityway.fr/dataflow/horaire-tc-tr/download?provider=TIC_URB&dataFormat=SIRI-SM
   # Catalogue resource: https://transport.data.gouv.fr/resources/81136
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/donnees-theoriques-du-reseau-de-transport-a-la-demande-allotic-communaute-dagglomeration-de-la-region-de-compiegne-et-de-la-basse-automne
   # Arrêts, horaires et parcours théoriques (GTFS) - réseau AlloTIC
   # Official resource: https://transport.data.gouv.fr/resources/81158
@@ -6992,7 +7045,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/80655
   - identifier: gtfs-schedule-80655
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/sngo-vernon-les-andelys-seine-normandie-agglo/20261021-143741/pt-th-offer-sngo-gtfs-20261021-862-opendata.zip"
+    source: "https://static.data.gouv.fr/resources/sngo-vernon-les-andelys-seine-normandie-agglo/20261113-123101/pt-th-offer-sngo-gtfs-20261110-1033-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -7017,7 +7070,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/giverny-vernon-gare-sncf
   # pt-th-offer-sngonavettegiverny-gtfs-20240413-382-opendata.zip
   # Official resource: https://transport.data.gouv.fr/resources/81177
@@ -7086,17 +7138,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-  # GTFS_Prod_05-11-2026_03-27.zip
-  # Official resource: https://transport.data.gouv.fr/resources/84289
-  - identifier: gtfs-schedule-84289
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/mova-ensemble-de-loffre-de-transport-collectif/20261105-130701/gtfs-prod-05-11-2026-03-27.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
   # GTFS-RT - Horaires en temps réel et position des véhicules
   # Official resource: https://transport.data.gouv.fr/resources/84268
   - identifier: gtfs-realtime-84268
@@ -7106,6 +7147,17 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
+  # GTFS_Prod_24-11-2026_03-28.zip
+  # Official resource: https://transport.data.gouv.fr/resources/84327
+  - identifier: gtfs-schedule-84327
+    format: gtfs-schedule
+    source: "https://static.data.gouv.fr/resources/mova-ensemble-de-loffre-de-transport-collectif/20261124-091939/gtfs-prod-24-11-2026-03-28.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
 ---
 identifier: fr-tam-horaires-theoriques-du-reseau-de-transport-urbain-sur-la-ville-damberieu-en-bugey
 region: fr
@@ -7146,7 +7198,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/fichier-gtfs-des-transports-urbains-de-la-communaute-dagglomeration-du-puy-en-velay
   # GTFS Urbain - Fichiers TXT
   # Official resource: https://transport.data.gouv.fr/resources/83905
@@ -7170,7 +7221,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/fichier-gtfs-des-transports-a-la-demande-de-la-communaute-dagglomeration-du-puy-en-velay
   # GTFS TAD - Fichier ZIP
   # Official resource: https://transport.data.gouv.fr/resources/83903
@@ -7251,7 +7301,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/transport-a-la-demande-flexitus-1
   # FLEXITUS_FLEXITUS-Version-V2_gtfs_2026-01-26_16-54-11.zip
   # Official resource: https://transport.data.gouv.fr/resources/83820
@@ -7264,7 +7313,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/transport-scolaire-scoltus
   # SCOL-TUS_SCOLTUS-V11_gtfs.zip
   # Official resource: https://transport.data.gouv.fr/resources/83821
@@ -7284,11 +7332,11 @@ provider:
   name: "CA de Cambrai"
   website: "https://transport.data.gouv.fr/datasets/donnees-gtfs-reseau-tuc-communaute-dagglomeration-de-cambrai"
 datasets:
-  # RHDF_GTFS_CAC_TUC_03092026
+  # RHDF_GTFS_CAC_TUC_26_11_2026
   # Official resource: https://transport.data.gouv.fr/resources/80751
   - identifier: gtfs-schedule-80751
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-tuc-communaute-dagglomeration-de-cambrai/20260903-092503/rhdf-gtfs-cac-tuc-03092026.zip"
+    source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-tuc-communaute-dagglomeration-de-cambrai/20261127-145151/rhdf-gtfs-cac-tuc.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -7518,25 +7566,11 @@ identifier: fr-ca-gaillac-graulhet
 region: fr
 provider:
   name: "CA Gaillac-Graulhet"
-  website: "https://transport.data.gouv.fr/datasets/reseau-urbain-le-passe-pont-communes-de-couffouleux-et-de-rabastens"
+  website: "https://transport.data.gouv.fr/datasets/reseau-urbain-la-navette-commune-de-gaillac"
   # Other grouped catalogue pages:
-  # - https://transport.data.gouv.fr/datasets/reseau-urbain-la-navette-commune-de-gaillac
   # - https://transport.data.gouv.fr/datasets/reseau-urbain-la-navette-commune-de-graulhet
   # - https://transport.data.gouv.fr/datasets/reseau-urbain-lislenbus-commune-de-lisle-sur-tarn
 datasets:
-  # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-urbain-le-passe-pont-communes-de-couffouleux-et-de-rabastens
-  # gtfs-passe-pont.zip
-  # Official resource: https://transport.data.gouv.fr/resources/82196
-  - identifier: gtfs-schedule-82196
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/reseau-urbain-le-passe-pont-communes-de-couffouleux-et-de-rabastens/20260831-123610/gtfs-passe-pont.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-urbain-la-navette-commune-de-gaillac
   # gtfs-gaillac.zip
   # Official resource: https://transport.data.gouv.fr/resources/82583
@@ -7549,7 +7583,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-urbain-la-navette-commune-de-graulhet
   # gtfs_graulhet
   # Official resource: https://transport.data.gouv.fr/resources/82584
@@ -7562,7 +7595,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-urbain-lislenbus-commune-de-lisle-sur-tarn
   # lislenbus-lislesurtarn.zip
   # Official resource: https://transport.data.gouv.fr/resources/81535
@@ -7708,7 +7740,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/72361
   - identifier: gtfs-schedule-72361
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/reseau-urbain-scolaire-guingamp-paimpol-mobilite/20260827-162143/gpmobi-gtfs-nouveau-reseau-2026.zip"
+    source: "https://static.data.gouv.fr/resources/reseau-urbain-scolaire-guingamp-paimpol-mobilite/20261117-111739/gpmobi-gtfs-nouveau-reseau-2026.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -8044,7 +8076,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82545
   - identifier: gtfs-schedule-82545
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-montelibus/20261105-145318/gtfs.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-montelibus/20261116-103659/gtfs-2026-11-16.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -8080,7 +8112,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82547
   - identifier: gtfs-schedule-82547
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/horaires-rlv-mobilites/20260819-074157/gtfs-19-08-2026-05-45.zip"
+    source: "https://static.data.gouv.fr/resources/horaires-rlv-mobilites/20261116-135125/gtfs-16-11-2026-05-45.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -8181,7 +8213,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-urbain-de-redon-agglomeration
   # GTFS_Reseau_RED_-_Juin_2025_ZJoixZFvE_250527_09-47-04.zip
   # Official resource: https://transport.data.gouv.fr/resources/83512
@@ -8393,7 +8424,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83396
   - identifier: gtfs-schedule-83396
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-reseau-arc-en-ciel-secteur-nord-perimetre-caudresis-catesis/20260907-063629/rhdf-gtfs-com-sco-59-p3b.zip"
+    source: "https://static.data.gouv.fr/resources/gtfs-reseau-arc-en-ciel-secteur-nord-perimetre-caudresis-catesis/20261119-084050/rhdf-gtfs-com-sco-59-p3b-2-.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -8602,7 +8633,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/arrets-horaires-et-parcours-theoriques-des-reseaux-naq-sai-nva-m-1
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/82375
@@ -8622,11 +8652,11 @@ provider:
   name: "CA Terre de Provence"
   website: "https://transport.data.gouv.fr/datasets/donnees-gtfs-reseau-topaz"
 datasets:
-  # GTFS_20261106A_Réseau_ToPAz
+  # GTFS_20261123A_Réseau_ToPAz
   # Official resource: https://transport.data.gouv.fr/resources/84230
   - identifier: gtfs-schedule-84230
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-topaz/20261106-080234/gtfs-20261106a-topostudio.zip"
+    source: "https://static.data.gouv.fr/resources/donnees-gtfs-reseau-topaz/20261123-125920/gtfs-20261123a-topostudio.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -9230,7 +9260,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/donnees-theoriques-du-reseau-urbain-de-flers-agglo-au-format-gtfs
   # NEMUS_gtfs_Du 01-01-26 au 31-12-26.zip
   # Official resource: https://transport.data.gouv.fr/resources/83782
@@ -9312,13 +9341,13 @@ identifier: fr-offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-et-gtfs-rt
 region: fr
 provider:
   name: "CA Lunel Agglo"
-  website: "https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-et-gtfs-rt"
+  website: "https://transport.data.gouv.fr/datasets/offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-gtfs-rt-netex"
 datasets:
   # GTFS Théorique - Olé (Lunel Agglo)
   # Official resource: https://transport.data.gouv.fr/resources/83852
   - identifier: gtfs-schedule-83852
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-et-gtfs-rt/20260913-175023/gtfs-lunel-agglo-reseau-ole-2026-vseptembre.zip"
+    source: "https://static.data.gouv.fr/resources/offre-de-transport-du-reseau-ole-lunel-agglo-gtfs-et-gtfs-rt/20261111-191537/gtfs-lunel-agglo-reseau-ole-2026-novembre.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -9393,7 +9422,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-de-transport-sorgen-bus
   # CASC - GTFS_SORG'EN BUS 2026.zip
   # Official resource: https://transport.data.gouv.fr/resources/84187
@@ -9441,13 +9469,27 @@ provider:
   name: "CC Challans-Gois Communauté"
   website: "https://transport.data.gouv.fr/datasets/reseau-transport-urbain-yole-bus-gtfs-1"
 datasets:
-  # GTFS-RT requires a matching static GTFS schedule before it can be enabled.
-# Resource 84262: Réseau urbain Yolé - Challans [gtfs-rt]
-# Source: https://api.pysae.com/api/v4/groups/challans/gtfs-rt
-# Catalogue resource: https://transport.data.gouv.fr/resources/84262
-  # - identifier: gtfs-realtime-84262
-  #   format: gtfs-realtime
-  #   source: "https://api.pysae.com/api/v4/groups/challans/gtfs-rt"
+  # Réseau urbain Yolé - Challans
+  # Official resource: https://transport.data.gouv.fr/resources/84262
+  - identifier: gtfs-realtime-84262
+    format: gtfs-realtime
+    source: "https://api.pysae.com/api/v4/groups/challans/gtfs-rt"
+    linkeddataset: fr-reseau-transport-urbain-yole-bus-gtfs-1-gtfs-schedule-84326
+    importdestination: realtime-queue
+    supportedobjects:
+      realtimejourneys: true
+      servicealerts: true
+  # YOLE BUS - Données GTFS
+  # Official resource: https://transport.data.gouv.fr/resources/84326
+  - identifier: gtfs-schedule-84326
+    format: gtfs-schedule
+    source: "https://static.data.gouv.fr/resources/reseau-transport-urbain-yole-bus-gtfs-1/20261123-160348/yole-bus.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
 ---
 identifier: fr-offre-de-transport-de-la-c-a-beaune-cote-sud-gtfs
 region: fr
@@ -9506,7 +9548,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-reseau-transport-urbain-coqueligo
   # GTFS Nouveau réseau urbain CoqueliGO au 01_12_2025
   # Official resource: https://transport.data.gouv.fr/resources/83716
@@ -9519,7 +9560,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/gtfs-transports-a-la-demande-tad-coqueligo
   # GFTS TAD COQUELIGO ARA 2026
   # Official resource: https://transport.data.gouv.fr/resources/82904
@@ -9715,6 +9755,10 @@ datasets:
       services: true
       journeys: true
       operators: true
+  # TODO: Confirm the SIRI profile; current SIRI importers handle VM and SX only.
+  # Resource 84225: Données en temps-réel SIRI [SIRI]
+  # Source: https://h16.hanoverdisplays.com/cluses/siri/r1/
+  # Catalogue resource: https://transport.data.gouv.fr/resources/84225
 ---
 identifier: fr-fr-200052264-t0012-0000-1
 region: fr
@@ -9800,7 +9844,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/tiva-urbain-reseau-urbain-a-vire-intercom-de-la-vire-au-noireau-2025-2026
   # Intercom_de_la_Vire_au_Noireau_Tiva_urbain_a_2025_2026_GTFS.zip
   # Official resource: https://transport.data.gouv.fr/resources/83846
@@ -9813,7 +9856,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/tiva-a-la-demande-service-de-transport-a-la-demande-intercom-de-la-vire-au-noireau-2025-2026
   # Intercom_de_la_Vire_au_Noireau_Tiva_à la demande_a_2025_2026_GTFS.zip
   # Official resource: https://transport.data.gouv.fr/resources/83770
@@ -9885,7 +9927,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/ozcar-navette-intercommunale
   # GTFS
   # Official resource: https://transport.data.gouv.fr/resources/84190
@@ -10260,17 +10301,6 @@ datasets:
   - identifier: gtfs-schedule-83746
     format: gtfs-schedule
     source: "https://static.data.gouv.fr/resources/donnees-du-reseau-evad-1/20251209-123614/gtfs-scolaire.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
-  # Données GTFS réseau EVA'D
-  # Official resource: https://transport.data.gouv.fr/resources/80973
-  - identifier: gtfs-schedule-80973
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/donnees-du-reseau-evad-1/20261110-115534/20261106-gtfs-evad.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -10796,7 +10826,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/montbus-transport-bus-montmelian
   # gtfs_montbus.zip
   # Official resource: https://transport.data.gouv.fr/resources/84276
@@ -11081,7 +11110,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/82310
   - identifier: gtfs-schedule-82310
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/le-bus-pont-audemer-val-de-risle/20250819-074312/pt-th-offer-lebus-gtfs-20250812-817-opendata.zip"
+    source: "https://static.data.gouv.fr/resources/le-bus-pont-audemer-val-de-risle/20261117-093934/pt-th-offer-lebus-gtfs-20261112-944-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -11575,7 +11604,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/81975
   - identifier: gtfs-schedule-81975
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/vikibus-yvetot-normandie/20261013-130530/pt-th-offer-vikibus-gtfs-20261013-859-opendata.zip"
+    source: "https://static.data.gouv.fr/resources/vikibus-yvetot-normandie/20261119-125437/pt-th-offer-vikibus-gtfs-20261118-662-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -11844,7 +11873,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-cvlmobilite-plan-de-transport-theorique-la-navette-lete-a-chinon-format-gtfs
   # LaNavette_l'étéàChinon_2026.zip
   # Official resource: https://transport.data.gouv.fr/resources/83189
@@ -12143,7 +12171,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-vai-embrun
   # Transports Vaï Embrun 2026-2027.zip
   # Official resource: https://transport.data.gouv.fr/resources/84175
@@ -12322,7 +12349,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/offre-de-transport-cc-cote-landes-nature
   # Offre transport NA Mobilités GTFS
   # Official resource: https://transport.data.gouv.fr/resources/83870
@@ -12399,7 +12425,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-cavalaire-ete
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81870
@@ -12422,7 +12447,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-cavalaire-sur-mer-hiver
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81873
@@ -12445,7 +12469,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-navette-estivale-grimaud
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81866
@@ -12468,7 +12491,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-ligne-de-la-croix-valmer
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81863
@@ -12491,7 +12513,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-navette-reguliere-saint-tropez
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81773
@@ -12514,7 +12535,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-navette-estivale-ramatuelle
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81772
@@ -12537,7 +12557,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/golfe-de-saint-tropez-donnees-mobilite-tc-ligne-le-rayol-canadel-sur-mer
   # données statiques
   # Official resource: https://transport.data.gouv.fr/resources/81858
@@ -12560,11 +12579,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
-# Catalogue items excluded from active import:
-# - SSIM flight-plan datasets: public-transit category label, but these are airline schedules.
-# - Two public-transit records have no available GTFS static or unsupported-format resource.
-# - SIRI Lite and alternative NeTEx resources alongside GTFS sources are not enabled here.
 ---
 identifier: fr-fr-200052264-t0030-0000-1
 region: fr
@@ -12602,24 +12616,6 @@ datasets:
       journeys: true
       operators: true
 ---
-identifier: fr-gtfs-transport-horaires-des-lignes-de-la-communaute-dile-rousse-balagne-a-balanina
-region: fr
-provider:
-  name: "CC de l'Ile-Rousse - Balagne"
-  website: "https://transport.data.gouv.fr/datasets/gtfs-transport-horaires-des-lignes-de-la-communaute-dile-rousse-balagne-a-balanina"
-datasets:
-  # a-balanina-horaires.zip
-  # Official resource: https://transport.data.gouv.fr/resources/82997
-  - identifier: gtfs-schedule-82997
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-transport-horaires-des-lignes-de-la-communaute-dile-rousse-balagne-a-balanina/20250627-205558/a-balanina.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
----
 identifier: fr-region-occitanie-cc-tarn-agout
 region: fr
 provider:
@@ -12650,7 +12646,6 @@ datasets:
     supportedobjects:
       realtimejourneys: true
       servicealerts: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/reseau-de-transport-urbain-de-la-ville-de-st-sulpice-la-pointe
   # GTFS
   # Official resource: https://transport.data.gouv.fr/resources/84089
@@ -12725,10 +12720,6 @@ datasets:
   #   format: gtfs-realtime
   #   source: "https://pysae.com/api/v2/groups/noirmoutiers/gtfs-rt"
   #   linkeddataset: fr-gtfs-pybus-le-reseau-urbain-de-parthenay-gtfs-schedule-82619
-  #   importdestination: realtime-queue
-  #   supportedobjects:
-  #     realtimejourneys: true
-  #     servicealerts: true
 ---
 identifier: fr-horaires-theoriques-du-reseau-figeac-le-bus-gtfs
 region: fr
@@ -12936,7 +12927,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/navettes-la-rosiere
   # gtfs_navettes_la_rosiere_ete2026.zip
   # Official resource: https://transport.data.gouv.fr/resources/84133
@@ -12949,7 +12939,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/navettes-bourg-saint-maurice
   # Navettes Bourg-Saint-Maurice
   # Official resource: https://transport.data.gouv.fr/resources/83626
@@ -12962,7 +12951,6 @@ datasets:
       services: true
       journeys: true
       operators: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/navettes-tignes
   # Horaires théoriques de la station de Tignes (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/83627
@@ -12984,7 +12972,6 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
-
   # Catalogue record: https://transport.data.gouv.fr/datasets/navettes-val-disere
   # Horaires théoriques du réseau Val d'Isère (GTFS)
   # Official resource: https://transport.data.gouv.fr/resources/83629
@@ -13081,7 +13068,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83642
   - identifier: gtfs-schedule-83642
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/navette-pontorson-le-mont-saint-michel/20261109-142453/montstmichelmaj.zip"
+    source: "https://static.data.gouv.fr/resources/navette-pontorson-le-mont-saint-michel/20261117-093858/pt-th-offer-navettestmichel-gtfs-20261112-729-opendata.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13099,7 +13086,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83787
   - identifier: gtfs-schedule-83787
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/skibus-vallee-des-belleville/20260701-134857/gtfs-prod-28062026-0322-4.zip"
+    source: "https://static.data.gouv.fr/resources/skibus-vallee-des-belleville/20261123-141133/gtfs-prod-20112026-0320-1.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13113,29 +13100,11 @@ provider:
   name: "Navettes hivernales Skibus Courchevel"
   website: "https://transport.data.gouv.fr/datasets/skibus-courchevel-hiver"
 datasets:
-  # Courchevel éte
+  # Courchevel hiver
   # Official resource: https://transport.data.gouv.fr/resources/84102
   - identifier: gtfs-schedule-84102
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/skibus-courchevel-hiver/20260703-154441/gtfs-prod-03072026-1051-1.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
----
-identifier: fr-remontees-mecaniques-courchevel
-region: fr
-provider:
-  name: "Remontées mécaniques - Courchevel"
-  website: "https://transport.data.gouv.fr/datasets/remontees-mecaniques-courchevel"
-datasets:
-  # gtfs_Remontees_au_depart_Courchevel_ete2026.zip
-  # Official resource: https://transport.data.gouv.fr/resources/84204
-  - identifier: gtfs-schedule-84204
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/remontees-mecaniques-courchevel/20260615-062405/gtfs-remontees-au-depart-courchevel-ete2026.zip"
+    source: "https://static.data.gouv.fr/resources/skibus-courchevel-hiver/20261123-140915/gtfs-prod-23-11-2026-10-18.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13167,22 +13136,11 @@ provider:
   name: "Navettes hivernales des 2 Alpes"
   website: "https://transport.data.gouv.fr/datasets/gtfs-les-2alpes-saison-hiver-2025-2026"
 datasets:
-  # GTFS de la navette annuelle de la station des 2 Alpes, circulant du 4 mai 2026 au 4 juillet 2026
+  # GTFS
   # Official resource: https://transport.data.gouv.fr/resources/83989
   - identifier: gtfs-schedule-83989
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-les-2alpes-saison-hiver-2025-2026/20260427-083045/gtfs-2-alpes-intersaison-jack.zip"
-    datasetsize: small
-    supportedobjects:
-      stops: true
-      services: true
-      journeys: true
-      operators: true
-  # GTFS.zip
-  # Official resource: https://transport.data.gouv.fr/resources/83810
-  - identifier: gtfs-schedule-83810
-    format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/gtfs-les-2alpes-saison-hiver-2025-2026/20260602-132501/gtfs-navette-annuelle-2-alpes.zip"
+    source: "https://static.data.gouv.fr/resources/gtfs-les-2alpes-saison-hiver-2025-2026/20261113-142212/gtfs-2-alpes.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13196,11 +13154,11 @@ provider:
   name: "Région Auvergne-Rhône-Alpes (CC Val Vanoise)"
   website: "https://transport.data.gouv.fr/datasets/meribus-ete"
 datasets:
-  # MERIBUS ESTIVAL 2026
+  # MERIBUS HIVER 2026 2027
   # Official resource: https://transport.data.gouv.fr/resources/82682
   - identifier: gtfs-schedule-82682
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/meribus-hiver/20260619-102403/gtfs.zip"
+    source: "https://static.data.gouv.fr/resources/meribus-ete/20261123-141235/gtfs.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13245,7 +13203,7 @@ datasets:
   # Official resource: https://transport.data.gouv.fr/resources/83994
   - identifier: gtfs-schedule-83994
     format: gtfs-schedule
-    source: "https://static.data.gouv.fr/resources/telecabine-eau-dolle-express-allemond-oz/20260831-084938/gtfs-telecabine-eau-dolle-express-hiver-2026-avril-2027.zip"
+    source: "https://static.data.gouv.fr/resources/telecabine-eau-dolle-express-allemond-oz/20261118-085259/gtfs-telecabine-eau-dolle-express-hiver-2026-avril-2027-b.zip"
     datasetsize: small
     supportedobjects:
       stops: true
@@ -13297,3 +13255,57 @@ datasets:
     importdestination: realtime-queue
     supportedobjects:
       realtimejourneys: true
+---
+identifier: fr-gtfs-via-mare
+region: fr
+provider:
+  name: "Réseau maritime de Corse du Sud"
+  website: "https://transport.data.gouv.fr/datasets/gtfs-via-mare"
+datasets:
+  # Via-Mare.zip
+  # Official resource: https://transport.data.gouv.fr/resources/84324
+  - identifier: gtfs-schedule-84324
+    format: gtfs-schedule
+    source: "https://data.corsica/data-fair/api/v1/datasets/lignes-maritimes-de-corse-du-sud-de-la-collectivite-de-corse/metadata-attachments/gtfs.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
+---
+identifier: fr-gtfs-communaute-dile-rousse-balagne-a-balanina
+region: fr
+provider:
+  name: "Réseau urbain A Balanina"
+  website: "https://transport.data.gouv.fr/datasets/gtfs-communaute-dile-rousse-balagne-a-balanina"
+datasets:
+  # A-Balanina.zip
+  # Official resource: https://transport.data.gouv.fr/resources/84323
+  - identifier: gtfs-schedule-84323
+    format: gtfs-schedule
+    source: "https://data.corsica/data-fair/api/v1/datasets/gtfs-transport-horaires-des-lignes-de-la-communaute-de-communes-corse-du-sud-a-0/metadata-attachments/gtfs.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true
+---
+identifier: fr-transport-urbain-par-cable-courchevel-hiver-2026-2027
+region: fr
+provider:
+  name: "Société des Trois Vallées"
+  website: "https://transport.data.gouv.fr/datasets/transport-urbain-par-cable-courchevel-hiver-2026-2027"
+datasets:
+  # rmu_courchevel_hiver2627_20261117.zip
+  # Official resource: https://transport.data.gouv.fr/resources/84308
+  - identifier: gtfs-schedule-84308
+    format: gtfs-schedule
+    source: "https://static.data.gouv.fr/resources/transport-urbain-par-cable-courchevel-hiver-2026-2027/20261118-081354/rmu-courchevel-hiver2627-20261117.zip"
+    datasetsize: small
+    supportedobjects:
+      stops: true
+      services: true
+      journeys: true
+      operators: true

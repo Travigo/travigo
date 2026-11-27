@@ -1,0 +1,44 @@
+name: Update French transport catalog
+
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-french-transport-catalog
+  cancel-in-progress: false
+
+jobs:
+  update-catalog:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Regenerate French transport catalog
+        run: go run ./scripts/generate-fr-transport-data-gouv.go
+
+      - name: Commit and push catalog changes
+        run: |
+          set -euo pipefail
+          git add -- data/datasources/fr-transport-data-gouv.yaml
+          if git diff --cached --quiet; then
+            echo "French transport catalog is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update French transport data catalog"
+          git push origin HEAD:main
