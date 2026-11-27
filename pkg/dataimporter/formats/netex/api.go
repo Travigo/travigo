@@ -97,7 +97,7 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 			return nil
 		},
 	}
-	ctx, cancel := context.WithTimeout(datasource.GetImportContext(), 30*time.Minute)
+	ctx, cancel := context.WithCancel(datasource.GetImportContext())
 	defer cancel()
 	importDatasource := *datasource
 	importDatasource.ImportContext = ctx

@@ -84,6 +84,9 @@ func (format *Fares) ParseFile(reader io.Reader) error {
 	if root.Name.Local == "" {
 		return fmt.Errorf("NeTEx document has no root element")
 	}
+	if strings.EqualFold(root.Name.Local, "html") {
+		return fmt.Errorf("BODS returned an HTML page instead of NeTEx fare data")
+	}
 	switch root.Name.Local {
 	case "PublicationDelivery", "CompositeFrame", "FareFrame", "ServiceFrame", "ResourceFrame":
 	default:

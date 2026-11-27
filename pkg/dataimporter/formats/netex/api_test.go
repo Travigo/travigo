@@ -51,3 +51,11 @@ func TestBODSFareFeedRecordFilterScopesFailedFeedCleanup(t *testing.T) {
 		t.Fatalf("source identifier filter = %#v, want escaped feed namespace prefix", filter["sourceidentifier"])
 	}
 }
+
+func TestParseNeTExPayloadReportsHTMLResponse(t *testing.T) {
+	body := []byte(`<!DOCTYPE html><html><head><title>Problem with the service</title></head><body><h1>Sorry, there is a problem with the service</h1></body></html>`)
+	err := (&Fares{}).parseNeTExPayload(body)
+	if err == nil || !strings.Contains(err.Error(), "HTML page instead of NeTEx") {
+		t.Fatalf("expected an actionable HTML response error, got %v", err)
+	}
+}
