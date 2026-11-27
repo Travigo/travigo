@@ -1,3 +1,8 @@
+# Generated from the ODPT public GTFS resource index.
+# Regenerate with: go run ./scripts/generate-jp-odpt.go
+# Existing dataset IDs and reviewed importer settings are retained when feeds match.
+# Unmatched ODPT API feeds already in this file remain as curated supplements.
+---
 identifier: jp-odpt
 region: jp
 provider:
@@ -7,159 +12,2162 @@ sourceauthentication:
   query:
     "acl:consumerKey": TRAVIGO_JP_ODPT_API_KEY
 datasets:
-- identifier: schedule-toei-bus
-  format: gtfs-schedule
+- identifier: "schedule-toei-bus"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/Toei/data/ToeiBus-GTFS.zip"
-  datasetsize: medium
+  datasetsize: "medium"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-toei-train
-  format: gtfs-schedule
+- identifier: "schedule-toei-train"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/Toei/data/Toei-Train-GTFS.zip"
-  datasetsize: small
+  datasetsize: "small"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-tokyo-metro
-  format: gtfs-schedule
+- identifier: "schedule-tokyo-metro"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/TokyoMetro/data/TokyoMetro-Train-GTFS.zip"
-  datasetsize: small
+  datasetsize: "small"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-yokohama-train
-  format: gtfs-schedule
-  source: "https://api.odpt.org/api/v4/files/odpt/YokohamaMunicipal/Train.zip?date=20241227"
-  datasetsize: small
+# City of Yokohama, Transportation Bureau - Yokohama Municipal Subway
+# ODPT resource key: schedule:yokohamamunicipal:train
+- identifier: "schedule-yokohama-train"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/YokohamaMunicipal/Train.zip?date=20251226"
+  datasetsize: "small"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-yokohama-bus
-  format: gtfs-schedule
+- identifier: "schedule-yokohama-bus"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/YokohamaMunicipal/data/YokohamaMunicipal-Bus-GTFS.zip"
-  datasetsize: medium
+  datasetsize: "medium"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-twr-train
-  format: gtfs-schedule
+- identifier: "schedule-twr-train"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/TWR/data/TWR-Train-GTFS.zip"
-  datasetsize: small
+  datasetsize: "small"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
-- identifier: schedule-tama-monorail
-  format: gtfs-schedule
+- identifier: "schedule-tama-monorail"
+  format: "gtfs-schedule"
   source: "https://api.odpt.org/api/v4/files/TamaMonorail/data/TamaMonorail-Train-GTFS.zip"
-  datasetsize: small
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Akaiwa City - 赤磐市広域路線バス・市民バス
+# ODPT resource key: schedule:akaiwacity:alllines
+- identifier: "schedule-akaiwacity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/AkaiwaCity/AllLines.zip?date=20261201"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Akiha Bus Service Co.,Ltd - Akiha Bus Service
+# ODPT resource key: schedule:akihabusservice:alllines
+- identifier: "schedule-akihabusservice-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/AkihaBusService/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Akita City - Akita City（My-Town Bus・GURURU Bus）
+# ODPT resource key: schedule:akitacity:akitacitybus
+- identifier: "schedule-akitacity-akitacitybus"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/AkitaCity/AkitaCityBus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Aomori City - Aomori City Bus information
+# ODPT resource key: schedule:aomoricity:alllines
+- identifier: "schedule-aomoricity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/AomoriCity/AllLines.zip?date=20260724"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# ASAHI Motor Corporation - Asahi motor corporation
+# ODPT resource key: schedule:asahibus:20261001
+- identifier: "schedule-asahibus-20261001"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/AsahiBus/20261001.zip?date=20261126"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# DAISHINTO Inc. - Daishinto.Inc
+# ODPT resource key: schedule:daishinto:radiantcity-yokohama
+- identifier: "schedule-daishinto-radiantcity-yokohama"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/Daishinto/Radiantcity_Yokohama.zip?date=20260301"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Gunma-Bus Corporation - Gunma Bus Co., Ltd.
+# ODPT resource key: schedule:gunmabus:alllines
+- identifier: "schedule-gunmabus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/GunmaBus/AllLines.zip?date=20261016"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Gunmachuo-bus Corporation - 群馬中央バス株式会社
+# ODPT resource key: schedule:gunmachuobus:alllines
+- identifier: "schedule-gunmachuobus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/GunmachuoBus/AllLines.zip?date=20260430"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hankyu Ferry Corporation - Hankyu Ferry
+# ODPT resource key: schedule:hankyuferry:schedul-hankyu
+- identifier: "schedule-hankyuferry-schedul-hankyu"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/HankyuFerry/schedul_hankyu.zip?date=20261120"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Higashimurayama City - Higashimurayama City Community Bus "Green Bus"
+# ODPT resource key: schedule:higashimurayamacity:alllines
+- identifier: "schedule-higashimurayamacity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HigashiMurayamaCity/Alllines.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Higashiyamato City Hall - 東大和市コミュニティバス「ちょこバス」
+# ODPT resource key: schedule:higashiyamatocity:alllines-cc0
+- identifier: "schedule-higashiyamatocity-alllines-cc0"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HigashiyamatoCity/AllLines_CC0.zip?date=20261118"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Higashiyamato City Hall - 東大和市コミュニティバス「ちょこバス」
+# ODPT resource key: schedule:higashiyamatocity:alllines-ccby4
+- identifier: "schedule-higashiyamatocity-alllines-ccby4"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HigashiyamatoCity/AllLines_CCBY4.zip?date=20261118"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Higashiyamato City Hall - 東大和市コミュニティバス「ちょこバス」
+# ODPT resource key: schedule:higashiyamatocity:alllines-odpt
+- identifier: "schedule-higashiyamatocity-alllines-odpt"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/HigashiyamatoCity/AllLines_ODPT.zip?date=20261118"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hitachi Motor Transportation Co. Ltd. - Bunkyo City Community Bus ”B-guru”
+# ODPT resource key: schedule:hitachiautomobiletransportation:alllines
+- identifier: "schedule-hitachiautomobiletransportation-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/AllLines.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hitachi Motor Transportation Co. Ltd. - Tokyo Chiyoda City Community Bus「KAZAGURUMA」
+# ODPT resource key: schedule:hitachiautomobiletransportation:chiyoda-alllines
+- identifier: "schedule-hitachiautomobiletransportation-chiyoda-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/Chiyoda_ALLLINES.zip?date=20260601"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hitachi Motor Transportation Co. Ltd. - Tokyo Kita City Community Bus "K-bus"
+# ODPT resource key: schedule:hitachiautomobiletransportation:kitaalllines
+- identifier: "schedule-hitachiautomobiletransportation-kitaalllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/HitachiAutomobileTransportation/KitaAllLines.zip?date=20251220"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hokkaido Takusyoku Bus Co., Ltd - Takusyoku Bus Highway Line
+# ODPT resource key: schedule:hokkaidotakushokubus:takusyoku-highway-line
+- identifier: "schedule-hokkaidotakushokubus-takusyoku-highway-line"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/HokkaidoTakushokuBus/Takusyoku_highway_line.zip?date=20261014"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Hokkaido Takusyoku Bus Co., Ltd - Takusyoku Bus Regular Line
+# ODPT resource key: schedule:hokkaidotakushokubus:takusyoku-regular-line
+- identifier: "schedule-hokkaidotakushokubus-takusyoku-regular-line"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/HokkaidoTakushokuBus/Takusyoku_regular_line.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Itsukishima Kisen - Ferry information of Itsukishima Kisen
+# ODPT resource key: schedule:itsukishimakisen:alllines
+- identifier: "schedule-itsukishimakisen-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/ItsukishimaKisen/AllLines.zip?date=20261001"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Iyotetsu Bus Co.,Ltd. - 伊予鉄バス
+# ODPT resource key: schedule:iyotetsubus:alllines
+- identifier: "schedule-iyotetsubus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/IyotetsuBus/AllLines.zip?date=20261025"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# IZUHAKONE BUS CO.,LTD - IZUHAKONE BUS CO.,LTD
+# ODPT resource key: schedule:izuhakonebus:izhb
+- identifier: "schedule-izuhakonebus-izhb"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/IzuhakoneBus/IZHB.zip?date=20261114"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Joshin-hire Corporation - 上信ハイヤー株式会社
+# ODPT resource key: schedule:joshinhire:alllines
+- identifier: "schedule-joshinhire-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/JoshinHire/AllLines.zip?date=20260819"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Joshin-bus - 株式会社上信観光バス 乗合事業課
+# ODPT resource key: schedule:joshinkankobus:alllines
+- identifier: "schedule-joshinkankobus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/JoshinKankoBus/AllLines.zip?date=20261127"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Juo Jidousha Corporation - Juo Jidosha Corporation
+# ODPT resource key: schedule:juobus:isesaki-honjo-line
+- identifier: "schedule-juobus-isesaki-honjo-line"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/JuoBus/Isesaki_Honjo_Line.zip?date=20261025"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kagoshima City Maritime Bureau - Sakurajima Ferry Regular Routes
+# ODPT resource key: schedule:kagoshimacitymaritimebureau:alllines
+- identifier: "schedule-kagoshimacitymaritimebureau-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KagoshimaCityMaritimeBureau/AllLines.zip?date=20251010"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kan-etsu Transportation Co.,Ltd. - 関越交通バス
+# ODPT resource key: schedule:kan-etsutransportation:alllines
+- identifier: "schedule-kan-etsutransportation-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/Kan_etsuTransportation/AllLines.zip?date=20261116"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kanto-bus Corporation - 関東バス株式会社
+# ODPT resource key: schedule:kantobus:alllines
+- identifier: "schedule-kantobus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KantoBus/AllLines.zip?date=20261116"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# KAWASAKI TSURUMI RINKO BUS CO．，LTD - 川崎鶴見臨港バス株式会社
+# ODPT resource key: schedule:kawasakitsurumirinkobus:allrinko
+- identifier: "schedule-kawasakitsurumirinkobus-allrinko"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KawasakiTsurumiRinkoBus/allrinko.zip?date=20261101"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Keifuku Bus Co., Ltd. - 京福バス（路線バス）
+# ODPT resource key: schedule:keifukubus:keifuku-rosen
+- identifier: "schedule-keifukubus-keifuku-rosen"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KeifukuBus/keifuku_rosen.zip?date=20261025"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Keio Dentetsu Bus Co.,Ltd - Keio Bus
+# ODPT resource key: schedule:keiobus:alllines
+- identifier: "schedule-keiobus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KeioBus/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# KEISEI BUS CHIBA WEST CO.,LTD. - KEISEI BUS CHIBA WEST
+# ODPT resource key: schedule:keiseitransitbus:alllines
+- identifier: "schedule-keiseitransitbus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KeiseiTransitBus/AllLines.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kenko Hokubu Kotsu co.Ltd - Kenko Hokubu Kotsu Local Bus
+# ODPT resource key: schedule:kenkohokubukotsu:localbus
+- identifier: "schedule-kenkohokubukotsu-localbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KenkoHokubuKotsu/Localbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kiyose City - Kiyo Bus
+# ODPT resource key: schedule:kiyosecity:kiyobus
+- identifier: "schedule-kiyosecity-kiyobus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KiyoseCity/KiyoBus.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Kouryou Kotsu Co.,Ltd. - Kochi Koryo Kotsu Local Bus
+# ODPT resource key: schedule:kochikoryokotsu:localbus
+- identifier: "schedule-kochikoryokotsu-localbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiKoryoKotsu/Localbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Express Bus
+# ODPT resource key: schedule:kochiseinantraffic:express
+- identifier: "schedule-kochiseinantraffic-express"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiSeinanTraffic/Express.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Local Bus
+# ODPT resource key: schedule:kochiseinantraffic:localbus
+- identifier: "schedule-kochiseinantraffic-localbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiSeinanTraffic/Localbus.zip?date=20261101"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Shimanto City Downtown Loop Bus
+# ODPT resource key: schedule:kochiseinantraffic:loopbus
+- identifier: "schedule-kochiseinantraffic-loopbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiSeinanTraffic/Loopbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Shimanto River Bus
+# ODPT resource key: schedule:kochiseinantraffic:riverbus
+- identifier: "schedule-kochiseinantraffic-riverbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiSeinanTraffic/Riverbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Shimanto Ashizuri Area Tour Bus
+# ODPT resource key: schedule:kochiseinantraffic:shimaashibus
+- identifier: "schedule-kochiseinantraffic-shimaashibus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KochiSeinanTraffic/Shimaashibus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kokubunji-city - Kokubunji city area bus "bun bus"
+# ODPT resource key: schedule:kokubunjicity:kokubunji-city-bunbus
+- identifier: "schedule-kokubunjicity-kokubunji-city-bunbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KokubunjiCity/kokubunji_city_bunbus.zip?date=20260105"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kunitachi-city Road Traffic Division - 東京都国立市コミュニティワゴンあおやぎっこ
+# ODPT resource key: schedule:kunitachicity:kunitachi-city-aoyagikko
+- identifier: "schedule-kunitachicity-kunitachi-city-aoyagikko"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KunitachiCity/kunitachi_city_aoyagikko.zip?date=20260113"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kunitachi-city Road Traffic Division - 国立市コミュニティバスくにっこ
+# ODPT resource key: schedule:kunitachicity:kunitachi-city-kunikko
+- identifier: "schedule-kunitachicity-kunitachi-city-kunikko"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/KunitachiCity/kunitachi_city_kunikko.zip?date=20260901"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# KyotoBus Co., Ltd - Kyotobus
+# ODPT resource key: schedule:kyotobus:alllines
+- identifier: "schedule-kyotobus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KyotoBus/AllLines.zip?date=20261125"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# KyotoBus Co., Ltd - Kyotobus
+# ODPT resource key: schedule:kyotobus:alllinesanotherversion
+- identifier: "schedule-kyotobus-alllinesanotherversion"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KyotoBus/AllLinesAnotherversion.zip?date=20261125"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kyoto Municipal Transportation Bureau - Kyoto City Bus
+# ODPT resource key: schedule:kyotomunicipaltransportation:kyoto-city-bus-gtfs
+- identifier: "schedule-kyotomunicipaltransportation-kyoto-city-bus-gtfs"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KyotoMunicipalTransportation/Kyoto_City_Bus_GTFS.zip?date=20261110"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Kyoto Municipal Transportation Bureau - Kyoto City Subway
+# ODPT resource key: schedule:kyotomunicipaltransportation:kyoto-city-subway-gtfs
+- identifier: "schedule-kyotomunicipaltransportation-kyoto-city-subway-gtfs"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/KyotoMunicipalTransportation/Kyoto_City_Subway_GTFS.zip?date=20260703"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Machidacity - 東京都町田市 コミュニティバス、市民バス
+# ODPT resource key: schedule:machidacity:alllines
+- identifier: "schedule-machidacity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/MachidaCity/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Matsue City Traffic Office - Matsue City Traffic Office
+# ODPT resource key: schedule:matsuecitytrafficoffice:alllines
+- identifier: "schedule-matsuecitytrafficoffice-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/MatsueCityTrafficOffice/AllLines.zip?date=20261124"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Meimon Taiyo Ferry Co., Ltd. - 株式会社名門大洋フェリー
+# ODPT resource key: schedule:meimontaiyoferry:alllines
+- identifier: "schedule-meimontaiyoferry-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/MeimonTaiyoFerry/AllLines.zip?date=20261101"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Midori City - 群馬県みどり市路線バス
+# ODPT resource key: schedule:midoricity:alllines
+- identifier: "schedule-midoricity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/MidoriCity/AllLines.zip?date=20260630"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Miyake village - 三宅村営バス
+# ODPT resource key: schedule:miyakevill:allline
+- identifier: "schedule-miyakevill-allline"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/MiyakeVill/AllLine.zip?date=20250929"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Mizuho Town - Mizuho Town Community Bus
+# ODPT resource key: schedule:mizuhotown:alllines
+- identifier: "schedule-mizuhotown-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/MizuhoTown/AllLines.zip?date=20241001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Nagai Transportation Co., Ltd. - Nagai Transportation Co., Ltd.
+# ODPT resource key: schedule:nagaitransportation:alllines
+- identifier: "schedule-nagaitransportation-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/NagaiTransportation/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# City of Nagoya Housing & City Planning Bureau - 名古屋市 SRT
+# ODPT resource key: schedule:nagoyahousingcityplanningbureau:nagoyasrt-alllines
+- identifier: "schedule-nagoyahousingcityplanningbureau-nagoyasrt-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/NagoyaHousingCityPlanningBureau/NagoyaSRT_AllLines.zip?date=20260911"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Nippon Chuo Bus Co.,Ltd. - 日本中央バス 全線 (2025.9/30までは奥多野線を除く)
+# ODPT resource key: schedule:nipponchuobus:maebashi-area
+- identifier: "schedule-nipponchuobus-maebashi-area"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/NipponChuoBus/Maebashi_Area.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Nisitokyobus Corporation - Nisitokyobus
+# ODPT resource key: schedule:nishitokyobus:ntbus
+- identifier: "schedule-nishitokyobus-ntbus"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/NishiTokyoBus/NTBus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Nishitokyo City - Nishitokyo City Hana Bus
+# ODPT resource key: schedule:nishitokyocity:alllines
+- identifier: "schedule-nishitokyocity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/NishitokyoCity/AllLines.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Odakyu Bus Co., Ltd. - 小田急バス
+# ODPT resource key: schedule:odakyubus:aiilines
+- identifier: "schedule-odakyubus-aiilines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/OdakyuBus/AIILines.zip?date=20260924"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Okushiri Island Ferry Co., Ltd. - Okushiri Island Ferry
+# ODPT resource key: schedule:okushiriislandferry:okushiri-esashi-ferry-route
+- identifier: "schedule-okushiriislandferry-okushiri-esashi-ferry-route"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/OkushiriIslandFerry/Okushiri_Esashi_Ferry_Route.zip?date=20260101"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Shikoku Kaihatsu Ferry Corporation - 四国開発フェリー株式会社（オレンジフェリー）
+# ODPT resource key: schedule:orangeferry:alllines
+- identifier: "schedule-orangeferry-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/OrangeFerry/AllLines.zip?date=20261101"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# oshima-bus Corporation - Oshima Bus
+# ODPT resource key: schedule:oshimabus:alllines
+- identifier: "schedule-oshimabus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/OshimaBus/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Otone Kotsu Jidousha Co.,Ltd. - 大利根交通バス
+# ODPT resource key: schedule:otonekotsu:alllines
+- identifier: "schedule-otonekotsu-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/OtoneKotsu/AllLines.zip?date=20260409"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Sanwa Merchant Vessel Co., Ltd. - 三和商船株式会社
+# ODPT resource key: schedule:sanwamerchantvessel:alllines
+- identifier: "schedule-sanwamerchantvessel-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/SanwaMerchantVessel/AllLines.zip?date=20260105"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Transportation Bureau City of Sendai - Bus infomation of Transportation Bureau, City of Sendai（GTFS-JP and GTFS-Realtime data）
+# ODPT resource key: schedule:sendaimunicipal:bus-realtime-information
+- identifier: "schedule-sendaimunicipal-bus-realtime-information"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/SendaiMunicipal/bus_realtime_information.zip?date=20261026"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Funaki Tetsudou Corporation - Funaki Tetsudou Corporation
+# ODPT resource key: schedule:sentetsubus:alllines
+- identifier: "schedule-sentetsubus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/SentetsuBus/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Shimanto Bus Transport Co., Ltd - Shimanto Bus Transport Feeder Bus
+# ODPT resource key: schedule:shimantokotsu:feederbus
+- identifier: "schedule-shimantokotsu-feederbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/ShimantoKotsu/Feederbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Shimanto Bus Transport Co., Ltd - Shimanto Bus Transport Co., Ltd Local Bus
+# ODPT resource key: schedule:shimantokotsu:localbus
+- identifier: "schedule-shimantokotsu-localbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/ShimantoKotsu/Localbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Shimotsuidentetsu Corporation - Shimoden BUS GTFS Static / GTFS Realtime
+# ODPT resource key: schedule:shimoden:shimoden-bus-gtfs-realtime
+- identifier: "schedule-shimoden-shimoden-bus-gtfs-realtime"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/Shimoden/Shimoden_BUS_GTFS_Realtime.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Shodoshima Olive Bus - 小豆島オリーブバス
+# ODPT resource key: schedule:shodoshimaolivebus:alllines
+- identifier: "schedule-shodoshimaolivebus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/ShodoshimaOliveBus/alllines.zip?date=20261013"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Suounadaferry Corporation - Ferry information of Suonada Ferry
+# ODPT resource key: schedule:suonadaferry:alllines
+- identifier: "schedule-suonadaferry-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/SuonadaFerry/AllLines.zip?date=20260723"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Susaki City - Susaki City Bus
+# ODPT resource key: schedule:susakicity:citybus
+- identifier: "schedule-susakicity-citybus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/SusakiCity/Citybus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Susaki City - Susaki City Ferry
+# ODPT resource key: schedule:susakicity:cityferry
+- identifier: "schedule-susakicity-cityferry"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/SusakiCity/Cityferry.zip?date=20261001"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tachikawa City - Tachikawa City Kururin Bus
+# ODPT resource key: schedule:tachikawacity:kururin-bus-alllines
+- identifier: "schedule-tachikawacity-kururin-bus-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TachikawaCity/kururin_bus_alllines.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# takasaki city - よしいバス
+# ODPT resource key: schedule:takasakicity:yosiibus
+- identifier: "schedule-takasakicity-yosiibus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TakasakiCity/yosiibus.zip?date=20260421"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tokai Kisen Co.,Ltd. - Tokai Kisen Co.,Ltd.
+# ODPT resource key: schedule:tokaikisen:alllines
+- identifier: "schedule-tokaikisen-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TokaiKisen/AllLines.zip?date=20261001"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Chuo City Office - コミュニティバス（江戸バス）
+# ODPT resource key: schedule:tokyochuocity:alldata
+- identifier: "schedule-tokyochuocity-alldata"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TokyoChuoCity/Alldata.zip?date=20260712"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# TOKYO CRUISE SHIP CO LTD - TOKYO CRUISE SHIP
+# ODPT resource key: schedule:tokyocruiseship:alllines
+- identifier: "schedule-tokyocruiseship-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TokyoCruiseShip/AllLines.zip?date=20250402"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Suginami City - Suginami City Green Slow Mobility
+# ODPT resource key: schedule:tokyosuginamicity:greenslowmobility
+- identifier: "schedule-tokyosuginamicity-greenslowmobility"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TokyoSuginamiCity/GreenSlowMobility.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Taito City Office - 台東区コミュニティバス
+# ODPT resource key: schedule:tokyotaitocity:megurinccby40
+- identifier: "schedule-tokyotaitocity-megurinccby40"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TokyoTaitoCity/megurinCCBY40.zip?date=20261102"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tokyu Bus Corporation - Community Bus (Meguro City)
+# ODPT resource key: schedule:tokyubus:tokyubus-community-megurocity
+- identifier: "schedule-tokyubus-tokyubus-community-megurocity"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_MeguroCity.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tokyu Bus Corporation - Community Bus (Ota City)
+# ODPT resource key: schedule:tokyubus:tokyubus-community-otacity
+- identifier: "schedule-tokyubus-tokyubus-community-otacity"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_OtaCity.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tokyu Bus Corporation - Community Bus (Shinagawa City)
+# ODPT resource key: schedule:tokyubus:tokyubus-community-shinagawacity
+- identifier: "schedule-tokyubus-tokyubus-community-shinagawacity"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TokyuBus/tokyubus_community_ShinagawaCity.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tosashi - 土佐市ドラゴンバス
+# ODPT resource key: schedule:tosacity:alllines
+- identifier: "schedule-tosacity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TosaCity/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Airport Limousine Bus
+# ODPT resource key: schedule:tosadentraffic:airportbus
+- identifier: "schedule-tosadentraffic-airportbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TosadenTraffic/Airportbus.zip?date=20261101"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Regular Bus
+# ODPT resource key: schedule:tosadentraffic:regularbus
+- identifier: "schedule-tosadentraffic-regularbus"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TosadenTraffic/Regularbus.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Streetcar
+# ODPT resource key: schedule:tosadentraffic:streetcar
+- identifier: "schedule-tosadentraffic-streetcar"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/TosadenTraffic/Streetcar.zip?date=20260801"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Transportation Bureau, City of Kawasaki - Kawasaki City Bus
+# ODPT resource key: schedule:transportationbureau-cityofkawasaki:alllines
+- identifier: "schedule-transportationbureau-cityofkawasaki-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TransportationBureau_CityOfKawasaki/AllLines.zip?date=20261101"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Tsukubakankoukotsu Co.,Ltd - 小金井市CoCoバス（野川・七軒家循環）
+# ODPT resource key: schedule:tsukubakankoukotsu:cocobusnogawa
+- identifier: "schedule-tsukubakankoukotsu-cocobusnogawa"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/TsukubaKankouKotsu/CoCoBusNogawa.zip?date=20260401"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Aomori City - Aomori city Community Bus
+# ODPT resource key: schedule:urbandevelopment-aomoricity:alllines
+- identifier: "schedule-urbandevelopment-aomoricity-alllines"
+  format: "gtfs-schedule"
+  source: "https://api-public.odpt.org/api/v4/files/odpt/UrbanDevelopment_AomoriCity/AllLines.zip?date=20261001"
+  datasetsize: "medium"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# Uwajima Unyu Ferries - Uwajima Unyu Ferries
+# ODPT resource key: schedule:uwajimaunyu:alllines
+- identifier: "schedule-uwajimaunyu-alllines"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/UwajimaUnyu/AllLines.zip?date=20261001"
+  datasetsize: "small"
+  supportedobjects:
+    stops: true
+    services: true
+    journeys: true
+    operators: true
+# City of Yokohama, Transportation Bureau - Yokohama Municipal Bus
+# ODPT resource key: schedule:yokohamamunicipal:bus
+- identifier: "schedule-yokohamamunicipal-bus"
+  format: "gtfs-schedule"
+  source: "https://api.odpt.org/api/v4/files/odpt/YokohamaMunicipal/Bus.zip?date=20261101"
+  datasetsize: "medium"
   supportedobjects:
     stops: true
     services: true
     journeys: true
     operators: true
 
-- identifier: realtime-twr-train-alert
-  format: gtfs-realtime
+- identifier: "realtime-twr-train-alert"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/twr_odpt_train_alert"
-  linkeddataset: jp-odpt-schedule-twr-train
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-twr-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     servicealerts: true
-
-- identifier: realtime-tama-monorail-alert
-  format: gtfs-realtime
+- identifier: "realtime-tama-monorail-alert"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tamamonorail_odpt_train_alert"
-  linkeddataset: jp-odpt-schedule-tama-monorail
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-tama-monorail"
+  importdestination: "realtime-queue"
   supportedobjects:
     servicealerts: true
-
-- identifier: realtime-tokyo-metro-alert
-  format: gtfs-realtime
+- identifier: "realtime-tokyo-metro-alert"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/tokyometro_odpt_train_alert"
-  linkeddataset: jp-odpt-schedule-tokyo-metro
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-tokyo-metro"
+  importdestination: "realtime-queue"
   supportedobjects:
     servicealerts: true
-
-- identifier: realtime-toei-train-trip-update
-  format: gtfs-realtime
+- identifier: "realtime-toei-train-trip-update"
+  format: "gtfs-realtime"
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_trip_update"
-  linkeddataset: jp-odpt-schedule-toei-train
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-toei-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-toei-train-trip-alert
-  format: gtfs-realtime
+- identifier: "realtime-toei-train-trip-alert"
+  format: "gtfs-realtime"
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/toei_odpt_train_alert"
-  linkeddataset: jp-odpt-schedule-toei-train
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-toei-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-toei-bus-trip-position
-  format: gtfs-realtime
+- identifier: "realtime-toei-bus-trip-position"
+  format: "gtfs-realtime"
   source: "https://api-public.odpt.org/api/v4/gtfs/realtime/ToeiBus"
-  linkeddataset: jp-odpt-schedule-toei-bus
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-toei-bus"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-
-- identifier: realtime-yokohama-train-update
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-train-update"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_trip_update"
-  linkeddataset: jp-odpt-schedule-yokohama-train
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-yokohama-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-yokohama-train-location
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-train-location"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_vehicle"
   customconfig:
-    locationonly: true
-  linkeddataset: jp-odpt-schedule-yokohama-train
-  importdestination: realtime-queue
+    "locationonly": "true"
+  linkeddataset: "jp-odpt-schedule-yokohama-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-yokohama-train-alert
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-train-alert"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalTrain_alert"
-  linkeddataset: jp-odpt-schedule-yokohama-train
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-yokohama-train"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-yokohama-bus-update
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-bus-update"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_trip_update"
-  linkeddataset: jp-odpt-schedule-yokohama-bus
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-yokohama-bus"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-yokohama-bus-location
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-bus-location"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_vehicle"
   customconfig:
-    locationonly: true
-  linkeddataset: jp-odpt-schedule-yokohama-bus
-  importdestination: realtime-queue
+    "locationonly": "true"
+  linkeddataset: "jp-odpt-schedule-yokohama-bus"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
-- identifier: realtime-yokohama-bus-alert
-  format: gtfs-realtime
+- identifier: "realtime-yokohama-bus-alert"
+  format: "gtfs-realtime"
   source: "https://api.odpt.org/api/v4/gtfs/realtime/YokohamaMunicipalBus_alert"
-  linkeddataset: jp-odpt-schedule-yokohama-bus
-  importdestination: realtime-queue
+  linkeddataset: "jp-odpt-schedule-yokohama-bus"
+  importdestination: "realtime-queue"
   supportedobjects:
     realtimejourneys: true
+# Akiha Bus Service Co.,Ltd - Akiha Bus Service - Trip updates
+# ODPT resource key: realtime:akihabusservice:alllines:trip_update
+- identifier: "realtime-akihabusservice-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_AkihaBusService_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-akihabusservice-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Akiha Bus Service Co.,Ltd - Akiha Bus Service - Vehicle positions
+# ODPT resource key: realtime:akihabusservice:alllines:vehicle_position
+- identifier: "realtime-akihabusservice-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_AkihaBusService_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-akihabusservice-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Akita City - Akita City（My-Town Bus・GURURU Bus） - Trip updates
+# ODPT resource key: realtime:akitacity:akitacitybus:trip_update
+- identifier: "realtime-akitacity-akitacitybus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_AkitaCity_AkitaCityBus_trip_update"
+  linkeddataset: "jp-odpt-schedule-akitacity-akitacitybus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Akita City - Akita City（My-Town Bus・GURURU Bus） - Vehicle positions
+# ODPT resource key: realtime:akitacity:akitacitybus:vehicle_position
+- identifier: "realtime-akitacity-akitacitybus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_AkitaCity_AkitaCityBus_vehicle"
+  linkeddataset: "jp-odpt-schedule-akitacity-akitacitybus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Aomori City - Aomori City Bus information - Service alerts
+# ODPT resource key: realtime:aomoricity:alllines:alert
+- identifier: "realtime-aomoricity-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_AomoriCity_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Aomori City - Aomori City Bus information - Trip updates
+# ODPT resource key: realtime:aomoricity:alllines:trip_update
+- identifier: "realtime-aomoricity-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_AomoriCity_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Aomori City - Aomori City Bus information - Vehicle positions
+# ODPT resource key: realtime:aomoricity:alllines:vehicle_position
+- identifier: "realtime-aomoricity-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_AomoriCity_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Gunma-Bus Corporation - Gunma Bus Co., Ltd. - Service alerts
+# ODPT resource key: realtime:gunmabus:alllines:alert
+- identifier: "realtime-gunmabus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmaBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-gunmabus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Gunma-Bus Corporation - Gunma Bus Co., Ltd. - Trip updates
+# ODPT resource key: realtime:gunmabus:alllines:trip_update
+- identifier: "realtime-gunmabus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmaBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-gunmabus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Gunma-Bus Corporation - Gunma Bus Co., Ltd. - Vehicle positions
+# ODPT resource key: realtime:gunmabus:alllines:vehicle_position
+- identifier: "realtime-gunmabus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmaBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-gunmabus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Gunmachuo-bus Corporation - 群馬中央バス株式会社 - Service alerts
+# ODPT resource key: realtime:gunmachuobus:alllines:alert
+- identifier: "realtime-gunmachuobus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmachuoBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-gunmachuobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Gunmachuo-bus Corporation - 群馬中央バス株式会社 - Trip updates
+# ODPT resource key: realtime:gunmachuobus:alllines:trip_update
+- identifier: "realtime-gunmachuobus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmachuoBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-gunmachuobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Gunmachuo-bus Corporation - 群馬中央バス株式会社 - Vehicle positions
+# ODPT resource key: realtime:gunmachuobus:alllines:vehicle_position
+- identifier: "realtime-gunmachuobus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_GunmachuoBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-gunmachuobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Hokkaido Takusyoku Bus Co., Ltd - Takusyoku Bus Regular Line - Trip updates
+# ODPT resource key: realtime:hokkaidotakushokubus:takusyoku-regular-line:trip_update
+- identifier: "realtime-hokkaidotakushokubus-takusyoku-regular-line-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_HokkaidoTakushokuBus_Takusyoku_regular_line_trip_update"
+  linkeddataset: "jp-odpt-schedule-hokkaidotakushokubus-takusyoku-regular-line"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Hokkaido Takusyoku Bus Co., Ltd - Takusyoku Bus Regular Line - Vehicle positions
+# ODPT resource key: realtime:hokkaidotakushokubus:takusyoku-regular-line:vehicle_position
+- identifier: "realtime-hokkaidotakushokubus-takusyoku-regular-line-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_HokkaidoTakushokuBus_Takusyoku_regular_line_vehicle"
+  linkeddataset: "jp-odpt-schedule-hokkaidotakushokubus-takusyoku-regular-line"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Iyotetsu Bus Co.,Ltd. - 伊予鉄バス - Service alerts
+# ODPT resource key: realtime:iyotetsubus:alllines:alert
+- identifier: "realtime-iyotetsubus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IyotetsuBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-iyotetsubus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Iyotetsu Bus Co.,Ltd. - 伊予鉄バス - Trip updates
+# ODPT resource key: realtime:iyotetsubus:alllines:trip_update
+- identifier: "realtime-iyotetsubus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IyotetsuBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-iyotetsubus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Iyotetsu Bus Co.,Ltd. - 伊予鉄バス - Vehicle positions
+# ODPT resource key: realtime:iyotetsubus:alllines:vehicle_position
+- identifier: "realtime-iyotetsubus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IyotetsuBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-iyotetsubus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# IZUHAKONE BUS CO.,LTD - IZUHAKONE BUS CO.,LTD - Service alerts
+# ODPT resource key: realtime:izuhakonebus:izhb:alert
+- identifier: "realtime-izuhakonebus-izhb-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IzuhakoneBus_IZHB_alert"
+  linkeddataset: "jp-odpt-schedule-izuhakonebus-izhb"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# IZUHAKONE BUS CO.,LTD - IZUHAKONE BUS CO.,LTD - Trip updates
+# ODPT resource key: realtime:izuhakonebus:izhb:trip_update
+- identifier: "realtime-izuhakonebus-izhb-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IzuhakoneBus_IZHB_trip_update"
+  linkeddataset: "jp-odpt-schedule-izuhakonebus-izhb"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# IZUHAKONE BUS CO.,LTD - IZUHAKONE BUS CO.,LTD - Vehicle positions
+# ODPT resource key: realtime:izuhakonebus:izhb:vehicle_position
+- identifier: "realtime-izuhakonebus-izhb-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_IzuhakoneBus_IZHB_vehicle"
+  linkeddataset: "jp-odpt-schedule-izuhakonebus-izhb"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Joshin-hire Corporation - 上信ハイヤー株式会社 - Service alerts
+# ODPT resource key: realtime:joshinhire:alllines:alert
+- identifier: "realtime-joshinhire-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinHire_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-joshinhire-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Joshin-hire Corporation - 上信ハイヤー株式会社 - Trip updates
+# ODPT resource key: realtime:joshinhire:alllines:trip_update
+- identifier: "realtime-joshinhire-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinHire_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-joshinhire-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Joshin-hire Corporation - 上信ハイヤー株式会社 - Vehicle positions
+# ODPT resource key: realtime:joshinhire:alllines:vehicle_position
+- identifier: "realtime-joshinhire-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinHire_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-joshinhire-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Joshin-bus - 株式会社上信観光バス 乗合事業課 - Service alerts
+# ODPT resource key: realtime:joshinkankobus:alllines:alert
+- identifier: "realtime-joshinkankobus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinKankoBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-joshinkankobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Joshin-bus - 株式会社上信観光バス 乗合事業課 - Trip updates
+# ODPT resource key: realtime:joshinkankobus:alllines:trip_update
+- identifier: "realtime-joshinkankobus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinKankoBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-joshinkankobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Joshin-bus - 株式会社上信観光バス 乗合事業課 - Vehicle positions
+# ODPT resource key: realtime:joshinkankobus:alllines:vehicle_position
+- identifier: "realtime-joshinkankobus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_JoshinKankoBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-joshinkankobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Juo Jidousha Corporation - Juo Jidosha Corporation - Service alerts
+# ODPT resource key: realtime:juobus:isesaki-honjo-line:alert
+- identifier: "realtime-juobus-isesaki-honjo-line-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_JuoBus_Isesaki_Honjo_Line_alert"
+  linkeddataset: "jp-odpt-schedule-juobus-isesaki-honjo-line"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Juo Jidousha Corporation - Juo Jidosha Corporation - Trip updates
+# ODPT resource key: realtime:juobus:isesaki-honjo-line:trip_update
+- identifier: "realtime-juobus-isesaki-honjo-line-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_JuoBus_Isesaki_Honjo_Line_trip_update"
+  linkeddataset: "jp-odpt-schedule-juobus-isesaki-honjo-line"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Juo Jidousha Corporation - Juo Jidosha Corporation - Vehicle positions
+# ODPT resource key: realtime:juobus:isesaki-honjo-line:vehicle_position
+- identifier: "realtime-juobus-isesaki-honjo-line-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_JuoBus_Isesaki_Honjo_Line_vehicle"
+  linkeddataset: "jp-odpt-schedule-juobus-isesaki-honjo-line"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kan-etsu Transportation Co.,Ltd. - 関越交通バス - Service alerts
+# ODPT resource key: realtime:kan-etsutransportation:alllines:alert
+- identifier: "realtime-kan-etsutransportation-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_Kan_etsuTransportation_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-kan-etsutransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Kan-etsu Transportation Co.,Ltd. - 関越交通バス - Trip updates
+# ODPT resource key: realtime:kan-etsutransportation:alllines:trip_update
+- identifier: "realtime-kan-etsutransportation-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_Kan_etsuTransportation_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-kan-etsutransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kan-etsu Transportation Co.,Ltd. - 関越交通バス - Vehicle positions
+# ODPT resource key: realtime:kan-etsutransportation:alllines:vehicle_position
+- identifier: "realtime-kan-etsutransportation-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_Kan_etsuTransportation_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-kan-etsutransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kanto-bus Corporation - 関東バス株式会社 - Service alerts
+# ODPT resource key: realtime:kantobus:alllines:alert
+- identifier: "realtime-kantobus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KantoBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-kantobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Kanto-bus Corporation - 関東バス株式会社 - Trip updates
+# ODPT resource key: realtime:kantobus:alllines:trip_update
+- identifier: "realtime-kantobus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KantoBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-kantobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kanto-bus Corporation - 関東バス株式会社 - Vehicle positions
+# ODPT resource key: realtime:kantobus:alllines:vehicle_position
+- identifier: "realtime-kantobus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KantoBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-kantobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KAWASAKI TSURUMI RINKO BUS CO．，LTD - 川崎鶴見臨港バス株式会社 - Service alerts
+# ODPT resource key: realtime:kawasakitsurumirinkobus:allrinko:alert
+- identifier: "realtime-kawasakitsurumirinkobus-allrinko-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KawasakiTsurumiRinkoBus_allrinko_alert"
+  linkeddataset: "jp-odpt-schedule-kawasakitsurumirinkobus-allrinko"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# KAWASAKI TSURUMI RINKO BUS CO．，LTD - 川崎鶴見臨港バス株式会社 - Trip updates
+# ODPT resource key: realtime:kawasakitsurumirinkobus:allrinko:trip_update
+- identifier: "realtime-kawasakitsurumirinkobus-allrinko-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KawasakiTsurumiRinkoBus_allrinko_trip_update"
+  linkeddataset: "jp-odpt-schedule-kawasakitsurumirinkobus-allrinko"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KAWASAKI TSURUMI RINKO BUS CO．，LTD - 川崎鶴見臨港バス株式会社 - Vehicle positions
+# ODPT resource key: realtime:kawasakitsurumirinkobus:allrinko:vehicle_position
+- identifier: "realtime-kawasakitsurumirinkobus-allrinko-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KawasakiTsurumiRinkoBus_allrinko_vehicle"
+  linkeddataset: "jp-odpt-schedule-kawasakitsurumirinkobus-allrinko"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Keifuku Bus Co., Ltd. - 京福バス（路線バス） - Service alerts
+# ODPT resource key: realtime:keifukubus:keifuku-rosen:alert
+- identifier: "realtime-keifukubus-keifuku-rosen-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeifukuBus_keifuku_rosen_alert"
+  linkeddataset: "jp-odpt-schedule-keifukubus-keifuku-rosen"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Keifuku Bus Co., Ltd. - 京福バス（路線バス） - Trip updates
+# ODPT resource key: realtime:keifukubus:keifuku-rosen:trip_update
+- identifier: "realtime-keifukubus-keifuku-rosen-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeifukuBus_keifuku_rosen_trip_update"
+  linkeddataset: "jp-odpt-schedule-keifukubus-keifuku-rosen"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Keifuku Bus Co., Ltd. - 京福バス（路線バス） - Vehicle positions
+# ODPT resource key: realtime:keifukubus:keifuku-rosen:vehicle_position
+- identifier: "realtime-keifukubus-keifuku-rosen-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeifukuBus_keifuku_rosen_vehicle"
+  linkeddataset: "jp-odpt-schedule-keifukubus-keifuku-rosen"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Keio Dentetsu Bus Co.,Ltd - Keio Bus - Trip updates
+# ODPT resource key: realtime:keiobus:alllines:trip_update
+- identifier: "realtime-keiobus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KeioBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-keiobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Keio Dentetsu Bus Co.,Ltd - Keio Bus - Vehicle positions
+# ODPT resource key: realtime:keiobus:alllines:vehicle_position
+- identifier: "realtime-keiobus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KeioBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-keiobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KEISEI BUS CHIBA WEST CO.,LTD. - KEISEI BUS CHIBA WEST - Service alerts
+# ODPT resource key: realtime:keiseitransitbus:alllines:alert
+- identifier: "realtime-keiseitransitbus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeiseiTransitBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-keiseitransitbus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# KEISEI BUS CHIBA WEST CO.,LTD. - KEISEI BUS CHIBA WEST - Trip updates
+# ODPT resource key: realtime:keiseitransitbus:alllines:trip_update
+- identifier: "realtime-keiseitransitbus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeiseiTransitBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-keiseitransitbus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KEISEI BUS CHIBA WEST CO.,LTD. - KEISEI BUS CHIBA WEST - Vehicle positions
+# ODPT resource key: realtime:keiseitransitbus:alllines:vehicle_position
+- identifier: "realtime-keiseitransitbus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KeiseiTransitBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-keiseitransitbus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kenko Hokubu Kotsu co.Ltd - Kenko Hokubu Kotsu Local Bus - Service alerts
+# ODPT resource key: realtime:kenkohokubukotsu:localbus:alert
+- identifier: "realtime-kenkohokubukotsu-localbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KenkoHokubuKotsu_Localbus_alert"
+  linkeddataset: "jp-odpt-schedule-kenkohokubukotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Kenko Hokubu Kotsu co.Ltd - Kenko Hokubu Kotsu Local Bus - Trip updates
+# ODPT resource key: realtime:kenkohokubukotsu:localbus:trip_update
+- identifier: "realtime-kenkohokubukotsu-localbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KenkoHokubuKotsu_Localbus_trip_update"
+  linkeddataset: "jp-odpt-schedule-kenkohokubukotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kenko Hokubu Kotsu co.Ltd - Kenko Hokubu Kotsu Local Bus - Vehicle positions
+# ODPT resource key: realtime:kenkohokubukotsu:localbus:vehicle_position
+- identifier: "realtime-kenkohokubukotsu-localbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KenkoHokubuKotsu_Localbus_vehicle"
+  linkeddataset: "jp-odpt-schedule-kenkohokubukotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kiyose City - Kiyo Bus - Trip updates
+# ODPT resource key: realtime:kiyosecity:kiyobus:trip_update
+- identifier: "realtime-kiyosecity-kiyobus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KiyoseCity_KiyoBus_trip_update"
+  linkeddataset: "jp-odpt-schedule-kiyosecity-kiyobus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kiyose City - Kiyo Bus - Vehicle positions
+# ODPT resource key: realtime:kiyosecity:kiyobus:vehicle_position
+- identifier: "realtime-kiyosecity-kiyobus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KiyoseCity_KiyoBus_vehicle"
+  linkeddataset: "jp-odpt-schedule-kiyosecity-kiyobus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kochi Kouryou Kotsu Co.,Ltd. - Kochi Koryo Kotsu Local Bus - Service alerts
+# ODPT resource key: realtime:kochikoryokotsu:localbus:alert
+- identifier: "realtime-kochikoryokotsu-localbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiKoryoKotsu_Localbus_alert"
+  linkeddataset: "jp-odpt-schedule-kochikoryokotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Kochi Kouryou Kotsu Co.,Ltd. - Kochi Koryo Kotsu Local Bus - Trip updates
+# ODPT resource key: realtime:kochikoryokotsu:localbus:trip_update
+- identifier: "realtime-kochikoryokotsu-localbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiKoryoKotsu_Localbus_trip_update"
+  linkeddataset: "jp-odpt-schedule-kochikoryokotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kochi Kouryou Kotsu Co.,Ltd. - Kochi Koryo Kotsu Local Bus - Vehicle positions
+# ODPT resource key: realtime:kochikoryokotsu:localbus:vehicle_position
+- identifier: "realtime-kochikoryokotsu-localbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiKoryoKotsu_Localbus_vehicle"
+  linkeddataset: "jp-odpt-schedule-kochikoryokotsu-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Local Bus - Service alerts
+# ODPT resource key: realtime:kochiseinantraffic:localbus:alert
+- identifier: "realtime-kochiseinantraffic-localbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiSeinanTraffic_Localbus_alert"
+  linkeddataset: "jp-odpt-schedule-kochiseinantraffic-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Local Bus - Trip updates
+# ODPT resource key: realtime:kochiseinantraffic:localbus:trip_update
+- identifier: "realtime-kochiseinantraffic-localbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiSeinanTraffic_Localbus_trip_update"
+  linkeddataset: "jp-odpt-schedule-kochiseinantraffic-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Kochi Seinan Traffic Co.,Ltd - Kochi Seinan Traffic Local Bus - Vehicle positions
+# ODPT resource key: realtime:kochiseinantraffic:localbus:vehicle_position
+- identifier: "realtime-kochiseinantraffic-localbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_KochiSeinanTraffic_Localbus_vehicle"
+  linkeddataset: "jp-odpt-schedule-kochiseinantraffic-localbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KyotoBus Co., Ltd - Kyotobus - Service alerts
+# ODPT resource key: realtime:kyotobus:alllines:alert
+- identifier: "realtime-kyotobus-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# KyotoBus Co., Ltd - Kyotobus - Trip updates
+# ODPT resource key: realtime:kyotobus:alllines:trip_update
+- identifier: "realtime-kyotobus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KyotoBus Co., Ltd - Kyotobus - Vehicle positions
+# ODPT resource key: realtime:kyotobus:alllines:vehicle_position
+- identifier: "realtime-kyotobus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KyotoBus Co., Ltd - Kyotobus - Service alerts
+# ODPT resource key: realtime:kyotobus:alllinesanotherversion:alert
+- identifier: "realtime-kyotobus-alllinesanotherversion-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLinesAnotherversion_alert"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllinesanotherversion"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# KyotoBus Co., Ltd - Kyotobus - Trip updates
+# ODPT resource key: realtime:kyotobus:alllinesanotherversion:trip_update
+- identifier: "realtime-kyotobus-alllinesanotherversion-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLinesAnotherversion_trip_update"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllinesanotherversion"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# KyotoBus Co., Ltd - Kyotobus - Vehicle positions
+# ODPT resource key: realtime:kyotobus:alllinesanotherversion:vehicle_position
+- identifier: "realtime-kyotobus-alllinesanotherversion-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_KyotoBus_AllLinesAnotherversion_vehicle"
+  linkeddataset: "jp-odpt-schedule-kyotobus-alllinesanotherversion"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Matsue City Traffic Office - Matsue City Traffic Office - Service alerts
+# ODPT resource key: realtime:matsuecitytrafficoffice:alllines:alert
+- identifier: "realtime-matsuecitytrafficoffice-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_MatsueCityTrafficOffice_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-matsuecitytrafficoffice-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Matsue City Traffic Office - Matsue City Traffic Office - Trip updates
+# ODPT resource key: realtime:matsuecitytrafficoffice:alllines:trip_update
+- identifier: "realtime-matsuecitytrafficoffice-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_MatsueCityTrafficOffice_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-matsuecitytrafficoffice-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Matsue City Traffic Office - Matsue City Traffic Office - Vehicle positions
+# ODPT resource key: realtime:matsuecitytrafficoffice:alllines:vehicle_position
+- identifier: "realtime-matsuecitytrafficoffice-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_MatsueCityTrafficOffice_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-matsuecitytrafficoffice-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nagai Transportation Co., Ltd. - Nagai Transportation Co., Ltd. - Service alerts
+# ODPT resource key: realtime:nagaitransportation:alllines:alert
+- identifier: "realtime-nagaitransportation-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagaiTransportation_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-nagaitransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Nagai Transportation Co., Ltd. - Nagai Transportation Co., Ltd. - Trip updates
+# ODPT resource key: realtime:nagaitransportation:alllines:trip_update
+- identifier: "realtime-nagaitransportation-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagaiTransportation_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-nagaitransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nagai Transportation Co., Ltd. - Nagai Transportation Co., Ltd. - Vehicle positions
+# ODPT resource key: realtime:nagaitransportation:alllines:vehicle_position
+- identifier: "realtime-nagaitransportation-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagaiTransportation_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-nagaitransportation-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# City of Nagoya Housing & City Planning Bureau - 名古屋市 SRT - Service alerts
+# ODPT resource key: realtime:nagoyahousingcityplanningbureau:nagoyasrt-alllines:alert
+- identifier: "realtime-nagoyahousingcityplanningbureau-nagoyasrt-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagoyaHousingCityPlanningBureau_NagoyaSRT_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-nagoyahousingcityplanningbureau-nagoyasrt-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# City of Nagoya Housing & City Planning Bureau - 名古屋市 SRT - Trip updates
+# ODPT resource key: realtime:nagoyahousingcityplanningbureau:nagoyasrt-alllines:trip_update
+- identifier: "realtime-nagoyahousingcityplanningbureau-nagoyasrt-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagoyaHousingCityPlanningBureau_NagoyaSRT_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-nagoyahousingcityplanningbureau-nagoyasrt-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# City of Nagoya Housing & City Planning Bureau - 名古屋市 SRT - Vehicle positions
+# ODPT resource key: realtime:nagoyahousingcityplanningbureau:nagoyasrt-alllines:vehicle_position
+- identifier: "realtime-nagoyahousingcityplanningbureau-nagoyasrt-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NagoyaHousingCityPlanningBureau_NagoyaSRT_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-nagoyahousingcityplanningbureau-nagoyasrt-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nippon Chuo Bus Co.,Ltd. - 日本中央バス 全線 (2025.9/30までは奥多野線を除く) - Service alerts
+# ODPT resource key: realtime:nipponchuobus:maebashi-area:alert
+- identifier: "realtime-nipponchuobus-maebashi-area-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NipponChuoBus_Maebashi_Area_alert"
+  linkeddataset: "jp-odpt-schedule-nipponchuobus-maebashi-area"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Nippon Chuo Bus Co.,Ltd. - 日本中央バス 全線 (2025.9/30までは奥多野線を除く) - Trip updates
+# ODPT resource key: realtime:nipponchuobus:maebashi-area:trip_update
+- identifier: "realtime-nipponchuobus-maebashi-area-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NipponChuoBus_Maebashi_Area_trip_update"
+  linkeddataset: "jp-odpt-schedule-nipponchuobus-maebashi-area"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nippon Chuo Bus Co.,Ltd. - 日本中央バス 全線 (2025.9/30までは奥多野線を除く) - Vehicle positions
+# ODPT resource key: realtime:nipponchuobus:maebashi-area:vehicle_position
+- identifier: "realtime-nipponchuobus-maebashi-area-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_NipponChuoBus_Maebashi_Area_vehicle"
+  linkeddataset: "jp-odpt-schedule-nipponchuobus-maebashi-area"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nisitokyobus Corporation - Nisitokyobus - Service alerts
+# ODPT resource key: realtime:nishitokyobus:ntbus:alert
+- identifier: "realtime-nishitokyobus-ntbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_NishiTokyoBus_NTBus_alert"
+  linkeddataset: "jp-odpt-schedule-nishitokyobus-ntbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Nisitokyobus Corporation - Nisitokyobus - Trip updates
+# ODPT resource key: realtime:nishitokyobus:ntbus:trip_update
+- identifier: "realtime-nishitokyobus-ntbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_NishiTokyoBus_NTBus_trip_update"
+  linkeddataset: "jp-odpt-schedule-nishitokyobus-ntbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Nisitokyobus Corporation - Nisitokyobus - Vehicle positions
+# ODPT resource key: realtime:nishitokyobus:ntbus:vehicle_position
+- identifier: "realtime-nishitokyobus-ntbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_NishiTokyoBus_NTBus_vehicle"
+  linkeddataset: "jp-odpt-schedule-nishitokyobus-ntbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Transportation Bureau City of Sendai - Bus infomation of Transportation Bureau, City of Sendai（GTFS-JP and GTFS-Realtime data） - Service alerts
+# ODPT resource key: realtime:sendaimunicipal:bus-realtime-information:alert
+- identifier: "realtime-sendaimunicipal-bus-realtime-information-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SendaiMunicipal_bus_realtime_information_alert"
+  linkeddataset: "jp-odpt-schedule-sendaimunicipal-bus-realtime-information"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Transportation Bureau City of Sendai - Bus infomation of Transportation Bureau, City of Sendai（GTFS-JP and GTFS-Realtime data） - Trip updates
+# ODPT resource key: realtime:sendaimunicipal:bus-realtime-information:trip_update
+- identifier: "realtime-sendaimunicipal-bus-realtime-information-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SendaiMunicipal_bus_realtime_information_trip_update"
+  linkeddataset: "jp-odpt-schedule-sendaimunicipal-bus-realtime-information"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Transportation Bureau City of Sendai - Bus infomation of Transportation Bureau, City of Sendai（GTFS-JP and GTFS-Realtime data） - Vehicle positions
+# ODPT resource key: realtime:sendaimunicipal:bus-realtime-information:vehicle_position
+- identifier: "realtime-sendaimunicipal-bus-realtime-information-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SendaiMunicipal_bus_realtime_information_vehicle"
+  linkeddataset: "jp-odpt-schedule-sendaimunicipal-bus-realtime-information"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Funaki Tetsudou Corporation - Funaki Tetsudou Corporation - Trip updates
+# ODPT resource key: realtime:sentetsubus:alllines:trip_update
+- identifier: "realtime-sentetsubus-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_SentetsuBus_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-sentetsubus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Funaki Tetsudou Corporation - Funaki Tetsudou Corporation - Vehicle positions
+# ODPT resource key: realtime:sentetsubus:alllines:vehicle_position
+- identifier: "realtime-sentetsubus-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_SentetsuBus_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-sentetsubus-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Shimotsuidentetsu Corporation - Shimoden BUS GTFS Static / GTFS Realtime - Service alerts
+# ODPT resource key: realtime:shimoden:shimoden-bus-gtfs-realtime:alert
+- identifier: "realtime-shimoden-shimoden-bus-gtfs-realtime-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_Shimoden_Shimoden_BUS_GTFS_Realtime_alert"
+  linkeddataset: "jp-odpt-schedule-shimoden-shimoden-bus-gtfs-realtime"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Shimotsuidentetsu Corporation - Shimoden BUS GTFS Static / GTFS Realtime - Trip updates
+# ODPT resource key: realtime:shimoden:shimoden-bus-gtfs-realtime:trip_update
+- identifier: "realtime-shimoden-shimoden-bus-gtfs-realtime-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_Shimoden_Shimoden_BUS_GTFS_Realtime_trip_update"
+  linkeddataset: "jp-odpt-schedule-shimoden-shimoden-bus-gtfs-realtime"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Shimotsuidentetsu Corporation - Shimoden BUS GTFS Static / GTFS Realtime - Vehicle positions
+# ODPT resource key: realtime:shimoden:shimoden-bus-gtfs-realtime:vehicle_position
+- identifier: "realtime-shimoden-shimoden-bus-gtfs-realtime-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_Shimoden_Shimoden_BUS_GTFS_Realtime_vehicle"
+  linkeddataset: "jp-odpt-schedule-shimoden-shimoden-bus-gtfs-realtime"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Susaki City - Susaki City Bus - Service alerts
+# ODPT resource key: realtime:susakicity:citybus:alert
+- identifier: "realtime-susakicity-citybus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SusakiCity_Citybus_alert"
+  linkeddataset: "jp-odpt-schedule-susakicity-citybus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Susaki City - Susaki City Bus - Trip updates
+# ODPT resource key: realtime:susakicity:citybus:trip_update
+- identifier: "realtime-susakicity-citybus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SusakiCity_Citybus_trip_update"
+  linkeddataset: "jp-odpt-schedule-susakicity-citybus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Susaki City - Susaki City Bus - Vehicle positions
+# ODPT resource key: realtime:susakicity:citybus:vehicle_position
+- identifier: "realtime-susakicity-citybus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_SusakiCity_Citybus_vehicle"
+  linkeddataset: "jp-odpt-schedule-susakicity-citybus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# takasaki city - よしいバス - Service alerts
+# ODPT resource key: realtime:takasakicity:yosiibus:alert
+- identifier: "realtime-takasakicity-yosiibus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TakasakiCity_yosiibus_alert"
+  linkeddataset: "jp-odpt-schedule-takasakicity-yosiibus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# takasaki city - よしいバス - Trip updates
+# ODPT resource key: realtime:takasakicity:yosiibus:trip_update
+- identifier: "realtime-takasakicity-yosiibus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TakasakiCity_yosiibus_trip_update"
+  linkeddataset: "jp-odpt-schedule-takasakicity-yosiibus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# takasaki city - よしいバス - Vehicle positions
+# ODPT resource key: realtime:takasakicity:yosiibus:vehicle_position
+- identifier: "realtime-takasakicity-yosiibus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TakasakiCity_yosiibus_vehicle"
+  linkeddataset: "jp-odpt-schedule-takasakicity-yosiibus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tokai Kisen Co.,Ltd. - Tokai Kisen Co.,Ltd. - Service alerts
+# ODPT resource key: realtime:tokaikisen:alllines:alert
+- identifier: "realtime-tokaikisen-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_TokaiKisen_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-tokaikisen-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Suginami City - Suginami City Green Slow Mobility - Trip updates
+# ODPT resource key: realtime:tokyosuginamicity:greenslowmobility:trip_update
+- identifier: "realtime-tokyosuginamicity-greenslowmobility-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TokyoSuginamiCity_GreenSlowMobility_trip_update"
+  linkeddataset: "jp-odpt-schedule-tokyosuginamicity-greenslowmobility"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Suginami City - Suginami City Green Slow Mobility - Vehicle positions
+# ODPT resource key: realtime:tokyosuginamicity:greenslowmobility:vehicle_position
+- identifier: "realtime-tokyosuginamicity-greenslowmobility-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TokyoSuginamiCity_GreenSlowMobility_vehicle"
+  linkeddataset: "jp-odpt-schedule-tokyosuginamicity-greenslowmobility"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosashi - 土佐市ドラゴンバス - Service alerts
+# ODPT resource key: realtime:tosacity:alllines:alert
+- identifier: "realtime-tosacity-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosaCity_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-tosacity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Tosashi - 土佐市ドラゴンバス - Trip updates
+# ODPT resource key: realtime:tosacity:alllines:trip_update
+- identifier: "realtime-tosacity-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosaCity_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-tosacity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosashi - 土佐市ドラゴンバス - Vehicle positions
+# ODPT resource key: realtime:tosacity:alllines:vehicle_position
+- identifier: "realtime-tosacity-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosaCity_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-tosacity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Airport Limousine Bus - Service alerts
+# ODPT resource key: realtime:tosadentraffic:airportbus:alert
+- identifier: "realtime-tosadentraffic-airportbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Airportbus_alert"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-airportbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Airport Limousine Bus - Trip updates
+# ODPT resource key: realtime:tosadentraffic:airportbus:trip_update
+- identifier: "realtime-tosadentraffic-airportbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Airportbus_trip_update"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-airportbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Airport Limousine Bus - Vehicle positions
+# ODPT resource key: realtime:tosadentraffic:airportbus:vehicle_position
+- identifier: "realtime-tosadentraffic-airportbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Airportbus_vehicle"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-airportbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Regular Bus - Service alerts
+# ODPT resource key: realtime:tosadentraffic:regularbus:alert
+- identifier: "realtime-tosadentraffic-regularbus-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Regularbus_alert"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-regularbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Regular Bus - Trip updates
+# ODPT resource key: realtime:tosadentraffic:regularbus:trip_update
+- identifier: "realtime-tosadentraffic-regularbus-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Regularbus_trip_update"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-regularbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Tosaden Traffic CO.,LTD - Tosaden Traffic Regular Bus - Vehicle positions
+# ODPT resource key: realtime:tosadentraffic:regularbus:vehicle_position
+- identifier: "realtime-tosadentraffic-regularbus-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_TosadenTraffic_Regularbus_vehicle"
+  linkeddataset: "jp-odpt-schedule-tosadentraffic-regularbus"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Transportation Bureau, City of Kawasaki - Kawasaki City Bus - Service alerts
+# ODPT resource key: realtime:transportationbureau-cityofkawasaki:alllines:alert
+- identifier: "realtime-transportationbureau-cityofkawasaki-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_TransportationBureau_CityOfKawasaki_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-transportationbureau-cityofkawasaki-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Transportation Bureau, City of Kawasaki - Kawasaki City Bus - Trip updates
+# ODPT resource key: realtime:transportationbureau-cityofkawasaki:alllines:trip_update
+- identifier: "realtime-transportationbureau-cityofkawasaki-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_TransportationBureau_CityOfKawasaki_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-transportationbureau-cityofkawasaki-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Transportation Bureau, City of Kawasaki - Kawasaki City Bus - Vehicle positions
+# ODPT resource key: realtime:transportationbureau-cityofkawasaki:alllines:vehicle_position
+- identifier: "realtime-transportationbureau-cityofkawasaki-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api.odpt.org/api/v4/gtfs/realtime/odpt_TransportationBureau_CityOfKawasaki_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-transportationbureau-cityofkawasaki-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Aomori City - Aomori city Community Bus - Service alerts
+# ODPT resource key: realtime:urbandevelopment-aomoricity:alllines:alert
+- identifier: "realtime-urbandevelopment-aomoricity-alllines-alert"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_UrbanDevelopment_AomoriCity_AllLines_alert"
+  linkeddataset: "jp-odpt-schedule-urbandevelopment-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    servicealerts: true
+# Aomori City - Aomori city Community Bus - Trip updates
+# ODPT resource key: realtime:urbandevelopment-aomoricity:alllines:trip_update
+- identifier: "realtime-urbandevelopment-aomoricity-alllines-trip-update"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_UrbanDevelopment_AomoriCity_AllLines_trip_update"
+  linkeddataset: "jp-odpt-schedule-urbandevelopment-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+# Aomori City - Aomori city Community Bus - Vehicle positions
+# ODPT resource key: realtime:urbandevelopment-aomoricity:alllines:vehicle_position
+- identifier: "realtime-urbandevelopment-aomoricity-alllines-vehicle-position"
+  format: "gtfs-realtime"
+  source: "https://api-public.odpt.org/api/v4/gtfs/realtime/odpt_UrbanDevelopment_AomoriCity_AllLines_vehicle"
+  linkeddataset: "jp-odpt-schedule-urbandevelopment-aomoricity-alllines"
+  importdestination: "realtime-queue"
+  supportedobjects:
+    realtimejourneys: true
+
+# Active ODPT GTFS datasets omitted pending review of non-standard licensing:
+# - Hakodate City Tram - Hakodate City Tram (その他ライセンス(認証なし))
+# - Shimotsuidentetsu Corporation - Shimoden BUS GTFS (その他ライセンス(認証なし))
+# - UNOBUS - UNOBUS GTFS (その他ライセンス(認証なし)): If you wish to use the service to provide guidance to bus passengers, you must apply for permission in advance from the bus company. CPs that have already received permission do not need to contact us.

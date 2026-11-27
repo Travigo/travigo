@@ -1,0 +1,44 @@
+name: Update Japan ODPT catalog
+
+on:
+  schedule:
+    - cron: '23 5 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-japan-odpt-catalog
+  cancel-in-progress: false
+
+jobs:
+  update-catalog:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Regenerate Japan ODPT catalog
+        run: go run ./scripts/generate-jp-odpt.go
+
+      - name: Commit and push catalog changes
+        run: |
+          set -euo pipefail
+          git add -- data/datasources/jp-odpt.yaml
+          if git diff --cached --quiet; then
+            echo "Japan ODPT catalog is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update Japan ODPT catalog"
+          git push origin HEAD:main
