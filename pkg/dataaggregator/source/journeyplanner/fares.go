@@ -45,7 +45,8 @@ type fareCatalogue struct {
 
 func addFareQuotes(ctx context.Context, plans []ctdf.JourneyPlan, rider, media string, age *int, cards []ctdf.FareCardSelection) {
 	catalogues := map[string]*fareCatalogue{}
-	itemsByDataset := map[string][]ctdf.JourneyPlanRouteItem{}
+	datasetIDs := map[string]bool{}
+	var fareItems []ctdf.JourneyPlanRouteItem
 	for index := range plans {
 		for _, item := range planJourneyItems(plans[index]) {
 			if item.Journey == nil || item.Journey.DataSource == nil {
@@ -53,12 +54,15 @@ func addFareQuotes(ctx context.Context, plans []ctdf.JourneyPlan, rider, media s
 			}
 			datasetID := item.Journey.DataSource.DatasetID
 			if datasetID != "" {
-				itemsByDataset[datasetID] = append(itemsByDataset[datasetID], item)
+				datasetIDs[datasetID] = true
+				fareItems = append(fareItems, item)
 			}
 		}
 	}
-	for datasetID, items := range itemsByDataset {
-		catalogues[datasetID] = loadFareCatalogue(ctx, datasetID, items, rider, media)
+	// Different schedule datasets can share one fare catalogue. Include all
+	// itinerary endpoints so journey-scoped and joined fares can span them.
+	for datasetID := range datasetIDs {
+		catalogues[datasetID] = loadFareCatalogue(ctx, datasetID, fareItems, rider, media)
 	}
 	for index := range plans {
 		plans[index].Fare = calculatePlanFare(ctx, plans[index], catalogues, rider, media, age, cards)
@@ -456,19 +460,10 @@ func loadFareCatalogue(ctx context.Context, datasetID string, items []ctdf.Journ
 		return catalogue
 	}
 
-	lookupRefs := map[string]bool{}
-	for ref := range locationRefs {
-		lookupRefs[ref] = true
-	}
-	for ref := range stopRefs {
-		lookupRefs[ref] = true
-	}
-	for ref := range catalogue.locations {
-		lookupRefs[ref] = true
-	}
+	originRefs, destinationRefs := fareRuleEndpointRefs(items, catalogue.locations)
 	rulesFilter := fareFilterAnd(catalogue.versionFilter,
-		fareRefFieldMatch("originref", append([]string{""}, sortedFareRefs(lookupRefs)...)),
-		fareRefFieldMatch("destinationref", append([]string{""}, sortedFareRefs(lookupRefs)...)),
+		fareRefFieldMatch("originref", append([]string{""}, sortedFareRefs(originRefs)...)),
+		fareRefFieldMatch("destinationref", append([]string{""}, sortedFareRefs(destinationRefs)...)),
 	)
 	cursor, err := database.GetCollection("fare_leg_rules").Find(ctx, rulesFilter)
 	if err != nil {
@@ -3071,6 +3066,34 @@ func fareIdentifierFieldFilter(base bson.M, field string, refs []string) bson.M 
 	}
 	filter[field] = bson.M{"$in": refs}
 	return filter
+}
+
+// fareRuleEndpointRefs retains each candidate leg's endpoints separately.
+// Joined legs and journey-scoped fares can span items, so all candidate origins
+// and destinations remain eligible; intermediate calls are still loaded for
+// via and restriction checks but do not expand the rule query.
+func fareRuleEndpointRefs(items []ctdf.JourneyPlanRouteItem, locations map[string]ctdf.FareLocation) (map[string]bool, map[string]bool) {
+	origins := map[string]bool{}
+	destinations := map[string]bool{}
+	for _, item := range items {
+		origin, destination, _, _, ok := fareItemEndpointCalls(item)
+		if !ok {
+			continue
+		}
+		addFareEndpointRefs(origins, origin.StopRef, fareItemLocationRef(item, true), locations)
+		addFareEndpointRefs(destinations, destination.StopRef, fareItemLocationRef(item, false), locations)
+	}
+	return origins, destinations
+}
+
+func addFareEndpointRefs(refs map[string]bool, stopRef, journeyLocationRef string, locations map[string]ctdf.FareLocation) {
+	addFareRef(refs, stopRef)
+	addFareRef(refs, journeyLocationRef)
+	for ref := range locations {
+		if fareLocationMatches(ref, stopRef, journeyLocationRef, locations) {
+			addFareRef(refs, ref)
+		}
+	}
 }
 
 func fareRefFieldMatch(field string, refs []string) bson.M {
