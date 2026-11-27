@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
 	"github.com/travigo/travigo/pkg/util"
@@ -72,8 +74,10 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 	if datasource == nil || datasource.FareVersionID == "" {
 		return datasets.DataImportReport{}, fmt.Errorf("BODS fare import requires a candidate fare version")
 	}
+	importStarted := time.Now()
 	apiKey, err := bodsAPIKey(dataset)
 	if err != nil {
+		log.Error().Err(err).Str("dataset", dataset.Identifier).Str("stage", "authentication").Dur("stage_elapsed", time.Since(importStarted)).Msg("BODS fare import failed")
 		return datasets.DataImportReport{}, err
 	}
 	client := &http.Client{
@@ -95,39 +99,80 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 	importDatasource := *datasource
 	importDatasource.ImportContext = ctx
 
+	metadataStarted := time.Now()
+	log.Info().Str("dataset", dataset.Identifier).Msg("Loading published BODS fare dataset metadata")
 	metadata, err := format.loadFaresMetadata(ctx, client, dataset.Source, apiKey)
 	if err != nil {
+		log.Error().Err(err).Str("dataset", dataset.Identifier).Str("stage", "metadata").Dur("stage_elapsed", time.Since(metadataStarted)).Msg("BODS fare import failed")
 		return datasets.DataImportReport{}, err
 	}
+	log.Info().Str("dataset", dataset.Identifier).Int("published_fare_datasets", len(metadata)).Dur("stage_elapsed", time.Since(metadataStarted)).Msg("Loaded BODS fare dataset metadata")
 	if len(metadata) == 0 {
-		return datasets.DataImportReport{}, fmt.Errorf("BODS fares API returned no published fare datasets")
+		err := fmt.Errorf("BODS fares API returned no published fare datasets")
+		log.Error().Err(err).Str("dataset", dataset.Identifier).Str("stage", "metadata").Dur("stage_elapsed", time.Since(metadataStarted)).Msg("BODS fare import failed")
+		return datasets.DataImportReport{}, err
 	}
 
 	report := datasets.DataImportReport{}
-	for _, entry := range metadata {
+	for index, entry := range metadata {
+		entryStarted := time.Now()
+		entryID := entry.identifier()
+		entryLog := log.With().
+			Str("dataset", dataset.Identifier).
+			Str("fare_dataset_id", entryID).
+			Int("fare_dataset_index", index+1).
+			Int("fare_dataset_count", len(metadata)).
+			Logger()
 		if entry.identifier() == "unknown" {
-			return datasets.DataImportReport{}, fmt.Errorf("BODS fare dataset metadata has no dataset id")
+			err := fmt.Errorf("BODS fare dataset metadata has no dataset id")
+			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
 		downloadURL := entry.downloadURL()
 		if downloadURL == "" {
-			return datasets.DataImportReport{}, fmt.Errorf("BODS fare dataset %s has no downloadable NeTEx URL", entry.identifier())
+			err := fmt.Errorf("BODS fare dataset %s has no downloadable NeTEx URL", entryID)
+			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
 		downloadURL, err = resolveBODSFaresURL(dataset.Source, downloadURL)
 		if err != nil {
-			return datasets.DataImportReport{}, fmt.Errorf("BODS fare dataset %s: %w", entry.identifier(), err)
+			err = fmt.Errorf("BODS fare dataset %s: %w", entryID, err)
+			entryLog.Error().Err(err).Str("stage", "metadata").Dur("elapsed", time.Since(entryStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
+		downloadStarted := time.Now()
+		entryLog.Info().Msg("Downloading BODS fare dataset")
 		body, err := fetchBODSFares(ctx, client, downloadURL, apiKey, maximumFaresDownload)
 		if err != nil {
-			return datasets.DataImportReport{}, fmt.Errorf("download BODS fare dataset %s: %w", entry.identifier(), err)
+			err = fmt.Errorf("download BODS fare dataset %s: %w", entryID, err)
+			entryLog.Error().Err(err).Str("stage", "download").Dur("stage_elapsed", time.Since(downloadStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
+		entryLog.Info().Int("download_bytes", len(body)).Dur("stage_elapsed", time.Since(downloadStarted)).Msg("Downloaded BODS fare dataset")
 		feed := &Fares{SourceNamespace: entry.namespace(), SourceOperators: entry.operatorRefs()}
+		parseStarted := time.Now()
+		entryLog.Info().Msg("Parsing BODS fare dataset")
 		if err := feed.parseNeTExPayload(body); err != nil {
-			return datasets.DataImportReport{}, fmt.Errorf("parse BODS fare dataset %s: %w", entry.identifier(), err)
+			err = fmt.Errorf("parse BODS fare dataset %s: %w", entryID, err)
+			entryLog.Error().Err(err).Str("stage", "parse").Int("download_bytes", len(body)).Dur("stage_elapsed", time.Since(parseStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
+		entryLog.Info().Int("fare_frames", len(findNodes(feed.root, "FareFrame"))).Dur("stage_elapsed", time.Since(parseStarted)).Msg("Parsed BODS fare dataset")
+		feedImportStarted := time.Now()
+		entryLog.Info().Msg("Importing parsed BODS fare dataset")
 		feedReport, err := feed.Import(dataset, &importDatasource)
 		if err != nil {
-			return datasets.DataImportReport{}, fmt.Errorf("import BODS fare dataset %s: %w", entry.identifier(), err)
+			err = fmt.Errorf("import BODS fare dataset %s: %w", entryID, err)
+			entryLog.Error().Err(err).Str("stage", "import").Int("download_bytes", len(body)).Int("fare_frames", len(findNodes(feed.root, "FareFrame"))).Dur("stage_elapsed", time.Since(feedImportStarted)).Msg("BODS fare dataset failed")
+			return datasets.DataImportReport{}, err
 		}
+		entryLog.Info().
+			Int("fare_products", feedReport.ImportedFareProducts).
+			Int("fare_offers", feedReport.ImportedFareOffers).
+			Int("fare_rules", feedReport.ImportedFareRules).
+			Int("fare_locations", feedReport.ImportedFareLocations).
+			Dur("stage_elapsed", time.Since(feedImportStarted)).
+			Msg("Imported BODS fare dataset")
 		report.FareDataPresent = report.FareDataPresent || feedReport.FareDataPresent
 		report.ImportedFareLocations += feedReport.ImportedFareLocations
 		report.ImportedFareProducts += feedReport.ImportedFareProducts
@@ -143,6 +188,14 @@ func (format *Fares) ImportAPI(dataset datasets.DataSet, datasource *ctdf.DataSo
 		report.ImportedFareTransferRules += feedReport.ImportedFareTransferRules
 		report.MergeFareValidityGaps(feedReport)
 	}
+	log.Info().
+		Str("dataset", dataset.Identifier).
+		Int("fare_dataset_count", len(metadata)).
+		Int("fare_products", report.ImportedFareProducts).
+		Int("fare_offers", report.ImportedFareOffers).
+		Int("fare_rules", report.ImportedFareRules).
+		Dur("elapsed", time.Since(importStarted)).
+		Msg("Completed BODS fare API import")
 	return report, nil
 }
 
@@ -153,29 +206,29 @@ func (format *Fares) loadFaresMetadata(ctx context.Context, client *http.Client,
 	for page := 0; page < maximumFaresPages && pageURL != ""; page++ {
 		requestURL, err := bodsAuthenticatedURL(pageURL, apiKey)
 		if err != nil {
-			return nil, fmt.Errorf("invalid BODS fares API URL: %w", err)
+			return nil, fmt.Errorf("page %d: invalid BODS fares API URL: %w", page+1, err)
 		}
 		if seenPages[requestURL] {
-			return nil, fmt.Errorf("BODS fares API pagination repeated a page")
+			return nil, fmt.Errorf("page %d: BODS fares API pagination repeated a page", page+1)
 		}
 		seenPages[requestURL] = true
 		body, err := fetchBODSFares(ctx, client, requestURL, "", maximumFaresMetadata)
 		if err != nil {
-			return nil, fmt.Errorf("request BODS fares metadata: %w", err)
+			return nil, fmt.Errorf("page %d: request BODS fares metadata: %w", page+1, err)
 		}
 		var response faresMetadataPage
 		if err := json.Unmarshal(body, &response); err != nil {
-			return nil, fmt.Errorf("decode BODS fares metadata: %w", err)
+			return nil, fmt.Errorf("page %d: decode BODS fares metadata: %w", page+1, err)
 		}
 		if len(response.Results) == 0 && page == 0 {
-			return nil, fmt.Errorf("BODS fares API response has no results array")
+			return nil, fmt.Errorf("page %d: BODS fares API response has no results array", page+1)
 		}
 		entries = append(entries, response.Results...)
 		pageURL = strings.TrimSpace(response.Next)
 		if pageURL != "" {
 			pageURL, err = resolveBODSFaresURL(requestURL, pageURL)
 			if err != nil {
-				return nil, fmt.Errorf("invalid BODS fares pagination URL: %w", err)
+				return nil, fmt.Errorf("page %d: invalid BODS fares pagination URL: %w", page+1, err)
 			}
 		}
 	}
@@ -256,7 +309,7 @@ func fetchBODSFares(ctx context.Context, client *http.Client, source, apiKey str
 	request.Header.Set("User-Agent", "Travigo fare importer")
 	response, err := client.Do(request)
 	if err != nil {
-		return nil, fmt.Errorf("request failed")
+		return nil, fmt.Errorf("%s", safeBODSFaresRequestError(err))
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
@@ -270,6 +323,24 @@ func fetchBODSFares(ctx context.Context, client *http.Client, source, apiKey str
 		return nil, fmt.Errorf("response exceeded %d bytes", maximumBytes)
 	}
 	return body, nil
+}
+
+func safeBODSFaresRequestError(err error) string {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) || urlErr.Err == nil {
+		return fmt.Sprintf("request failed (%T)", err)
+	}
+	reason := urlErr.Err.Error()
+	if parsedURL, parseErr := url.Parse(urlErr.URL); parseErr == nil {
+		if apiKey := parsedURL.Query().Get("api_key"); apiKey != "" {
+			reason = strings.ReplaceAll(reason, apiKey, "[redacted]")
+			reason = strings.ReplaceAll(reason, url.QueryEscape(apiKey), "[redacted]")
+		}
+	}
+	if strings.Contains(strings.ToLower(reason), "api_key") {
+		return fmt.Sprintf("request failed (%T)", urlErr.Err)
+	}
+	return "request failed: " + reason
 }
 
 func (format *Fares) parseNeTExPayload(body []byte) error {
