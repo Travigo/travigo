@@ -71,6 +71,27 @@ func validGTFSCoordinates(longitude, latitude float64) bool {
 		latitude >= -90 && latitude <= 90
 }
 
+// gtfsStopTimezone follows the parent hierarchy before using the feed timezone.
+// A cycle or missing parent falls back to the agency timezone.
+func gtfsStopTimezone(stop Stop, stops map[string]Stop, agencyTimezone string) string {
+	seen := map[string]bool{}
+	for stop.Parent != "" {
+		if seen[stop.Parent] {
+			return agencyTimezone
+		}
+		seen[stop.Parent] = true
+		parent, ok := stops[stop.Parent]
+		if !ok {
+			return agencyTimezone
+		}
+		stop = parent
+	}
+	if stop.Timezone != "" {
+		return stop.Timezone
+	}
+	return agencyTimezone
+}
+
 type frequencyWindow struct {
 	StartTime      time.Time
 	EndTime        time.Time
@@ -466,12 +487,24 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	}
 
 	//// Stops ////
+	// Read the hierarchy first: GTFS does not require parents to precede children.
+	stopTimezones := map[string]Stop{}
+	if err := importObject[Stop](g, "stops.txt", "stop timezones", false, func(s Stop) (any, string) {
+		stopTimezones[s.ID] = Stop{Parent: s.Parent, Timezone: s.Timezone}
+		return nil, ""
+	}); err != nil {
+		return datasets.DataImportReport{}, fmt.Errorf("read GTFS stop timezones: %w", err)
+	}
+	agencyTimezone := ""
+	if len(g.Agencies) > 0 {
+		agencyTimezone = g.Agencies[0].Timezone
+	}
 	g.stopLocations = map[string]ctdf.Location{}
 	g.stopNames = map[string]string{}
 	g.stopChildren = map[string][]string{}
 	g.fareStopRefs = map[string][]string{}
 	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
-		timezone := s.Timezone
+		timezone := gtfsStopTimezone(s, stopTimezones, agencyTimezone)
 
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, s.ID)
 		if s.ZoneID != "" {
