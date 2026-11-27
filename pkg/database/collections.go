@@ -57,6 +57,9 @@ func createFareIndexes() error {
 		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "originref", Value: 1}, {Key: "destinationref", Value: 1}}},
 		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "routeref", Value: 1}}},
 		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "leggroupref", Value: 1}}},
+		// Only GTFS rules using fallback semantics need this lookup. The partial
+		// index avoids scanning large rail catalogues where the flag is absent.
+		{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}}, Options: options.Index().SetName("fare_fallback_rules").SetPartialFilterExpression(bson.M{"emptyfieldsarefallback": true})},
 	})
 	if err != nil {
 		return fmt.Errorf("create fare leg rule lookup indexes: %w", err)
