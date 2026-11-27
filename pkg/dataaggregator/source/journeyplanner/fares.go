@@ -461,10 +461,12 @@ func loadFareCatalogue(ctx context.Context, datasetID string, items []ctdf.Journ
 	}
 
 	originRefs, destinationRefs := fareRuleEndpointRefs(items, catalogue.locations)
-	rulesFilter := fareFilterAnd(catalogue.versionFilter,
-		fareRefFieldMatch("originref", append([]string{""}, sortedFareRefs(originRefs)...)),
-		fareRefFieldMatch("destinationref", append([]string{""}, sortedFareRefs(destinationRefs)...)),
-	)
+	rulesFilter := bson.M{
+		"datasetid":      head.DatasetID,
+		"fareversionid":  head.ActiveVersionID,
+		"originref":      fareRuleEndpointMatch(originRefs),
+		"destinationref": fareRuleEndpointMatch(destinationRefs),
+	}
 	cursor, err := database.GetCollection("fare_leg_rules").Find(ctx, rulesFilter)
 	if err != nil {
 		catalogue.reason = "The active fare catalogue could not be read."
@@ -3094,6 +3096,17 @@ func addFareEndpointRefs(refs map[string]bool, stopRef, journeyLocationRef strin
 			addFareRef(refs, ref)
 		}
 	}
+}
+
+func fareRuleEndpointMatch(refs map[string]bool) bson.M {
+	// A single $in on each endpoint lets MongoDB bound both parts of the
+	// compound index. Empty and missing strings are wildcards. MongoDB also
+	// matches missing fields with null, so exclude explicitly stored nulls.
+	values := bson.A{nil, ""}
+	for _, ref := range sortedFareRefs(refs) {
+		values = append(values, ref)
+	}
+	return bson.M{"$in": values, "$not": bson.M{"$type": "null"}}
 }
 
 func fareRefFieldMatch(field string, refs []string) bson.M {
