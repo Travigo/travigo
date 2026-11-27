@@ -17,6 +17,8 @@ type JourneyPlan struct {
 	IncludeFares        bool
 	FareRider           string
 	FareMedia           string
+	FareAge             *int
+	FareCards           []ctdf.FareCardSelection
 	StartDateTime       time.Time
 	ArrivalByDateTime   time.Time
 

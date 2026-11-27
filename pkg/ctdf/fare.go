@@ -3,6 +3,7 @@ package ctdf
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -65,17 +66,132 @@ type FareTariff struct {
 }
 
 type FareRiderCategory struct {
-	FareRecord      `bson:",inline"`
-	Name            string `bson:"name"`
-	UserType        string `bson:"usertype,omitempty"`
-	RailcardCode    string `bson:"railcardcode,omitempty"`
-	AdultStatusCode string `bson:"adultstatuscode,omitempty"`
-	ChildStatusCode string `bson:"childstatuscode,omitempty"`
-	MinimumAge      *int   `bson:"minimumage,omitempty"`
-	MaximumAge      *int   `bson:"maximumage,omitempty"`
-	ProofRequired   string `bson:"proofrequired,omitempty"`
-	IsDefault       bool   `bson:"isdefault,omitempty"`
-	EligibilityURL  string `bson:"eligibilityurl,omitempty"`
+	FareRecord        `bson:",inline"`
+	Name              string `bson:"name"`
+	UserType          string `bson:"usertype,omitempty"`
+	CardType          string `bson:"cardtype,omitempty"`
+	HolderType        string `bson:"holdertype,omitempty"`
+	RailcardCode      string `bson:"railcardcode,omitempty"`
+	AdultStatusCode   string `bson:"adultstatuscode,omitempty"`
+	ChildStatusCode   string `bson:"childstatuscode,omitempty"`
+	RestrictedByArea  bool   `bson:"restrictedbyarea,omitempty"`
+	RestrictedByTrain bool   `bson:"restrictedbytrain,omitempty"`
+	RestrictedByDate  bool   `bson:"restrictedbydate,omitempty"`
+	MinimumPassengers int    `bson:"minimumpassengers,omitempty"`
+	MinimumHolders    int    `bson:"minimumholders,omitempty"`
+	MinimumAdults     int    `bson:"minimumadults,omitempty"`
+	MinimumChildren   int    `bson:"minimumchildren,omitempty"`
+	MinimumAge        *int   `bson:"minimumage,omitempty"`
+	MaximumAge        *int   `bson:"maximumage,omitempty"`
+	ProofRequired     string `bson:"proofrequired,omitempty"`
+	IsDefault         bool   `bson:"isdefault,omitempty"`
+	EligibilityURL    string `bson:"eligibilityurl,omitempty"`
+}
+
+func (rider FareRiderCategory) RequiresEligibilityProof() bool {
+	return strings.TrimSpace(rider.ProofRequired) != "" || strings.TrimSpace(rider.EligibilityURL) != ""
+}
+
+func (rider FareRiderCategory) IsAgeOnlyCategory() bool {
+	if rider.RequiresEligibilityProof() {
+		return false
+	}
+	category := strings.TrimSpace(rider.UserType)
+	if category == "" {
+		category = strings.TrimSpace(rider.Name)
+	}
+	switch strings.ToLower(category) {
+	case "adult", "child", "infant":
+		return true
+	default:
+		return false
+	}
+}
+
+// FareRailStatusDiscount stores one RSPS5045 status and ticket discount
+// category pair. Flat, maximum and minimum values are in pence; percentage is
+// in tenths of one percent as encoded by the source feed.
+type FareRailStatusDiscount struct {
+	FareRecord            `bson:",inline"`
+	StatusCode            string `bson:"statuscode"`
+	DiscountCategory      string `bson:"discountcategory"`
+	Indicator             string `bson:"indicator"`
+	PercentageTenths      int    `bson:"percentagetenths,omitempty"`
+	FirstSingleMaxFlat    int64  `bson:"firstsinglemaxflat,omitempty"`
+	FirstReturnMaxFlat    int64  `bson:"firstreturnmaxflat,omitempty"`
+	StandardSingleMaxFlat int64  `bson:"standardsinglemaxflat,omitempty"`
+	StandardReturnMaxFlat int64  `bson:"standardreturnmaxflat,omitempty"`
+	FirstLowerMinimum     int64  `bson:"firstlowerminimum,omitempty"`
+	FirstHigherMinimum    int64  `bson:"firsthigherminimum,omitempty"`
+	StandardLowerMinimum  int64  `bson:"standardlowerminimum,omitempty"`
+	StandardHigherMinimum int64  `bson:"standardhigherminimum,omitempty"`
+	ClassMarkers          string `bson:"classmarkers,omitempty"`
+}
+
+// FareRailcardMinimumFare stores the RSPS5045 minimum fare for one ticket and
+// railcard combination. The minimum applies only when a matching train
+// restriction says it is in force, and only to adult railcard fares.
+type FareRailcardMinimumFare struct {
+	FareRecord   `bson:",inline"`
+	RailcardCode string `bson:"railcardcode"`
+	TicketCode   string `bson:"ticketcode"`
+	AmountPence  int64  `bson:"amountpence"`
+}
+
+func (minimum FareRailcardMinimumFare) Validate() error {
+	if err := minimum.FareRecord.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(minimum.RailcardCode) == "" || len(minimum.RailcardCode) > 3 {
+		return fmt.Errorf("railcard minimum fare requires a railcard code of at most three characters")
+	}
+	if strings.TrimSpace(minimum.TicketCode) == "" || len(minimum.TicketCode) > 3 {
+		return fmt.Errorf("railcard minimum fare requires a ticket code of at most three characters")
+	}
+	if minimum.AmountPence <= 0 {
+		return fmt.Errorf("railcard minimum fare must be greater than zero pence")
+	}
+	return nil
+}
+
+func (discount FareRailStatusDiscount) Validate() error {
+	if err := discount.FareRecord.Validate(); err != nil {
+		return err
+	}
+	if len(discount.StatusCode) != 3 {
+		return fmt.Errorf("rail status code must contain three characters")
+	}
+	category, err := strconv.Atoi(discount.DiscountCategory)
+	if err != nil || category < 1 || category > 20 {
+		return fmt.Errorf("rail discount category must be between 1 and 20")
+	}
+	switch discount.Indicator {
+	case "0", "F", "M", "H", "L", "X", "N":
+	default:
+		return fmt.Errorf("unsupported rail discount indicator %q", discount.Indicator)
+	}
+	if discount.PercentageTenths < 0 || discount.PercentageTenths > 1000 {
+		return fmt.Errorf("rail discount percentage must be between 0 and 100 percent")
+	}
+	for _, amount := range []int64{
+		discount.FirstSingleMaxFlat, discount.FirstReturnMaxFlat,
+		discount.StandardSingleMaxFlat, discount.StandardReturnMaxFlat,
+		discount.FirstLowerMinimum, discount.FirstHigherMinimum,
+		discount.StandardLowerMinimum, discount.StandardHigherMinimum,
+	} {
+		if amount < 0 {
+			return fmt.Errorf("rail status discount amounts cannot be negative")
+		}
+	}
+	if discount.ClassMarkers != "" && len(discount.ClassMarkers) != 4 {
+		return fmt.Errorf("rail status class markers must contain four characters")
+	}
+	for _, marker := range discount.ClassMarkers {
+		if marker != 'Y' && marker != 'N' {
+			return fmt.Errorf("rail status class markers must contain only Y or N")
+		}
+	}
+	return nil
 }
 
 func (rider FareRiderCategory) Validate() error {
@@ -90,6 +206,11 @@ func (rider FareRiderCategory) Validate() error {
 	}
 	if rider.MaximumAge != nil && *rider.MaximumAge < 0 {
 		return fmt.Errorf("fare rider maximum age cannot be negative")
+	}
+	for _, minimum := range []int{rider.MinimumPassengers, rider.MinimumHolders, rider.MinimumAdults, rider.MinimumChildren} {
+		if minimum < 0 {
+			return fmt.Errorf("fare rider minimum group sizes cannot be negative")
+		}
 	}
 	if rider.MinimumAge != nil && rider.MaximumAge != nil && *rider.MaximumAge < *rider.MinimumAge {
 		return fmt.Errorf("fare rider maximum age is less than its minimum age")
@@ -536,21 +657,22 @@ type FareQuote struct {
 // FareCatalogue is a candidate or active version loaded as one validation unit.
 // Persisted records remain in their typed collections.
 type FareCatalogue struct {
-	DatasetID       string
-	FareVersionID   string
-	Locations       []FareLocation
-	Tariffs         []FareTariff
-	Products        []FareProduct
-	RiderCategories []FareRiderCategory
-	Media           []FareMedia
-	Networks        []FareNetwork
-	RouteNetworks   []FareRouteNetwork
-	Timeframes      []FareTimeframe
-	Offers          []FareOffer
-	LegRules        []FareLegRule
-	TransferRules   []FareTransferRule
-	EffectiveJoins  []FareEffectiveLegJoin
-	Caps            []FareCap
+	DatasetID           string
+	FareVersionID       string
+	Locations           []FareLocation
+	Tariffs             []FareTariff
+	Products            []FareProduct
+	RiderCategories     []FareRiderCategory
+	RailStatusDiscounts []FareRailStatusDiscount
+	Media               []FareMedia
+	Networks            []FareNetwork
+	RouteNetworks       []FareRouteNetwork
+	Timeframes          []FareTimeframe
+	Offers              []FareOffer
+	LegRules            []FareLegRule
+	TransferRules       []FareTransferRule
+	EffectiveJoins      []FareEffectiveLegJoin
+	Caps                []FareCap
 }
 
 func (record FareRecord) Validate() error {

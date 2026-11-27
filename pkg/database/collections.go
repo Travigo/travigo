@@ -35,6 +35,7 @@ func createIndexes() error {
 	EnsureDatasetRetirementIndexes(context.Background())
 	createUserNotificationSubscriptionsIndexes()
 	createUserCommutesIndexes()
+	createUserFareProfileIndexes()
 	if err := EnsureTDMappingsIndex(context.Background()); err != nil {
 		log.Error().Err(err).Msg("Creating rail TD mappings index")
 	}
@@ -43,7 +44,7 @@ func createIndexes() error {
 
 func createFareIndexes() error {
 	ctx := context.Background()
-	for _, collectionName := range []string{"fare_locations", "fare_tariffs", "fare_products", "fare_rider_categories", "fare_media", "fare_networks", "fare_route_networks", "fare_timeframes", "fare_offers", "fare_leg_rules", "fare_transfer_rules", "fare_effective_leg_joins", "fare_caps"} {
+	for _, collectionName := range []string{"fare_locations", "fare_tariffs", "fare_products", "fare_rider_categories", "fare_rail_status_discounts", "fare_railcard_minimum_fares", "fare_media", "fare_networks", "fare_route_networks", "fare_timeframes", "fare_offers", "fare_leg_rules", "fare_transfer_rules", "fare_effective_leg_joins", "fare_caps"} {
 		_, err := GetCollection(collectionName).Indexes().CreateMany(ctx, []mongo.IndexModel{
 			{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}}},
 			{Keys: bson.D{{Key: "datasetid", Value: 1}, {Key: "fareversionid", Value: 1}, {Key: "primaryidentifier", Value: 1}}, Options: options.Index().SetUnique(true)},
@@ -178,6 +179,16 @@ func createUserNotificationSubscriptionsIndexes() {
 	})
 	if err != nil {
 		log.Error().Err(err).Msg("Creating User Notification Subscriptions Index")
+	}
+}
+
+func createUserFareProfileIndexes() {
+	_, err := GetCollection("user_fare_profiles").Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys:    bson.D{{Key: "userid", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("Creating User Fare Profile Index")
 	}
 }
 

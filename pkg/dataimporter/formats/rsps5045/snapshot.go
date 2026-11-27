@@ -52,7 +52,7 @@ func (format *Fares) prepareSourceArchive(ctx context.Context, datasetID, fareVe
 	collection := database.GetCollection(sourceRecordCollection)
 	validateRequiredRows := func() error {
 		for _, fileType := range []string{"FFL", "FSC", "LOC", "RTE", "TTY"} {
-			count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType})
+			count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType}, options.Count().SetLimit(1))
 			if err != nil {
 				return fmt.Errorf("count RSPS5045 %s source rows: %w", fileType, err)
 			}
@@ -173,7 +173,9 @@ func cloneSourceSnapshot(ctx context.Context, fromVersion, datasetID, toVersion 
 	if _, err := collection.DeleteMany(ctx, bson.M{"datasetid": datasetID, "fareversionid": toVersion}); err != nil {
 		return fmt.Errorf("clear candidate RSPS5045 source snapshot: %w", err)
 	}
-	cursor, err := collection.Find(ctx, bson.M{"datasetid": datasetID, "fareversionid": fromVersion}, options.Find().SetSort(bson.D{{Key: "sourcekey", Value: 1}}).SetBatchSize(writeBatchSize))
+	// Preserve source-key order within each file type for legacy rekeying,
+	// and let the snapshot's compound index provide that order.
+	cursor, err := collection.Find(ctx, bson.M{"datasetid": datasetID, "fareversionid": fromVersion}, options.Find().SetSort(bson.D{{Key: "filetype", Value: 1}, {Key: "sourcekey", Value: 1}}).SetBatchSize(writeBatchSize))
 	if err != nil {
 		return fmt.Errorf("read active RSPS5045 source snapshot: %w", err)
 	}
@@ -211,7 +213,7 @@ func cloneSourceSnapshot(ctx context.Context, fromVersion, datasetID, toVersion 
 	if err := writeSourceRows(ctx, collection, writes, datasource); err != nil {
 		return err
 	}
-	count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": toVersion})
+	count, err := collection.CountDocuments(ctx, bson.M{"datasetid": datasetID, "fareversionid": toVersion}, options.Count().SetLimit(1))
 	if err != nil {
 		return fmt.Errorf("verify candidate RSPS5045 source snapshot: %w", err)
 	}
@@ -663,7 +665,7 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 			_ = writer.Close()
 			return failed(fmt.Errorf("write merged RSPS5045 %s header: %w", fileType, err))
 		}
-		cursor, findErr := collection.Find(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType}, options.Find().SetSort(bson.D{{Key: "sourcekey", Value: 1}}).SetBatchSize(writeBatchSize))
+		cursor, findErr := collection.Find(ctx, bson.M{"datasetid": datasetID, "fareversionid": fareVersionID, "filetype": fileType}, options.Find().SetSort(bson.D{{Key: "sourcekey", Value: 1}}).SetProjection(bson.M{"_id": 0, "record": 1}).SetBatchSize(writeBatchSize))
 		if findErr != nil {
 			_ = writer.Close()
 			return failed(fmt.Errorf("read merged RSPS5045 %s rows: %w", fileType, findErr))
@@ -674,7 +676,9 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 		lastProgress := fileStarted
 		log.Info().Str("dataset", datasetID).Str("file_type", fileType).Int64("records", count).Msg("Rebuilding RSPS5045 snapshot member")
 		for cursor.Next(ctx) {
-			var row sourceRecord
+			var row struct {
+				Record string `bson:"record"`
+			}
 			if err := cursor.Decode(&row); err != nil {
 				cursor.Close(ctx)
 				_ = writer.Close()
@@ -684,10 +688,15 @@ func buildSnapshotArchive(ctx context.Context, datasetID, fareVersionID, sequenc
 			if snapshotMarkerTypes[fileType] && len(record) > 0 {
 				record = "R" + record[1:]
 			}
-			if _, err := buffer.WriteString(record + "\n"); err != nil {
+			if _, err := buffer.WriteString(record); err != nil {
 				cursor.Close(ctx)
 				_ = writer.Close()
 				return failed(fmt.Errorf("write merged RSPS5045 %s row: %w", fileType, err))
+			}
+			if err := buffer.WriteByte('\n'); err != nil {
+				cursor.Close(ctx)
+				_ = writer.Close()
+				return failed(fmt.Errorf("write merged RSPS5045 %s newline: %w", fileType, err))
 			}
 			rows++
 			if rspsProgressDue(rows, lastProgress) {

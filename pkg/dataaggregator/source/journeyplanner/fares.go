@@ -25,6 +25,8 @@ type fareCatalogue struct {
 	transferRules            []ctdf.FareTransferRule
 	effectiveJoins           []ctdf.FareEffectiveLegJoin
 	caps                     []ctdf.FareCap
+	railStatusDiscounts      []ctdf.FareRailStatusDiscount
+	railcardMinimumFares     []ctdf.FareRailcardMinimumFare
 	locations                map[string]ctdf.FareLocation
 	products                 map[string]ctdf.FareProduct
 	riders                   map[string]ctdf.FareRiderCategory
@@ -41,7 +43,7 @@ type fareCatalogue struct {
 	reason                   string
 }
 
-func addFareQuotes(ctx context.Context, plans []ctdf.JourneyPlan, rider, media string) {
+func addFareQuotes(ctx context.Context, plans []ctdf.JourneyPlan, rider, media string, age *int, cards []ctdf.FareCardSelection) {
 	catalogues := map[string]*fareCatalogue{}
 	itemsByDataset := map[string][]ctdf.JourneyPlanRouteItem{}
 	for index := range plans {
@@ -59,7 +61,7 @@ func addFareQuotes(ctx context.Context, plans []ctdf.JourneyPlan, rider, media s
 		catalogues[datasetID] = loadFareCatalogue(ctx, datasetID, items, rider, media)
 	}
 	for index := range plans {
-		plans[index].Fare = calculatePlanFare(ctx, plans[index], catalogues, rider, media)
+		plans[index].Fare = calculatePlanFare(ctx, plans[index], catalogues, rider, media, age, cards)
 	}
 }
 
@@ -572,7 +574,9 @@ func loadFareCatalogue(ctx context.Context, datasetID string, items []ctdf.Journ
 	catalogue.riders = readFareRiders(ctx, fareRiderFilter(catalogue.versionFilter, sortedFareRefs(riderRefs), rider))
 	catalogue.media = readFareMedia(ctx, fareMediaFilter(catalogue.versionFilter, sortedFareRefs(mediaRefs), media))
 	catalogue.caps = readFareCaps(ctx, catalogue.versionFilter)
-	if catalogue.offers == nil || catalogue.riders == nil || catalogue.media == nil || catalogue.caps == nil {
+	catalogue.railStatusDiscounts = readFareRailStatusDiscounts(ctx, catalogue.versionFilter)
+	catalogue.railcardMinimumFares = readFareRailcardMinimumFares(ctx, catalogue.versionFilter)
+	if catalogue.offers == nil || catalogue.riders == nil || catalogue.media == nil || catalogue.caps == nil || catalogue.railStatusDiscounts == nil || catalogue.railcardMinimumFares == nil {
 		catalogue.reason = "The active fare product options could not be read."
 		return catalogue
 	}
@@ -667,8 +671,8 @@ func loadFareCatalogue(ctx context.Context, datasetID string, items []ctdf.Journ
 	return catalogue
 }
 
-func calculatePlanFare(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string) *ctdf.FareQuote {
-	return calculatePlanFareWithMatches(ctx, plan, catalogues, rider, media, nil)
+func calculatePlanFare(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string, age *int, cards []ctdf.FareCardSelection) *ctdf.FareQuote {
+	return calculatePlanFareWithMatches(ctx, plan, catalogues, rider, media, age, cards, nil)
 }
 
 type fareMatchedProduct struct {
@@ -695,11 +699,11 @@ func legacyFareTransferPolicyForProduct(product ctdf.FareProduct) *legacyFareTra
 	}
 }
 
-func calculatePlanFareWithMatches(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string, matches *[]fareMatchedProduct) *ctdf.FareQuote {
-	return calculatePlanFareWithScope(ctx, plan, catalogues, rider, media, matches, nil)
+func calculatePlanFareWithMatches(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string, age *int, cards []ctdf.FareCardSelection, matches *[]fareMatchedProduct) *ctdf.FareQuote {
+	return calculatePlanFareWithScope(ctx, plan, catalogues, rider, media, age, cards, matches, nil)
 }
 
-func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string, matches *[]fareMatchedProduct, itineraryScope []ctdf.JourneyPlanRouteItem) *ctdf.FareQuote {
+func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, catalogues map[string]*fareCatalogue, rider, media string, age *int, cards []ctdf.FareCardSelection, matches *[]fareMatchedProduct, itineraryScope []ctdf.JourneyPlanRouteItem) *ctdf.FareQuote {
 	journeyItems := planJourneyItems(plan)
 	if len(journeyItems) == 0 {
 		return unavailableFare("This itinerary has no fareable transit leg.")
@@ -740,7 +744,7 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 			if allSameCatalogue {
 				scope = journeyItems
 			}
-			componentQuote := calculatePlanFareWithScope(ctx, itemPlan, catalogues, rider, media, &perLegMatches[index], scope)
+			componentQuote := calculatePlanFareWithScope(ctx, itemPlan, catalogues, rider, media, age, cards, &perLegMatches[index], scope)
 			segmentQuotes[index] = componentQuote
 			for _, assumption := range componentQuote.PassengerAssumptions {
 				if !containsFareRef(quote.PassengerAssumptions, assumption) {
@@ -782,8 +786,8 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 		for index := range segments {
 			segmentItems[index] = segments[index].item
 		}
-		combined, reason := combineFareLegs(segmentItems, perLegMatches, catalogues, allSameCatalogue, rider, media)
-		if reason != "" {
+		combined, reason := combineFareLegs(segmentItems, perLegMatches, catalogues, allSameCatalogue, rider, media, age, cards)
+		if len(combined) == 0 && reason != "" {
 			quote.Certainty = ctdf.FareCertaintyPartial
 			quote.Reason = reason
 			if matches != nil {
@@ -797,7 +801,12 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 			return quote
 		}
 		quote.Alternatives = combined
-		quote.Price = &quote.Alternatives[0].Price
+		if reason == "" {
+			quote.Price = &quote.Alternatives[0].Price
+		} else {
+			quote.Certainty = ctdf.FareCertaintyPartial
+			quote.Reason = reason
+		}
 		for _, item := range journeyItems {
 			if item.Journey != nil && item.Journey.DataSource != nil {
 				quote.Source = item.Journey.DataSource.ProviderName
@@ -810,10 +819,11 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 		for _, component := range quote.Components {
 			if component.Certainty == ctdf.FareCertaintyPartial || component.Certainty == ctdf.FareCertaintyUnavailable {
 				quote.Certainty = ctdf.FareCertaintyPartial
-				quote.Reason = component.Reason
-				if quote.Reason == "" {
-					quote.Reason = "At least one transit leg has only a partial fare match."
+				componentReason := component.Reason
+				if componentReason == "" {
+					componentReason = "At least one transit leg has only a partial fare match."
 				}
+				quote.Reason = appendFareReason(quote.Reason, componentReason)
 				break
 			}
 		}
@@ -834,7 +844,9 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 	if len(catalogue.caps) > 0 {
 		return partialFare("The active fare catalogue contains fare caps, but prior fare spending is unavailable.")
 	}
-	riderRefs, riderAssumption, riderRequestFound := resolveFareRiderRefs(catalogue, rider)
+	travelDate, _ := fareItemValidationTimes(item)
+	travelDate = fareLocalJourneyTime(travelDate, journey)
+	riderRefs, riderAssumption, riderRequestFound, profileRiderReason := resolveFarePassenger(catalogue, rider, age, cards, travelDate)
 	mediaRefs, mediaRequestFound := resolveFareMediaRefs(catalogue, media)
 	if rider != "" && !riderRequestFound {
 		return partialFare("The requested rider category is not present in the active fare catalogue.")
@@ -842,7 +854,7 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 	if media != "" && !mediaRequestFound {
 		return partialFare("The requested fare media is not present in the active fare catalogue.")
 	}
-	requestedRailcards := selectedFareRailcards(catalogue, riderRefs)
+	requestedRailcards := selectedFareRailcards(catalogue, riderRefs, cards, travelDate)
 
 	origin, destination, _, _, endpointsOK := fareItemEndpointCalls(item)
 	if !endpointsOK || origin == nil || destination == nil {
@@ -864,7 +876,7 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 	if riderAssumption != "" {
 		quote.PassengerAssumptions = []string{riderAssumption}
 	}
-	partialReason := ""
+	partialReason := profileRiderReason
 	deferredPartialReason := ""
 	deferredPriority := -1
 	dateFiltered := false
@@ -930,11 +942,12 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 			}
 		}
 		rulePartialReason := ""
+		minimumFareApplies := false
 		if len(rule.UnresolvedConstraints) > 0 {
 			rulePartialReason = appendFareReason(rulePartialReason, "A matching fare has route, restriction or validity conditions that are not yet evaluated: "+strings.Join(rule.UnresolvedConstraints, "; "))
 		}
 		if rule.RailConditions != nil {
-			matches, reason := fareRailConditionsMatch(ctx, catalogue, rule.RailConditions, journey, item)
+			matches, reason := fareRailConditionsMatch(ctx, catalogue, rule.RailConditions, journey, item, &minimumFareApplies)
 			if !matches {
 				continue
 			}
@@ -942,22 +955,16 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 				rulePartialReason = appendFareReason(rulePartialReason, reason)
 			}
 		}
-		if rule.RiderRef != "" {
+		if !fareRiderMatches(catalogue, rule.RiderRef, riderRefs, age != nil && rider == "" && rule.RailConditions != nil, requestedRailcards) {
 			if len(riderRefs) == 0 {
 				if rule.RulePriority > deferredPriority {
 					deferredPriority = rule.RulePriority
-					deferredPartialReason = "A matching fare requires a rider category; the catalogue has no default adult category."
+					deferredPartialReason = "A matching fare requires a rider category; no eligible category could be resolved."
 				} else if rule.RulePriority == deferredPriority {
-					deferredPartialReason = appendFareReason(deferredPartialReason, "A matching fare requires a rider category; the catalogue has no default adult category.")
+					deferredPartialReason = appendFareReason(deferredPartialReason, "A matching fare requires a rider category; no eligible category could be resolved.")
 				}
-				continue
 			}
-			if !riderRefs[rule.RiderRef] {
-				if len(requestedRailcards) == 0 || !fareRiderIsAdult(rule.RiderRef, catalogue) {
-					continue
-				}
-				rulePartialReason = appendFareReason(rulePartialReason, "The selected railcard is recognized, but its discount has not been calculated; the displayed price is the published adult fare.")
-			}
+			continue
 		}
 		if media != "" && rule.MediaRef != "" {
 			if !mediaRefs[rule.MediaRef] {
@@ -1006,19 +1013,16 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 				passengerFiltered = true
 				continue
 			}
-			if product.RiderRef != "" {
+			if !fareRiderMatches(catalogue, product.RiderRef, riderRefs, age != nil && rider == "" && product.RailTicket != nil, requestedRailcards) {
 				if len(riderRefs) == 0 {
 					if rule.RulePriority > deferredPriority {
 						deferredPriority = rule.RulePriority
-						deferredPartialReason = "A matching fare requires a rider category; the catalogue has no default adult category."
+						deferredPartialReason = "A matching fare requires a rider category; no eligible category could be resolved."
 					} else if rule.RulePriority == deferredPriority {
-						deferredPartialReason = appendFareReason(deferredPartialReason, "A matching fare requires a rider category; the catalogue has no default adult category.")
+						deferredPartialReason = appendFareReason(deferredPartialReason, "A matching fare requires a rider category; no eligible category could be resolved.")
 					}
-					continue
 				}
-				if !riderRefs[product.RiderRef] && (len(requestedRailcards) == 0 || !fareRiderIsAdult(product.RiderRef, catalogue)) {
-					continue
-				}
+				continue
 			}
 			if media != "" && product.MediaRef != "" && !mediaRefs[product.MediaRef] {
 				continue
@@ -1034,7 +1038,7 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 		}
 		if rule.RulePriority > highestPriority {
 			highestPriority = rule.RulePriority
-			partialReason = ""
+			partialReason = profileRiderReason
 			quote.Alternatives = nil
 			seenOffers = map[string]bool{}
 			matchedProducts = nil
@@ -1077,17 +1081,11 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 				passengerFiltered = true
 				continue
 			}
-			if product.RiderRef != "" {
+			if !fareRiderMatches(catalogue, product.RiderRef, riderRefs, age != nil && rider == "" && product.RailTicket != nil, requestedRailcards) {
 				if len(riderRefs) == 0 {
-					partialReason = appendFareReason(partialReason, "A matching fare requires a rider category; the catalogue has no default adult category.")
-					continue
+					partialReason = appendFareReason(partialReason, "A matching fare requires a rider category; no eligible category could be resolved.")
 				}
-				if !riderRefs[product.RiderRef] {
-					if len(requestedRailcards) == 0 || !fareRiderIsAdult(product.RiderRef, catalogue) {
-						continue
-					}
-					partialReason = appendFareReason(partialReason, "The selected railcard is recognized, but its discount has not been calculated; the displayed price is the published adult fare.")
-				}
+				continue
 			}
 			if media != "" && product.MediaRef != "" {
 				if !mediaRefs[product.MediaRef] {
@@ -1098,16 +1096,12 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 			if mediaRef == "" {
 				mediaRef = product.MediaRef
 			}
-			alternativeKey := offer.PrimaryIdentifier + "\x00" + mediaRef
 			conditions := append([]string(nil), offer.SalesConditions...)
 			if product.RailTicket != nil {
 				conditions = append(conditions, fareRailTicketConditions(*product.RailTicket)...)
 			}
 			if rule.RailConditions != nil {
 				conditions = append(conditions, fareRailConditionDescriptions(rule.RailConditions)...)
-			}
-			for _, railcard := range requestedRailcards {
-				conditions = append(conditions, "Railcard requested: "+railcard.Name+"; no railcard discount is included in this published adult fare.")
 			}
 			if offer.SalesOfferPackage != "" {
 				conditions = append(conditions, "Purchase option: "+offer.SalesOfferPackage)
@@ -1126,27 +1120,33 @@ func calculatePlanFareWithScope(ctx context.Context, plan ctdf.JourneyPlan, cata
 			if riderRef == "" {
 				riderRef = product.RiderRef
 			}
-			if riderRef != "" {
+			if riderRef != "" && !(product.RailTicket != nil && age != nil) {
 				if rider, exists := catalogue.riders[riderRef]; exists {
 					conditions = append(conditions, fareRiderCondition(rider))
 				}
 			}
-			alternative := ctdf.FareQuoteAlternative{
-				ProductRef:  product.PrimaryIdentifier,
-				Name:        product.Name,
-				Price:       offer.Price,
-				Conditions:  conditions,
-				PurchaseURL: offer.SalesURL,
-			}
-			matchedProducts = append(matchedProducts, fareMatchedProduct{
-				alternative:          alternative,
-				legGroupRef:          rule.LegGroupRef,
-				offerRef:             offer.PrimaryIdentifier,
-				legacyTransferPolicy: legacyFareTransferPolicyForProduct(product),
-			})
-			if !seenOffers[alternativeKey] {
-				seenOffers[alternativeKey] = true
-				quote.Alternatives = append(quote.Alternatives, alternative)
+			nonStandardDiscount := rule.RailConditions != nil && rule.RailConditions.NonStandardDiscount
+			priceVariants := railFarePriceVariants(catalogue, product, offer.Price, travelDate, age, requestedRailcards, nonStandardDiscount, minimumFareApplies)
+			for _, priceVariant := range priceVariants {
+				partialReason = appendFareReason(partialReason, priceVariant.partialReason)
+				alternativeKey := offer.PrimaryIdentifier + "\x00" + mediaRef + "\x00" + priceVariant.key
+				alternative := ctdf.FareQuoteAlternative{
+					ProductRef:  product.PrimaryIdentifier,
+					Name:        product.Name,
+					Price:       priceVariant.price,
+					Conditions:  append(append([]string(nil), conditions...), priceVariant.conditions...),
+					PurchaseURL: offer.SalesURL,
+				}
+				matchedProducts = append(matchedProducts, fareMatchedProduct{
+					alternative:          alternative,
+					legGroupRef:          rule.LegGroupRef,
+					offerRef:             offer.PrimaryIdentifier,
+					legacyTransferPolicy: legacyFareTransferPolicyForProduct(product),
+				})
+				if !seenOffers[alternativeKey] {
+					seenOffers[alternativeKey] = true
+					quote.Alternatives = append(quote.Alternatives, alternative)
+				}
 			}
 		}
 	}
@@ -1264,7 +1264,7 @@ func appendFareAccumulation(values *[]fareAccumulation, seen map[string]bool, va
 	return true
 }
 
-func combineFareLegs(items []ctdf.JourneyPlanRouteItem, legMatches [][]fareMatchedProduct, catalogues map[string]*fareCatalogue, allSameCatalogue bool, rider, media string) ([]ctdf.FareQuoteAlternative, string) {
+func combineFareLegs(items []ctdf.JourneyPlanRouteItem, legMatches [][]fareMatchedProduct, catalogues map[string]*fareCatalogue, allSameCatalogue bool, rider, media string, age *int, cards []ctdf.FareCardSelection) ([]ctdf.FareQuoteAlternative, string) {
 	if len(items) != len(legMatches) || len(items) < 2 {
 		return nil, "The itinerary's fare legs could not be aligned with their fare rules."
 	}
@@ -1299,6 +1299,7 @@ func combineFareLegs(items []ctdf.JourneyPlanRouteItem, legMatches [][]fareMatch
 	}
 
 	const maxFareCombinations = 256
+	partialReason := ""
 	accumulations := make([]fareAccumulation, 0, min(len(legMatches[0]), maxFareCombinations))
 	initialSeen := map[string]bool{}
 	for _, match := range legMatches[0] {
@@ -1404,10 +1405,12 @@ func combineFareLegs(items []ctdf.JourneyPlanRouteItem, legMatches [][]fareMatch
 
 				for _, rule := range applicableRules {
 					transferTime, _ := fareItemValidationTimes(items[legIndex])
-					transferProducts, reason := fareTransferProducts(catalogue, rule, rider, media, transferTime)
-					if reason != "" {
+					transferTime = fareLocalJourneyTime(transferTime, items[legIndex].Journey)
+					transferProducts, reason := fareTransferProducts(catalogue, rule, rider, media, age, cards, transferTime)
+					if len(transferProducts) == 0 && reason != "" {
 						return nil, reason
 					}
+					partialReason = appendFareReason(partialReason, reason)
 					for _, transfer := range transferProducts {
 						value := cloneFareAccumulation(accumulation)
 						value.lastGroup = match.legGroupRef
@@ -1537,7 +1540,7 @@ func combineFareLegs(items []ctdf.JourneyPlanRouteItem, legMatches [][]fareMatch
 			return nil, "Matching fares use different currencies and cannot be compared."
 		}
 	}
-	return result, ""
+	return result, partialReason
 }
 
 func matchingFareTransferRules(catalogue *fareCatalogue, fromGroup, toGroup string, currentTransferCount int) []ctdf.FareTransferRule {
@@ -1661,7 +1664,7 @@ func fareItemLegRange(item ctdf.JourneyPlanRouteItem) (int, int, bool) {
 	return startLeg, endLeg, ok
 }
 
-func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, rider, media string, travelTime time.Time) ([]fareTransferProduct, string) {
+func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, rider, media string, age *int, cards []ctdf.FareCardSelection, travelTime time.Time) ([]fareTransferProduct, string) {
 	productRefs := rule.ProductRefs
 	if len(productRefs) == 0 && rule.ProductRef != "" {
 		productRefs = []string{rule.ProductRef}
@@ -1669,7 +1672,7 @@ func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, 
 	if len(productRefs) == 0 {
 		return []fareTransferProduct{{price: ctdf.FareMoney{Currency: ""}, name: "Free transfer"}}, ""
 	}
-	riderRefs, _, riderFound := resolveFareRiderRefs(catalogue, rider)
+	riderRefs, _, riderFound, partialReason := resolveFarePassenger(catalogue, rider, age, cards, travelTime)
 	mediaRefs, mediaFound := resolveFareMediaRefs(catalogue, media)
 	if rider != "" && !riderFound {
 		return nil, "The requested rider category is not present for a matching transfer fare."
@@ -1677,13 +1680,14 @@ func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, 
 	if media != "" && !mediaFound {
 		return nil, "The requested fare medium is not present for a matching transfer fare."
 	}
+	requestedRailcards := selectedFareRailcards(catalogue, riderRefs, cards, travelTime)
 	result := make([]fareTransferProduct, 0)
 	for _, productRef := range productRefs {
 		product, exists := catalogue.products[productRef]
 		if !exists {
 			return nil, "A matching transfer rule references a missing fare product."
 		}
-		if product.RiderRef != "" && (len(riderRefs) == 0 || !riderRefs[product.RiderRef]) {
+		if !fareRiderMatches(catalogue, product.RiderRef, riderRefs, age != nil && rider == "" && product.RailTicket != nil, requestedRailcards) {
 			continue
 		}
 		if media != "" && product.MediaRef != "" && !mediaRefs[product.MediaRef] {
@@ -1699,7 +1703,18 @@ func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, 
 					conditions = append(conditions, "Ticket medium: "+fareMedia.Name)
 				}
 			}
-			result = append(result, fareTransferProduct{ref: productRef, name: product.Name, price: offer.Price, conditions: conditions, purchaseURL: offer.SalesURL})
+			if product.RiderRef != "" && !(product.RailTicket != nil && age != nil) {
+				if category, exists := catalogue.riders[product.RiderRef]; exists {
+					conditions = append(conditions, fareRiderCondition(category))
+				}
+			}
+			for _, variant := range railFarePriceVariants(catalogue, product, offer.Price, travelTime, age, requestedRailcards, false, false) {
+				partialReason = appendFareReason(partialReason, variant.partialReason)
+				result = append(result, fareTransferProduct{
+					ref: productRef, name: product.Name, price: variant.price,
+					conditions: append(append([]string(nil), conditions...), variant.conditions...), purchaseURL: offer.SalesURL,
+				})
+			}
 		}
 	}
 	if len(result) == 0 {
@@ -1714,7 +1729,7 @@ func fareTransferProducts(catalogue *fareCatalogue, rule ctdf.FareTransferRule, 
 		}
 		return result[i].price.AmountMinor < result[j].price.AmountMinor
 	})
-	return result, ""
+	return result, partialReason
 }
 
 func cloneFareAccumulation(value fareAccumulation) fareAccumulation {
@@ -1871,7 +1886,7 @@ func fareRailConditionDescriptions(conditions *ctdf.FareRailConditions) []string
 	return values
 }
 
-func fareRailConditionsMatch(ctx context.Context, catalogue *fareCatalogue, conditions *ctdf.FareRailConditions, journey *ctdf.Journey, item ctdf.JourneyPlanRouteItem) (bool, string) {
+func fareRailConditionsMatch(ctx context.Context, catalogue *fareCatalogue, conditions *ctdf.FareRailConditions, journey *ctdf.Journey, item ctdf.JourneyPlanRouteItem, minimumFareApplies *bool) (bool, string) {
 	travelTime, _ := fareItemValidationTimes(item)
 	if travelTime.IsZero() {
 		return true, "Rail restrictions depend on a journey date or time that is unavailable."
@@ -2080,7 +2095,9 @@ func fareRailConditionsMatch(ctx context.Context, catalogue *fareCatalogue, cond
 				}
 				if matched {
 					if timeRestriction.MinimumFare {
-						partialReasons = append(partialReasons, "A rail time restriction requires the applicable minimum fare.")
+						if minimumFareApplies != nil {
+							*minimumFareApplies = true
+						}
 						continue
 					}
 					return false, ""
@@ -2604,13 +2621,40 @@ func fareRiderCondition(rider ctdf.FareRiderCategory) string {
 	return "Passenger eligibility: " + label
 }
 
-func selectedFareRailcards(catalogue *fareCatalogue, selected map[string]bool) []ctdf.FareRiderCategory {
-	values := make([]ctdf.FareRiderCategory, 0)
-	for ref := range selected {
-		rider, exists := catalogue.riders[ref]
-		if exists && strings.EqualFold(rider.UserType, "railcard") {
-			values = append(values, rider)
+func selectedFareRailcards(catalogue *fareCatalogue, selected map[string]bool, requested []ctdf.FareCardSelection, travelDate time.Time) []ctdf.FareRiderCategory {
+	byStableID := make(map[string]ctdf.FareRiderCategory)
+	consider := func(rider ctdf.FareRiderCategory) {
+		if !fareRiderIsDiscountCard(rider) || (!travelDate.IsZero() && !fareDateWithinRange(travelDate, rider.EffectiveFrom, rider.EffectiveTo)) {
+			return
 		}
+		stableID := fareCardStableIdentifier(rider)
+		key := rider.DatasetID + "\x00" + stableID
+		previous, exists := byStableID[key]
+		if !exists || rider.EffectiveFrom.After(previous.EffectiveFrom) {
+			byStableID[key] = rider
+		}
+	}
+	for ref := range selected {
+		if rider, exists := catalogue.riders[ref]; exists {
+			consider(rider)
+		}
+	}
+	for _, selection := range requested {
+		if selection.DatasetID != catalogue.datasetID {
+			continue
+		}
+		for _, rider := range catalogue.riders {
+			if !fareRiderIsDiscountCard(rider) {
+				continue
+			}
+			if fareCardStableIdentifier(rider) == selection.SourceIdentifier {
+				consider(rider)
+			}
+		}
+	}
+	values := make([]ctdf.FareRiderCategory, 0, len(byStableID))
+	for _, rider := range byStableID {
+		values = append(values, rider)
 	}
 	sort.Slice(values, func(i, j int) bool {
 		if values[i].Name != values[j].Name {
@@ -2619,6 +2663,74 @@ func selectedFareRailcards(catalogue *fareCatalogue, selected map[string]bool) [
 		return values[i].PrimaryIdentifier < values[j].PrimaryIdentifier
 	})
 	return values
+}
+
+func fareRiderIsDiscountCard(rider ctdf.FareRiderCategory) bool {
+	return strings.EqualFold(rider.UserType, "railcard") || strings.EqualFold(rider.UserType, "discount_card") || rider.CardType != ""
+}
+
+func resolveFareRiderRefsForAge(catalogue *fareCatalogue, requested string, age *int) (map[string]bool, string, bool) {
+	if age == nil || strings.TrimSpace(requested) != "" {
+		return resolveFareRiderRefs(catalogue, requested)
+	}
+	selected := make(map[string]bool)
+	assumptions := make([]string, 0)
+	for ref, rider := range catalogue.riders {
+		if !rider.IsAgeOnlyCategory() || fareRiderIsDiscountCard(rider) || !fareRiderAgeMatches(rider, *age) {
+			continue
+		}
+		selected[ref] = true
+		assumptions = append(assumptions, rider.Name)
+	}
+	if len(selected) == 0 {
+		return selected, fmt.Sprintf("Passenger age: %d.", *age), true
+	}
+	return selected, fmt.Sprintf("Passenger age: %d; fare category: %s.", *age, strings.Join(uniqueFareNames(assumptions), ", ")), true
+}
+
+func fareRiderMatches(catalogue *fareCatalogue, ref string, selected map[string]bool, useRailAdultBaseline bool, cards []ctdf.FareRiderCategory) bool {
+	if ref == "" || selected[ref] {
+		return true
+	}
+	category := catalogue.riders[ref]
+	if !fareRiderIsAdult(ref, catalogue) || category.RequiresEligibilityProof() {
+		return false
+	}
+	// An age-based rail quote derives the passenger's price from the published
+	// adult product, even when the active version has no child status rule.
+	if useRailAdultBaseline && category.IsDefault && category.IsAgeOnlyCategory() {
+		return true
+	}
+	for _, card := range cards {
+		if selected[card.PrimaryIdentifier] {
+			return true
+		}
+	}
+	return false
+}
+
+func fareRiderAgeMatches(rider ctdf.FareRiderCategory, age int) bool {
+	if rider.MinimumAge != nil && age < *rider.MinimumAge {
+		return false
+	}
+	if rider.MaximumAge != nil && age > *rider.MaximumAge {
+		return false
+	}
+	if rider.MinimumAge != nil || rider.MaximumAge != nil {
+		return true
+	}
+	userType := strings.ToLower(strings.TrimSpace(rider.UserType))
+	name := strings.ToLower(strings.TrimSpace(rider.Name))
+	if userType == "adult" || name == "adult" {
+		return age >= 16
+	}
+	if userType == "child" || name == "child" {
+		return age >= 5 && age <= 15
+	}
+	if userType == "infant" || name == "infant" {
+		return age >= 0 && age < 5
+	}
+	return false
 }
 
 func fareRiderIsAdult(ref string, catalogue *fareCatalogue) bool {
@@ -2906,6 +3018,22 @@ func readFareCaps(ctx context.Context, filter bson.M) []ctdf.FareCap {
 	return values
 }
 
+func readFareRailStatusDiscounts(ctx context.Context, filter bson.M) []ctdf.FareRailStatusDiscount {
+	values := make([]ctdf.FareRailStatusDiscount, 0)
+	if err := readFareCollection(ctx, "fare_rail_status_discounts", filter, &values); err != nil {
+		return nil
+	}
+	return values
+}
+
+func readFareRailcardMinimumFares(ctx context.Context, filter bson.M) []ctdf.FareRailcardMinimumFare {
+	values := make([]ctdf.FareRailcardMinimumFare, 0)
+	if err := readFareCollection(ctx, "fare_railcard_minimum_fares", filter, &values); err != nil {
+		return nil
+	}
+	return values
+}
+
 func addFareRef(values map[string]bool, ref string) {
 	if ref != "" {
 		values[ref] = true
@@ -3009,7 +3137,7 @@ func loadFareLocationParents(ctx context.Context, versionFilter bson.M, location
 }
 
 func fareRiderFilter(base bson.M, refs []string, requested string) bson.M {
-	clauses := bson.A{bson.M{"isdefault": true}}
+	clauses := bson.A{bson.M{"isdefault": true}, bson.M{"usertype": "railcard"}, bson.M{"usertype": "discount_card"}}
 	if len(refs) > 0 {
 		clauses = append(clauses, bson.M{"primaryidentifier": bson.M{"$in": refs}})
 	}
@@ -3184,7 +3312,7 @@ func resolveFareRiderRefs(catalogue *fareCatalogue, requested string) (map[strin
 		return selected, "Passenger category: " + strings.Join(uniqueFareNames(assumptions), ", ") + " (selected).", true
 	}
 	for ref, rider := range catalogue.riders {
-		if rider.IsDefault {
+		if rider.IsDefault && !rider.RequiresEligibilityProof() {
 			selected[ref] = true
 			assumptions = append(assumptions, rider.Name)
 		}

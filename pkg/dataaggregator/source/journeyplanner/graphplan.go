@@ -255,7 +255,7 @@ func (s Source) JourneyPlanQuery(q query.JourneyPlan) (*ctdf.JourneyPlanResults,
 		return s.JourneyPlanQuery(retry)
 	}
 	if q.IncludeFares {
-		addFareQuotes(ctx, result.JourneyPlans, q.FareRider, q.FareMedia)
+		addFareQuotes(ctx, result.JourneyPlans, q.FareRider, q.FareMedia, q.FareAge, q.FareCards)
 	}
 	return result, nil
 }

@@ -884,7 +884,7 @@ func deleteFareVersionRecords(ctx context.Context, datasetID string, fareVersion
 	if len(fareVersionIDs) == 0 {
 		return nil
 	}
-	for _, collectionName := range []string{"fare_locations", "fare_tariffs", "fare_products", "fare_rider_categories", "fare_media", "fare_networks", "fare_route_networks", "fare_timeframes", "fare_offers", "fare_leg_rules", "fare_transfer_rules", "fare_effective_leg_joins", "fare_caps", "rsps5045_source_records"} {
+	for _, collectionName := range []string{"fare_locations", "fare_tariffs", "fare_products", "fare_rider_categories", "fare_rail_status_discounts", "fare_railcard_minimum_fares", "fare_media", "fare_networks", "fare_route_networks", "fare_timeframes", "fare_offers", "fare_leg_rules", "fare_transfer_rules", "fare_effective_leg_joins", "fare_caps", "rsps5045_source_records"} {
 		if _, err := database.GetCollection(collectionName).DeleteMany(ctx, bson.M{
 			"datasetid": datasetID, "fareversionid": bson.M{"$in": fareVersionIDs},
 		}); err != nil {
@@ -919,6 +919,12 @@ func validateFareVersion(datasetID, fareVersionID string) error {
 		{"fare_rider_categories", func() error {
 			return walkFareVersionRecords[ctdf.FareRiderCategory](ctx, "fare_rider_categories", filter, datasetID, fareVersionID, func(value ctdf.FareRiderCategory) error { return value.Validate() })
 		}},
+		{"fare_rail_status_discounts", func() error {
+			return walkFareVersionRecords[ctdf.FareRailStatusDiscount](ctx, "fare_rail_status_discounts", filter, datasetID, fareVersionID, func(value ctdf.FareRailStatusDiscount) error { return value.Validate() })
+		}},
+		{"fare_railcard_minimum_fares", func() error {
+			return walkFareVersionRecords[ctdf.FareRailcardMinimumFare](ctx, "fare_railcard_minimum_fares", filter, datasetID, fareVersionID, func(value ctdf.FareRailcardMinimumFare) error { return value.Validate() })
+		}},
 		{"fare_media", func() error {
 			return walkFareVersionRecords[ctdf.FareMedia](ctx, "fare_media", filter, datasetID, fareVersionID, validateFareMedia)
 		}},
@@ -935,6 +941,9 @@ func validateFareVersion(datasetID, fareVersionID string) error {
 			return walkFareVersionRecords[ctdf.FareOffer](ctx, "fare_offers", filter, datasetID, fareVersionID, func(value ctdf.FareOffer) error { return value.Validate() })
 		}},
 		{"fare_leg_rules", func() error {
+			if datasetID == "gb-nationalrail-fares" {
+				return validateRailFareLegRules(ctx, filter, datasetID, fareVersionID)
+			}
 			return walkFareVersionRecords[ctdf.FareLegRule](ctx, "fare_leg_rules", filter, datasetID, fareVersionID, func(value ctdf.FareLegRule) error { return value.Validate() })
 		}},
 		{"fare_transfer_rules", func() error {
@@ -993,6 +1002,9 @@ func validateFareVersion(datasetID, fareVersionID string) error {
 		{"fare_caps", "eligibleriderrefs", true, "fare_rider_categories", "primaryidentifier"},
 		{"fare_caps", "locationrefs", true, "fare_locations", "primaryidentifier"},
 	} {
+		if datasetID == "gb-nationalrail-fares" && ref.collection == "fare_leg_rules" && ref.field == "offerref" {
+			continue // Checked in batches while validating rail leg rules.
+		}
 		started := time.Now()
 		log.Info().
 			Str("dataset", datasetID).
@@ -1089,6 +1101,64 @@ func validateFareCap(value ctdf.FareCap) error {
 	return value.Price.ValidateNonNegative()
 }
 
+// validateRailFareLegRules checks offer identifiers in batches while walking
+// rules for record validation, avoiding a separate scan over all rail rules.
+func validateRailFareLegRules(ctx context.Context, filter bson.M, datasetID, fareVersionID string) error {
+	const batchSize = 2000
+	pending := make(map[string]string, batchSize)
+	flush := func() error {
+		if len(pending) == 0 {
+			return nil
+		}
+		refs := make([]string, 0, len(pending))
+		for ref := range pending {
+			refs = append(refs, ref)
+		}
+		matches, err := database.GetCollection("fare_offers").Find(ctx, bson.M{
+			"datasetid": filter["datasetid"], "fareversionid": filter["fareversionid"], "primaryidentifier": bson.M{"$in": refs},
+		}, options.Find().SetProjection(bson.M{"_id": 0, "primaryidentifier": 1}).SetBatchSize(batchSize))
+		if err != nil {
+			return fmt.Errorf("check rail offer references: %w", err)
+		}
+		for matches.Next(ctx) {
+			var match struct {
+				PrimaryIdentifier string `bson:"primaryidentifier"`
+			}
+			if err := matches.Decode(&match); err != nil {
+				matches.Close(ctx)
+				return fmt.Errorf("decode rail offer reference: %w", err)
+			}
+			delete(pending, match.PrimaryIdentifier)
+		}
+		err = matches.Err()
+		matches.Close(ctx)
+		if err != nil {
+			return fmt.Errorf("iterate rail offer references: %w", err)
+		}
+		for ref, source := range pending {
+			return fmt.Errorf("fare_leg_rules %q references missing fare record through offerref: %s", source, ref)
+		}
+		return nil
+	}
+	err := walkFareVersionRecords[ctdf.FareLegRule](ctx, "fare_leg_rules", filter, datasetID, fareVersionID, func(rule ctdf.FareLegRule) error {
+		if err := rule.Validate(); err != nil {
+			return err
+		}
+		if rule.OfferRef == "" {
+			return nil
+		}
+		pending[rule.OfferRef] = rule.PrimaryIdentifier
+		if len(pending) >= batchSize {
+			return flush()
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return flush()
+}
+
 func checkFareReference(ctx context.Context, collectionName string, filter bson.M, field string, array bool, targetCollection, targetKey string) error {
 	const foundField = "__fare_reference_matches"
 	pipeline := mongo.Pipeline{
@@ -1105,6 +1175,16 @@ func checkFareReference(ctx context.Context, collectionName string, filter bson.
 		pipeline = append(pipeline, bson.D{{Key: "$match", Value: bson.M{
 			field: bson.M{"$exists": true, "$nin": bson.A{"", nil}},
 		}}})
+	}
+	// Rail fares repeat a small set of products, riders and locations across
+	// millions of rules. Check each distinct reference once, retaining one
+	// source identifier so a dangling reference can still be diagnosed.
+	if filter["datasetid"] == "gb-nationalrail-fares" && !array &&
+		(field == "productref" || field == "riderref" || field == "originref" || field == "destinationref") {
+		pipeline = append(pipeline,
+			bson.D{{Key: "$group", Value: bson.M{"_id": "$" + field, "primaryidentifier": bson.M{"$first": "$primaryidentifier"}}}},
+			bson.D{{Key: "$set", Value: bson.M{field: "$_id"}}},
+		)
 	}
 	lookupPipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: bson.M{"datasetid": filter["datasetid"], "fareversionid": filter["fareversionid"]}}},
@@ -1148,7 +1228,11 @@ func checkFareReference(ctx context.Context, collectionName string, filter bson.
 		if err := cursor.Decode(&invalid); err != nil {
 			return fmt.Errorf("decode dangling %s.%s reference: %w", collectionName, field, err)
 		}
-		return fmt.Errorf("%s %q references missing fare record through %s: %v", collectionName, invalid["primaryidentifier"], field, invalid["__fare_missing_references"])
+		missing := invalid[field]
+		if array {
+			missing = invalid["__fare_missing_references"]
+		}
+		return fmt.Errorf("%s %q references missing fare record through %s: %v", collectionName, invalid["primaryidentifier"], field, missing)
 	}
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("iterate %s.%s references: %w", collectionName, field, err)

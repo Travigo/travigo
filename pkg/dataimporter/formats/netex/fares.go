@@ -264,6 +264,37 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 			riderRefs[scopedSourceID] = riderRef
 			report.ImportedFareRiderCategories++
 		}
+		for _, rightType := range []string{"SaleDiscountRight", "CappedDiscountRight", "UsageDiscountRight"} {
+			for _, discountRight := range findNodes(frame, rightType) {
+				cardDetails := fareDiscountRightDetails(discountRight)
+				if cardDetails.SourceID == "" {
+					continue
+				}
+				if cardDetails.Name == "" {
+					cardDetails.Name = cardDetails.SourceID
+				}
+				scopedSourceID := format.scopeSourceID(cardDetails.SourceID)
+				cardSourceID := netexDiscountRightSourcePrefix(rightType) + ":" + scopedSourceID
+				if riderRefs[cardSourceID] != "" {
+					continue
+				}
+				riderRef := netexID(dataset.Identifier, "rider", cardSourceID)
+				card := &ctdf.FareRiderCategory{
+					FareRecord:     baseRecord("rider", cardSourceID),
+					Name:           cardDetails.Name,
+					UserType:       "discount_card",
+					CardType:       cardDetails.ProductType,
+					ProofRequired:  cardDetails.ProofRequired,
+					EligibilityURL: cardDetails.EligibilityURL,
+				}
+				card.PrimaryIdentifier = riderRef
+				if err := upsertFareRecord("fare_rider_categories", riderRef, card); err != nil {
+					return report, err
+				}
+				riderRefs[cardSourceID] = riderRef
+				report.ImportedFareRiderCategories++
+			}
+		}
 	}
 
 	mediaRefs := map[string][]string{}
@@ -553,6 +584,38 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 		return report, fmt.Errorf("NeTEx fare frames contain no supported priced fare rules (products=%d, tables=%d, tablesWithSupportedProducts=%d, tablesWithoutPrices=%d, unmatchedTableTargets=%v)", len(products), tableCount, matchedProductTableCount, unpricedTableCount, unmatchedProductTables)
 	}
 	return report, nil
+}
+
+type netexSaleDiscountRightDetails struct {
+	SourceID       string
+	Name           string
+	ProductType    string
+	ProofRequired  string
+	EligibilityURL string
+}
+
+func fareDiscountRightDetails(node *xmlNode) netexSaleDiscountRightDetails {
+	productType := nodeAttr(node, "productType")
+	if productType == "" {
+		productType = node.Name.Local
+	} else {
+		productType = node.Name.Local + ": " + productType
+	}
+	return netexSaleDiscountRightDetails{
+		SourceID:       nodeAttr(node, "id"),
+		Name:           nodeText(node, "Name"),
+		ProductType:    productType,
+		ProofRequired:  strings.Join(nodeTexts(node, "ProofRequired"), ", "),
+		EligibilityURL: nodeText(node, "URL"),
+	}
+}
+
+func netexDiscountRightSourcePrefix(elementName string) string {
+	return map[string]string{
+		"SaleDiscountRight":   "sale-discount-right",
+		"CappedDiscountRight": "capped-discount-right",
+		"UsageDiscountRight":  "usage-discount-right",
+	}[elementName]
 }
 
 func fareTableTargetRefs(table *xmlNode) []string {

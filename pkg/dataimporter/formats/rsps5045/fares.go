@@ -72,11 +72,6 @@ type fareStage struct {
 	RestrictionCode string `bson:"restrictioncode,omitempty"`
 }
 
-type flowFare struct {
-	Flow flowStage `bson:"flow"`
-	Fare fareStage `bson:"fare"`
-}
-
 type ticketType struct {
 	Code          string
 	Name          string
@@ -120,10 +115,35 @@ type tocSpecificTicketRecord struct {
 }
 
 type railcardRecord struct {
-	Code          string
-	Name          string
-	EffectiveFrom time.Time
-	EffectiveTo   time.Time
+	Code              string
+	Name              string
+	HolderType        string
+	AdultStatusCode   string
+	ChildStatusCode   string
+	RestrictedByArea  bool
+	RestrictedByTrain bool
+	RestrictedByDate  bool
+	MinimumPassengers int
+	MinimumHolders    int
+	MinimumAdults     int
+	MinimumChildren   int
+	EffectiveFrom     time.Time
+	EffectiveTo       time.Time
+}
+
+type railStatusRecord struct {
+	Code                  string
+	Start                 time.Time
+	End                   time.Time
+	FirstSingleMaxFlat    int64
+	FirstReturnMaxFlat    int64
+	StandardSingleMaxFlat int64
+	StandardReturnMaxFlat int64
+	FirstLowerMinimum     int64
+	FirstHigherMinimum    int64
+	StandardLowerMinimum  int64
+	StandardHigherMinimum int64
+	ClassMarkers          string
 }
 
 type locationData struct {
@@ -607,6 +627,16 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 		return report, err
 	}
 	report.ImportedFareRiderCategories += railcardCount
+	statusDiscountCount, err := format.importRailStatusDiscounts(dataset, record)
+	if err != nil {
+		return report, err
+	}
+	log.Info().Str("dataset", dataset.Identifier).Int("discount_rules", statusDiscountCount).Msg("Imported RSPS5045 status discount rules")
+	railcardMinimumCount, err := format.importRailcardMinimumFares(dataset, record)
+	if err != nil {
+		return report, err
+	}
+	log.Info().Str("dataset", dataset.Identifier).Int("minimum_fares", railcardMinimumCount).Msg("Imported RSPS5045 railcard minimum fares")
 	railRestrictionCatalog, err := format.importRailRestrictions()
 	if err != nil {
 		return report, err
@@ -1036,47 +1066,85 @@ func (format *Fares) importRailcards(dataset datasets.DataSet, record fareRecord
 	railcards := make([]railcardRecord, 0)
 	count := 0
 	_, _, err := scanFile(files[0], files[0].Name, "RLC", nil, func(line []byte, _ int64) error {
-		if len(line) != 127 {
-			return fmt.Errorf("RLC record has length %d; expected 127", len(line))
+		parsed, parseErr := parseRailcardRecord(line)
+		if parseErr != nil {
+			return parseErr
 		}
-		code := strings.TrimSpace(string(line[0:3]))
-		if code == "" {
+		if parsed.Code == "" {
 			return nil // The blank code denotes the no-railcard status record.
 		}
-		name := strings.TrimSpace(string(line[28:48]))
-		if name == "" {
-			return fmt.Errorf("RLC railcard %s has no description", code)
-		}
-		end, err := dateField(line[3:11])
-		if err != nil {
-			return err
-		}
-		from, err := dateField(line[11:19])
-		if err != nil {
-			return err
-		}
-		if !from.IsZero() && !end.IsZero() && end.Before(from) {
-			return fmt.Errorf("RLC railcard %s ends before it starts", code)
-		}
-		sourceID := strings.Join([]string{code, dateKey(from), dateKey(end)}, "-")
+		sourceID := strings.Join([]string{parsed.Code, dateKey(parsed.EffectiveFrom), dateKey(parsed.EffectiveTo)}, "-")
 		ref := fmt.Sprintf("%s-rsps5045-rider-%s", dataset.Identifier, safeID(sourceID))
 		category := &ctdf.FareRiderCategory{
-			FareRecord:      setRecordPrimary(record("rider", sourceID, from, end), ref),
-			Name:            name,
-			UserType:        "railcard",
-			RailcardCode:    code,
-			AdultStatusCode: strings.TrimSpace(string(line[118:121])),
-			ChildStatusCode: strings.TrimSpace(string(line[121:124])),
-			ProofRequired:   "Valid " + name,
+			FareRecord:        setRecordPrimary(record("rider", sourceID, parsed.EffectiveFrom, parsed.EffectiveTo), ref),
+			Name:              parsed.Name,
+			UserType:          "railcard",
+			CardType:          "railcard",
+			HolderType:        parsed.HolderType,
+			RailcardCode:      parsed.Code,
+			AdultStatusCode:   parsed.AdultStatusCode,
+			ChildStatusCode:   parsed.ChildStatusCode,
+			RestrictedByArea:  parsed.RestrictedByArea,
+			RestrictedByTrain: parsed.RestrictedByTrain,
+			RestrictedByDate:  parsed.RestrictedByDate,
+			MinimumPassengers: parsed.MinimumPassengers,
+			MinimumHolders:    parsed.MinimumHolders,
+			MinimumAdults:     parsed.MinimumAdults,
+			MinimumChildren:   parsed.MinimumChildren,
+			ProofRequired:     "Valid " + parsed.Name,
 		}
 		if err := upsertFare("fare_rider_categories", ref, category); err != nil {
 			return err
 		}
-		railcards = append(railcards, railcardRecord{Code: code, Name: name, EffectiveFrom: from, EffectiveTo: end})
+		railcards = append(railcards, parsed)
 		count++
 		return nil
 	})
 	return railcards, count, err
+}
+
+func parseRailcardRecord(line []byte) (railcardRecord, error) {
+	if len(line) != 127 {
+		return railcardRecord{}, fmt.Errorf("RLC record has length %d; expected 127", len(line))
+	}
+	record := railcardRecord{Code: strings.TrimSpace(string(line[0:3]))}
+	if record.Code == "" {
+		return record, nil // The blank code denotes the no-railcard status record.
+	}
+	record.Name = strings.TrimSpace(string(line[28:48]))
+	if record.Name == "" {
+		return railcardRecord{}, fmt.Errorf("RLC railcard %s has no description", record.Code)
+	}
+	var err error
+	record.EffectiveTo, err = dateField(line[3:11])
+	if err != nil {
+		return railcardRecord{}, fmt.Errorf("RLC railcard %s end date: %w", record.Code, err)
+	}
+	record.EffectiveFrom, err = dateField(line[11:19])
+	if err != nil {
+		return railcardRecord{}, fmt.Errorf("RLC railcard %s start date: %w", record.Code, err)
+	}
+	if !record.EffectiveFrom.IsZero() && !record.EffectiveTo.IsZero() && record.EffectiveTo.Before(record.EffectiveFrom) {
+		return railcardRecord{}, fmt.Errorf("RLC railcard %s ends before it starts", record.Code)
+	}
+	minimums := []*int{&record.MinimumPassengers, &record.MinimumHolders, &record.MinimumAdults, &record.MinimumChildren}
+	for index, field := range []struct {
+		name string
+		data []byte
+	}{{"minimum passengers", line[59:62]}, {"minimum holders", line[65:68]}, {"minimum adults", line[77:80]}, {"minimum children", line[83:86]}} {
+		value, parseErr := parseRSPSInt(field.data, "RLC "+field.name)
+		if parseErr != nil {
+			return railcardRecord{}, fmt.Errorf("RLC railcard %s: %w", record.Code, parseErr)
+		}
+		*minimums[index] = value
+	}
+	record.HolderType = strings.TrimSpace(string(line[27:28]))
+	record.RestrictedByArea = line[49] == 'Y'
+	record.RestrictedByTrain = line[50] == 'Y'
+	record.RestrictedByDate = line[51] == 'Y'
+	record.AdultStatusCode = strings.TrimSpace(string(line[118:121]))
+	record.ChildStatusCode = strings.TrimSpace(string(line[121:124]))
+	return record, nil
 }
 
 func dateKey(value time.Time) string {
@@ -1701,7 +1769,8 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 	if _, err := fareCollection.DeleteMany(ctx, bson.M{"runid": runID}); err != nil {
 		return fmt.Errorf("clear RSPS5045 fare staging: %w", err)
 	}
-	var flowWrites, fareWrites []mongo.WriteModel
+	flowWrites := make([]mongo.WriteModel, 0, writeBatchSize)
+	fareWrites := make([]mongo.WriteModel, 0, writeBatchSize)
 	var flowCount, fareCount, rowCount int64
 	flush := func(collection *mongo.Collection, writes *[]mongo.WriteModel) error {
 		if len(*writes) == 0 {
@@ -1714,7 +1783,8 @@ func (format *Fares) stageFlowsAndFares(ctx context.Context, file *zip.File, dat
 			return err
 		}
 		_, err := collection.BulkWrite(ctx, *writes, options.BulkWrite().SetOrdered(false))
-		*writes = nil
+		clear(*writes)
+		*writes = (*writes)[:0]
 		return err
 	}
 	_, _, err := scanFile(file, file.Name, "FFL", map[byte]int{'F': 49, 'T': 22}, func(line []byte, _ int64) error {
@@ -1849,33 +1919,87 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 	}
 	started := time.Now()
 	log.Info().Str("dataset", dataset.Identifier).Int64("fare_rows", expectedFares).Msg("Converting staged RSPS5045 fares")
-	pipeline := mongo.Pipeline{
-		bson.D{{Key: "$match", Value: bson.M{"runid": runID}}},
-		bson.D{{Key: "$lookup", Value: bson.D{
-			{Key: "from", Value: flowStageCollection},
-			{Key: "let", Value: bson.D{{Key: "flowid", Value: "$flowid"}, {Key: "runid", Value: "$runid"}}},
-			{Key: "pipeline", Value: mongo.Pipeline{bson.D{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{bson.M{"$eq": bson.A{"$flowid", "$$flowid"}}, bson.M{"$eq": bson.A{"$runid", "$$runid"}}}}}}}}},
-			{Key: "as", Value: "flow"},
-		}}},
-		bson.D{{Key: "$unwind", Value: "$flow"}},
-		bson.D{{Key: "$project", Value: bson.M{"_id": 0, "flow": "$flow", "fare": "$$ROOT"}}},
-	}
-	cursor, err := fareCollection.Aggregate(ctx, pipeline, options.Aggregate().SetAllowDiskUse(true).SetBatchSize(writeBatchSize))
+	// Flows are shared by many fares. Load them once instead of making MongoDB
+	// perform an indexed lookup for every staged fare row.
+	const maxCachedFlows = 1_000_000
+	flowCollection := database.GetCollection(flowStageCollection)
+	flowCount, err := flowCollection.CountDocuments(ctx, bson.M{"runid": runID}, options.Count().SetLimit(maxCachedFlows+1))
 	if err != nil {
-		return fmt.Errorf("join staged RSPS5045 flows and fares: %w", err)
+		return fmt.Errorf("count staged RSPS5045 flows: %w", err)
+	}
+	useDatabaseJoin := flowCount > maxCachedFlows
+	var flows map[string]flowStage
+	if !useDatabaseJoin {
+		flows = make(map[string]flowStage, flowCount)
+		flowCursor, err := flowCollection.Find(ctx, bson.M{"runid": runID}, options.Find().SetBatchSize(writeBatchSize))
+		if err != nil {
+			return fmt.Errorf("read staged RSPS5045 flows: %w", err)
+		}
+		for flowCursor.Next(ctx) {
+			var flow flowStage
+			if err := flowCursor.Decode(&flow); err != nil {
+				flowCursor.Close(ctx)
+				return fmt.Errorf("decode staged RSPS5045 flow: %w", err)
+			}
+			flows[flow.FlowID] = flow
+		}
+		err = flowCursor.Err()
+		flowCursor.Close(ctx)
+		if err != nil {
+			return fmt.Errorf("iterate staged RSPS5045 flows: %w", err)
+		}
+	}
+	var cursor *mongo.Cursor
+	if useDatabaseJoin {
+		log.Info().Str("dataset", dataset.Identifier).Msg("Flow cache limit exceeded; joining staged fares in MongoDB")
+		pipeline := mongo.Pipeline{
+			bson.D{{Key: "$match", Value: bson.M{"runid": runID}}},
+			bson.D{{Key: "$lookup", Value: bson.D{
+				{Key: "from", Value: flowStageCollection},
+				{Key: "let", Value: bson.D{{Key: "flowid", Value: "$flowid"}, {Key: "runid", Value: "$runid"}}},
+				{Key: "pipeline", Value: mongo.Pipeline{bson.D{{Key: "$match", Value: bson.M{"$expr": bson.M{"$and": bson.A{bson.M{"$eq": bson.A{"$flowid", "$$flowid"}}, bson.M{"$eq": bson.A{"$runid", "$$runid"}}}}}}}}},
+				{Key: "as", Value: "flow"},
+			}}},
+			bson.D{{Key: "$unwind", Value: "$flow"}},
+			bson.D{{Key: "$project", Value: bson.M{"_id": 0, "flow": "$flow", "fare": "$$ROOT"}}},
+		}
+		cursor, err = fareCollection.Aggregate(ctx, pipeline, options.Aggregate().SetAllowDiskUse(true).SetBatchSize(writeBatchSize))
+	} else {
+		cursor, err = fareCollection.Find(ctx, bson.M{"runid": runID}, options.Find().SetBatchSize(writeBatchSize))
+	}
+	if err != nil {
+		return fmt.Errorf("read staged RSPS5045 fares: %w", err)
 	}
 	defer cursor.Close(ctx)
 	offerWriter := newFareBulkWriter(ctx, datasource, "fare_offers")
 	ruleWriter := newFareBulkWriter(ctx, datasource, "fare_leg_rules")
+	areaRefs := make(map[string]string)
 	var joined int64
 	lastProgress := started
 	for cursor.Next(ctx) {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		var row flowFare
-		if err := cursor.Decode(&row); err != nil {
-			return fmt.Errorf("decode joined RSPS5045 fare: %w", err)
+		var flow flowStage
+		var fare fareStage
+		if useDatabaseJoin {
+			var row struct {
+				Flow flowStage `bson:"flow"`
+				Fare fareStage `bson:"fare"`
+			}
+			if err := cursor.Decode(&row); err != nil {
+				return fmt.Errorf("decode joined RSPS5045 fare: %w", err)
+			}
+			flow, fare = row.Flow, row.Fare
+		} else {
+			if err := cursor.Decode(&fare); err != nil {
+				return fmt.Errorf("decode staged RSPS5045 fare: %w", err)
+			}
+			var found bool
+			flow, found = flows[fare.FlowID]
+			if !found {
+				continue
+			}
 		}
 		joined++
 		if rspsProgressDue(joined, lastProgress) {
@@ -1889,7 +2013,6 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 				Msg("RSPS5045 fare conversion progress")
 			lastProgress = time.Now()
 		}
-		flow, fare := row.Flow, row.Fare
 		if flow.StatusCode != "000" {
 			continue
 		}
@@ -1915,19 +2038,25 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 		for _, segment := range railSegments {
 			originRef := segment.OriginRef
 			if originRef == "" {
-				originRef, err = ensureAreaLocation(dataset, datasource, record, flow.Origin)
+				_, alreadyStored := areaRefs[flow.Origin]
+				originRef, err = cachedAreaLocation(areaRefs, dataset, datasource, record, flow.Origin)
 				if err != nil {
 					return err
 				}
-				report.ImportedFareLocations++
+				if !alreadyStored {
+					report.ImportedFareLocations++
+				}
 			}
 			destinationRef := segment.DestinationRef
 			if destinationRef == "" {
-				destinationRef, err = ensureAreaLocation(dataset, datasource, record, flow.Destination)
+				_, alreadyStored := areaRefs[flow.Destination]
+				destinationRef, err = cachedAreaLocation(areaRefs, dataset, datasource, record, flow.Destination)
 				if err != nil {
 					return err
 				}
-				report.ImportedFareLocations++
+				if !alreadyStored {
+					report.ImportedFareLocations++
+				}
 			}
 			product := segment.Product
 			segmentSource := dateKey(segment.Start) + "-" + dateKey(segment.End)
@@ -1957,7 +2086,7 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 				conditions = append(conditions, "London routing condition: "+flow.ViaLondon)
 				constraints = append(constraints, "London routing condition "+flow.ViaLondon)
 			}
-			if flow.DiscountFlag != "" && flow.DiscountFlag != "0" {
+			if isNonStandardDiscountFlag(flow.DiscountFlag) {
 				conditions = append(conditions, "Non-standard discount conditions apply")
 			}
 			if flow.UsageCode == "G" {
@@ -1980,7 +2109,7 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 				FareSettingTOC:       flow.FareTOC,
 				CrossLondonIndicator: flow.ViaLondon,
 				UsageCode:            flow.UsageCode,
-				NonStandardDiscount:  flow.DiscountFlag != "" && flow.DiscountFlag != "0",
+				NonStandardDiscount:  isNonStandardDiscountFlag(flow.DiscountFlag),
 				Restrictions:         railRestrictions[fare.RestrictionCode],
 				TicketCalendars:      product.RailTicket.Calendars,
 				AdvancePurchase:      matchingAdvancePurchase(advancePurchase[fare.TicketCode], fare.RestrictionCode),
@@ -2034,6 +2163,17 @@ func (format *Fares) writeFlowFares(dataset datasets.DataSet, datasource *ctdf.D
 		Dur("elapsed", time.Since(started)).
 		Msg("Converted staged RSPS5045 fares")
 	return nil
+}
+
+func cachedAreaLocation(cache map[string]string, dataset datasets.DataSet, datasource *ctdf.DataSourceReference, record fareRecordFactory, nlc string) (string, error) {
+	if ref, ok := cache[nlc]; ok {
+		return ref, nil
+	}
+	ref, err := ensureAreaLocation(dataset, datasource, record, nlc)
+	if err == nil {
+		cache[nlc] = ref
+	}
+	return ref, err
 }
 
 func ensureAreaLocation(dataset datasets.DataSet, datasource *ctdf.DataSourceReference, record fareRecordFactory, nlc string) (string, error) {

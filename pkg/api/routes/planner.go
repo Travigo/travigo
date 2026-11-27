@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -82,6 +83,23 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		c.SendStatus(fiber.StatusBadRequest)
 		return c.JSON(fiber.Map{"error": "Parameter include_fares should be a boolean"})
 	}
+	var fareAge *int
+	if ageValue := strings.TrimSpace(c.Query("fare_age")); ageValue != "" {
+		age, parseErr := strconv.Atoi(ageValue)
+		if parseErr != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Parameter fare_age should be an integer between 0 and 120"})
+		}
+		fareAge = &age
+	}
+	var fareCards []ctdf.FareCardSelection
+	if cardsValue := strings.TrimSpace(c.Query("fare_cards")); cardsValue != "" {
+		if err := json.Unmarshal([]byte(cardsValue), &fareCards); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Parameter fare_cards should be a JSON array of card selections"})
+		}
+	}
+	if err := (ctdf.UserFareProfile{Age: fareAge, DiscountCards: fareCards}).Validate(); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
 
 	startDateTimeString := c.Query("datetime")
 
@@ -160,6 +178,8 @@ func getPlanBetweenStops(c *fiber.Ctx) error {
 		IncludeFares:              includeFares,
 		FareRider:                 strings.TrimSpace(c.Query("fare_rider")),
 		FareMedia:                 strings.TrimSpace(c.Query("fare_media")),
+		FareAge:                   fareAge,
+		FareCards:                 fareCards,
 		StartDateTime:             startDateTime,
 		MaxChanges:                maxChanges,
 		MaxTransferDistanceMetres: maxTransferDistanceMetres,

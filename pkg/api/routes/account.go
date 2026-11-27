@@ -18,6 +18,9 @@ func AccountRouter(router fiber.Router) {
 	router.Post("/notificationtoken", postNotificationToken)
 	router.Delete("/notificationtoken", deleteNotificationToken)
 	router.Delete("/notificationtoken/:token", deleteNotificationToken)
+	router.Get("/fareprofile", getUserFareProfile)
+	router.Put("/fareprofile", putUserFareProfile)
+	router.Get("/farecards", listFareCardOptions)
 }
 
 func listNotificationTokens(c *fiber.Ctx) error {

@@ -61,6 +61,35 @@ func TestFareTablePricesBODSPointToPointTable(t *testing.T) {
 	}
 }
 
+func TestDiscountRightDetailsPreserveNeTExTypes(t *testing.T) {
+	format := &Fares{}
+	input := `<FareFrame>
+		<SaleDiscountRight id="railcard-1" productType="travelCard"><Name>Network Railcard</Name><ProofRequired>Valid railcard</ProofRequired><URL>https://example.test/card</URL></SaleDiscountRight>
+		<CappedDiscountRight id="oyster"><Name>Oyster</Name></CappedDiscountRight>
+		<UsageDiscountRight id="mileage" productType="usageRebate"><Name>Mileage rebate</Name></UsageDiscountRight>
+	</FareFrame>`
+	if err := format.ParseFile(strings.NewReader(input)); err != nil {
+		t.Fatalf("ParseFile() error = %v", err)
+	}
+	details := fareDiscountRightDetails(findNodes(format.root, "SaleDiscountRight")[0])
+	if details.SourceID != "railcard-1" || details.Name != "Network Railcard" || details.ProductType != "SaleDiscountRight: travelCard" {
+		t.Fatalf("sale discount right details = %#v", details)
+	}
+	if details.ProofRequired != "Valid railcard" || details.EligibilityURL != "https://example.test/card" {
+		t.Fatalf("eligibility details = %#v", details)
+	}
+	capped := fareDiscountRightDetails(findNodes(format.root, "CappedDiscountRight")[0])
+	usage := fareDiscountRightDetails(findNodes(format.root, "UsageDiscountRight")[0])
+	if capped.ProductType != "CappedDiscountRight" || usage.ProductType != "UsageDiscountRight: usageRebate" {
+		t.Fatalf("other discount right types = %q, %q", capped.ProductType, usage.ProductType)
+	}
+	if netexDiscountRightSourcePrefix("SaleDiscountRight") != "sale-discount-right" ||
+		netexDiscountRightSourcePrefix("CappedDiscountRight") != "capped-discount-right" ||
+		netexDiscountRightSourcePrefix("UsageDiscountRight") != "usage-discount-right" {
+		t.Fatal("discount right source prefixes are not stable")
+	}
+}
+
 func TestFareTablePricesFlatPrices(t *testing.T) {
 	format := &Fares{}
 	input := `<FareFrame><FareTable id="flat-table"><pricesFor>
