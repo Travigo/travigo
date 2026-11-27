@@ -269,6 +269,7 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	mediaRefs := map[string][]string{}
 	packageNames := map[string]string{}
 	packageConditions := map[string][]string{}
+	salesPackageProducts := map[string][]string{}
 	for _, frame := range frames {
 		for _, salesPackage := range findNodes(frame, "SalesOfferPackage") {
 			packageID := nodeAttr(salesPackage, "id")
@@ -277,6 +278,7 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 			}
 			scopedPackageID := format.scopeSourceID(packageID)
 			packageNames[scopedPackageID] = nodeText(salesPackage, "Name")
+			salesPackageProducts[scopedPackageID] = salesOfferProductRefs(salesPackage)
 			for _, assignment := range findNodes(salesPackage, "DistributionAssignment") {
 				for _, payment := range nodeTexts(assignment, "PaymentMethods") {
 					packageConditions[scopedPackageID] = append(packageConditions[scopedPackageID], "Payment method: "+payment)
@@ -377,19 +379,12 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	priceGroups := map[string][]string{}
 	matrix := map[string]netexDistanceMatrixElement{}
 	for _, frame := range frames {
-		currency := frameCurrency(frame)
-		for _, priceType := range []string{"FarePrice", "GeographicalIntervalPrice"} {
-			for _, price := range findNodes(frame, priceType) {
-				id, amount := nodeAttr(price, "id"), nodeText(price, "Amount")
-				if id == "" || amount == "" {
-					continue
-				}
-				money, err := moneyFromDecimal(amount, currency)
-				if err != nil {
-					return report, fmt.Errorf("NeTEx price %s: %w", id, err)
-				}
-				amounts[format.scopeSourceID(id)] = money
-			}
+		frameAmounts, err := fareFrameAmounts(frame, format.scopeSourceID)
+		if err != nil {
+			return report, err
+		}
+		for id, amount := range frameAmounts {
+			amounts[id] = amount
 		}
 		for _, group := range findNodes(frame, "PriceGroup") {
 			groupID := nodeAttr(group, "id")
@@ -418,17 +413,29 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 	// repeat the same price in multiple cells; the compound id makes reimports
 	// and repeated modular frames idempotent.
 	seenRules := map[string]bool{}
+	tableCount := 0
+	matchedProductTableCount := 0
+	unpricedTableCount := 0
+	unmatchedProductTables := make([]string, 0)
 	for _, frame := range frames {
-		for _, table := range findNodes(frame, "FareTable") {
+		for _, table := range findFareTables(frame) {
+			tableCount++
 			tableSourceID := format.scopeSourceID(nodeAttr(table, "id"))
-			productSourceID := nodeAttr(firstRef(table, "PreassignedFareProductRef"), "ref")
-			if productSourceID == "" {
-				productSourceID = nodeAttr(firstRef(table, "AmountOfPriceUnitProductRef"), "ref")
+			salesPackageID := nodeAttr(firstRef(table, "SalesOfferPackageRef"), "ref")
+			productSourceID, err := fareTableProductSourceID(table, salesPackageProducts[format.scopeSourceID(salesPackageID)])
+			if err != nil {
+				return report, fmt.Errorf("NeTEx fare table %q: %w", nodeAttr(table, "id"), err)
 			}
 			product := products[format.scopeSourceID(productSourceID)]
 			if product == nil {
+				targets := fareTableTargetRefs(table)
+				if len(targets) == 0 {
+					targets = []string{"none"}
+				}
+				unmatchedProductTables = append(unmatchedProductTables, nodeAttr(table, "id")+"["+strings.Join(targets, ",")+"]")
 				continue
 			}
+			matchedProductTableCount++
 			tariffSourceID := nodeAttr(firstRef(table, "TariffRef"), "ref")
 			var tariff *ctdf.FareTariff
 			var tariffNode *xmlNode
@@ -439,7 +446,6 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 			if tariffSourceID != "" && (tariff == nil || tariffNode == nil) {
 				return report, fmt.Errorf("NeTEx fare table references unknown tariff %q", tariffSourceID)
 			}
-			salesPackageID := nodeAttr(firstRef(table, "SalesOfferPackageRef"), "ref")
 			userProfileIDs := nodeRefValues(table, "UserProfileRef")
 			tableRiderRefs := make([]string, 0, len(userProfileIDs))
 			for _, userProfileID := range userProfileIDs {
@@ -455,6 +461,9 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 			prices, err := fareTablePrices(table, matrix, priceGroups, locations, format.scopeSourceID)
 			if err != nil {
 				return report, err
+			}
+			if len(prices) == 0 {
+				unpricedTableCount++
 			}
 			routeRefs := tariffRouteRefs(table, lineGroups, lineRouteRefs)
 			if len(routeRefs) == 0 {
@@ -538,9 +547,83 @@ func (format *Fares) Import(dataset datasets.DataSet, datasource *ctdf.DataSourc
 		}
 	}
 	if report.ImportedFareRules == 0 {
-		return report, fmt.Errorf("NeTEx fare frames contain no supported priced fare rules")
+		if len(unmatchedProductTables) > 5 {
+			unmatchedProductTables = append(unmatchedProductTables[:5], "...")
+		}
+		return report, fmt.Errorf("NeTEx fare frames contain no supported priced fare rules (products=%d, tables=%d, tablesWithSupportedProducts=%d, tablesWithoutPrices=%d, unmatchedTableTargets=%v)", len(products), tableCount, matchedProductTableCount, unpricedTableCount, unmatchedProductTables)
 	}
 	return report, nil
+}
+
+func fareTableTargetRefs(table *xmlNode) []string {
+	targets := make([]string, 0)
+	for _, name := range []string{"PreassignedFareProductRef", "AmountOfPriceUnitProductRef", "CappedDiscountRightRef"} {
+		for _, ref := range findNodes(table, name) {
+			if id := nodeAttr(ref, "ref"); id != "" {
+				targets = append(targets, name+"="+id)
+			}
+		}
+	}
+	return uniqueStrings(targets)
+}
+
+func fareTableProductSourceID(table *xmlNode, salesPackageProducts []string) (string, error) {
+	productID := nodeAttr(firstRef(table, "PreassignedFareProductRef"), "ref")
+	if productID == "" {
+		productID = nodeAttr(firstRef(table, "AmountOfPriceUnitProductRef"), "ref")
+	}
+	if productID != "" {
+		return productID, nil
+	}
+	salesPackageProducts = uniqueStrings(salesPackageProducts)
+	switch len(salesPackageProducts) {
+	case 0:
+		return "", nil
+	case 1:
+		return salesPackageProducts[0], nil
+	default:
+		return "", fmt.Errorf("prices for a sales offer package containing multiple fare products are ambiguous")
+	}
+}
+
+func salesOfferProductRefs(salesPackage *xmlNode) []string {
+	productIDs := append(nodeRefValues(salesPackage, "PreassignedFareProductRef"), nodeRefValues(salesPackage, "AmountOfPriceUnitProductRef")...)
+	return uniqueStrings(productIDs)
+}
+
+func fareFrameAmounts(frame *xmlNode, scopeSourceID func(string) string) (map[string]ctdf.FareMoney, error) {
+	amounts := make(map[string]ctdf.FareMoney)
+	currency := frameCurrency(frame)
+	for _, priceType := range []string{"FarePrice", "GeographicalIntervalPrice", "DistanceMatrixElementPrice"} {
+		for _, price := range findNodes(frame, priceType) {
+			id, amount := nodeAttr(price, "id"), nodeText(price, "Amount")
+			if id == "" || amount == "" {
+				continue
+			}
+			money, err := moneyFromDecimal(amount, currency)
+			if err != nil {
+				return nil, fmt.Errorf("NeTEx price %s: %w", id, err)
+			}
+			amounts[scopeSourceID(id)] = money
+		}
+	}
+	return amounts, nil
+}
+
+func findFareTables(root *xmlNode) []*xmlNode {
+	tables := make([]*xmlNode, 0)
+	var visit func(*xmlNode)
+	visit = func(node *xmlNode) {
+		if node.Name.Local == "FareTable" {
+			tables = append(tables, node)
+			return
+		}
+		for _, child := range node.Children {
+			visit(child)
+		}
+	}
+	visit(root)
+	return tables
 }
 
 func fareTablePrices(table *xmlNode, matrix map[string]netexDistanceMatrixElement, priceGroups map[string][]string, locations map[string]string, scopeSourceID func(string) string) ([]netexFareTablePrice, error) {
@@ -610,6 +693,14 @@ func farePriceIDs(root *xmlNode) []string {
 			if id := nodeAttr(price, "id"); id != "" {
 				ids = append(ids, id)
 			}
+		}
+	}
+	for _, price := range findNodes(root, "DistanceMatrixElementPrice") {
+		if nodeText(price, "Amount") == "" {
+			continue
+		}
+		if id := nodeAttr(price, "id"); id != "" {
+			ids = append(ids, id)
 		}
 	}
 	return uniqueStrings(ids)

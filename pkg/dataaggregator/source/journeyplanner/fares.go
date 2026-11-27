@@ -1243,7 +1243,7 @@ func fareAccumulationKey(value fareAccumulation) string {
 		}
 		policy = fmt.Sprintf("%s|%t|%s", maxTransfers, value.legacyTransferPolicy.transfersUnlimited, transferDuration)
 	}
-	return fmt.Sprintf("%d|%s|%d|%q|%q|%q|%q|%q|%q|%q|%d|%d|%q|%q|%s",
+	return fmt.Sprintf("%d|%s|%d|%q|%q|%q|%q|%q|%q|%q|%d|%d|%d|%q|%q|%s",
 		value.price.AmountMinor, value.price.Currency, value.price.Exponent,
 		value.productRefs, value.names, value.conditions, value.purchaseURL, value.lastGroup,
 		value.transferRunFromGroup, value.transferRunToGroup, value.transferRunCount,
