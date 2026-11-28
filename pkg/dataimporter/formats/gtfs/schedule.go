@@ -776,6 +776,10 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		if agency == nil && len(g.Agencies) > 0 {
 			agency = &g.Agencies[0]
 		}
+		departureTimezone := ""
+		if agency != nil {
+			departureTimezone = agency.Timezone
+		}
 
 		// Put it all together again
 		journey := &ctdf.Journey{
@@ -796,7 +800,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			WheelchairAccessible: t.WheelchairAccessible,
 			BikesAllowed:         t.BikesAllowed,
 			DestinationDisplay:   g.GetTranslation("trips", "trip_headsign", "en", t.Headsign),
-			DepartureTimezone:    agency.Timezone,
+			DepartureTimezone:    departureTimezone,
 			Availability:         availability,
 		}
 
