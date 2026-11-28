@@ -201,6 +201,7 @@ type gtfsArea struct {
 
 type fareImportSummary struct {
 	Present       bool
+	ImportFailed  bool
 	Locations     int
 	Products      int
 	Offers        int
@@ -316,6 +317,15 @@ func (g *Schedule) importFareData(dataset datasets.DataSet, datasource *ctdf.Dat
 		return g.importGTFSFaresV2(dataset, datasource, summary)
 	}
 	return g.importGTFSFaresV1(dataset, datasource, summary, hasV1Attributes, hasV1Rules)
+}
+
+func (g *Schedule) importFareDataBestEffort(dataset datasets.DataSet, datasource *ctdf.DataSourceReference) fareImportSummary {
+	summary, err := g.importFareData(dataset, datasource)
+	if err != nil {
+		log.Error().Err(err).Str("dataset", dataset.Identifier).Msg("GTFS fare import failed; continuing timetable import without fares")
+		return fareImportSummary{ImportFailed: true}
+	}
+	return summary
 }
 
 func (g *Schedule) fareRecord(dataset datasets.DataSet, datasource *ctdf.DataSourceReference, identifier, sourceID string) ctdf.FareRecord {

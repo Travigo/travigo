@@ -11,14 +11,16 @@ type DataImportReport struct {
 	CreationDateTime time.Time     `groups:"web-import-report"`
 	RunTime          time.Duration `groups:"web-import-report"`
 
-	ImportedStops                  int `groups:"web-import-report"`
-	ImportedStopGroups             int `groups:"web-import-report"`
-	ImportedServices               int `groups:"web-import-report"`
-	ImportedJourneys               int `groups:"web-import-report"`
-	ImportedJourneyTracks          int
-	ImportedOperators              int      `groups:"web-import-report"`
-	ImportedOperationGroups        int      `groups:"web-import-report"`
-	FareDataPresent                bool     `groups:"web-import-report"`
+	ImportedStops           int `groups:"web-import-report"`
+	ImportedStopGroups      int `groups:"web-import-report"`
+	ImportedServices        int `groups:"web-import-report"`
+	ImportedJourneys        int `groups:"web-import-report"`
+	ImportedJourneyTracks   int
+	ImportedOperators       int  `groups:"web-import-report"`
+	ImportedOperationGroups int  `groups:"web-import-report"`
+	FareDataPresent         bool `groups:"web-import-report"`
+	// FareDataImportFailed discards a bad candidate while retaining its active fare version.
+	FareDataImportFailed           bool     `groups:"internal" bson:"-" json:"-"`
 	ImportedFareLocations          int      `groups:"web-import-report"`
 	FareLocationsLinkedToStops     int      `groups:"web-import-report"`
 	FareLocationsWithoutStopLink   int      `groups:"web-import-report"`

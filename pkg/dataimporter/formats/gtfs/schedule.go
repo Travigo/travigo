@@ -1081,10 +1081,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 
 	fareReport := fareImportSummary{}
 	if dataset.SupportedObjects.Fares {
-		fareReport, err = g.importFareData(dataset, datasource)
-		if err != nil {
-			return datasets.DataImportReport{}, err
-		}
+		fareReport = g.importFareDataBestEffort(dataset, datasource)
 	}
 
 	return datasets.DataImportReport{
@@ -1093,6 +1090,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 		ImportedServices:            len(g.ctdfServices),
 		ImportedJourneys:            importedJourneys,
 		FareDataPresent:             fareReport.Present,
+		FareDataImportFailed:        fareReport.ImportFailed,
 		ImportedFareLocations:       fareReport.Locations,
 		ImportedFareProducts:        fareReport.Products,
 		ImportedFareOffers:          fareReport.Offers,

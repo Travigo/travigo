@@ -133,6 +133,16 @@ func TestFilterImportReportOnlyIncludesSupportedObjects(t *testing.T) {
 	}
 }
 
+func TestFilterImportReportPreservesFareFailureOnlyWhenSupported(t *testing.T) {
+	failedReport := datasets.DataImportReport{FareDataImportFailed: true}
+	if report := filterImportReport(failedReport, datasets.SupportedObjects{Fares: true}); !report.FareDataImportFailed {
+		t.Fatal("supported fare import failure was cleared from the report")
+	}
+	if report := filterImportReport(failedReport, datasets.SupportedObjects{}); report.FareDataImportFailed {
+		t.Fatal("unsupported fare import failure was retained in the report")
+	}
+}
+
 func TestTfLRouteTracksIsARegisteredBatchDataset(t *testing.T) {
 	workingDirectory, err := os.Getwd()
 	if err != nil {

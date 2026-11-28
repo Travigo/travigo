@@ -496,6 +496,7 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			importReport.ImportedOperators += report.ImportedOperators
 			importReport.ImportedOperationGroups += report.ImportedOperationGroups
 			importReport.FareDataPresent = importReport.FareDataPresent || report.FareDataPresent
+			importReport.FareDataImportFailed = importReport.FareDataImportFailed || report.FareDataImportFailed
 			importReport.ImportedFareLocations += report.ImportedFareLocations
 			importReport.FareLocationsLinkedToStops += report.FareLocationsLinkedToStops
 			importReport.FareLocationsWithoutStopLink += report.FareLocationsWithoutStopLink
@@ -512,7 +513,11 @@ func importDataset(dataset *datasets.DataSet, forceImport bool, skipCleanup bool
 			importReport.ImportedFareTransferRules += report.ImportedFareTransferRules
 			importReport.MergeFareValidityGaps(report)
 		}
-		if dataset.Format == datasets.DataSetFormatGTFSSchedule && dataset.SupportedObjects.Fares && !importReport.FareDataPresent {
+		if dataset.Format == datasets.DataSetFormatGTFSSchedule && dataset.SupportedObjects.Fares && importReport.FareDataImportFailed {
+			if err := discardStagingFareVersion(fareLease, datasource.FareVersionID); err != nil {
+				return err
+			}
+		} else if dataset.Format == datasets.DataSetFormatGTFSSchedule && dataset.SupportedObjects.Fares && !importReport.FareDataPresent {
 			if err := retireFareVersionForImport(dataset, fareLease); err != nil {
 				return err
 			}
@@ -1315,6 +1320,7 @@ func filterImportReport(report datasets.DataImportReport, supported datasets.Sup
 	}
 	if !supported.Fares {
 		report.FareDataPresent = false
+		report.FareDataImportFailed = false
 		report.ImportedFareLocations = 0
 		report.FareLocationsLinkedToStops = 0
 		report.FareLocationsWithoutStopLink = 0
