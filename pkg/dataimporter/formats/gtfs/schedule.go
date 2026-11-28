@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/travigo/go-csv"
 	"github.com/travigo/travigo/pkg/ctdf"
 	"github.com/travigo/travigo/pkg/database"
 	"github.com/travigo/travigo/pkg/dataimporter/datasets"
@@ -279,6 +278,14 @@ func (gtfs *Schedule) ParseFile(reader io.Reader) error {
 }
 
 func importObject[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
+	return importObjectWithFileCleanup(g, fileName, tableName, toProcess, parser, true)
+}
+
+func importObjectKeepingFile[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string)) error {
+	return importObjectWithFileCleanup(g, fileName, tableName, toProcess, parser, false)
+}
+
+func importObjectWithFileCleanup[T interface{}](g *Schedule, fileName string, tableName string, toProcess bool, parser func(T) (any, string), removeFile bool) error {
 	log.Info().Str("table", tableName).Msg("Processing Table")
 	processingQueue := NewDatabaseBatchProcessingQueue(tableName, 3000)
 	queueFinished := false
@@ -291,7 +298,10 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 		}()
 	}
 
-	file, _ := os.Open(g.fileMap[fileName])
+	file, err := os.Open(g.fileMap[fileName])
+	if err != nil {
+		return fmt.Errorf("open GTFS %s: %w", fileName, err)
+	}
 	defer file.Close()
 
 	// Check for UTF-8 BOM that messes up headers
@@ -304,27 +314,17 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 		_, _ = reader.Discard(3)
 	}
 
-	decoder := csv.NewDecoder(reader)
-
-	line, err := decoder.ReadLine()
+	decoder, err := newGTFSCSVDecoder[T](reader)
 	if err != nil {
-		return err
-	}
-	if err = decodeGTFSHeader(decoder, line); err != nil {
 		return err
 	}
 
 	for {
-		line, err = decoder.ReadLine()
-		if err != nil {
-			return err
-		}
-		if line == "" {
+		v, err := decoder.Read()
+		if err == io.EOF {
 			break
 		}
-
-		var v T
-		if err = decoder.DecodeRecord(&v, line); err != nil {
+		if err != nil {
 			return err
 		}
 		parsedObject, parsedObjectIdentifier := parser(v)
@@ -361,7 +361,9 @@ func importObject[T interface{}](g *Schedule, fileName string, tableName string,
 
 	log.Info().Str("table", tableName).Msg("Finished Table")
 
-	os.Remove(g.fileMap[fileName])
+	if removeFile {
+		os.Remove(g.fileMap[fileName])
+	}
 
 	return nil
 }
@@ -489,7 +491,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	//// Stops ////
 	// Read the hierarchy first: GTFS does not require parents to precede children.
 	stopTimezones := map[string]Stop{}
-	if err := importObject[Stop](g, "stops.txt", "stop timezones", false, func(s Stop) (any, string) {
+	if err := importObjectKeepingFile[Stop](g, "stops.txt", "stop timezones", false, func(s Stop) (any, string) {
 		stopTimezones[s.ID] = Stop{Parent: s.Parent, Timezone: s.Timezone}
 		return nil, ""
 	}); err != nil {
@@ -503,7 +505,7 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 	g.stopNames = map[string]string{}
 	g.stopChildren = map[string][]string{}
 	g.fareStopRefs = map[string][]string{}
-	importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
+	if err := importObject[Stop](g, "stops.txt", "stops_raw", dataset.SupportedObjects.Stops, func(s Stop) (any, string) {
 		timezone := gtfsStopTimezone(s, stopTimezones, agencyTimezone)
 
 		stopID := fmt.Sprintf("%s-stop-%s", dataset.Identifier, s.ID)
@@ -548,7 +550,9 @@ func (g *Schedule) Import(dataset datasets.DataSet, datasource *ctdf.DataSourceR
 			ctdfStop.Associations = append(ctdfStop.Associations, &ctdf.Association{Type: "stop_group", AssociatedIdentifier: fmt.Sprintf("%s-stopgroup-%s", dataset.Identifier, s.Parent)})
 		}
 		return ctdfStop, stopID
-	})
+	}); err != nil {
+		return datasets.DataImportReport{}, fmt.Errorf("import GTFS stops: %w", err)
+	}
 
 	//// Calendars ////
 	g.calendarMapping = map[string]*Calendar{}

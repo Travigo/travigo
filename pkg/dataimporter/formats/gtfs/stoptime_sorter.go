@@ -11,7 +11,6 @@ import (
 	"strconv"
 
 	"github.com/rs/zerolog/log"
-	gtfscsv "github.com/travigo/go-csv"
 )
 
 const stopTimeSortChunkSize = 25000
@@ -129,13 +128,8 @@ func writeSortedStopTimeChunks(sourcePath string) ([]string, error) {
 		_, _ = reader.Discard(3)
 	}
 
-	decoder := gtfscsv.NewDecoder(reader)
-
-	line, err := decoder.ReadLine()
+	decoder, err := newGTFSCSVDecoder[StopTime](reader)
 	if err != nil {
-		return nil, err
-	}
-	if err = decodeGTFSHeader(decoder, line); err != nil {
 		return nil, err
 	}
 
@@ -143,16 +137,11 @@ func writeSortedStopTimeChunks(sourcePath string) ([]string, error) {
 	var chunkFiles []string
 
 	for {
-		line, err = decoder.ReadLine()
-		if err != nil {
-			return chunkFiles, err
-		}
-		if line == "" {
+		stopTime, err := decoder.Read()
+		if err == io.EOF {
 			break
 		}
-
-		var stopTime StopTime
-		if err = decoder.DecodeRecord(&stopTime, line); err != nil {
+		if err != nil {
 			return chunkFiles, err
 		}
 

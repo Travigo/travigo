@@ -28,7 +28,6 @@ require (
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.12.1
-	github.com/travigo/go-csv v1.0.2
 	github.com/urfave/cli/v2 v2.27.7 // direct
 	go.mongodb.org/mongo-driver v1.17.10
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e
